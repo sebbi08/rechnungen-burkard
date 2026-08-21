@@ -5,4 +5,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Burkard.Invoicing.Api</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Invoicing.Domain/Invoicing.Domain.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>
