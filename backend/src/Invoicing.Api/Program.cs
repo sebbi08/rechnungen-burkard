@@ -1,8 +1,12 @@
+using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
+using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddOData(o =>
+    o.Select().Filter().OrderBy().Count().SetMaxTop(200)
+     .AddRouteComponents("odata", EdmModelBuilder.Build()));
 
 var connectionString = builder.Configuration.GetConnectionString("Invoicing")
     ?? "Data Source=invoicing.db";
