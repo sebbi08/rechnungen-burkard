@@ -2,3 +2,12 @@
 # superpowers SDD scratch space
 .superpowers/
 .worktrees/
+
+# Build artifacts (backend/ and frontend/)
+bin/
+obj/
+node_modules/
+dist/
+*.db
+.playwright/
+test-results/

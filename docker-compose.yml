@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/dev.Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/src/backend
+      - invoicing-data:/data
+    environment:
+      - ConnectionStrings__Invoicing=Data Source=/data/invoicing.db
+      - ASPNETCORE_ENVIRONMENT=Development
+volumes:
+  invoicing-data:

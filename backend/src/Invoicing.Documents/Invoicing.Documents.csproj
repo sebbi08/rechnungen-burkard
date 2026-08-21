@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Burkard.Invoicing.Documents</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Invoicing.Domain/Invoicing.Domain.csproj" />
+    <PackageReference Include="QuestPDF" Version="2025.*" />
+  </ItemGroup>
+</Project>
