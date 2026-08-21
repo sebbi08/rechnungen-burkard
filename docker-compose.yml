@@ -3,13 +3,12 @@ services:
     build:
       context: .
       dockerfile: backend/dev.Dockerfile
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8080:8080"
     volumes:
       - ./backend:/src/backend
-      - invoicing-data:/data
+      - ./data:/data
     environment:
       - ConnectionStrings__Invoicing=Data Source=/data/invoicing.db
       - ASPNETCORE_ENVIRONMENT=Development
-volumes:
-  invoicing-data:
