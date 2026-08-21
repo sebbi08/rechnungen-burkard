@@ -24,31 +24,10 @@ public class InvoiceItemsController : ODataController
 
     public IActionResult Post([FromBody] InvoiceItem item)
     {
-        if (string.IsNullOrWhiteSpace(item.Number))
-        {
-            return BadRequest(new
-            {
-                error = new { code = "ItemNumberRequired", message = "The item number is required." }
-            });
-        }
+        var error = Validate(item);
+        if (error is not null) return BadRequest(error);
 
-        if (string.IsNullOrWhiteSpace(item.Description))
-        {
-            return BadRequest(new
-            {
-                error = new { code = "ItemDescriptionRequired", message = "The description is required." }
-            });
-        }
-
-        if (!_db.VatRates.Any(v => v.Rate == item.VatRate))
-        {
-            return BadRequest(new
-            {
-                error = new { code = "VatRateNotConfigured", message = "The VAT rate is not configured." }
-            });
-        }
-
-        if (_db.InvoiceItems.Any(i => i.Number == item.Number))
+        if (_db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
         {
             return BadRequest(new
             {
@@ -68,13 +47,14 @@ public class InvoiceItemsController : ODataController
 
         delta.Patch(item);
 
-        if (string.IsNullOrWhiteSpace(item.Number)
-            || !_db.VatRates.Any(v => v.Rate == item.VatRate)
-            || _db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
+        var error = Validate(item);
+        if (error is not null) return BadRequest(error);
+
+        if (_db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
         {
             return BadRequest(new
             {
-                error = new { code = "InvalidItem", message = "Number, description and VAT rate are required." }
+                error = new { code = "ItemNumberExists", message = "This item number already exists." }
             });
         }
 
@@ -89,5 +69,25 @@ public class InvoiceItemsController : ODataController
         _db.InvoiceItems.Remove(item);
         _db.SaveChanges();
         return NoContent();
+    }
+
+    private object? Validate(InvoiceItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Number))
+        {
+            return new { error = new { code = "ItemNumberRequired", message = "The item number is required." } };
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Description))
+        {
+            return new { error = new { code = "ItemDescriptionRequired", message = "The description is required." } };
+        }
+
+        if (!_db.VatRates.Any(v => v.Rate == item.VatRate))
+        {
+            return new { error = new { code = "VatRateNotConfigured", message = "The VAT rate is not configured." } };
+        }
+
+        return null;
     }
 }

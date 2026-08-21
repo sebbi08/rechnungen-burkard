@@ -70,4 +70,58 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         using var json = await ODataJson.ReadAsync(duplicate);
         Assert.Equal("ItemNumberExists", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
+
+    [Fact]
+    public async Task Patch_item_with_empty_description_is_rejected()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var created = await client.PostAsync("/odata/InvoiceItems", ODataJson.Body(new
+        {
+            Number = "3001",
+            Description = "Grabpflege",
+            VatRate = 7.0m,
+        }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var id = await GetCreatedIdAsync(created);
+        var patch = new HttpRequestMessage(HttpMethod.Patch, $"/odata/InvoiceItems({id})")
+        {
+            Content = ODataJson.Body(new { Description = "" }),
+        };
+        var response = await client.SendAsync(patch);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal("ItemDescriptionRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Patch_item_with_unconfigured_vat_rate_is_rejected()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var created = await client.PostAsync("/odata/InvoiceItems", ODataJson.Body(new
+        {
+            Number = "3002",
+            Description = "Grabpflege",
+            VatRate = 7.0m,
+        }));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var id = await GetCreatedIdAsync(created);
+        var patch = new HttpRequestMessage(HttpMethod.Patch, $"/odata/InvoiceItems({id})")
+        {
+            Content = ODataJson.Body(new { VatRate = 99m }),
+        };
+        var response = await client.SendAsync(patch);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal("VatRateNotConfigured", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    private static async Task<long> GetCreatedIdAsync(HttpResponseMessage created)
+    {
+        using var json = await ODataJson.ReadAsync(created);
+        return json.RootElement.GetProperty("Id").GetInt64();
+    }
 }
