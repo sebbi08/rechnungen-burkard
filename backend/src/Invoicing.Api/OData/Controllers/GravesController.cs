@@ -74,10 +74,7 @@ public class GravesController : ODataController
             return Ok(new { value = Array.Empty<object>() });
         }
 
-        var lowered = term.ToLowerInvariant();
         var graves = await _db.Graves
-            .Where(g => g.GraveNumber.ToLower().Contains(lowered)
-                        || g.Recipients.Any(r => r.Recipient.Name.ToLower().Contains(lowered)))
             .Select(g => new
             {
                 g.Id,
@@ -86,6 +83,13 @@ public class GravesController : ODataController
             })
             .ToListAsync();
 
-        return Ok(new { value = graves });
+        // Match in memory: SQL-side lower() folds ASCII only and would miss
+        // non-ASCII case differences (e.g. 'ö' vs 'Ö'), which matters for German names.
+        var matches = graves
+            .Where(g => g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                        || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        return Ok(new { value = matches });
     }
 }
