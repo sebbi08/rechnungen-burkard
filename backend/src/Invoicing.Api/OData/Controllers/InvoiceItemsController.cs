@@ -1,0 +1,93 @@
+using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData.Query;
+using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.EntityFrameworkCore;
+
+namespace Burkard.Invoicing.Api.OData.Controllers;
+
+public class InvoiceItemsController : ODataController
+{
+    private readonly AppDbContext _db;
+
+    public InvoiceItemsController(AppDbContext db) => _db = db;
+
+    [EnableQuery]
+    public IQueryable<InvoiceItem> Get() => _db.InvoiceItems.AsNoTracking();
+
+    public ActionResult<InvoiceItem> Get([FromRoute] long key)
+    {
+        var item = _db.InvoiceItems.Find(key);
+        return item is null ? NotFound() : Ok(item);
+    }
+
+    public IActionResult Post([FromBody] InvoiceItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Number))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "ItemNumberRequired", message = "The item number is required." }
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Description))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "ItemDescriptionRequired", message = "The description is required." }
+            });
+        }
+
+        if (!_db.VatRates.Any(v => v.Rate == item.VatRate))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "VatRateNotConfigured", message = "The VAT rate is not configured." }
+            });
+        }
+
+        if (_db.InvoiceItems.Any(i => i.Number == item.Number))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "ItemNumberExists", message = "This item number already exists." }
+            });
+        }
+
+        _db.InvoiceItems.Add(item);
+        _db.SaveChanges();
+        return Created(item);
+    }
+
+    public IActionResult Patch([FromRoute] long key, [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<InvoiceItem> delta)
+    {
+        var item = _db.InvoiceItems.Find(key);
+        if (item is null) return NotFound();
+
+        delta.Patch(item);
+
+        if (string.IsNullOrWhiteSpace(item.Number)
+            || !_db.VatRates.Any(v => v.Rate == item.VatRate)
+            || _db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidItem", message = "Number, description and VAT rate are required." }
+            });
+        }
+
+        _db.SaveChanges();
+        return Updated(item);
+    }
+
+    public IActionResult Delete([FromRoute] long key)
+    {
+        var item = _db.InvoiceItems.Find(key);
+        if (item is null) return NotFound();
+        _db.InvoiceItems.Remove(item);
+        _db.SaveChanges();
+        return NoContent();
+    }
+}
