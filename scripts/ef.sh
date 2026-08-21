@@ -7,6 +7,7 @@ docker build -q -t invoicing-dev-sdk -f "${REPO_ROOT}/backend/dev-sdk.Dockerfile
 exec docker run --rm \
   -u "$(id -u):$(id -g)" \
   -e HOME=/tmp/home \
+  -e DOTNET_CLI_HOME=/tmp/home \
   -e NUGET_PACKAGES=/nuget \
   -v "${REPO_ROOT}/backend:/src" \
   -v invoicing-nuget:/nuget \
