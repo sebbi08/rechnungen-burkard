@@ -1,0 +1,39 @@
+<core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
+    <Dialog id="invoiceDialog" title="{i18n>createInvoice}" stretch="true">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="{i18n>recipientName}" labelFor="recipient" />
+                <Select id="recipient" items="{odata>/Recipients}"
+                    selectedKey="{invoiceDraft>/recipientId}">
+                    <core:Item key="{odata>Id}" text="{odata>Name}" />
+                </Select>
+                <Table id="lineTable" items="{invoiceDraft>/lines}">
+                    <columns>
+                        <Column><Text text="{i18n>itemNumber}" /></Column>
+                        <Column><Text text="{i18n>itemCount}" /></Column>
+                        <Column><Text text="{i18n>itemPrice}" /></Column>
+                    </columns>
+                    <items>
+                        <ColumnListItem>
+                            <cells>
+                                <Select id="lineItem" items="{odata>/InvoiceItems}"
+                                    selectedKey="{invoiceDraft>itemId}">
+                                    <core:Item key="{odata>Id}" text="{odata>Number}" />
+                                </Select>
+                                <Input value="{invoiceDraft>count}" type="Number" ariaLabel="{i18n>itemCount}" />
+                                <Input value="{invoiceDraft>unitPrice}" type="Number" ariaLabel="{i18n>itemPrice}" />
+                            </cells>
+                        </ColumnListItem>
+                    </items>
+                </Table>
+                <Button text="{i18n>addLine}" press="onAddLine" />
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="{i18n>save}" type="Emphasized" press="onInvoiceDialogSave" />
+        </beginButton>
+        <endButton>
+            <Button text="{i18n>cancel}" press="onInvoiceDialogCancel" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

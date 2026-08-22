@@ -10,7 +10,49 @@
             </tnt:SideNavigation>
         </tnt:sideContent>
         <tnt:mainContents>
-            <Page title="{i18n>menuInvoices}" titleLevel="H1" />
+            <Page title="{i18n>menuInvoices}" titleLevel="H1">
+                <subHeader>
+                    <Toolbar>
+                        <Select id="halfYearFilter" width="12rem" change="onHalfYearChange">
+                            <core:Item key="" text="{i18n>allInvoices}" />
+                            <core:Item key="2026-1" text="H1 2026" />
+                            <core:Item key="2026-2" text="H2 2026" />
+                            <core:Item key="2025-1" text="H1 2025" />
+                            <core:Item key="2025-2" text="H2 2025" />
+                        </Select>
+                        <ToolbarSpacer />
+                        <Button text="{i18n>bulkNormal}" press="onBulkNormal" />
+                        <Button text="{i18n>bulkCopy}" press="onBulkCopy" />
+                        <Button text="{i18n>createInvoice}" press="onCreateInvoice" type="Emphasized" />
+                    </Toolbar>
+                </subHeader>
+                <content>
+                    <Table id="invoicesTable" items="{odata>/Invoices}">
+                        <columns>
+                            <Column><Text text="{i18n>invoiceNumber}" /></Column>
+                            <Column><Text text="{i18n>recipientName}" /></Column>
+                            <Column><Text text="{i18n>invoiceDate}" /></Column>
+                            <Column><Text text="{i18n>revision}" /></Column>
+                            <Column />
+                        </columns>
+                        <items>
+                            <ColumnListItem>
+                                <cells>
+                                    <Text text="{odata>InvoiceNumber}" />
+                                    <Text text="{odata>RecipientName}" />
+                                    <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
+                                    <Text text="{odata>RevisionNumber}" />
+                                    <HBox>
+                                        <Button text="{i18n>downloadNormal}" press="onDownloadNormal" type="Transparent" />
+                                        <Button text="{i18n>downloadCopy}" press="onDownloadCopy" type="Transparent" />
+                                        <Button text="{i18n>editInvoice}" press="onEditInvoice" type="Transparent" />
+                                    </HBox>
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </content>
+            </Page>
         </tnt:mainContents>
     </tnt:ToolPage>
 </mvc:View>

@@ -79,3 +79,51 @@ export async function createItem(item: {
 export async function createRecipient(recipient: { Name: string; Address: string }): Promise<void> {
     await ensureOk(await post("/odata/Recipients", recipient));
 }
+
+export interface InvoiceLineDto {
+    itemId: number;
+    count: number;
+    unitPrice: number | null;
+}
+
+export interface DocumentDto {
+    Id: number;
+    FileName: string;
+}
+
+export async function createInvoice(recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
+    await ensureOk(await post("/odata/CreateInvoice", { recipientId, lines }));
+}
+
+export async function createRevision(invoiceId: number, recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
+    await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
+}
+
+export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
+    const response = await fetch(`/odata/Invoices(${invoiceId})/Documents`);
+    await ensureOk(response);
+    const body = await response.json();
+    return body.value as DocumentDto[];
+}
+
+export function downloadUrl(documentId: number): string {
+    return `/odata/Documents(${documentId})/$value`;
+}
+
+export async function bulkDownload(kind: "Normal" | "Copy", fileName: string): Promise<void> {
+    const response = await post("/odata/BulkDownloadDocuments", { kind });
+    await ensureOk(response);
+    const blob = await response.blob();
+    await downloadBlob(blob, fileName);
+}
+
+export async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
