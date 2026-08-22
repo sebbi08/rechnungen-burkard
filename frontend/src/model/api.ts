@@ -34,6 +34,7 @@ const CODE_TO_I18N: Record<string, string> = {
     InvalidVatRate: "errorInvalidVatRate",
     GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
     JobAlreadyRunning: "errorJobAlreadyRunning",
+    GraveNotSaved: "errorGraveNotSaved",
 };
 
 export async function showError(controller: Controller, error: unknown): Promise<void> {
@@ -126,4 +127,65 @@ export async function downloadBlob(blob: Blob, fileName: string): Promise<void> 
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+}
+
+export interface JobDto {
+    Id: number;
+    Status: string;
+    ProgressPercent: number;
+    ResultJson?: string;
+}
+
+export async function generateGraveInvoices(year: number, half: number): Promise<JobDto> {
+    const response = await post("/odata/GenerateGraveInvoices", { year, half });
+    await ensureOk(response);
+    return (await response.json()) as JobDto;
+}
+
+export async function fetchGraveStatus(year: number, half: number): Promise<any[]> {
+    const response = await fetch(`/odata/GraveInvoicingStatus?year=${year}&half=${half}`);
+    await ensureOk(response);
+    const body = await response.json();
+    return body.value as any[];
+}
+
+export async function createGrave(grave: {
+    GraveNumber: string; StartDate: string; EndDate: string;
+}): Promise<number> {
+    const response = await post("/odata/Graves", grave);
+    await ensureOk(response);
+    const body = await response.json();
+    return body.Id as number;
+}
+
+export async function patchGrave(graveId: number, fields: Record<string, unknown>): Promise<void> {
+    const response = await fetch(`/odata/Graves(${graveId})`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+    });
+    await ensureOk(response);
+}
+
+export async function createGraveItemLink(graveId: number, itemId: number, count: number): Promise<void> {
+    await ensureOk(await post("/odata/GraveItems", { GraveId: graveId, ItemId: itemId, Count: count }));
+}
+
+export async function createGraveRecipientLink(graveId: number, recipientId: number): Promise<void> {
+    await ensureOk(await post("/odata/GraveRecipients", { GraveId: graveId, RecipientId: recipientId }));
+}
+
+export async function fetchGraveDetails(graveId: number): Promise<any> {
+    const response = await fetch(
+        `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`);
+    await ensureOk(response);
+    return response.json();
+}
+
+export async function deleteGraveItemLink(linkId: number): Promise<void> {
+    await ensureOk(await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }));
+}
+
+export async function deleteGraveRecipientLink(linkId: number): Promise<void> {
+    await ensureOk(await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }));
 }

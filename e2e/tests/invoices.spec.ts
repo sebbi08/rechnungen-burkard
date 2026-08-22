@@ -30,20 +30,26 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
     await page.locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "9001" }).click();
     await page.getByLabel("Anzahl").fill("2");
     await page.getByLabel("Preis").fill("120");
-    // by now the initial list has fully rendered: snapshot the row count. The dev
-    // DB persists between runs (already holds 2026-0001..2026-0005), so asserting
-    // a fixed number would pass on pre-existing rows.
-    const rowsBefore = await invoicesTable.locator("tbody tr").count();
+    // The dev DB persists between runs and grave generation creates many
+    // invoices, so the table only renders its first page. Count via the API
+    // instead of the rendered rows, and remember the current first row
+    // (newest first) so we can wait for the refresh below.
+    const countBefore = Number((await (await page.request.get(
+        "http://localhost:8080/odata/Invoices?$count=true&$top=0")).json())["@odata.count"]);
+    const firstRowText = await invoicesTable.locator("tbody tr").first().innerText();
     await page.getByRole("button", { name: "Speichern" }).click();
 
-    // assert row-count growth: saving adds exactly one invoice row
-    await expect(invoicesTable.locator("tbody tr")).toHaveCount(rowsBefore + 1);
+    // saving adds exactly one invoice
+    await expect(async () => {
+        const count = Number((await (await page.request.get(
+            "http://localhost:8080/odata/Invoices?$count=true&$top=0")).json())["@odata.count"]);
+        expect(count).toBe(countBefore + 1);
+    }).toPass({ timeout: 10000 });
 
     const downloadPromise = page.waitForEvent("download");
-    // new rows are appended at the end: download the normal document from the
-    // last row (getByRole instead of getByText, which would also match the
-    // "Rechnungsnummer" header)
-    await invoicesTable.locator("tbody tr").last()
+    // newest first: the new invoice is the first row once the table refreshes
+    await expect(invoicesTable.locator("tbody tr").first()).not.toContainText(firstRowText);
+    await invoicesTable.locator("tbody tr").first()
         .getByRole("button", { name: "Rechnung", exact: true }).first().click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toContain(".pdf");

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Attributes;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
@@ -17,10 +18,47 @@ public class GravesController : ODataController
     [EnableQuery]
     public IQueryable<Grave> Get() => _db.Graves.AsNoTracking();
 
-    public ActionResult<Grave> Get([FromRoute] long key)
+    // The OData single-result $expand validator rejects collection navigations
+    // ("The property 'Items' cannot be used in the $expand query option"), so
+    // build the expected payload explicitly: PascalCase, same shape the EDM
+    // serializer would produce for $expand=Items($expand=Item),
+    // Recipients($expand=Recipient).
+    private static readonly JsonSerializerOptions PascalCaseJson = new()
     {
-        var grave = _db.Graves.Find(key);
-        return grave is null ? NotFound() : Ok(grave);
+        PropertyNamingPolicy = null,
+    };
+
+    public IActionResult Get([FromRoute] long key)
+    {
+        var grave = _db.Graves
+            .Include(g => g.Items)
+                .ThenInclude(i => i.Item)
+            .Include(g => g.Recipients)
+                .ThenInclude(r => r.Recipient)
+            .AsNoTracking()
+            .FirstOrDefault(g => g.Id == key);
+        if (grave is null) return NotFound();
+
+        var result = new
+        {
+            grave.Id,
+            grave.GraveNumber,
+            grave.StartDate,
+            grave.EndDate,
+            Items = grave.Items.Select(i => new
+            {
+                i.Id,
+                i.Count,
+                Item = new { i.Item.Id, i.Item.Number, i.Item.Description, i.Item.DefaultPrice, i.Item.VatRate },
+            }).ToList(),
+            Recipients = grave.Recipients.Select(r => new
+            {
+                r.Id,
+                Recipient = new { r.Recipient.Id, r.Recipient.Name, r.Recipient.Address },
+            }).ToList(),
+        };
+
+        return new JsonResult(result, PascalCaseJson);
     }
 
     public IActionResult Post([FromBody] Grave grave)

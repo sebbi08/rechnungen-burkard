@@ -27,7 +27,8 @@
                     </Toolbar>
                 </subHeader>
                 <content>
-                    <Table id="invoicesTable" items="{odata>/Invoices}">
+                    <Table id="invoicesTable" growing="true" growingThreshold="50"
+                        items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}">
                         <columns>
                             <Column><Text text="{i18n>invoiceNumber}" /></Column>
                             <Column><Text text="{i18n>recipientName}" /></Column>
