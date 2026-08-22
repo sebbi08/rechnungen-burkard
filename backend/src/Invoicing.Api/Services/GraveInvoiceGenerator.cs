@@ -148,7 +148,9 @@ public sealed class GraveInvoiceGenerator
                 ItemNumber = item.Item.Number,
                 Description = item.Item.Description,
                 Count = item.Count,
-                UnitPrice = decimal.Round(unitPrice, 2, MidpointRounding.AwayFromZero),
+                // 3 decimals keep round(count × unitPrice × 100) exactly equal to the
+                // derived net for realistic counts, so the persisted line gross stays exact.
+                UnitPrice = decimal.Round(unitPrice, 3, MidpointRounding.AwayFromZero),
                 VatRate = item.Item.VatRate,
                 LineNumber = i + 1,
             });

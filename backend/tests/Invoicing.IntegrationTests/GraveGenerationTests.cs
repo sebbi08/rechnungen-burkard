@@ -137,6 +137,71 @@ public class GraveGenerationTests
     }
 
     [Fact]
+    public async Task Odd_three_way_split_keeps_persisted_line_gross_exact_to_the_cent()
+    {
+        using var host = new ApiTestHost();
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.VatRates.Add(new VatRate { Rate = 7m });
+            var item = new InvoiceItem { Number = "6001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
+            db.InvoiceItems.Add(item);
+            var recipients = new[]
+            {
+                new Recipient { Name = "Anna", Address = "A-Straße 1" },
+                new Recipient { Name = "Bert", Address = "B-Straße 2" },
+                new Recipient { Name = "Carla", Address = "C-Straße 3" },
+            };
+            db.Recipients.AddRange(recipients);
+            var grave = new Grave
+            {
+                GraveNumber = "G-1",
+                StartDate = new DateOnly(2020, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+
+            db.GraveItems.Add(new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 2 });
+            db.GraveRecipients.AddRange(recipients.Select(r =>
+                new GraveRecipient { GraveId = grave.Id, RecipientId = r.Id }));
+            await db.SaveChangesAsync();
+        }
+
+        using var client = host.CreateClient();
+        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 2 }));
+        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
+        using var startJson = await ODataJson.ReadAsync(start);
+        var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
+        Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
+
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var invoices = await db.Invoices.Include(i => i.Lines)
+                .Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
+                .ToListAsync();
+
+            // 2 × 100.00 + 7% VAT = 214.00 gross for the grave; 3 recipients → 71.34 / 71.33 / 71.33
+            Assert.Equal(3, invoices.Count);
+            Assert.All(invoices, i => Assert.Equal(100m / 3, i.SharePercent));
+
+            // gross per invoice recomputed from the PERSISTED lines:
+            // round(round(count × unitPrice × 100) × (100 + rate) / 100) per line, summed.
+            var grosses = invoices
+                .Select(i => (long)Math.Round(i.Lines.Sum(l =>
+                    Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m)))
+                .OrderBy(g => g)
+                .ToList();
+
+            Assert.Equal(new List<long> { 7133, 7133, 7134 }, grosses);
+            Assert.Equal(21400, grosses.Sum());
+        }
+    }
+
+    [Fact]
     public async Task Second_generation_for_same_half_year_is_rejected()
     {
         using var host = new ApiTestHost();
