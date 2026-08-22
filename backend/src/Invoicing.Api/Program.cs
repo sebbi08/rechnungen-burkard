@@ -16,6 +16,9 @@ var connectionString = builder.Configuration.GetConnectionString("Invoicing")
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
+builder.Services.AddScoped<DocumentDataBuilder>();
+builder.Services.AddSingleton<IDocumentGenerator, QuestPdfDocumentGenerator>();
+builder.Services.AddScoped<InvoiceService>();
 
 var app = builder.Build();
 
