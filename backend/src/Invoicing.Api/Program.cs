@@ -14,6 +14,7 @@ builder.Services.AddControllers().AddOData(o =>
 var connectionString = builder.Configuration.GetConnectionString("Invoicing")
     ?? "Data Source=invoicing.db";
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
+builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
 
 var app = builder.Build();

@@ -12,3 +12,4 @@ services:
     environment:
       - ConnectionStrings__Invoicing=Data Source=/data/invoicing.db
       - ASPNETCORE_ENVIRONMENT=Development
+      - TZ=Europe/Berlin

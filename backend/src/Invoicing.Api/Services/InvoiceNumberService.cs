@@ -7,17 +7,22 @@ namespace Burkard.Invoicing.Api.Services;
 public sealed class InvoiceNumberService
 {
     private readonly AppDbContext _db;
+    private readonly IClock _clock;
 
-    public InvoiceNumberService(AppDbContext db) => _db = db;
+    public InvoiceNumberService(AppDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     /// <summary>
-    /// Computes the next number for the current year. The caller inserts the
+    /// Computes the next number for the current local year. The caller inserts the
     /// Invoice row inside its own transaction; the unique (Year, Sequence)
     /// index makes concurrent allocations fail loudly (retry in caller).
     /// </summary>
     public async Task<(string Number, int Year, int Sequence)> AllocateAsync(CancellationToken ct = default)
     {
-        var year = DateTime.UtcNow.Year;
+        var year = _clock.GetLocalNow().Year;
         var maxSequence = await _db.Invoices
             .Where(i => i.Year == year)
             .MaxAsync(i => (int?)i.Sequence, ct) ?? 0;
