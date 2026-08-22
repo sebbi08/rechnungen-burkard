@@ -8,8 +8,13 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class InvoiceActionsController : ODataController
 {
     private readonly InvoiceService _service;
+    private readonly ILogger<InvoiceActionsController> _logger;
 
-    public InvoiceActionsController(InvoiceService service) => _service = service;
+    public InvoiceActionsController(InvoiceService service, ILogger<InvoiceActionsController> logger)
+    {
+        _service = service;
+        _logger = logger;
+    }
 
     [HttpPost("CreateInvoice")]
     public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request)
@@ -27,8 +32,9 @@ public class InvoiceActionsController : ODataController
         {
             // Letting the exception escape would cause the test host to rethrow it on the
             // client instead of producing a 500 response; mirror production behavior.
+            _logger.LogError(ex, "CreateInvoice failed");
             return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = ex.Message } });
+                new { error = new { code = "InternalError", message = "An internal error occurred." } });
         }
     }
 
