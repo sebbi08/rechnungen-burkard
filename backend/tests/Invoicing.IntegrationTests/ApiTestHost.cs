@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api;
+using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -14,6 +15,8 @@ public class ApiTestHost : WebApplicationFactory<Program>
 {
     private readonly string _dbFile;
 
+    public string DbFilePath => _dbFile;
+
     public ApiTestHost()
     {
         _dbFile = Path.Combine(Path.GetTempPath(), $"invoicing-test-{Guid.NewGuid():N}.db");
@@ -27,6 +30,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
             var descriptor = services.Single(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
             services.Remove(descriptor);
             services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
+            services.AddSingleton<IJobHandler, TestJobHandler>();
         });
     }
 

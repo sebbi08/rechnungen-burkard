@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
@@ -19,6 +20,9 @@ builder.Services.AddScoped<InvoiceNumberService>();
 builder.Services.AddScoped<DocumentDataBuilder>();
 builder.Services.AddSingleton<IDocumentGenerator, QuestPdfDocumentGenerator>();
 builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddSingleton<JobQueue>();
+builder.Services.AddScoped<JobService>();
+builder.Services.AddHostedService<JobRunner>();
 
 var app = builder.Build();
 
