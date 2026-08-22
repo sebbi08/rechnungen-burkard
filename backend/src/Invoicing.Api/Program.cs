@@ -1,5 +1,6 @@
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ builder.Services.AddControllers().AddOData(o =>
 var connectionString = builder.Configuration.GetConnectionString("Invoicing")
     ?? "Data Source=invoicing.db";
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
+builder.Services.AddScoped<InvoiceNumberService>();
 
 var app = builder.Build();
 
