@@ -1,6 +1,10 @@
+using System.Text.Json;
+using Burkard.Invoicing.Api.Jobs;
+using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
@@ -8,11 +12,15 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class InvoiceActionsController : ODataController
 {
     private readonly InvoiceService _service;
+    private readonly JobService _jobs;
+    private readonly AppDbContext _db;
     private readonly ILogger<InvoiceActionsController> _logger;
 
-    public InvoiceActionsController(InvoiceService service, ILogger<InvoiceActionsController> logger)
+    public InvoiceActionsController(InvoiceService service, JobService jobs, AppDbContext db, ILogger<InvoiceActionsController> logger)
     {
         _service = service;
+        _jobs = jobs;
+        _db = db;
         _logger = logger;
     }
 
@@ -57,6 +65,51 @@ public class InvoiceActionsController : ODataController
             return StatusCode(StatusCodes.Status500InternalServerError,
                 new { error = new { code = "InternalError", message = "An internal error occurred." } });
         }
+    }
+
+    [HttpPost("GenerateGraveInvoices")]
+    public async Task<IActionResult> GenerateGraveInvoices([FromBody] GenerateGraveInvoicesRequest request)
+    {
+        if (request.Year < 2000 || request.Year > 2100 || request.Half is not (1 or 2))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidHalfYear", message = "The half-year is invalid." }
+            });
+        }
+
+        var alreadyInvoicedCount = _db.GraveInvoiceRuns
+            .Where(r => r.Year == request.Year && r.Half == request.Half)
+            .Select(r => r.GraveId)
+            .Distinct()
+            .Count();
+        if (alreadyInvoicedCount > 0 && alreadyInvoicedCount >= _db.Graves.Count())
+        {
+            return Conflict(new
+            {
+                error = new { code = "GravesAlreadyInvoiced", message = "Invoices for this half-year were already generated." }
+            });
+        }
+
+        if (_jobs.HasActive("GraveInvoices"))
+        {
+            return Conflict(new
+            {
+                error = new { code = "JobAlreadyRunning", message = "A generation is already running." }
+            });
+        }
+
+        var total = _db.Graves.Count();
+        var job = await _jobs.EnqueueAsync("GraveInvoices",
+            JsonSerializer.Serialize(new GraveInvoicesPayload(request.Year, request.Half)),
+            total, HttpContext.RequestAborted);
+        return Accepted(job);
+    }
+
+    public sealed class GenerateGraveInvoicesRequest
+    {
+        public int Year { get; set; }
+        public int Half { get; set; }
     }
 
     public sealed class CreateInvoiceRequest

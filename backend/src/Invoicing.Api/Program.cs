@@ -20,8 +20,10 @@ builder.Services.AddScoped<InvoiceNumberService>();
 builder.Services.AddScoped<DocumentDataBuilder>();
 builder.Services.AddSingleton<IDocumentGenerator, QuestPdfDocumentGenerator>();
 builder.Services.AddScoped<InvoiceService>();
+builder.Services.AddScoped<GraveInvoiceGenerator>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddScoped<JobService>();
+builder.Services.AddScoped<IJobHandler, GraveInvoicesJobHandler>();
 builder.Services.AddHostedService<JobRunner>();
 
 var app = builder.Build();

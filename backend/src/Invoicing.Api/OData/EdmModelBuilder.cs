@@ -21,6 +21,7 @@ public static class EdmModelBuilder
         b.Singleton<GlobalSettings>("Settings");
         b.Action("CreateInvoice").ReturnsFromEntitySet<Invoice>("Invoices");
         b.Action("CreateRevision").ReturnsFromEntitySet<Invoice>("Invoices");
+        b.Action("GenerateGraveInvoices").ReturnsFromEntitySet<Job>("Jobs");
         return b.GetEdmModel();
     }
 }
