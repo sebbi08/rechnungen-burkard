@@ -92,7 +92,7 @@ internal sealed class InvoiceDocument : IDocument
                         table.Cell().Text(line.Description);
                         table.Cell().AlignRight().Text(line.Count.ToString());
                         table.Cell().AlignRight().Text(Money(line.UnitPrice));
-                        table.Cell().AlignRight().Text($"{line.VatRate.ToString("0.#", German)} %");
+                        table.Cell().AlignRight().Text($"{line.VatRate.ToString("0.#", German)}{DocumentTexts.VatRateSuffix}");
                         table.Cell().AlignRight().Text(Money(line.LineTotal));
                     }
                 });
@@ -120,7 +120,7 @@ internal sealed class InvoiceDocument : IDocument
             {
                 text.Span(DocumentTexts.PageFooterPageOf + " ");
                 text.CurrentPageNumber();
-                text.Span(" von ");
+                text.Span(DocumentTexts.PageFooterOf);
                 text.TotalPages();
             });
         });

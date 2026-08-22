@@ -24,4 +24,6 @@ public static class DocumentTexts
     public static string VatTotal(decimal amount) => $"MwSt. gesamt: {amount.ToString("N2", German)}";
     public static string GrossTotal(decimal amount) => $"Gesamtbetrag: {amount.ToString("N2", German)}";
     public static string PageFooterPageOf => "Seite";
+    public static string PageFooterOf => " von ";
+    public static string VatRateSuffix => " %";
 }
