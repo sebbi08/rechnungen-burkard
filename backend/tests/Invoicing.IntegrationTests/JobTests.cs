@@ -56,6 +56,8 @@ public class JobTests : IClassFixture<ApiTestHost>
     {
         using var scope = _host.Services.CreateScope();
         var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
+        var handler = (TestJobHandler)_host.Services.GetServices<IJobHandler>().Single(h => h is TestJobHandler);
+        var callsBefore = handler.Calls;
         var job = await jobs.EnqueueAsync("Test", null, 10, CancellationToken.None);
 
         var finished = await WaitForTerminalAsync(job.Id, TimeSpan.FromSeconds(15));
@@ -63,8 +65,7 @@ public class JobTests : IClassFixture<ApiTestHost>
         Assert.Equal(100, finished.ProgressPercent);
         Assert.Equal(10, finished.ProcessedCount);
 
-        var handler = (TestJobHandler)_host.Services.GetServices<IJobHandler>().Single(h => h is TestJobHandler);
-        Assert.Equal(1, handler.Calls); // this enqueue is the only "Test" job in this fixture
+        Assert.Equal(callsBefore + 1, handler.Calls);
     }
 
     [Fact]
