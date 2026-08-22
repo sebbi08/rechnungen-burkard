@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "types": ["@openui5/types"]
+  },
+  "include": ["./src/**/*"]
+}
