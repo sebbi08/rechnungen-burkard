@@ -66,6 +66,12 @@ public sealed class InvoiceService
 
         var lines = await BuildLinesAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(recipient.Address))
+        {
+            throw new ValidationException("RecipientAddressRequired", "The recipient address is required.");
+        }
+
         var now = DateTime.UtcNow;
         var baseNumber = InvoiceNumberFormatter.StripRevision(original.InvoiceNumber);
 

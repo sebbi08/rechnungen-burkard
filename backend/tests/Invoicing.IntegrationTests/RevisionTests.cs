@@ -15,9 +15,9 @@ public class RevisionTests : IClassFixture<ApiTestHost>
 
     public RevisionTests(ApiTestHost host) => _host = host;
 
-    private async Task<(long InvoiceId, long ItemId, long RecipientId, byte[] NormalBytes)> SeedInvoiceAsync()
+    private async Task<(long InvoiceId, long ItemId, long RecipientId, byte[] NormalBytes)> SeedInvoiceAsync(ApiTestHost host)
     {
-        using var scope = _host.Services.CreateScope();
+        using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
         var item = new InvoiceItem { Number = "5001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
@@ -26,7 +26,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
-        using var client = _host.CreateClient();
+        using var client = host.CreateClient();
         var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
         {
             recipientId = recipient.Id,
@@ -43,7 +43,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
     [Fact]
     public async Task Revision_creates_new_row_keeps_original_and_resnapshots_recipient()
     {
-        var (invoiceId, itemId, recipientId, originalBytes) = await SeedInvoiceAsync();
+        var (invoiceId, itemId, recipientId, originalBytes) = await SeedInvoiceAsync(_host);
 
         using var scope = _host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -85,5 +85,33 @@ public class RevisionTests : IClassFixture<ApiTestHost>
         var originalNormal = original.Documents.Single(d => d.Kind == DocumentKind.Normal);
         Assert.Equal(originalBytes, originalNormal.Content);
         Assert.Equal(2, revision.Documents.Count);
+    }
+
+    [Fact]
+    public async Task Revision_with_blank_recipient_address_fails()
+    {
+        using var host = new ApiTestHost();
+        var (invoiceId, itemId, recipientId, _) = await SeedInvoiceAsync(host);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var recipient = await db.Recipients.FindAsync(recipientId);
+        recipient!.Address = "";
+        await db.SaveChangesAsync();
+
+        using var client = host.CreateClient();
+        var response = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
+        {
+            invoiceId,
+            recipientId,
+            lines = new[] { new { itemId, count = 1, unitPrice = (decimal?)null } },
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal("RecipientAddressRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        var revisions = await db.Invoices.CountAsync(i => i.RootId == invoiceId);
+        Assert.Equal(1, revisions);
     }
 }
