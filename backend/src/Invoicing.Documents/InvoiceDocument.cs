@@ -128,9 +128,9 @@ internal sealed class InvoiceDocument : IDocument
 
     private static string Money(decimal value) => value.ToString("N2", German);
 
-    // up to 3 decimals, no trailing zeros (e.g. 33,335) — unit prices are rounded
+    // at least 2, up to 3 decimals (e.g. 120,00 or 33,335) — unit prices are rounded
     // to 3 decimals so persisted line grosses stay exact to the cent.
-    private static string UnitPrice(decimal value) => value.ToString("0.###", German);
+    private static string UnitPrice(decimal value) => value.ToString("#,0.00#", German);
 
     private static IContainer HeaderCell(IContainer container) =>
         container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingBottom(3);
