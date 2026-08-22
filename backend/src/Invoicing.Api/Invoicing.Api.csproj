@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Invoicing.Domain/Invoicing.Domain.csproj" />
+    <ProjectReference Include="../../src/Invoicing.Documents/Invoicing.Documents.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OData" Version="8.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.*">

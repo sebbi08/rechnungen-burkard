@@ -3,6 +3,8 @@ using Burkard.Invoicing.Api.Persistence;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers().AddOData(o =>
     o.Select().Filter().OrderBy().Count().SetMaxTop(200)
