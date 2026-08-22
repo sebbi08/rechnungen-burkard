@@ -10,7 +10,31 @@
             </tnt:SideNavigation>
         </tnt:sideContent>
         <tnt:mainContents>
-            <Page title="{i18n>menuRecipients}" titleLevel="H1" />
+            <Page title="{i18n>menuRecipients}" titleLevel="H1">
+                <subHeader>
+                    <Toolbar>
+                        <SearchField width="16rem" search="onSearch" placeholder="{i18n>searchByName}" />
+                        <ToolbarSpacer />
+                        <Button text="{i18n>createRecipient}" press="onCreateRecipient" type="Emphasized" />
+                    </Toolbar>
+                </subHeader>
+                <content>
+                    <Table id="recipientsTable" items="{odata>/Recipients}">
+                        <columns>
+                            <Column><Text text="{i18n>recipientName}" /></Column>
+                            <Column><Text text="{i18n>recipientAddress}" /></Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem>
+                                <cells>
+                                    <Text text="{odata>Name}" />
+                                    <Text text="{odata>Address}" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </content>
+            </Page>
         </tnt:mainContents>
     </tnt:ToolPage>
 </mvc:View>

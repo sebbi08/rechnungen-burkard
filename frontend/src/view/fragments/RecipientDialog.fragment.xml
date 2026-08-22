@@ -1,0 +1,18 @@
+<core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
+    <Dialog title="{i18n>createRecipient}">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="{i18n>recipientName}" labelFor="recipientName" />
+                <Input id="recipientName" width="20rem" />
+                <Label text="{i18n>recipientAddress}" labelFor="recipientAddress" />
+                <TextArea id="recipientAddress" rows="4" width="20rem" />
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="{i18n>save}" type="Emphasized" press="onDialogSave" />
+        </beginButton>
+        <endButton>
+            <Button text="{i18n>cancel}" press="onDialogCancel" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

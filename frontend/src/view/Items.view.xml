@@ -10,7 +10,35 @@
             </tnt:SideNavigation>
         </tnt:sideContent>
         <tnt:mainContents>
-            <Page title="{i18n>menuItems}" titleLevel="H1" />
+            <Page title="{i18n>menuItems}" titleLevel="H1">
+                <subHeader>
+                    <Toolbar>
+                        <SearchField width="16rem" search="onSearch" placeholder="{i18n>searchByNumber}" />
+                        <ToolbarSpacer />
+                        <Button text="{i18n>createItem}" press="onCreateItem" type="Emphasized" />
+                    </Toolbar>
+                </subHeader>
+                <content>
+                    <Table id="itemsTable" items="{odata>/InvoiceItems}">
+                        <columns>
+                            <Column><Text text="{i18n>itemNumber}" /></Column>
+                            <Column><Text text="{i18n>itemDescription}" /></Column>
+                            <Column><Text text="{i18n>vatRate}" /></Column>
+                            <Column><Text text="{i18n>itemDefaultPrice}" /></Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem>
+                                <cells>
+                                    <Text text="{odata>Number}" />
+                                    <Text text="{odata>Description}" />
+                                    <Text text="{odata>VatRate}" />
+                                    <Text text="{odata>DefaultPrice}" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </content>
+            </Page>
         </tnt:mainContents>
     </tnt:ToolPage>
 </mvc:View>

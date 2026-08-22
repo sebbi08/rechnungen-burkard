@@ -1,0 +1,22 @@
+<core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
+    <Dialog title="{i18n>createItem}">
+        <content>
+            <VBox class="sapUiContentPadding">
+                <Label text="{i18n>itemNumber}" labelFor="itemNumber" />
+                <Input id="itemNumber" width="20rem" />
+                <Label text="{i18n>itemDescription}" labelFor="itemDescription" />
+                <Input id="itemDescription" width="20rem" />
+                <Label text="{i18n>vatRate}" labelFor="itemVatRate" />
+                <Input id="itemVatRate" type="Number" width="20rem" />
+                <Label text="{i18n>itemDefaultPrice}" labelFor="itemDefaultPrice" />
+                <Input id="itemDefaultPrice" type="Number" width="20rem" />
+            </VBox>
+        </content>
+        <beginButton>
+            <Button text="{i18n>save}" type="Emphasized" press="onDialogSave" />
+        </beginButton>
+        <endButton>
+            <Button text="{i18n>cancel}" press="onDialogCancel" />
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>

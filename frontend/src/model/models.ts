@@ -7,6 +7,8 @@ export default {
         return new ODataModel({
             serviceUrl: "/odata/",
             synchronizationMode: "None",
+            // the backend does not expose a $batch endpoint, so send requests directly
+            groupId: "$direct",
         });
     },
 
