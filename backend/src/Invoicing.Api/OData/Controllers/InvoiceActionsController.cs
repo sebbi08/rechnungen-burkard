@@ -38,8 +38,36 @@ public class InvoiceActionsController : ODataController
         }
     }
 
+    [HttpPost("CreateRevision")]
+    public async Task<IActionResult> CreateRevision([FromBody] CreateRevisionRequest request)
+    {
+        try
+        {
+            var invoice = await _service.CreateRevisionAsync(
+                request.InvoiceId, request.RecipientId, request.Lines, HttpContext.RequestAborted);
+            return Created($"odata/Invoices({invoice.Id})", invoice);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateRevision failed");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+        }
+    }
+
     public sealed class CreateInvoiceRequest
     {
+        public long RecipientId { get; set; }
+        public List<InvoiceLineInput> Lines { get; set; } = new();
+    }
+
+    public sealed class CreateRevisionRequest
+    {
+        public long InvoiceId { get; set; }
         public long RecipientId { get; set; }
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }

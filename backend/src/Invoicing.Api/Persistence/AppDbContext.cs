@@ -24,7 +24,7 @@ public sealed class AppDbContext : DbContext
     {
         mb.Entity<VatRate>().HasIndex(v => v.Rate).IsUnique();
         mb.Entity<InvoiceItem>().HasIndex(i => i.Number).IsUnique();
-        mb.Entity<Invoice>().HasIndex(i => new { i.Year, i.Sequence }).IsUnique();
+        mb.Entity<Invoice>().HasIndex(i => new { i.Year, i.Sequence, i.RevisionNumber }).IsUnique();
         mb.Entity<Invoice>().HasIndex(i => i.RootId);
         mb.Entity<InvoiceLine>().HasIndex(l => l.InvoiceId);
         mb.Entity<Document>().HasIndex(d => d.InvoiceId);

@@ -53,6 +53,70 @@ public sealed class InvoiceService
         }
     }
 
+    public async Task<Invoice> CreateRevisionAsync(long invoiceId, long recipientId,
+        IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
+    {
+        var original = await _db.Invoices
+            .Include(i => i.Lines).Include(i => i.Documents)
+            .SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
+            ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
+
+        var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
+            ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
+
+        var lines = await BuildLinesAsync(lineInputs, ct);
+        var settings = await _db.GlobalSettings.FirstAsync(ct);
+        var now = DateTime.UtcNow;
+        var baseNumber = InvoiceNumberFormatter.StripRevision(original.InvoiceNumber);
+
+        var revision = new Invoice
+        {
+            RootId = original.RootId,
+            RevisionNumber = original.RevisionNumber + 1,
+            Year = original.Year,
+            Sequence = original.Sequence,
+            InvoiceNumber = InvoiceNumberFormatter.ForRevision(baseNumber, original.RevisionNumber + 1),
+            GraveId = original.GraveId,
+            PeriodYear = original.PeriodYear,
+            PeriodHalf = original.PeriodHalf,
+            SharePercent = original.SharePercent,
+            RecipientId = recipient.Id,
+            RecipientName = recipient.Name,
+            RecipientAddress = recipient.Address,
+            EndingText = settings.EndingText,
+            StampWord = settings.StampWord,
+            GeneratedAt = now,
+            Lines = lines,
+        };
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        _db.Invoices.Add(revision);
+        await _db.SaveChangesAsync(ct);
+
+        var data = _dataBuilder.Build(revision, shareText: null);
+        revision.Documents = new List<Document>
+        {
+            new()
+            {
+                Kind = DocumentKind.Normal,
+                FileName = $"{revision.InvoiceNumber}.pdf",
+                Content = _documents.Generate(data, isCopy: false),
+                GeneratedAt = now,
+            },
+            new()
+            {
+                Kind = DocumentKind.Copy,
+                FileName = $"{revision.InvoiceNumber}-Kopie.pdf",
+                Content = _documents.Generate(data, isCopy: true),
+                GeneratedAt = now,
+            },
+        };
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return revision;
+    }
+
     private async Task<List<InvoiceLine>> BuildLinesAsync(IReadOnlyList<InvoiceLineInput> inputs, CancellationToken ct)
     {
         if (inputs.Count == 0)

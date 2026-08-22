@@ -227,7 +227,7 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasIndex("RootId");
 
-                    b.HasIndex("Year", "Sequence")
+                    b.HasIndex("Year", "Sequence", "RevisionNumber")
                         .IsUnique();
 
                     b.ToTable("Invoices");

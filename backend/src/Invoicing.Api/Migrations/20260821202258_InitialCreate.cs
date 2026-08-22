@@ -301,9 +301,9 @@ namespace Burkard.Invoicing.Api.Migrations
                 column: "RootId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Invoices_Year_Sequence",
+                name: "IX_Invoices_Year_Sequence_RevisionNumber",
                 table: "Invoices",
-                columns: new[] { "Year", "Sequence" },
+                columns: new[] { "Year", "Sequence", "RevisionNumber" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
