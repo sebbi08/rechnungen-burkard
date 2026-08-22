@@ -37,7 +37,8 @@
                                     <Text text="{odata>RecipientName}" />
                                     <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
                                     <HBox>
-                                        <Text text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}" />
+                                        <Text text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}"
+                                            visible="{= ${odata>RevisionNumber} > 0}" />
                                         <Text text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
                                             visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
                                     </HBox>

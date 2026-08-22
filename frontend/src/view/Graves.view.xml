@@ -22,7 +22,8 @@
                     </Toolbar>
                 </subHeader>
                 <content>
-                    <Table id="gravesTable" items="{path: 'odata>/Graves', parameters: {$orderby: 'Id desc'}}">
+                    <Table id="gravesTable" items="{path: 'odata>/Graves', parameters: {$orderby: 'Id desc'}}"
+                        noDataText="{i18n>noData}">
                         <columns>
                             <Column><Text text="{i18n>graveNumber}" /></Column>
                             <Column><Text text="{i18n>startDate}" /></Column>

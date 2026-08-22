@@ -75,12 +75,13 @@ export default class Items extends BaseController {
 
     public async onDialogSave(event: any): Promise<void> {
         const dialog = event.getSource().getParent() as any;
+        const rawPrice = (this.byId("itemDefaultPrice") as Input).getValue();
         const fields = {
             Number: (this.byId("itemNumber") as Input).getValue(),
             Description: (this.byId("itemDescription") as Input).getValue(),
             VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
-            DefaultPrice: (this.byId("itemDefaultPrice") as Input).getValue()
-                ? Number((this.byId("itemDefaultPrice") as Input).getValue()) : null,
+            // an empty input means "no default price"; a price of 0 is a real value
+            DefaultPrice: rawPrice === "" ? null : Number(rawPrice),
         };
         try {
             if (this._editId != null) {

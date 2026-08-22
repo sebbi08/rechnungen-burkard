@@ -138,7 +138,7 @@ test("graves: search by number narrows the list and empty search shows nothing (
 
     await search.fill(`gibtsnicht${ts}`);
     await search.press("Enter");
-    // no match: the table renders its empty state and this run's grave is gone
-    await expect(gravesTable).toContainText("No data");
+    // no match: the table renders its German empty state and this run's grave is gone
+    await expect(gravesTable).toContainText("Keine Daten");
     await expect(gravesTable).not.toContainText(graveNumber);
 });
