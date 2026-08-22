@@ -28,7 +28,8 @@
                         </items>
                     </Table>
                     <HBox class="sapUiSmallMarginTop">
-                        <Select id="linkItem" width="12rem" items="{odata>/InvoiceItems}">
+                        <Select id="linkItem" width="12rem"
+                            items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}">
                             <core:Item key="{odata>Id}" text="{odata>Number}" />
                         </Select>
                         <Input id="linkCount" type="Number" width="6rem" value="1" ariaLabel="{i18n>itemCount}" />
@@ -51,10 +52,12 @@
                         </items>
                     </Table>
                     <HBox class="sapUiSmallMarginTop">
-                        <Select id="linkRecipient" width="12rem" items="{odata>/Recipients}">
+                        <Select id="linkRecipient" width="12rem"
+                            items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
                         </Select>
                         <Button text="{i18n>add}" press="onAddRecipientLink" />
+                        <Button text="{i18n>newRecipient}" press="onNewRecipient" type="Transparent" />
                     </HBox>
                 </Panel>
             </VBox>

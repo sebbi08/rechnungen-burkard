@@ -19,16 +19,18 @@
                     </Toolbar>
                 </subHeader>
                 <content>
-                    <Table id="recipientsTable" items="{odata>/Recipients}">
+                    <Table id="recipientsTable" items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                         <columns>
                             <Column><Text text="{i18n>recipientName}" /></Column>
                             <Column><Text text="{i18n>recipientAddress}" /></Column>
+                            <Column />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{odata>Name}" />
                                     <Text text="{odata>Address}" />
+                                    <Button text="{i18n>edit}" press="onEditRecipient" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>

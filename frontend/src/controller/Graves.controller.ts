@@ -6,9 +6,12 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Select from "sap/m/Select";
 import Input from "sap/m/Input";
+import TextArea from "sap/m/TextArea";
 import Item from "sap/ui/core/Item";
 import BusyDialog from "sap/m/BusyDialog";
 import MessageBox from "sap/m/MessageBox";
+import Filter from "sap/ui/model/Filter";
+import FilterOperator from "sap/ui/model/FilterOperator";
 
 export default class Graves extends BaseController {
     private static readonly JOB_TIMEOUT_MS = 10 * 60 * 1000;
@@ -50,6 +53,34 @@ export default class Graves extends BaseController {
 
     public onHalfYearChange(): void {
         void this.refreshStatus();
+    }
+
+    public async onSearchGraves(event: any): Promise<void> {
+        const term = event.getParameter("query") as string;
+        const binding = (this.byId("gravesTable") as any).getBinding("items") as ODataListBinding;
+        if (!term) {
+            binding.filter([]);
+            return;
+        }
+
+        try {
+            // the backend search is Unicode-aware (umlauts); filter the table
+            // by the returned numeric ids, which are immune to case folding
+            const matches = await api.searchGraves(term);
+            const ids = matches.map((match) => Number(match.id));
+            if (!ids.length) {
+                // no match: filter to an impossible id so the table renders empty
+                binding.filter(new Filter("Id", FilterOperator.EQ, -1));
+                return;
+            }
+
+            binding.filter(new Filter({
+                filters: ids.map((id) => new Filter("Id", FilterOperator.EQ, id)),
+                and: false,
+            }));
+        } catch (error) {
+            await api.showError(this, error);
+        }
     }
 
     private async refreshStatus(): Promise<void> {
@@ -174,6 +205,41 @@ export default class Graves extends BaseController {
         } catch (error) {
             await api.showError(this, error);
         }
+    }
+
+    public async onNewRecipient(): Promise<void> {
+        if (!this._quickDialog) {
+            // loadFragment passes this controller and the view ID prefix so that
+            // this.byId(...) finds the quick-create dialog controls
+            this._quickDialog = await this.loadFragment({
+                name: "burkard.invoicing.view.fragments.RecipientQuickCreate",
+            }) as any;
+        }
+        (this.byId("quickName") as Input).setValue("");
+        (this.byId("quickAddress") as TextArea).setValue("");
+        this._quickDialog.open();
+    }
+
+    public async onQuickRecipientSave(event: any): Promise<void> {
+        const dialog = event.getSource().getParent() as any;
+        try {
+            const id = await api.createRecipient({
+                Name: (this.byId("quickName") as Input).getValue(),
+                Address: (this.byId("quickAddress") as TextArea).getValue(),
+            });
+            // refresh the link select's list so the new row is included, then
+            // select it; the parent grave dialog stays open
+            const select = this.byId("linkRecipient") as Select;
+            await (select.getBinding("items") as ODataListBinding).refresh();
+            select.setSelectedKey(String(id));
+            dialog.close();
+        } catch (error) {
+            await api.showError(this, error);
+        }
+    }
+
+    public onQuickRecipientCancel(event: any): void {
+        (event.getSource().getParent() as any).close();
     }
 
     public async onDeleteItemLink(event: any): Promise<void> {
@@ -305,11 +371,8 @@ export default class Graves extends BaseController {
         }
     }
 
-    private i18nText(key: string): string {
-        return (this.getView()!.getModel("i18n") as any).getResourceBundle().getText(key);
-    }
-
     private _running = false;
     private _graveDialog: any;
+    private _quickDialog: any;
     private _generateDialog: any;
 }

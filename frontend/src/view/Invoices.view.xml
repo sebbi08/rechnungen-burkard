@@ -36,7 +36,11 @@
                                     <Text text="{odata>InvoiceNumber}" />
                                     <Text text="{odata>RecipientName}" />
                                     <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
-                                    <Text text="{odata>RevisionNumber}" />
+                                    <HBox>
+                                        <Text text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}" />
+                                        <Text text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
+                                            visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
+                                    </HBox>
                                     <HBox>
                                         <Button text="{i18n>downloadNormal}" press="onDownloadNormal" type="Transparent" />
                                         <Button text="{i18n>downloadCopy}" press="onDownloadCopy" type="Transparent" />

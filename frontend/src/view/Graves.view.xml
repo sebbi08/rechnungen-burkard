@@ -13,6 +13,7 @@
             <Page title="{i18n>menuGraves}" titleLevel="H1">
                 <subHeader>
                     <Toolbar>
+                        <SearchField width="16rem" search="onSearchGraves" placeholder="{i18n>searchGrave}" />
                         <Label text="{i18n>halfYear}" labelFor="halfYearSelect" />
                         <Select id="halfYearSelect" width="10rem" change="onHalfYearChange" />
                         <ToolbarSpacer />

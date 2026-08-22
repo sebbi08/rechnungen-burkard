@@ -6,6 +6,7 @@ import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import Filter from "sap/ui/model/Filter";
 import FilterOperator from "sap/ui/model/FilterOperator";
 import Input from "sap/m/Input";
+import TextArea from "sap/m/TextArea";
 
 export default class Recipients extends BaseController {
     public onInit(): void {
@@ -28,6 +29,15 @@ export default class Recipients extends BaseController {
     }
 
     public async onCreateRecipient(): Promise<void> {
+        await this.openRecipientDialog(null);
+    }
+
+    public async onEditRecipient(event: any): Promise<void> {
+        const context = event.getSource().getBindingContext("odata") as Context;
+        await this.openRecipientDialog(context);
+    }
+
+    private async openRecipientDialog(context: Context | null): Promise<void> {
         if (!this._dialog) {
             // loadFragment passes this controller and the view ID prefix so that
             // this.byId(...) finds the dialog controls and IDs stay unique; the
@@ -37,17 +47,34 @@ export default class Recipients extends BaseController {
                 name: "burkard.invoicing.view.fragments.RecipientDialog",
             }) as any;
         }
+
+        if (context) {
+            (this.byId("recipientName") as Input).setValue(context.getProperty("Name") as string);
+            (this.byId("recipientAddress") as TextArea).setValue(context.getProperty("Address") as string);
+            this._editId = context.getProperty("Id") as number;
+        } else {
+            (this.byId("recipientName") as Input).setValue("");
+            (this.byId("recipientAddress") as TextArea).setValue("");
+            this._editId = null;
+        }
+        this._dialog.setTitle(this.i18nText(context ? "editRecipient" : "createRecipient"));
         this._dialog.open();
     }
 
     public async onDialogSave(event: any): Promise<void> {
         const dialog = event.getSource().getParent() as any;
+        const fields = {
+            Name: (this.byId("recipientName") as Input).getValue(),
+            Address: (this.byId("recipientAddress") as TextArea).getValue(),
+        };
         try {
-            await api.createRecipient({
-                Name: (this.byId("recipientName") as Input).getValue(),
-                Address: (this.byId("recipientAddress") as Input).getValue(),
-            });
+            if (this._editId != null) {
+                await api.updateRecipient(this._editId, fields);
+            } else {
+                await api.createRecipient(fields);
+            }
             dialog.close();
+            this._editId = null;
             ((this.byId("recipientsTable") as any).getBinding("items") as ODataListBinding).refresh();
         } catch (error) {
             await api.showError(this, error);
@@ -58,5 +85,6 @@ export default class Recipients extends BaseController {
         (event.getSource().getParent() as any).close();
     }
 
+    private _editId: number | null = null;
     private _dialog: any;
 }

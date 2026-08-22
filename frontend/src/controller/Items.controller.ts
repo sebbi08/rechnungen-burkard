@@ -34,6 +34,15 @@ export default class Items extends BaseController {
     }
 
     public async onCreateItem(): Promise<void> {
+        await this.openItemDialog(null);
+    }
+
+    public async onEditItem(event: any): Promise<void> {
+        const context = event.getSource().getBindingContext("odata") as Context;
+        await this.openItemDialog(context);
+    }
+
+    private async openItemDialog(context: Context | null): Promise<void> {
         if (!this._dialog) {
             // loadFragment passes this controller and the view ID prefix so that
             // this.byId(...) finds the dialog controls and IDs stay unique; the
@@ -43,20 +52,44 @@ export default class Items extends BaseController {
                 name: "burkard.invoicing.view.fragments.ItemDialog",
             }) as any;
         }
+
+        if (context) {
+            (this.byId("itemNumber") as Input).setValue(context.getProperty("Number") as string);
+            (this.byId("itemDescription") as Input).setValue(context.getProperty("Description") as string);
+            (this.byId("itemVatRate") as Input).setValue(String(context.getProperty("VatRate")));
+            (this.byId("itemDefaultPrice") as Input).setValue(
+                context.getProperty("DefaultPrice") != null
+                    ? String(context.getProperty("DefaultPrice"))
+                    : "");
+            this._editId = context.getProperty("Id") as number;
+        } else {
+            (this.byId("itemNumber") as Input).setValue("");
+            (this.byId("itemDescription") as Input).setValue("");
+            (this.byId("itemVatRate") as Input).setValue("");
+            (this.byId("itemDefaultPrice") as Input).setValue("");
+            this._editId = null;
+        }
+        this._dialog.setTitle(this.i18nText(context ? "editItem" : "createItem"));
         this._dialog.open();
     }
 
     public async onDialogSave(event: any): Promise<void> {
         const dialog = event.getSource().getParent() as any;
+        const fields = {
+            Number: (this.byId("itemNumber") as Input).getValue(),
+            Description: (this.byId("itemDescription") as Input).getValue(),
+            VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
+            DefaultPrice: (this.byId("itemDefaultPrice") as Input).getValue()
+                ? Number((this.byId("itemDefaultPrice") as Input).getValue()) : null,
+        };
         try {
-            await api.createItem({
-                Number: (this.byId("itemNumber") as Input).getValue(),
-                Description: (this.byId("itemDescription") as Input).getValue(),
-                VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
-                DefaultPrice: (this.byId("itemDefaultPrice") as Input).getValue()
-                    ? Number((this.byId("itemDefaultPrice") as Input).getValue()) : null,
-            });
+            if (this._editId != null) {
+                await api.updateItem(this._editId, fields);
+            } else {
+                await api.createItem(fields);
+            }
             dialog.close();
+            this._editId = null;
             ((this.byId("itemsTable") as any).getBinding("items") as ODataListBinding).refresh();
         } catch (error) {
             await api.showError(this, error);
@@ -67,5 +100,6 @@ export default class Items extends BaseController {
         (event.getSource().getParent() as any).close();
     }
 
+    private _editId: number | null = null;
     private _dialog: any;
 }

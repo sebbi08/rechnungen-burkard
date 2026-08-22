@@ -3,10 +3,15 @@
         <content>
             <VBox class="sapUiContentPadding">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
-                <Select id="recipient" items="{odata>/Recipients}"
-                    selectedKey="{invoiceDraft>/recipientId}">
-                    <core:Item key="{odata>Id}" text="{odata>Name}" />
-                </Select>
+                <HBox>
+                    <Select id="recipient" width="20rem"
+                        items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+                        selectedKey="{invoiceDraft>/recipientId}">
+                        <core:Item key="{odata>Id}" text="{odata>Name}" />
+                    </Select>
+                    <Button text="{i18n>newRecipient}" press="onNewRecipient" type="Transparent"
+                        class="sapUiTinyMarginBegin" />
+                </HBox>
                 <Table id="lineTable" items="{invoiceDraft>/lines}">
                     <columns>
                         <Column><Text text="{i18n>itemNumber}" /></Column>
@@ -16,7 +21,7 @@
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <Select id="lineItem" items="{odata>/InvoiceItems}"
+                                <Select id="lineItem" items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}"
                                     selectedKey="{invoiceDraft>itemId}">
                                     <core:Item key="{odata>Id}" text="{odata>Number}" />
                                 </Select>

@@ -19,12 +19,13 @@
                     </Toolbar>
                 </subHeader>
                 <content>
-                    <Table id="itemsTable" items="{odata>/InvoiceItems}">
+                    <Table id="itemsTable" items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}">
                         <columns>
                             <Column><Text text="{i18n>itemNumber}" /></Column>
                             <Column><Text text="{i18n>itemDescription}" /></Column>
                             <Column><Text text="{i18n>vatRate}" /></Column>
                             <Column><Text text="{i18n>itemDefaultPrice}" /></Column>
+                            <Column />
                         </columns>
                         <items>
                             <ColumnListItem>
@@ -33,6 +34,7 @@
                                     <Text text="{odata>Description}" />
                                     <Text text="{odata>VatRate}" />
                                     <Text text="{odata>DefaultPrice}" />
+                                    <Button text="{i18n>edit}" press="onEditItem" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>

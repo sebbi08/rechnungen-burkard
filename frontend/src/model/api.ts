@@ -24,6 +24,14 @@ function post(url: string, payload: unknown): Promise<Response> {
     });
 }
 
+function patch(url: string, payload: unknown): Promise<Response> {
+    return fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+}
+
 const CODE_TO_I18N: Record<string, string> = {
     StampWordRequired: "errorStampWordRequired",
     PriceRequired: "errorPriceRequired",
@@ -78,8 +86,24 @@ export async function createItem(item: {
     await ensureOk(await post("/odata/InvoiceItems", { ...item, DefaultPrice: item.DefaultPrice ?? null }));
 }
 
-export async function createRecipient(recipient: { Name: string; Address: string }): Promise<void> {
-    await ensureOk(await post("/odata/Recipients", recipient));
+export async function updateItem(id: number, fields: {
+    Number?: string; Description?: string; VatRate?: number; DefaultPrice?: number | null;
+}): Promise<void> {
+    await ensureOk(await patch(`/odata/InvoiceItems(${id})`, fields));
+}
+
+export async function createRecipient(recipient: { Name: string; Address: string }): Promise<number> {
+    const response = await post("/odata/Recipients", recipient);
+    await ensureOk(response);
+    const body = await response.json();
+    // OData entity responses are PascalCase; accept camelCase defensively
+    return (body.Id ?? body.id) as number;
+}
+
+export async function updateRecipient(id: number, fields: {
+    Name?: string; Address?: string;
+}): Promise<void> {
+    await ensureOk(await patch(`/odata/Recipients(${id})`, fields));
 }
 
 export interface InvoiceLineDto {
@@ -187,6 +211,19 @@ export async function fetchGraveStatus(year: number, half: number): Promise<any[
     await ensureOk(response);
     const body = await response.json();
     return body.value as any[];
+}
+
+export interface GraveSearchResult {
+    id: number;
+    graveNumber: string;
+    recipientNames: string[];
+}
+
+export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
+    const response = await fetch(`/odata/SearchGraves?term=${encodeURIComponent(term)}`);
+    await ensureOk(response);
+    const body = await response.json();
+    return body.value as GraveSearchResult[];
 }
 
 export async function createGrave(grave: {

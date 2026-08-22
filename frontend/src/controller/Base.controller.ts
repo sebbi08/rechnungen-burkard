@@ -10,4 +10,8 @@ export default abstract class BaseController extends Controller {
             (UIComponent.getRouterFor(this) as Router).navTo(key);
         }
     }
+
+    protected i18nText(key: string): string {
+        return (this.getView()!.getModel("i18n") as any).getResourceBundle().getText(key);
+    }
 }

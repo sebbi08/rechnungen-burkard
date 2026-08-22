@@ -99,9 +99,12 @@ test("create a grave and link item and recipient (Story 5)", async ({ page }) =>
     const gravesTable = page.locator("[id$='gravesTable-listUl']");
 
     await page.getByRole("button", { name: "Grab anlegen" }).click();
-    await page.getByLabel("Grabnummer").fill(graveNumber);
-    await page.getByLabel("Beginn").fill("2026-01-01");
-    await page.getByLabel("Ende").fill("2040-12-31");
+    // scope to the dialog: the new toolbar search field's accessible name also
+    // contains "Grabnummer" and would win the race while the dialog loads
+    const graveDialog = page.locator(".sapMDialog");
+    await graveDialog.getByLabel("Grabnummer").fill(graveNumber);
+    await graveDialog.getByLabel("Beginn").fill("2026-01-01");
+    await graveDialog.getByLabel("Ende").fill("2040-12-31");
     await page.getByRole("button", { name: "Speichern" }).click();
 
     await expect(gravesTable).toContainText(graveNumber);

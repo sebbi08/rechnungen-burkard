@@ -6,6 +6,8 @@ import Filter from "sap/ui/model/Filter";
 import FilterOperator from "sap/ui/model/FilterOperator";
 import Context from "sap/ui/model/odata/v4/Context";
 import Select from "sap/m/Select";
+import Input from "sap/m/Input";
+import TextArea from "sap/m/TextArea";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Item from "sap/ui/core/Item";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
@@ -130,6 +132,41 @@ export default class Invoices extends BaseController {
         this._dialog.close();
     }
 
+    public async onNewRecipient(): Promise<void> {
+        if (!this._quickDialog) {
+            // loadFragment passes this controller and the view ID prefix so that
+            // this.byId(...) finds the quick-create dialog controls
+            this._quickDialog = await this.loadFragment({
+                name: "burkard.invoicing.view.fragments.RecipientQuickCreate",
+            }) as any;
+        }
+        (this.byId("quickName") as Input).setValue("");
+        (this.byId("quickAddress") as TextArea).setValue("");
+        this._quickDialog.open();
+    }
+
+    public async onQuickRecipientSave(event: any): Promise<void> {
+        const dialog = event.getSource().getParent() as any;
+        try {
+            const id = await api.createRecipient({
+                Name: (this.byId("quickName") as Input).getValue(),
+                Address: (this.byId("quickAddress") as TextArea).getValue(),
+            });
+            // refresh the recipient select's list so the new row is included,
+            // then select it in the parent invoice dialog, which stays open
+            const select = this.byId("recipient") as Select;
+            await (select.getBinding("items") as ODataListBinding).refresh();
+            (this._dialog.getModel("invoiceDraft") as JSONModel).setProperty("/recipientId", id);
+            dialog.close();
+        } catch (error) {
+            await api.showError(this, error);
+        }
+    }
+
+    public onQuickRecipientCancel(event: any): void {
+        (event.getSource().getParent() as any).close();
+    }
+
     public async onDownloadNormal(event: any): Promise<void> {
         await this.download(event.getSource().getBindingContext("odata") as Context, false);
     }
@@ -185,5 +222,18 @@ export default class Invoices extends BaseController {
         return date.toLocaleDateString("de-DE");
     }
 
+    public formatInvoiceNumber(value: string | null | undefined): string {
+        if (value == null) {
+            return "";
+        }
+        const index = value.lastIndexOf("-R");
+        return index >= 0 ? value.slice(0, index) : value;
+    }
+
+    public formatRevisionBadge(value: number | null | undefined): string {
+        return value != null && value > 0 ? `R${value}` : "";
+    }
+
+    private _quickDialog: any;
     private _dialog: any;
 }
