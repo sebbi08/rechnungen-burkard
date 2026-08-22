@@ -30,4 +30,18 @@ public class VatRateTests : IClassFixture<ApiTestHost>
         var response = await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = -1m }));
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Post_scale_equivalent_rate_is_rejected_after_normalization()
+    {
+        using var client = _host.CreateClient();
+        var first = await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19.0m }));
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+        // 19 == 19.0 after normalization: the duplicate must be detected
+        var duplicate = await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19m }));
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
+        using var json = await ODataJson.ReadAsync(duplicate);
+        Assert.Equal("VatRateExists", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
 }

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Burkard.Invoicing.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260821202258_InitialCreate")]
+    [Migration("20260822173058_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -139,9 +139,10 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GraveId");
-
                     b.HasIndex("ItemId");
+
+                    b.HasIndex("GraveId", "ItemId")
+                        .IsUnique();
 
                     b.ToTable("GraveItems");
                 });
@@ -160,9 +161,10 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GraveId");
-
                     b.HasIndex("RecipientId");
+
+                    b.HasIndex("GraveId", "RecipientId")
+                        .IsUnique();
 
                     b.ToTable("GraveRecipients");
                 });
@@ -403,7 +405,7 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.HasOne("Burkard.Invoicing.Domain.Entities.InvoiceItem", "Item")
                         .WithMany()
                         .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Item");
@@ -420,7 +422,7 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.HasOne("Burkard.Invoicing.Domain.Entities.Recipient", "Recipient")
                         .WithMany()
                         .HasForeignKey("RecipientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Recipient");

@@ -42,12 +42,25 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
 
 test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
     await page.goto("/index.html#/recipients");
-    await page.getByRole("button", { name: "Empfänger anlegen" }).click();
-    // scope to the dialog: the page search field's placeholder also contains "Name"
-    await page.locator(".sapMDialog").getByLabel("Name").fill("Familie Mahr");
-    await page.getByLabel("Adresse").fill("Musterstraße 1\n12345 Musterstadt");
-    await page.getByRole("button", { name: "Speichern" }).click();
 
-    await page.getByRole("searchbox").fill("Mahr");
+    const createRecipient = async (name: string) => {
+        await page.getByRole("button", { name: "Empfänger anlegen" }).click();
+        // scope to the dialog: the page search field's placeholder also contains "Name"
+        await page.locator(".sapMDialog").getByLabel("Name").fill(name);
+        await page.getByLabel("Adresse").fill("Musterstraße 1\n12345 Musterstadt");
+        await page.getByRole("button", { name: "Speichern" }).click();
+        await expect(page.locator("table")).toContainText(name);
+        // wait until the dialog has fully closed before reopening it
+        await expect(page.locator(".sapMDialog")).toBeHidden();
+    };
+
+    await createRecipient("Familie Mahr");
+    await createRecipient("Zweiter Empfänger");
+
+    // search must actually narrow the list: "Mahr" matches only the first recipient
+    const search = page.getByRole("searchbox");
+    await search.fill("Mahr");
+    await search.press("Enter");
     await expect(page.locator("table")).toContainText("Familie Mahr");
+    await expect(page.locator("table")).not.toContainText("Zweiter Empfänger");
 });

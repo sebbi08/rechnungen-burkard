@@ -23,8 +23,16 @@ public class RecipientsController : ODataController
         return recipient is null ? NotFound() : Ok(recipient);
     }
 
-    public IActionResult Post([FromBody] Recipient recipient)
+    public IActionResult Post([FromBody] Recipient? recipient)
     {
+        if (recipient is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         var error = Validate(recipient);
         if (error is not null) return BadRequest(error);
 
@@ -33,8 +41,16 @@ public class RecipientsController : ODataController
         return Created(recipient);
     }
 
-    public IActionResult Patch([FromRoute] long key, [FromBody] Delta<Recipient> delta)
+    public IActionResult Patch([FromRoute] long key, [FromBody] Delta<Recipient>? delta)
     {
+        if (delta is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         var recipient = _db.Recipients.Find(key);
         if (recipient is null) return NotFound();
 
@@ -51,7 +67,19 @@ public class RecipientsController : ODataController
         var recipient = _db.Recipients.Find(key);
         if (recipient is null) return NotFound();
         _db.Recipients.Remove(recipient);
-        _db.SaveChanges();
+        try
+        {
+            _db.SaveChanges();
+        }
+        catch (DbUpdateException)
+        {
+            // Restrict FK: the recipient is still linked to a grave
+            return BadRequest(new
+            {
+                error = new { code = "RecipientInUse", message = "This recipient is linked to a grave and cannot be deleted." }
+            });
+        }
+
         return NoContent();
     }
 

@@ -7,6 +7,10 @@ export default {
         return new ODataModel({
             serviceUrl: "/odata/",
             synchronizationMode: "None",
+            // list-binding filters (search fields, half-year filter) require
+            // Server mode; the app never queues client-side changes, so all
+            // writes stay on the server anyway
+            operationMode: "Server",
             // the backend does not expose a $batch endpoint, so send requests directly
             groupId: "$direct",
         });

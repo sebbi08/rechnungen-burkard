@@ -16,8 +16,16 @@ public class GraveRecipientsController : ODataController
     [EnableQuery]
     public IQueryable<GraveRecipient> Get() => _db.GraveRecipients.AsNoTracking();
 
-    public IActionResult Post([FromBody] GraveRecipient link)
+    public IActionResult Post([FromBody] GraveRecipient? link)
     {
+        if (link is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         if (!_db.Graves.Any(g => g.Id == link.GraveId))
         {
             return BadRequest(new
@@ -31,6 +39,14 @@ public class GraveRecipientsController : ODataController
             return BadRequest(new
             {
                 error = new { code = "RecipientNotFound", message = "The recipient does not exist." }
+            });
+        }
+
+        if (_db.GraveRecipients.Any(l => l.GraveId == link.GraveId && l.RecipientId == link.RecipientId))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "GraveRecipientLinkExists", message = "This recipient is already linked to the grave." }
             });
         }
 

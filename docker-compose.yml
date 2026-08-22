@@ -22,5 +22,4 @@ services:
     ports:
       - "8080:8080"
 volumes:
-  invoicing-data:
   frontend-node-modules:

@@ -6,10 +6,13 @@ import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Select from "sap/m/Select";
 import Input from "sap/m/Input";
+import Item from "sap/ui/core/Item";
 import BusyDialog from "sap/m/BusyDialog";
 import MessageBox from "sap/m/MessageBox";
 
 export default class Graves extends BaseController {
+    private static readonly JOB_TIMEOUT_MS = 10 * 60 * 1000;
+
     public onInit(): void {
         const view = this.getView()!;
         // routed views run onInit before they are added to the App, so the
@@ -17,6 +20,16 @@ export default class Graves extends BaseController {
         const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
         view.setBindingContext(model.createBindingContext("/") as Context, "odata");
         view.setModel(new JSONModel({ statuses: {} }), "status");
+
+        // half-year options are generated at runtime; default to the current
+        // year's first half, matching the generate dialog's default half
+        const select = this.byId("halfYearSelect") as Select;
+        select.removeAllItems();
+        for (const option of api.halfYearOptions(2, 1)) {
+            select.addItem(new Item({ key: option.key, text: option.text }));
+        }
+        select.setSelectedKey(`${new Date().getFullYear()}-1`);
+
         void this.refreshStatus();
     }
 
@@ -207,6 +220,15 @@ export default class Graves extends BaseController {
                 name: "burkard.invoicing.view.fragments.GenerateDialog",
             }) as any;
         }
+
+        // year options are generated at runtime; default to the current year
+        const yearSelect = this.byId("genYear") as Select;
+        yearSelect.removeAllItems();
+        for (const option of api.yearOptions(1, 1)) {
+            yearSelect.addItem(new Item({ key: option.key, text: option.text }));
+        }
+        yearSelect.setSelectedKey(String(new Date().getFullYear()));
+
         this._generateDialog.open();
     }
 
@@ -221,14 +243,21 @@ export default class Graves extends BaseController {
         busy.open();
 
         let finished: api.JobDto | null = null;
+        let failure: unknown = null;
         try {
             const job = await api.generateGraveInvoices(year, half);
             finished = await this.pollJob(job.Id);
         } catch (error) {
-            await api.showError(this, error);
+            failure = error;
         } finally {
+            // close the busy dialog before any result or error message opens
             busy.close();
             this._running = false;
+        }
+
+        if (failure) {
+            await api.showError(this, failure);
+            return;
         }
 
         if (!finished) {
@@ -256,7 +285,12 @@ export default class Graves extends BaseController {
     }
 
     private async pollJob(jobId: number): Promise<api.JobDto> {
+        const deadline = Date.now() + Graves.JOB_TIMEOUT_MS;
         while (true) {
+            if (Date.now() > deadline) {
+                throw new Error("JobTimeout");
+            }
+
             const response = await fetch(`/odata/Jobs(${jobId})`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);

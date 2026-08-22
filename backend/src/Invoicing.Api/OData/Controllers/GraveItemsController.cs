@@ -16,8 +16,16 @@ public class GraveItemsController : ODataController
     [EnableQuery]
     public IQueryable<GraveItem> Get() => _db.GraveItems.AsNoTracking();
 
-    public IActionResult Post([FromBody] GraveItem link)
+    public IActionResult Post([FromBody] GraveItem? link)
     {
+        if (link is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         if (!_db.Graves.Any(g => g.Id == link.GraveId))
         {
             return BadRequest(new
@@ -39,6 +47,14 @@ public class GraveItemsController : ODataController
             return BadRequest(new
             {
                 error = new { code = "InvalidCount", message = "The count must be positive." }
+            });
+        }
+
+        if (_db.GraveItems.Any(l => l.GraveId == link.GraveId && l.ItemId == link.ItemId))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "GraveItemLinkExists", message = "This item is already linked to the grave." }
             });
         }
 

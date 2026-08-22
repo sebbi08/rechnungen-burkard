@@ -14,12 +14,7 @@
                 <subHeader>
                     <Toolbar>
                         <Label text="{i18n>halfYear}" labelFor="halfYearSelect" />
-                        <Select id="halfYearSelect" width="10rem" selectedKey="2026-1" change="onHalfYearChange">
-                            <core:Item key="2026-1" text="H1 2026" />
-                            <core:Item key="2026-2" text="H2 2026" />
-                            <core:Item key="2025-1" text="H1 2025" />
-                            <core:Item key="2025-2" text="H2 2025" />
-                        </Select>
+                        <Select id="halfYearSelect" width="10rem" change="onHalfYearChange" />
                         <ToolbarSpacer />
                         <Button text="{i18n>createGrave}" press="onCreateGrave" />
                         <Button text="{i18n>generateInvoices}" press="onGenerateInvoices" type="Emphasized" />

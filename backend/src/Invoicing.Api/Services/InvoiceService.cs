@@ -57,7 +57,6 @@ public sealed class InvoiceService
         IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
     {
         var original = await _db.Invoices
-            .Include(i => i.Lines).Include(i => i.Documents)
             .SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
@@ -99,7 +98,10 @@ public sealed class InvoiceService
         _db.Invoices.Add(revision);
         await _db.SaveChangesAsync(ct);
 
-        var data = _dataBuilder.Build(revision, shareText: null);
+        var shareText = original.SharePercent is { } sharePercent
+            ? DocumentTexts.ShareText(sharePercent)
+            : null;
+        var data = _dataBuilder.Build(revision, shareText);
         revision.Documents = new List<Document>
         {
             new()

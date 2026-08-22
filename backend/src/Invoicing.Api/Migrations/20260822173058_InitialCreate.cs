@@ -175,7 +175,7 @@ namespace Burkard.Invoicing.Api.Migrations
                         column: x => x.ItemId,
                         principalTable: "InvoiceItems",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -250,7 +250,7 @@ namespace Burkard.Invoicing.Api.Migrations
                         column: x => x.RecipientId,
                         principalTable: "Recipients",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
@@ -265,9 +265,10 @@ namespace Burkard.Invoicing.Api.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_GraveItems_GraveId",
+                name: "IX_GraveItems_GraveId_ItemId",
                 table: "GraveItems",
-                column: "GraveId");
+                columns: new[] { "GraveId", "ItemId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_GraveItems_ItemId",
@@ -275,9 +276,10 @@ namespace Burkard.Invoicing.Api.Migrations
                 column: "ItemId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_GraveRecipients_GraveId",
+                name: "IX_GraveRecipients_GraveId_RecipientId",
                 table: "GraveRecipients",
-                column: "GraveId");
+                columns: new[] { "GraveId", "RecipientId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_GraveRecipients_RecipientId",

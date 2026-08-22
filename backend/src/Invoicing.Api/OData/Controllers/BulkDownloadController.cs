@@ -15,8 +15,16 @@ public class BulkDownloadController : ODataController
     public BulkDownloadController(AppDbContext db) => _db = db;
 
     [HttpPost("BulkDownloadDocuments")]
-    public async Task<IActionResult> Bulk([FromBody] BulkDownloadRequest request)
+    public async Task<IActionResult> Bulk([FromBody] BulkDownloadRequest? request)
     {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         if (request.Kind is not ("Normal" or "Copy"))
         {
             return BadRequest(new

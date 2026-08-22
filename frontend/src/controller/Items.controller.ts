@@ -34,12 +34,16 @@ export default class Items extends BaseController {
     }
 
     public async onCreateItem(): Promise<void> {
-        // loadFragment passes this controller and the view ID prefix so that
-        // this.byId(...) finds the dialog controls and IDs stay unique
-        const dialog = await this.loadFragment({
-            name: "burkard.invoicing.view.fragments.ItemDialog",
-        }) as any;
-        dialog.open();
+        if (!this._dialog) {
+            // loadFragment passes this controller and the view ID prefix so that
+            // this.byId(...) finds the dialog controls and IDs stay unique; the
+            // fragment must be reused on later opens or the view-prefixed child
+            // IDs collide with the first instance
+            this._dialog = await this.loadFragment({
+                name: "burkard.invoicing.view.fragments.ItemDialog",
+            }) as any;
+        }
+        this._dialog.open();
     }
 
     public async onDialogSave(event: any): Promise<void> {
@@ -62,4 +66,6 @@ export default class Items extends BaseController {
     public onDialogCancel(event: any): void {
         (event.getSource().getParent() as any).close();
     }
+
+    private _dialog: any;
 }

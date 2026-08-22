@@ -119,6 +119,24 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         Assert.Equal("VatRateNotConfigured", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task Create_item_with_scale_equivalent_vat_rate_is_accepted()
+    {
+        using var client = _host.CreateClient();
+        await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19.0m }));
+
+        // only "19" is configured; "19.0" must be normalized and accepted
+        var response = await client.PostAsync("/odata/InvoiceItems", ODataJson.Body(new
+        {
+            Number = "4001",
+            Description = "Grabpflege",
+            VatRate = 19.0m,
+        }));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(19m, json.RootElement.GetProperty("VatRate").GetDecimal());
+    }
+
     private static async Task<long> GetCreatedIdAsync(HttpResponseMessage created)
     {
         using var json = await ODataJson.ReadAsync(created);

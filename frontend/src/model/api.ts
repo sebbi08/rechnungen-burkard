@@ -34,6 +34,7 @@ const CODE_TO_I18N: Record<string, string> = {
     InvalidVatRate: "errorInvalidVatRate",
     GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
     JobAlreadyRunning: "errorJobAlreadyRunning",
+    JobTimeout: "errorJobTimeout",
     GraveNotSaved: "errorGraveNotSaved",
 };
 
@@ -101,7 +102,9 @@ export async function createRevision(invoiceId: number, recipientId: number, lin
 }
 
 export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
-    const response = await fetch(`/odata/Invoices(${invoiceId})/Documents`);
+    // only the id and file name are needed for the download links; keep the
+    // PDF blobs out of the response
+    const response = await fetch(`/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName`);
     await ensureOk(response);
     const body = await response.json();
     return body.value as DocumentDto[];
@@ -111,11 +114,48 @@ export function downloadUrl(documentId: number): string {
     return `/odata/Documents(${documentId})/$value`;
 }
 
-export async function bulkDownload(kind: "Normal" | "Copy", fileName: string): Promise<void> {
-    const response = await post("/odata/BulkDownloadDocuments", { kind });
+export async function bulkDownload(
+    kind: "Normal" | "Copy",
+    fileName: string,
+    year?: number,
+    half?: number,
+): Promise<void> {
+    const payload: Record<string, unknown> = { kind };
+    if (year != null && half != null) {
+        payload.year = year;
+        payload.half = half;
+    }
+
+    const response = await post("/odata/BulkDownloadDocuments", payload);
     await ensureOk(response);
     const blob = await response.blob();
     await downloadBlob(blob, fileName);
+}
+
+export interface YearHalfOption {
+    key: string;
+    text: string;
+}
+
+// Half-year keys ("2026-1", "2026-2") for the given year range, newest first.
+export function halfYearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
+    const currentYear = new Date().getFullYear();
+    const options: YearHalfOption[] = [];
+    for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
+        options.push({ key: `${year}-2`, text: `H2 ${year}` });
+        options.push({ key: `${year}-1`, text: `H1 ${year}` });
+    }
+    return options;
+}
+
+// Year-only keys ("2026") for the given year range, newest first.
+export function yearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
+    const currentYear = new Date().getFullYear();
+    const options: YearHalfOption[] = [];
+    for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
+        options.push({ key: String(year), text: String(year) });
+    }
+    return options;
 }
 
 export async function downloadBlob(blob: Blob, fileName: string): Promise<void> {

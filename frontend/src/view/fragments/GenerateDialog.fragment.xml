@@ -3,11 +3,7 @@
         <content>
             <VBox class="sapUiContentPadding">
                 <Label text="{i18n>halfYear}" labelFor="genYear" />
-                <Select id="genYear" width="10rem" selectedKey="2026">
-                    <core:Item key="2026" text="2026" />
-                    <core:Item key="2025" text="2025" />
-                    <core:Item key="2024" text="2024" />
-                </Select>
+                <Select id="genYear" width="10rem" />
                 <Select id="genHalf" width="10rem" selectedKey="1">
                     <core:Item key="1" text="H1" />
                     <core:Item key="2" text="H2" />

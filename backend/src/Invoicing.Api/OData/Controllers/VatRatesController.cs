@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
@@ -22,8 +23,18 @@ public class VatRatesController : ODataController
         return rate is null ? NotFound() : Ok(rate);
     }
 
-    public IActionResult Post([FromBody] VatRate rate)
+    public IActionResult Post([FromBody] VatRate? rate)
     {
+        if (rate is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
+        rate.Rate = VatRateNormalizer.Normalize(rate.Rate);
+
         if (rate.Rate <= 0)
         {
             return BadRequest(new

@@ -25,8 +25,24 @@ public class InvoiceActionsController : ODataController
     }
 
     [HttpPost("CreateInvoice")]
-    public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest request)
+    public async Task<IActionResult> CreateInvoice([FromBody] CreateInvoiceRequest? request)
     {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "NoLines", message = "At least one line is required." }
+            });
+        }
+
         try
         {
             var invoice = await _service.CreateAsync(request.RecipientId, request.Lines, HttpContext.RequestAborted);

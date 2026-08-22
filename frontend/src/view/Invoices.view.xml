@@ -13,13 +13,7 @@
             <Page title="{i18n>menuInvoices}" titleLevel="H1">
                 <subHeader>
                     <Toolbar>
-                        <Select id="halfYearFilter" width="12rem" change="onHalfYearChange">
-                            <core:Item key="" text="{i18n>allInvoices}" />
-                            <core:Item key="2026-1" text="H1 2026" />
-                            <core:Item key="2026-2" text="H2 2026" />
-                            <core:Item key="2025-1" text="H1 2025" />
-                            <core:Item key="2025-2" text="H2 2025" />
-                        </Select>
+                        <Select id="halfYearFilter" width="12rem" change="onHalfYearChange" />
                         <ToolbarSpacer />
                         <Button text="{i18n>bulkNormal}" press="onBulkNormal" />
                         <Button text="{i18n>bulkCopy}" press="onBulkCopy" />

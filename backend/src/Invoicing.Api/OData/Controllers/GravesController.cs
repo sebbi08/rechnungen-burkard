@@ -61,8 +61,16 @@ public class GravesController : ODataController
         return new JsonResult(result, PascalCaseJson);
     }
 
-    public IActionResult Post([FromBody] Grave grave)
+    public IActionResult Post([FromBody] Grave? grave)
     {
+        if (grave is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         if (string.IsNullOrWhiteSpace(grave.GraveNumber))
         {
             return BadRequest(new
@@ -77,8 +85,16 @@ public class GravesController : ODataController
         return Created(grave);
     }
 
-    public IActionResult Patch([FromRoute] long key, [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave> delta)
+    public IActionResult Patch([FromRoute] long key, [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave>? delta)
     {
+        if (delta is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         var grave = _db.Graves.Find(key);
         if (grave is null) return NotFound();
         delta.Patch(grave);

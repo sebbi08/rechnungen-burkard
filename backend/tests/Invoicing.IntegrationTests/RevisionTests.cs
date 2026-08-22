@@ -114,4 +114,88 @@ public class RevisionTests : IClassFixture<ApiTestHost>
         var revisions = await db.Invoices.CountAsync(i => i.RootId == invoiceId);
         Assert.Equal(1, revisions);
     }
+
+    [Fact]
+    public async Task Revision_of_grave_invoice_keeps_share_percent_and_documents()
+    {
+        // own host: this test seeds the same vat rate as the other tests in
+        // this class, so the shared fixture database would collide
+        using var host = new ApiTestHost();
+
+        // seed a grave with one item and one recipient, then generate its invoice
+        long graveId, itemId, recipientId, invoiceId;
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.VatRates.Add(new VatRate { Rate = 7m });
+            var item = new InvoiceItem { Number = "5002", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
+            var recipient = new Recipient { Name = "Max Beispiel", Address = "Hauptstraße 2\n99999 Musterdorf" };
+            db.InvoiceItems.Add(item);
+            db.Recipients.Add(recipient);
+            var grave = new Grave
+            {
+                GraveNumber = "R-001",
+                StartDate = new DateOnly(2020, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            db.GraveItems.Add(new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 2 });
+            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = recipient.Id });
+            await db.SaveChangesAsync();
+            (graveId, itemId, recipientId) = (grave.Id, item.Id, recipient.Id);
+        }
+
+        using var client = host.CreateClient();
+        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2027, half = 1 }));
+        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
+        using var startJson = await ODataJson.ReadAsync(start);
+        var jobId = startJson.RootElement.GetProperty("Id").GetInt64();
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        while (DateTime.UtcNow < deadline)
+        {
+            var jobResponse = await client.GetAsync($"/odata/Jobs({jobId})");
+            jobResponse.EnsureSuccessStatusCode();
+            using var jobJson = await ODataJson.ReadAsync(jobResponse);
+            var status = jobJson.RootElement.GetProperty("Status").GetString();
+            Assert.NotEqual("Failed", status);
+            if (status == "Succeeded")
+            {
+                break;
+            }
+
+            await Task.Delay(100);
+        }
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            invoiceId = (await db.Invoices.SingleAsync(i => i.GraveId == graveId
+                && i.PeriodYear == 2027 && i.PeriodHalf == 1)).Id;
+        }
+
+        var revisionResponse = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
+        {
+            invoiceId,
+            recipientId,
+            lines = new[] { new { itemId, count = 2, unitPrice = (decimal?)null } },
+        }));
+        Assert.Equal(HttpStatusCode.Created, revisionResponse.StatusCode);
+
+        using var scope2 = host.Services.CreateScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var original = await db2.Invoices.SingleAsync(i => i.Id == invoiceId);
+        var revision = await db2.Invoices
+            .Include(i => i.Documents)
+            .SingleAsync(i => i.RootId == invoiceId && i.RevisionNumber == 1);
+
+        // the revision must keep the share statement data of the original
+        Assert.NotNull(original.SharePercent);
+        Assert.Equal(original.SharePercent, revision.SharePercent);
+        Assert.Equal(2, revision.Documents.Count);
+        Assert.All(revision.Documents, d => Assert.NotEmpty(d.Content));
+    }
 }

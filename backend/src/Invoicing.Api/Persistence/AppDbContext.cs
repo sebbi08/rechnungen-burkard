@@ -36,5 +36,12 @@ public sealed class AppDbContext : DbContext
         mb.Entity<Grave>().HasMany(g => g.Recipients).WithOne().HasForeignKey(r => r.GraveId).OnDelete(DeleteBehavior.Cascade);
         mb.Entity<Invoice>().HasMany(i => i.Lines).WithOne().HasForeignKey(l => l.InvoiceId).OnDelete(DeleteBehavior.Cascade);
         mb.Entity<Invoice>().HasMany(i => i.Documents).WithOne(d => d.Invoice).HasForeignKey(d => d.InvoiceId).OnDelete(DeleteBehavior.Cascade);
+        // a grave link must not vanish together with the referenced item/recipient;
+        // deleting a referenced row is blocked (handled as a 400 in the controllers)
+        mb.Entity<GraveItem>().HasOne(i => i.Item).WithMany().HasForeignKey(i => i.ItemId).OnDelete(DeleteBehavior.Restrict);
+        mb.Entity<GraveRecipient>().HasOne(r => r.Recipient).WithMany().HasForeignKey(r => r.RecipientId).OnDelete(DeleteBehavior.Restrict);
+        // one link per (grave, item) / (grave, recipient)
+        mb.Entity<GraveItem>().HasIndex(i => new { i.GraveId, i.ItemId }).IsUnique();
+        mb.Entity<GraveRecipient>().HasIndex(r => new { r.GraveId, r.RecipientId }).IsUnique();
     }
 }

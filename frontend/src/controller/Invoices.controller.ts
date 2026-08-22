@@ -7,6 +7,9 @@ import FilterOperator from "sap/ui/model/FilterOperator";
 import Context from "sap/ui/model/odata/v4/Context";
 import Select from "sap/m/Select";
 import JSONModel from "sap/ui/model/json/JSONModel";
+import Item from "sap/ui/core/Item";
+import ResourceModel from "sap/ui/model/resource/ResourceModel";
+import type ResourceBundle from "sap/base/i18n/ResourceBundle";
 
 export default class Invoices extends BaseController {
     public onInit(): void {
@@ -15,6 +18,16 @@ export default class Invoices extends BaseController {
         const view = this.getView()!;
         const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
         view.setBindingContext(model.createBindingContext("/") as Context, "odata");
+
+        // half-year filter options are generated at runtime
+        const select = this.byId("halfYearFilter") as Select;
+        const bundle = (this.getOwnerComponent()!.getModel("i18n") as ResourceModel)
+            .getResourceBundle() as ResourceBundle;
+        select.removeAllItems();
+        select.addItem(new Item({ key: "", text: bundle.getText("allInvoices") }));
+        for (const option of api.halfYearOptions(2, 1)) {
+            select.addItem(new Item({ key: option.key, text: option.text }));
+        }
     }
 
     public onHalfYearChange(event: any): void {
@@ -65,16 +78,21 @@ export default class Invoices extends BaseController {
     }
 
     private async loadLines(invoiceId: number): Promise<any[]> {
-        const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        try {
+            const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const body = await response.json();
+            return (body.value as any[]).map((line) => ({
+                itemId: line.ItemId,
+                count: line.Count,
+                unitPrice: line.UnitPrice,
+            }));
+        } catch (error) {
+            await api.showError(this, error);
+            return [{ itemId: null, count: 1, unitPrice: null }];
         }
-        const body = await response.json();
-        return (body.value as any[]).map((line) => ({
-            itemId: line.ItemId,
-            count: line.Count,
-            unitPrice: line.UnitPrice,
-        }));
     }
 
     public onAddLine(): void {
@@ -90,7 +108,8 @@ export default class Invoices extends BaseController {
         const lines = (draft.lines as any[]).map((line) => ({
             itemId: Number(line.itemId),
             count: Number(line.count),
-            unitPrice: line.unitPrice ? Number(line.unitPrice) : null,
+            // a price of 0 is a real value, not a missing one
+            unitPrice: line.unitPrice != null ? Number(line.unitPrice) : null,
         }));
 
         try {
@@ -120,20 +139,42 @@ export default class Invoices extends BaseController {
     }
 
     private async download(context: Context, isCopy: boolean): Promise<void> {
-        const invoiceId = context.getProperty("Id") as number;
-        const documents = await api.fetchDocuments(invoiceId);
-        const match = documents.find((d) => d.FileName.includes("Kopie") === isCopy);
-        if (match) {
-            window.open(api.downloadUrl(match.Id), "_blank");
+        try {
+            const invoiceId = context.getProperty("Id") as number;
+            const documents = await api.fetchDocuments(invoiceId);
+            const match = documents.find((d) => d.FileName.includes("Kopie") === isCopy);
+            if (match) {
+                window.open(api.downloadUrl(match.Id), "_blank");
+            }
+        } catch (error) {
+            await api.showError(this, error);
+        }
+    }
+
+    private async onBulk(kind: "Normal" | "Copy", fileName: string): Promise<void> {
+        try {
+            // the half-year filter also narrows the bulk download
+            const key = (this.byId("halfYearFilter") as Select).getSelectedKey();
+            let year: number | undefined;
+            let half: number | undefined;
+            if (key) {
+                const [yearPart, halfPart] = key.split("-").map(Number);
+                year = yearPart;
+                half = halfPart;
+            }
+
+            await api.bulkDownload(kind, fileName, year, half);
+        } catch (error) {
+            await api.showError(this, error);
         }
     }
 
     public async onBulkNormal(): Promise<void> {
-        await api.bulkDownload("Normal", "rechnungen.zip");
+        await this.onBulk("Normal", "rechnungen.zip");
     }
 
     public async onBulkCopy(): Promise<void> {
-        await api.bulkDownload("Copy", "kopien.zip");
+        await this.onBulk("Copy", "kopien.zip");
     }
 
     public formatDate(value: Date | string | null | undefined): string {
