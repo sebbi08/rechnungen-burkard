@@ -1,5 +1,4 @@
 import type Controller from "sap/ui/core/mvc/Controller";
-import MessageToast from "sap/m/MessageToast";
 import MessageBox from "sap/m/MessageBox";
 import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
@@ -42,11 +41,11 @@ export async function showError(controller: Controller, error: unknown): Promise
     const bundle = (controller.getOwnerComponent()!.getModel("i18n") as ResourceModel)
         .getResourceBundle() as ResourceBundle;
 
-    // Known backend error codes are shown as a short toast with a German text;
-    // anything unexpected falls back to a generic MessageBox.
+    // Known backend error codes are shown in a blocking MessageBox with a German
+    // text; anything unexpected falls back to a generic MessageBox with the code.
     const key = CODE_TO_I18N[raw];
     if (key) {
-        await MessageToast.show(bundle.getText(key) ?? key);
+        await MessageBox.error(bundle.getText(key) ?? key);
         return;
     }
 

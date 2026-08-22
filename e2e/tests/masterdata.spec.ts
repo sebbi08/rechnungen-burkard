@@ -5,11 +5,22 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
 
     await page.getByLabel("Stempelwort").fill("");
     await page.getByRole("button", { name: "Speichern" }).click();
-    await expect(page.locator(".sapMMessageToast, .sapMDialog")).toContainText("Stempelwort");
+    await expect(page.locator(".sapMDialog")).toContainText("Stempelwort");
+
+    // the error is a blocking dialog: dismiss it before continuing
+    await page.locator(".sapMDialog").getByRole("button").click();
+    await expect(page.locator(".sapMDialog")).toHaveCount(0);
 
     await page.getByLabel("Stempelwort").fill("Kopie");
     await page.getByLabel("VAT-Satz").fill("7");
     await page.getByRole("button", { name: "VAT-Satz hinzufügen" }).click();
+    // on reruns the rate may already exist: dismiss the blocking error dialog
+    const errorDialog = page.locator(".sapMDialog");
+    await errorDialog.waitFor({ state: "attached", timeout: 2000 }).catch(() => {});
+    if (await errorDialog.count()) {
+        await errorDialog.getByRole("button").click();
+        await expect(errorDialog).toHaveCount(0);
+    }
     await page.getByRole("button", { name: "Speichern" }).click();
 
     await expect(page.locator(".sapMListTbl")).toContainText("7");
