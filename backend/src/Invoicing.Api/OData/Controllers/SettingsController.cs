@@ -19,8 +19,16 @@ public class SettingsController : ODataController
         return Ok(settings);
     }
 
-    public IActionResult Patch([FromBody] Delta<GlobalSettings> delta)
+    public IActionResult Patch([FromBody] Delta<GlobalSettings>? delta)
     {
+        if (delta is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         var settings = _db.GlobalSettings.FirstOrDefault()
             ?? throw new InvalidOperationException("GlobalSettings not seeded.");
 

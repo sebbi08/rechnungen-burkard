@@ -63,8 +63,24 @@ public class InvoiceActionsController : ODataController
     }
 
     [HttpPost("CreateRevision")]
-    public async Task<IActionResult> CreateRevision([FromBody] CreateRevisionRequest request)
+    public async Task<IActionResult> CreateRevision([FromBody] CreateRevisionRequest? request)
     {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "NoLines", message = "At least one line is required." }
+            });
+        }
+
         try
         {
             var invoice = await _service.CreateRevisionAsync(
@@ -84,8 +100,16 @@ public class InvoiceActionsController : ODataController
     }
 
     [HttpPost("GenerateGraveInvoices")]
-    public async Task<IActionResult> GenerateGraveInvoices([FromBody] GenerateGraveInvoicesRequest request)
+    public async Task<IActionResult> GenerateGraveInvoices([FromBody] GenerateGraveInvoicesRequest? request)
     {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
         if (request.Year < 2000 || request.Year > 2100 || request.Half is not (1 or 2))
         {
             return BadRequest(new
