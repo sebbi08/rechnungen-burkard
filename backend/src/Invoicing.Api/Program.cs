@@ -35,6 +35,10 @@ using (var scope = app.Services.CreateScope())
     DatabaseSeeder.Seed(db);
 }
 
+// Serve the UI5 build from wwwroot (combined release image).
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 

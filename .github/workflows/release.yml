@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        run: |
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CUR=${LATEST#v}
+          IFS=. read -r MAJ MIN PAT <<< "$CUR"
+          case "${{ github.event.inputs.bump }}" in
+            major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
+            minor) MIN=$((MIN+1)); PAT=0 ;;
+            patch) PAT=$((PAT+1)) ;;
+          esac
+          echo "NEW_VERSION=v${MAJ}.${MIN}.${PAT}" >> "$GITHUB_ENV"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}:${{ env.NEW_VERSION }}"
+          docker build --build-arg VERSION="${{ env.NEW_VERSION }}" -t "$IMAGE" .
+          docker tag "$IMAGE" "ghcr.io/${{ github.repository }}:latest"
+          docker push "$IMAGE"
+          docker push "ghcr.io/${{ github.repository }}:latest"
+
+      - name: Create tag and GitHub release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ env.NEW_VERSION }}"
+          git push origin "${{ env.NEW_VERSION }}"
+          gh release create "${{ env.NEW_VERSION }}" --title "${{ env.NEW_VERSION }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
