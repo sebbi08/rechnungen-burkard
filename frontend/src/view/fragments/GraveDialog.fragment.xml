@@ -1,7 +1,7 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
     <Dialog id="graveDialog" title="{i18n>createGrave}" stretch="true">
         <content>
-            <VBox class="sapUiContentPadding">
+            <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>graveNumber}" labelFor="graveNumber" />
                 <Input id="graveNumber" width="16rem" value="{graveDraft>/GraveNumber}" />
                 <Label text="{i18n>startDate}" labelFor="graveStart" />

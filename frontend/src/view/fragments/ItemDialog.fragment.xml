@@ -1,7 +1,7 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
     <Dialog title="{i18n>createItem}">
         <content>
-            <VBox class="sapUiContentPadding">
+            <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>itemNumber}" labelFor="itemNumber" />
                 <Input id="itemNumber" width="20rem" />
                 <Label text="{i18n>itemDescription}" labelFor="itemDescription" />

@@ -1,7 +1,7 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
     <Dialog id="invoiceDialog" title="{i18n>createInvoice}" stretch="true">
         <content>
-            <VBox class="sapUiContentPadding">
+            <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
                 <HBox>
                     <Select id="recipient" width="20rem"

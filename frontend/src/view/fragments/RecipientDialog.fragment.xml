@@ -1,7 +1,7 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
     <Dialog title="{i18n>createRecipient}">
         <content>
-            <VBox class="sapUiContentPadding">
+            <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipientName" />
                 <Input id="recipientName" width="20rem" />
                 <Label text="{i18n>recipientAddress}" labelFor="recipientAddress" />
