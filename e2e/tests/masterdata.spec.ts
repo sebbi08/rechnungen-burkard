@@ -41,7 +41,11 @@ test("items: create an item without default price (Story 2)", async ({
   // scope to the dialog: the page search field's placeholder also contains "Nummer"
   await page.locator(".sapMDialog").getByLabel("Nummer").fill("1001");
   await page.getByLabel("Bezeichnung").fill("Grabpflege");
-  await page.getByLabel("VAT-Satz").fill("7");
+  // the VAT rate is a Select: open the popover and pick the seeded rate
+  await page.locator(".sapMDialog .sapMSlt").click();
+  await page
+    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "7" })
+    .click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.locator("table")).toContainText("1001");
@@ -179,7 +183,8 @@ test("graves: search by number narrows the list and empty search shows nothing (
 
   await search.fill(`gibtsnicht${ts}`);
   await search.press("Enter");
-  // no match: the table renders its German empty state and this run's grave is gone
-  await expect(gravesTable).toContainText("Keine Daten");
+  // no match: the table renders its German empty state and this run's grave is gone;
+  // generous timeout: parallel grave-generation runs can keep the backend busy
+  await expect(gravesTable).toContainText("Keine Daten", { timeout: 15000 });
   await expect(gravesTable).not.toContainText(graveNumber);
 });

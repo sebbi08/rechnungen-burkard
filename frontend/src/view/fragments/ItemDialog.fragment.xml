@@ -7,7 +7,10 @@
                 <Label text="{i18n>itemDescription}" labelFor="itemDescription" />
                 <Input id="itemDescription" width="20rem" />
                 <Label text="{i18n>vatRate}" labelFor="itemVatRate" />
-                <Input id="itemVatRate" type="Number" width="20rem" />
+                <Select id="itemVatRate" width="20rem" forceSelection="false"
+                    items="{path: 'odata>/VatRates', parameters: {$orderby: 'Rate asc'}}">
+                    <core:Item key="{odata>Rate}" text="{odata>Rate}" />
+                </Select>
                 <Label text="{i18n>itemDefaultPrice}" labelFor="itemDefaultPrice" />
                 <Input id="itemDefaultPrice" type="Number" width="20rem" />
             </VBox>

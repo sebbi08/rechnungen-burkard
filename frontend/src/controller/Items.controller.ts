@@ -1,4 +1,5 @@
 import Input from "sap/m/Input";
+import Select from "sap/m/Select";
 import Filter from "sap/ui/model/Filter";
 import FilterOperator from "sap/ui/model/FilterOperator";
 import Context from "sap/ui/model/odata/v4/Context";
@@ -64,7 +65,7 @@ export default class Items extends BaseController {
       (this.byId("itemDescription") as Input).setValue(
         context.getProperty("Description") as string,
       );
-      (this.byId("itemVatRate") as Input).setValue(
+      (this.byId("itemVatRate") as Select).setSelectedKey(
         String(context.getProperty("VatRate")),
       );
       (this.byId("itemDefaultPrice") as Input).setValue(
@@ -76,7 +77,7 @@ export default class Items extends BaseController {
     } else {
       (this.byId("itemNumber") as Input).setValue("");
       (this.byId("itemDescription") as Input).setValue("");
-      (this.byId("itemVatRate") as Input).setValue("");
+      (this.byId("itemVatRate") as Select).setSelectedKey("");
       (this.byId("itemDefaultPrice") as Input).setValue("");
       this._editId = null;
     }
@@ -90,7 +91,7 @@ export default class Items extends BaseController {
     const fields = {
       Number: (this.byId("itemNumber") as Input).getValue(),
       Description: (this.byId("itemDescription") as Input).getValue(),
-      VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
+      VatRate: Number((this.byId("itemVatRate") as Select).getSelectedKey()),
       // an empty input means "no default price"; a price of 0 is a real value
       DefaultPrice: rawPrice === "" ? null : Number(rawPrice),
     };
