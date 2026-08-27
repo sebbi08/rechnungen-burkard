@@ -28,9 +28,9 @@
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <HBox class="sapUiMediumMarginTop">
-                        <Label text="{i18n>vatRate}" labelFor="newVatRate" />
-                        <Input id="newVatRate" type="Number" width="8rem" />
+                    <HBox alignItems="Center" class="sapUiMediumMarginTop">
+                        <Label text="{i18n>vatRate}" labelFor="newVatRate" class="sapUiSmallMarginEnd" />
+                        <Input id="newVatRate" type="Number" width="8rem" class="sapUiSmallMarginEnd" />
                         <Button text="{i18n>addVatRate}" press=".onAddVatRate" />
                     </HBox>
                 </content>
