@@ -7,10 +7,12 @@
             <Panel headerText="{i18n>menuSettings}" class="sapUiSmallMarginBottom">
                 <form:SimpleForm editable="true" layout="ResponsiveGridLayout">
                     <Label text="{i18n>settingsStampWord}" labelFor="stampWord" />
-                    <Input id="stampWord" value="{odata>StampWord}" width="20rem" />
+                    <Input id="stampWord" value="{path: 'odata>/Settings/StampWord', mode: 'OneWay'}" width="20rem" />
                     <Label text="{i18n>settingsEndingText}" labelFor="endingText" />
-                    <TextArea id="endingText" value="{odata>EndingText}" rows="6" width="100%" />
+                    <TextArea id="endingText" value="{path: 'odata>/Settings/EndingText', mode: 'OneWay'}" rows="6" width="100%" />
                 </form:SimpleForm>
+                <Button id="save" text="{i18n>save}" type="Emphasized" press=".onSave"
+                    class="sapUiSmallMarginTop" />
             </Panel>
             <Panel headerText="{i18n>settingsVatRates}" class="sapUiSmallMarginBottom">
                 <content>
@@ -35,7 +37,6 @@
                     </HBox>
                 </content>
             </Panel>
-            <Button id="save" text="{i18n>save}" type="Emphasized" press=".onSave" />
         </content>
     </Page>
 </mvc:View>

@@ -28,6 +28,18 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.locator(".sapMListTbl")).toContainText("7");
+
+  // regression: the ending text must survive typing, save and a reload
+  // (two-way relative bindings broke on UI5 1.151 with a console error)
+  await page.locator(".sapMDialog").getByRole("button").click();
+  await expect(page.locator(".sapMDialog")).toHaveCount(0);
+  const endingText = `E2E Schlusstext ${Date.now()}`;
+  await page.getByLabel("Schlusstext").fill(endingText);
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await page.locator(".sapMDialog").getByRole("button").click();
+  await expect(page.locator(".sapMDialog")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel("Schlusstext")).toHaveValue(endingText);
 });
 
 test("items: create an item without default price (Story 2)", async ({
