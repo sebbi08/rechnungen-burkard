@@ -1,51 +1,41 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core" xmlns:form="sap.ui.layout.form"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
+    xmlns:form="sap.ui.layout.form"
     controllerName="burkard.invoicing.controller.Settings" displayBlock="true">
-    <tnt:ToolPage>
-        <tnt:sideContent>
-            <tnt:SideNavigation>
-                <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
-                </tnt:item>
-            </tnt:SideNavigation>
-        </tnt:sideContent>
-        <tnt:mainContents>
-            <Page title="{i18n>menuSettings}" titleLevel="H1">
+    <Page title="{i18n>menuSettings}" titleLevel="H1" showNavButton="true"
+        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+        <content>
+            <Panel headerText="{i18n>menuSettings}" class="sapUiSmallMarginBottom">
+                <form:SimpleForm editable="true" layout="ResponsiveGridLayout">
+                    <Label text="{i18n>settingsStampWord}" labelFor="stampWord" />
+                    <Input id="stampWord" value="{odata>StampWord}" width="20rem" />
+                    <Label text="{i18n>settingsEndingText}" labelFor="endingText" />
+                    <TextArea id="endingText" value="{odata>EndingText}" rows="6" width="100%" />
+                </form:SimpleForm>
+            </Panel>
+            <Panel headerText="{i18n>settingsVatRates}" class="sapUiSmallMarginBottom">
                 <content>
-                    <Panel headerText="{i18n>menuSettings}">
-                        <form:SimpleForm editable="true" layout="ResponsiveGridLayout">
-                            <Label text="{i18n>settingsStampWord}" labelFor="stampWord" />
-                            <Input id="stampWord" value="{odata>StampWord}" width="20rem" />
-                            <Label text="{i18n>settingsEndingText}" labelFor="endingText" />
-                            <TextArea id="endingText" value="{odata>EndingText}" rows="6" width="100%" />
-                        </form:SimpleForm>
-                    </Panel>
-                    <Panel headerText="{i18n>settingsVatRates}">
-                        <content>
-                            <Table id="vatRates" items="{odata>/VatRates}" noDataText="{i18n>noData}">
-                                <columns>
-                                    <Column><Text text="{i18n>vatRate}" /></Column>
-                                    <Column />
-                                </columns>
-                                <items>
-                                    <ColumnListItem>
-                                        <cells>
-                                            <Text text="{odata>Rate}" />
-                                            <Button text="{i18n>delete}" press="onDeleteVatRate" type="Transparent" />
-                                        </cells>
-                                    </ColumnListItem>
-                                </items>
-                            </Table>
-                            <HBox class="sapUiMediumMarginTop">
-                                <Label text="{i18n>vatRate}" labelFor="newVatRate" />
-                                <Input id="newVatRate" type="Number" width="8rem" />
-                                <Button text="{i18n>addVatRate}" press="onAddVatRate" />
-                            </HBox>
-                        </content>
-                    </Panel>
-                    <Button id="save" text="{i18n>save}" type="Emphasized" press="onSave" />
+                    <Table id="vatRates" items="{odata>/VatRates}" noDataText="{i18n>noData}">
+                        <columns>
+                            <Column><Text text="{i18n>vatRate}" /></Column>
+                            <Column />
+                        </columns>
+                        <items>
+                            <ColumnListItem>
+                                <cells>
+                                    <Text text="{odata>Rate}" />
+                                    <Button text="{i18n>delete}" press=".onDeleteVatRate" type="Transparent" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                    <HBox class="sapUiMediumMarginTop">
+                        <Label text="{i18n>vatRate}" labelFor="newVatRate" />
+                        <Input id="newVatRate" type="Number" width="8rem" />
+                        <Button text="{i18n>addVatRate}" press=".onAddVatRate" />
+                    </HBox>
                 </content>
-            </Page>
-        </tnt:mainContents>
-    </tnt:ToolPage>
+            </Panel>
+            <Button id="save" text="{i18n>save}" type="Emphasized" press=".onSave" />
+        </content>
+    </Page>
 </mvc:View>

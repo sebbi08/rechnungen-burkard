@@ -9,10 +9,10 @@
             </VBox>
         </content>
         <beginButton>
-            <Button text="{i18n>save}" type="Emphasized" press="onQuickRecipientSave" />
+            <Button text="{i18n>save}" type="Emphasized" press=".onQuickRecipientSave" />
         </beginButton>
         <endButton>
-            <Button text="{i18n>cancel}" press="onQuickRecipientCancel" />
+            <Button text="{i18n>cancel}" press=".onQuickRecipientCancel" />
         </endButton>
     </Dialog>
 </core:FragmentDefinition>

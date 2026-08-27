@@ -1,28 +1,19 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
     controllerName="burkard.invoicing.controller.Invoices" displayBlock="true">
-    <tnt:ToolPage>
-        <tnt:sideContent>
-            <tnt:SideNavigation>
-                <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
-                </tnt:item>
-            </tnt:SideNavigation>
-        </tnt:sideContent>
-        <tnt:mainContents>
-            <Page title="{i18n>menuInvoices}" titleLevel="H1">
-                <subHeader>
-                    <Toolbar>
-                        <Select id="halfYearFilter" width="12rem" change="onHalfYearChange" />
-                        <ToolbarSpacer />
-                        <Button text="{i18n>bulkNormal}" press="onBulkNormal" />
-                        <Button text="{i18n>bulkCopy}" press="onBulkCopy" />
-                        <Button text="{i18n>createInvoice}" press="onCreateInvoice" type="Emphasized" />
-                    </Toolbar>
-                </subHeader>
-                <content>
-                    <Table id="invoicesTable" growing="true" growingThreshold="50"
-                        items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}">
+    <Page title="{i18n>menuInvoices}" titleLevel="H1" showNavButton="true"
+        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+        <subHeader>
+            <Toolbar>
+                <Select id="halfYearFilter" width="12rem" change=".onHalfYearChange" />
+                <ToolbarSpacer />
+                <Button text="{i18n>bulkNormal}" press=".onBulkNormal" />
+                <Button text="{i18n>bulkCopy}" press=".onBulkCopy" />
+                <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized" />
+            </Toolbar>
+        </subHeader>
+        <content>
+            <Table id="invoicesTable" class="sapUiSmallMarginTop" growing="true" growingThreshold="50"
+                items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}">
                         <columns>
                             <Column><Text text="{i18n>invoiceNumber}" /></Column>
                             <Column><Text text="{i18n>recipientName}" /></Column>
@@ -43,16 +34,14 @@
                                             visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
                                     </HBox>
                                     <HBox>
-                                        <Button text="{i18n>downloadNormal}" press="onDownloadNormal" type="Transparent" />
-                                        <Button text="{i18n>downloadCopy}" press="onDownloadCopy" type="Transparent" />
-                                        <Button text="{i18n>editInvoice}" press="onEditInvoice" type="Transparent" />
+                                        <Button text="{i18n>downloadNormal}" press=".onDownloadNormal" type="Transparent" />
+                                        <Button text="{i18n>downloadCopy}" press=".onDownloadCopy" type="Transparent" />
+                                        <Button text="{i18n>editInvoice}" press=".onEditInvoice" type="Transparent" />
                                     </HBox>
                                 </cells>
                             </ColumnListItem>
                         </items>
-                    </Table>
-                </content>
-            </Page>
-        </tnt:mainContents>
-    </tnt:ToolPage>
+            </Table>
+        </content>
+    </Page>
 </mvc:View>

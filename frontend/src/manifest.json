@@ -1,17 +1,21 @@
 {
-  "_version": "1.58.0",
+  "_version": "2.0.0",
   "sap.app": {
     "id": "burkard.invoicing",
     "type": "application",
     "i18n": "i18n/i18n.properties",
-    "applicationVersion": { "version": "0.0.1" },
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
     "title": "{{appTitle}}",
     "description": "{{appDescription}}",
     "dataSources": {
       "invoicing": {
         "uri": "/odata/",
         "type": "OData",
-        "settings": { "odataVersion": "4.0" }
+        "settings": {
+          "odataVersion": "4.0"
+        }
       }
     }
   },
@@ -19,25 +23,29 @@
     "rootView": {
       "viewName": "burkard.invoicing.view.App",
       "type": "XML",
-      "async": true,
       "id": "app"
     },
     "dependencies": {
-      "minUI5Version": "1.132.0",
+      "minUI5Version": "1.151.0",
       "libs": {
+        "sap.f": {},
         "sap.m": {},
         "sap.ui.core": {},
-        "sap.ui.layout": {},
-        "sap.tnt": {}
+        "sap.ui.layout": {}
       }
     },
-    "contentDensities": { "compact": true, "cozy": true },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
     "models": {
       "i18n": {
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
           "bundleName": "burkard.invoicing.i18n.i18n",
-          "supportedLocales": [""],
+          "supportedLocales": [
+            ""
+          ],
           "fallbackLocale": ""
         }
       }
@@ -45,25 +53,86 @@
     "routing": {
       "config": {
         "routerClass": "sap.m.routing.Router",
-        "viewPath": "burkard.invoicing.view",
+        "path": "burkard.invoicing.view",
         "viewType": "XML",
         "controlId": "app",
-        "controlAggregation": "pages",
-        "async": true
+        "controlAggregation": "pages"
       },
       "routes": [
-        { "name": "settings", "pattern": "", "target": ["settings"] },
-        { "name": "items", "pattern": "items", "target": ["items"] },
-        { "name": "recipients", "pattern": "recipients", "target": ["recipients"] },
-        { "name": "invoices", "pattern": "invoices", "target": ["invoices"] },
-        { "name": "graves", "pattern": "graves", "target": ["graves"] }
+        {
+          "name": "home",
+          "pattern": "",
+          "target": [
+            "home"
+          ]
+        },
+        {
+          "name": "settings",
+          "pattern": "settings",
+          "target": [
+            "settings"
+          ]
+        },
+        {
+          "name": "items",
+          "pattern": "items",
+          "target": [
+            "items"
+          ]
+        },
+        {
+          "name": "recipients",
+          "pattern": "recipients",
+          "target": [
+            "recipients"
+          ]
+        },
+        {
+          "name": "invoices",
+          "pattern": "invoices",
+          "target": [
+            "invoices"
+          ]
+        },
+        {
+          "name": "graves",
+          "pattern": "graves",
+          "target": [
+            "graves"
+          ]
+        }
       ],
       "targets": {
-        "settings": { "viewName": "Settings", "viewLevel": 0 },
-        "items": { "viewName": "Items", "viewLevel": 0 },
-        "recipients": { "viewName": "Recipients", "viewLevel": 0 },
-        "invoices": { "viewName": "Invoices", "viewLevel": 0 },
-        "graves": { "viewName": "Graves", "viewLevel": 0 }
+        "home": {
+          "name": "Home",
+          "level": 0,
+          "type": "View"
+        },
+        "settings": {
+          "name": "Settings",
+          "level": 0,
+          "type": "View"
+        },
+        "items": {
+          "name": "Items",
+          "level": 0,
+          "type": "View"
+        },
+        "recipients": {
+          "name": "Recipients",
+          "level": 0,
+          "type": "View"
+        },
+        "invoices": {
+          "name": "Invoices",
+          "level": 0,
+          "type": "View"
+        },
+        "graves": {
+          "name": "Graves",
+          "level": 0,
+          "type": "View"
+        }
       }
     }
   }

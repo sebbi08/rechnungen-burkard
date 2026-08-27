@@ -1,25 +1,17 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
     controllerName="burkard.invoicing.controller.Recipients" displayBlock="true">
-    <tnt:ToolPage>
-        <tnt:sideContent>
-            <tnt:SideNavigation>
-                <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
-                </tnt:item>
-            </tnt:SideNavigation>
-        </tnt:sideContent>
-        <tnt:mainContents>
-            <Page title="{i18n>menuRecipients}" titleLevel="H1">
-                <subHeader>
-                    <Toolbar>
-                        <SearchField width="16rem" search="onSearch" placeholder="{i18n>searchByName}" />
-                        <ToolbarSpacer />
-                        <Button text="{i18n>createRecipient}" press="onCreateRecipient" type="Emphasized" />
-                    </Toolbar>
-                </subHeader>
-                <content>
-                    <Table id="recipientsTable" items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
+    <Page title="{i18n>menuRecipients}" titleLevel="H1" showNavButton="true"
+        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+        <subHeader>
+            <Toolbar>
+                <SearchField width="16rem" search=".onSearch" placeholder="{i18n>searchByName}" />
+                <ToolbarSpacer />
+                <Button text="{i18n>createRecipient}" press=".onCreateRecipient" type="Emphasized" />
+            </Toolbar>
+        </subHeader>
+        <content>
+            <Table id="recipientsTable" class="sapUiSmallMarginTop"
+                items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                         <columns>
                             <Column><Text text="{i18n>recipientName}" /></Column>
                             <Column><Text text="{i18n>recipientAddress}" /></Column>
@@ -30,13 +22,11 @@
                                 <cells>
                                     <Text text="{odata>Name}" />
                                     <Text text="{odata>Address}" />
-                                    <Button text="{i18n>edit}" press="onEditRecipient" type="Transparent" />
+                                    <Button text="{i18n>edit}" press=".onEditRecipient" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>
-                    </Table>
-                </content>
-            </Page>
-        </tnt:mainContents>
-    </tnt:ToolPage>
+            </Table>
+        </content>
+    </Page>
 </mvc:View>

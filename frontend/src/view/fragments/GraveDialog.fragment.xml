@@ -22,7 +22,7 @@
                                 <cells>
                                     <Text text="{graveDraft>Number}" />
                                     <Text text="{graveDraft>Count}" />
-                                    <Button text="{i18n>delete}" press="onDeleteItemLink" type="Transparent" />
+                                    <Button text="{i18n>delete}" press=".onDeleteItemLink" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>
@@ -33,7 +33,7 @@
                             <core:Item key="{odata>Id}" text="{odata>Number}" />
                         </Select>
                         <Input id="linkCount" type="Number" width="6rem" value="1" ariaLabel="{i18n>itemCount}" />
-                        <Button text="{i18n>add}" press="onAddItemLink" />
+                        <Button text="{i18n>add}" press=".onAddItemLink" />
                     </HBox>
                 </Panel>
                 <Panel headerText="{i18n>graveRecipients}">
@@ -46,7 +46,7 @@
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{graveDraft>Name}" />
-                                    <Button text="{i18n>delete}" press="onDeleteRecipientLink" type="Transparent" />
+                                    <Button text="{i18n>delete}" press=".onDeleteRecipientLink" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>
@@ -56,17 +56,17 @@
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
                         </Select>
-                        <Button text="{i18n>add}" press="onAddRecipientLink" />
-                        <Button text="{i18n>newRecipient}" press="onNewRecipient" type="Transparent" />
+                        <Button text="{i18n>add}" press=".onAddRecipientLink" />
+                        <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent" />
                     </HBox>
                 </Panel>
             </VBox>
         </content>
         <beginButton>
-            <Button text="{i18n>save}" type="Emphasized" press="onGraveDialogSave" />
+            <Button text="{i18n>save}" type="Emphasized" press=".onGraveDialogSave" />
         </beginButton>
         <endButton>
-            <Button text="{i18n>cancel}" press="onGraveDialogCancel" />
+            <Button text="{i18n>cancel}" press=".onGraveDialogCancel" />
         </endButton>
     </Dialog>
 </core:FragmentDefinition>

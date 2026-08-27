@@ -6,7 +6,6 @@ export default {
   createODataModel(): ODataModel {
     return new ODataModel({
       serviceUrl: "/odata/",
-      synchronizationMode: "None",
       // list-binding filters (search fields, half-year filter) require
       // Server mode; the app never queues client-side changes, so all
       // writes stay on the server anyway

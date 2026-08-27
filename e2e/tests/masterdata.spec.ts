@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("settings: stamp word validation and VAT rate (Story 1)", async ({
   page,
 }) => {
-  await page.goto("/index.html");
+  await page.goto("/index.html#/settings");
 
   await page.getByLabel("Stempelwort").fill("");
   await page.getByRole("button", { name: "Speichern" }).click();

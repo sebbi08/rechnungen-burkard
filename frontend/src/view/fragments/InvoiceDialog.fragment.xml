@@ -9,7 +9,7 @@
                         selectedKey="{invoiceDraft>/recipientId}">
                         <core:Item key="{odata>Id}" text="{odata>Name}" />
                     </Select>
-                    <Button text="{i18n>newRecipient}" press="onNewRecipient" type="Transparent"
+                    <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent"
                         class="sapUiTinyMarginBegin" />
                 </HBox>
                 <Table id="lineTable" items="{invoiceDraft>/lines}">
@@ -31,14 +31,14 @@
                         </ColumnListItem>
                     </items>
                 </Table>
-                <Button text="{i18n>addLine}" press="onAddLine" />
+                <Button text="{i18n>addLine}" press=".onAddLine" />
             </VBox>
         </content>
         <beginButton>
-            <Button text="{i18n>save}" type="Emphasized" press="onInvoiceDialogSave" />
+            <Button text="{i18n>save}" type="Emphasized" press=".onInvoiceDialogSave" />
         </beginButton>
         <endButton>
-            <Button text="{i18n>cancel}" press="onInvoiceDialogCancel" />
+            <Button text="{i18n>cancel}" press=".onInvoiceDialogCancel" />
         </endButton>
     </Dialog>
 </core:FragmentDefinition>

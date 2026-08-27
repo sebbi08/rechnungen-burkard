@@ -13,10 +13,10 @@
             </VBox>
         </content>
         <beginButton>
-            <Button text="{i18n>save}" type="Emphasized" press="onDialogSave" />
+            <Button text="{i18n>save}" type="Emphasized" press=".onDialogSave" />
         </beginButton>
         <endButton>
-            <Button text="{i18n>cancel}" press="onDialogCancel" />
+            <Button text="{i18n>cancel}" press=".onDialogCancel" />
         </endButton>
     </Dialog>
 </core:FragmentDefinition>
