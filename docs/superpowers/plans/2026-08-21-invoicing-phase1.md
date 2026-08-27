@@ -92,10 +92,12 @@ Dockerfile                        # combined release image (Task 17)
 ### Task 1: Repository scaffolding, backend projects, dev containers
 
 **Files:**
+
 - Create: `backend/Invoicing.sln`, `backend/src/Invoicing.Domain/Invoicing.Domain.csproj`, `backend/src/Invoicing.Documents/Invoicing.Documents.csproj`, `backend/src/Invoicing.Api/Invoicing.Api.csproj`, `backend/tests/Invoicing.IntegrationTests/Invoicing.IntegrationTests.csproj`, `backend/tests/Invoicing.DocumentTests/Invoicing.DocumentTests.csproj`, `backend/dev.Dockerfile`, `docker-compose.yml`, `backend/src/Invoicing.Api/Program.cs`, `backend/tests/Invoicing.IntegrationTests/ApiTestHost.cs`, `backend/tests/Invoicing.IntegrationTests/HealthTests.cs`, `backend/.gitignore`
 - Create: `.gitignore` (root)
 
 **Interfaces:**
+
 - Produces: `Burkard.Invoicing.Api.Program` (partial, public for `WebApplicationFactory`), endpoint `GET /healthz`, test host class `ApiTestHost : WebApplicationFactory<Program>`.
 
 - [ ] **Step 1: Write the failing test**
@@ -301,10 +303,12 @@ git commit -m "chore: scaffold backend solution and dev containers"
 ### Task 2: Domain entities, DbContext, single initial migration, settings seed
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Domain/Entities/*.cs` (all entities below), `backend/src/Invoicing.Api/Persistence/AppDbContext.cs`, `backend/src/Invoicing.Api/Persistence/DatabaseSeeder.cs`, `backend/tests/Invoicing.IntegrationTests/SeedTests.cs`
 - Modify: `backend/src/Invoicing.Api/Invoicing.Api.csproj` (add EF Core packages + Domain reference), `backend/src/Invoicing.Api/Program.cs` (register DbContext, migrate + seed at startup), `backend/tests/Invoicing.IntegrationTests/ApiTestHost.cs` (SQLite temp DB + migrate on startup)
 
 **Interfaces:**
+
 - Produces: entities `VatRate`, `GlobalSettings`, `InvoiceItem`, `Recipient`, `Grave`, `GraveItem`, `GraveRecipient`, `Invoice`, `InvoiceLine`, `Document` (+enum `DocumentKind { Normal = 0, Copy = 1 }`), `GraveInvoiceRun`, `Job` (+enum `JobStatus { Queued = 0, Running = 1, Succeeded = 2, Failed = 3 }`), all with `long Id`; `AppDbContext` DbSets; unique indexes: `InvoiceItem.Number`, `VatRate.Rate`, `(GraveInvoiceRun.GraveId, Year, Half)`, `(Invoice.Year, Sequence)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -733,10 +737,12 @@ git commit -m "feat: add domain model and initial EF Core migration"
 ### Task 3: OData foundation — EDM model, Settings and VAT rates API
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/OData/EdmModelBuilder.cs`, `backend/src/Invoicing.Api/OData/Controllers/SettingsController.cs`, `backend/src/Invoicing.Api/OData/Controllers/VatRatesController.cs`
 - Modify: `backend/src/Invoicing.Api/Invoicing.Api.csproj` (add `Microsoft.AspNetCore.OData`), `backend/src/Invoicing.Api/Program.cs` (AddOData + route prefix), `backend/tests/Invoicing.IntegrationTests/ODataJson.cs` (helper), create `SettingsTests.cs`, `VatRateTests.cs`
 
 **Interfaces:**
+
 - Produces: singleton `/odata/Settings` (GET/PATCH, validates non-empty `StampWord`), entity set `/odata/VatRates` (CRUD, validates `Rate > 0`, duplicates rejected 400), error body shape `{"error":{"code":"...","message":"..."}}`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1026,9 +1032,11 @@ git commit -m "feat: OData foundation with settings and VAT rate endpoints"
 ### Task 4: Invoice items and recipients API
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/OData/Controllers/InvoiceItemsController.cs`, `backend/src/Invoicing.Api/OData/Controllers/RecipientsController.cs`, `backend/tests/Invoicing.IntegrationTests/InvoiceItemTests.cs`, `backend/tests/Invoicing.IntegrationTests/RecipientTests.cs`
 
 **Interfaces:**
+
 - Produces: `/odata/InvoiceItems` CRUD (validates non-empty `Number`, non-empty `Description`, `VatRate` must be a configured rate); `/odata/Recipients` CRUD (validates non-empty `Name` and `Address`).
 
 - [ ] **Step 1: Write the failing tests**
@@ -1358,9 +1366,11 @@ git commit -m "feat: invoice item and recipient endpoints"
 ### Task 5: Graves API (with items, recipients, and search)
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/OData/Controllers/GravesController.cs`, `backend/src/Invoicing.Api/OData/Controllers/GraveItemsController.cs`, `backend/src/Invoicing.Api/OData/Controllers/GraveRecipientsController.cs`, `backend/tests/Invoicing.IntegrationTests/GraveTests.cs`
 
 **Interfaces:**
+
 - Produces: `/odata/Graves` CRUD (validates non-empty `GraveNumber`), `/odata/GraveItems` and `/odata/GraveRecipients` CRUD for links (validate referenced grave exists; validate grave-item count > 0), and search endpoint `GET /odata/SearchGraves?term=...` returning JSON `{ "value": [ { "Id", "GraveNumber", "RecipientNames": [...] } ] }` matching grave number or any recipient name (case-insensitive).
 
 - [ ] **Step 1: Write the failing test**
@@ -1683,10 +1693,12 @@ git commit -m "feat: grave management endpoints with links and search"
 ### Task 6: Document generation (QuestPDF composers) and document tests
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Documents/InvoiceDocumentData.cs`, `backend/src/Invoicing.Documents/InvoiceDocument.cs`, `backend/src/Invoicing.Documents/DocumentService.cs`, `backend/src/Invoicing.Documents/DocumentTexts.cs`, `backend/tests/Invoicing.DocumentTests/InvoiceDocumentTests.cs`, `backend/tests/Invoicing.DocumentTests/CopyStampTests.cs`, `backend/tests/Invoicing.DocumentTests/DeterminismTests.cs`
 - Modify: `backend/src/Invoicing.Api/Program.cs` (set QuestPDF license)
 
 **Interfaces:**
+
 - Produces: `DocumentService.GeneratePdf(InvoiceDocumentData data, bool isCopy) → byte[]` (deterministic); `InvoiceDocumentData` model with `InvoiceNumber`, `GeneratedAt` (UTC), `RecipientName`, `RecipientAddress`, `ShareText` (nullable), `EndingText`, `StampWord`, `Lines` (`LineData` with `Position`, `ItemNumber`, `Description`, `Count`, `UnitPrice`, `VatRate`, `LineTotal`, `VatAmount`), `VatSummaries` (per-rate `NetTotal`, `VatAmount`, `GrossTotal`), `NetTotal`, `TotalVat`, `GrossTotal`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2095,9 +2107,11 @@ git commit -m "feat: deterministic QuestPDF invoice and copy generation"
 ### Task 7: Invoice number service (pure formatting + allocation)
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Domain/InvoiceNumberFormatter.cs`, `backend/src/Invoicing.Api/Services/InvoiceNumberService.cs`, `backend/tests/Invoicing.DocumentTests/../..` — put unit tests in `backend/tests/Invoicing.IntegrationTests/InvoiceNumberFormatterTests.cs` (pure logic only; no host needed)
 
 **Interfaces:**
+
 - Produces: `InvoiceNumberFormatter.ForOriginal(int year, int sequence) → "2026-0001"`; `InvoiceNumberFormatter.ForRevision(string baseNumber, int revisionNumber) → "2026-0001-R1"`; `InvoiceNumberFormatter.StripRevision(string number) → "2026-0001"`; `InvoiceNumberService.AllocateAsync(CancellationToken) → (string Number, int Year, int Sequence)` — reads max sequence per year, caller inserts the invoice inside its transaction; unique index guards races.
 
 - [ ] **Step 1: Write the failing unit tests**
@@ -2219,10 +2233,12 @@ git commit -m "feat: invoice number formatting and allocation service"
 ### Task 8: CreateInvoice action — snapshots, atomic document pair
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/Services/ValidationException.cs`, `backend/src/Invoicing.Api/Services/InvoiceService.cs`, `backend/src/Invoicing.Api/Services/DocumentDataBuilder.cs`, `backend/src/Invoicing.Api/Services/DocumentGenerator.cs`, `backend/src/Invoicing.Api/OData/Controllers/InvoiceActionsController.cs`, `backend/tests/Invoicing.IntegrationTests/CreateInvoiceTests.cs`
 - Modify: `backend/src/Invoicing.Api/OData/EdmModelBuilder.cs` (declare action `CreateInvoice`), `backend/src/Invoicing.Api/Program.cs` (register `InvoiceService`, `DocumentDataBuilder`, `IDocumentGenerator`)
 
 **Interfaces:**
+
 - Consumes: `AppDbContext`, `InvoiceNumberService`, `DocumentService.GeneratePdf`, `InvoiceNumberFormatter`.
 - Produces: `IDocumentGenerator { byte[] Generate(InvoiceDocumentData data, bool isCopy); }` + default implementation `QuestPdfDocumentGenerator`; `InvoiceService.CreateAsync(long recipientId, IReadOnlyList<InvoiceLineInput> lines, CancellationToken) → Invoice` (validates, snapshots recipient/ending text/stamp word, allocates number, generates normal+copy in one transaction; throws `ValidationException(code, message)`); `InvoiceLineInput { ItemId, Count, UnitPrice? }`; endpoint `POST /odata/CreateInvoice` with body `{"recipientId": 1, "lines":[{"itemId":1,"count":2,"unitPrice":null}]}` → 201 with invoice JSON (or 400 with error code).
 
@@ -2784,10 +2800,12 @@ git commit -m "feat: CreateInvoice action with snapshots and atomic document pai
 ### Task 9: CreateRevision action and document download endpoint
 
 **Files:**
+
 - Create: `backend/tests/Invoicing.IntegrationTests/RevisionTests.cs`, `backend/tests/Invoicing.IntegrationTests/DocumentDownloadTests.cs`, `backend/src/Invoicing.Api/OData/Controllers/DocumentDownloadController.cs`
 - Modify: `backend/src/Invoicing.Api/Services/InvoiceService.cs` (add `CreateRevisionAsync`), `backend/src/Invoicing.Api/OData/Controllers/InvoiceActionsController.cs` (add `CreateRevision` action)
 
 **Interfaces:**
+
 - Produces: `InvoiceService.CreateRevisionAsync(long invoiceId, long recipientId, IReadOnlyList<InvoiceLineInput> lines, CancellationToken) → Invoice` — new row with same `RootId`, `RevisionNumber + 1`, number `{base}-R{n}` (via `InvoiceNumberFormatter.StripRevision`), re-snapshots recipient/settings, regenerates both documents, leaves original untouched; `POST /odata/CreateRevision` body `{"invoiceId":1,"recipientId":1,"lines":[...]}` → 201; `GET /odata/Documents({key})/$value` → PDF file.
 
 - [ ] **Step 1: Write the failing tests**
@@ -3084,10 +3102,12 @@ git commit -m "feat: invoice revisions and document download endpoint"
 ### Task 10: Job queue, runner, and progress endpoints
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/Jobs/JobQueue.cs`, `backend/src/Invoicing.Api/Jobs/IJobHandler.cs`, `backend/src/Invoicing.Api/Jobs/JobRunner.cs`, `backend/src/Invoicing.Api/Services/JobService.cs`, `backend/src/Invoicing.Api/OData/Controllers/JobsController.cs`, `backend/tests/Invoicing.IntegrationTests/JobTests.cs`
 - Modify: `backend/src/Invoicing.Api/Program.cs` (register queue/runner/handler), `backend/tests/Invoicing.IntegrationTests/ApiTestHost.cs` (expose `DbFilePath`, register `TestJobHandler`)
 
 **Interfaces:**
+
 - Consumes: `Job`/`JobStatus` entities, `AppDbContext`.
 - Produces: `JobQueue.Enqueue(long jobId)` / `ReadAllAsync(CancellationToken) → IAsyncEnumerable<long>`; `IJobHandler { string Type; Task ExecuteAsync(Job job, IProgressWriter progress, CancellationToken ct); }`; `IProgressWriter.ReportAsync(int processed, int total, CancellationToken)`; `JobService.EnqueueAsync(type, payloadJson, totalCount, ct) → Job` and `JobService.HasActive(type) → bool`; `GET /odata/Jobs` + `GET /odata/Jobs({key})` for polling; startup recovery resets `Running → Queued` and requeues `Queued`.
 
@@ -3526,10 +3546,12 @@ git commit -m "feat: persistent job queue with background runner and recovery"
 ### Task 11: Share calculation and half-year grave invoice generation
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Domain/ShareCalculator.cs`, `backend/src/Invoicing.Api/Services/GraveInvoiceGenerator.cs`, `backend/src/Invoicing.Api/Jobs/GraveInvoicesJobHandler.cs`, `backend/src/Invoicing.Api/OData/Controllers/GraveInvoicingStatusController.cs`, `backend/tests/Invoicing.IntegrationTests/ShareCalculatorTests.cs`, `backend/tests/Invoicing.IntegrationTests/GraveGenerationTests.cs`
 - Modify: `backend/src/Invoicing.Api/OData/Controllers/InvoiceActionsController.cs` (add `GenerateGraveInvoices` action), `backend/src/Invoicing.Api/Program.cs` (register `IJobHandler`), `backend/src/Invoicing.Documents/DocumentTexts.cs` (created in Task 6 — add `ShareText` if missing)
 
 **Interfaces:**
+
 - Consumes: `ShareCalculator`, `DocumentService`, `AppDbContext`, `JobService`.
 - Produces: `ShareCalculator.SplitCents(long totalCents, int recipients) → long[]` (base + remainder distributed one cent at a time in order); `POST /odata/GenerateGraveInvoices` body `{"year":2026,"half":1}` → 202 + Job (or 409 `JobAlreadyRunning`, 400 `InvalidHalfYear`); `GET /odata/GraveInvoicingStatus?year=2026&half=1` → `{ "value": [ { "Id", "GraveNumber", "Invoiced" } ] }` ordered not-invoiced first; job handler type `"GraveInvoices"` that creates one invoice per recipient with distributed shares, `SharePercent = 100m/n`, `GraveInvoiceRun` rows, and `ResultJson` listing skipped graves.
 
@@ -4236,9 +4258,11 @@ git commit -m "feat: half-year grave invoice generation with share splitting"
 ### Task 12: Bulk download (normal and copies separately)
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/OData/Controllers/BulkDownloadController.cs`, `backend/tests/Invoicing.IntegrationTests/BulkDownloadTests.cs`
 
 **Interfaces:**
+
 - Consumes: `Document`/`DocumentKind`, `Document.Invoice` navigation (for half-year filter).
 - Produces: `POST /odata/BulkDownloadDocuments` body `{"kind":"Normal"|"Copy","year":2026,"half":1}` (year/half optional) → `application/zip` containing exactly the documents of the requested kind, never mixing kinds.
 
@@ -4414,10 +4438,12 @@ git commit -m "feat: separate bulk downloads for normal documents and copies"
 ### Task 13: Frontend scaffold — UI5 TypeScript app, shell, navigation, E2E harness
 
 **Files:**
+
 - Create: `frontend/package.json`, `frontend/ui5.yaml`, `frontend/tsconfig.json`, `frontend/src/index.html`, `frontend/src/manifest.json`, `frontend/src/Component.ts`, `frontend/src/model/models.ts`, `frontend/src/controller/Base.controller.ts`, `frontend/src/controller/App.controller.ts`, `frontend/src/controller/Settings.controller.ts`, `frontend/src/controller/Items.controller.ts`, `frontend/src/controller/Recipients.controller.ts`, `frontend/src/controller/Invoices.controller.ts`, `frontend/src/controller/Graves.controller.ts`, `frontend/src/view/App.view.xml`, `frontend/src/view/Settings.view.xml`, `frontend/src/view/Items.view.xml`, `frontend/src/view/Recipients.view.xml`, `frontend/src/view/Invoices.view.xml`, `frontend/src/view/Graves.view.xml`, `frontend/src/view/fragments/Navigation.fragment.xml`, `frontend/src/i18n/i18n.properties`, `e2e/package.json`, `e2e/playwright.config.ts`, `e2e/tests/app.spec.ts`
 - Modify: `docker-compose.yml` (add `frontend` service)
 
 **Interfaces:**
+
 - Consumes: backend at `/odata` (proxied in dev).
 - Produces: app namespace `burkard.invoicing`; routes `settings` (default), `items`, `recipients`, `invoices`, `graves`; `models.createODataModel()`; `models.bindRoot(view)`; `BaseController.onNavSelect(event)`; German i18n bundle `burkard.invoicing.i18n.i18n`.
 
@@ -4444,11 +4470,11 @@ git commit -m "feat: separate bulk downloads for normal documents and copies"
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-    testDir: "./tests",
-    timeout: 60000,
-    use: {
-        baseURL: "http://localhost:8080",
-    },
+  testDir: "./tests",
+  timeout: 60000,
+  use: {
+    baseURL: "http://localhost:8080",
+  },
 });
 ```
 
@@ -4458,14 +4484,14 @@ export default defineConfig({
 import { test, expect } from "@playwright/test";
 
 test("app loads and navigation works", async ({ page }) => {
-    await page.goto("/index.html");
-    await expect(page.locator("body")).toContainText("Einstellungen");
+  await page.goto("/index.html");
+  await expect(page.locator("body")).toContainText("Einstellungen");
 
-    await page.locator("li.sapTntNavLI", { hasText: "Rechnungen" }).click();
-    await expect(page).toHaveURL(/invoices/);
+  await page.locator("li.sapTntNavLI", { hasText: "Rechnungen" }).click();
+  await expect(page).toHaveURL(/invoices/);
 
-    await page.locator("li.sapTntNavLI", { hasText: "Gräber" }).click();
-    await expect(page).toHaveURL(/graves/);
+  await page.locator("li.sapTntNavLI", { hasText: "Gräber" }).click();
+  await expect(page).toHaveURL(/graves/);
 });
 ```
 
@@ -4557,20 +4583,22 @@ server:
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rechnungen</title>
-  <script id="sap-ui-bootstrap"
-    src="resources/sap-ui-core.js"
-    data-sap-ui-theme="sap_horizon"
-    data-sap-ui-resourceroots='{"burkard.invoicing": "./"}'
-    data-sap-ui-oninit="module:sap/ui/core/ComponentSupport"
-    data-sap-ui-compatVersion="edge"
-    data-sap-ui-async="true"
-    data-sap-ui-frameOptions="trusted"></script>
-</head>
-<body class="sapUiBody" id="content"></body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rechnungen</title>
+    <script
+      id="sap-ui-bootstrap"
+      src="resources/sap-ui-core.js"
+      data-sap-ui-theme="sap_horizon"
+      data-sap-ui-resourceroots='{"burkard.invoicing": "./"}'
+      data-sap-ui-oninit="module:sap/ui/core/ComponentSupport"
+      data-sap-ui-compatVersion="edge"
+      data-sap-ui-async="true"
+      data-sap-ui-frameOptions="trusted"
+    ></script>
+  </head>
+  <body class="sapUiBody" id="content"></body>
 </html>
 ```
 
@@ -4628,7 +4656,11 @@ server:
       "routes": [
         { "name": "settings", "pattern": "", "target": ["settings"] },
         { "name": "items", "pattern": "items", "target": ["items"] },
-        { "name": "recipients", "pattern": "recipients", "target": ["recipients"] },
+        {
+          "name": "recipients",
+          "pattern": "recipients",
+          "target": ["recipients"]
+        },
         { "name": "invoices", "pattern": "invoices", "target": ["invoices"] },
         { "name": "graves", "pattern": "graves", "target": ["graves"] }
       ],
@@ -4663,16 +4695,16 @@ import UIComponent from "sap/ui/core/UIComponent";
 import models from "./model/models";
 
 export default class Component extends UIComponent {
-    public static metadata = {
-        manifest: "json",
-        interfaces: ["sap.ui.core.IAsyncContentCreation"],
-    };
+  public static metadata = {
+    manifest: "json",
+    interfaces: ["sap.ui.core.IAsyncContentCreation"],
+  };
 
-    public init(): void {
-        super.init();
-        this.setModel(models.createODataModel(), "odata");
-        this.getRouter().initialize();
-    }
+  public init(): void {
+    super.init();
+    this.setModel(models.createODataModel(), "odata");
+    this.getRouter().initialize();
+  }
 }
 ```
 
@@ -4684,18 +4716,18 @@ import type Context from "sap/ui/model/odata/v4/Context";
 import type View from "sap/ui/core/mvc/View";
 
 export default {
-    createODataModel(): ODataModel {
-        return new ODataModel({
-            serviceUrl: "/odata/",
-            synchronizationMode: "None",
-        });
-    },
+  createODataModel(): ODataModel {
+    return new ODataModel({
+      serviceUrl: "/odata/",
+      synchronizationMode: "None",
+    });
+  },
 
-    bindRoot(view: View): void {
-        const model = view.getModel("odata") as ODataModel;
-        const context = model.createBindingContext("/") as Context;
-        view.setBindingContext(context, "odata");
-    },
+  bindRoot(view: View): void {
+    const model = view.getModel("odata") as ODataModel;
+    const context = model.createBindingContext("/") as Context;
+    view.setBindingContext(context, "odata");
+  },
 };
 ```
 
@@ -4708,12 +4740,12 @@ import Router from "sap/m/routing/Router";
 import UIComponent from "sap/ui/core/UIComponent";
 
 export default abstract class BaseController extends Controller {
-    public onNavSelect(event: Event): void {
-        const key = (event.getParameter("item") as { getKey(): string }).getKey();
-        if (key) {
-            (UIComponent.getRouterFor(this) as Router).navTo(key);
-        }
+  public onNavSelect(event: Event): void {
+    const key = (event.getParameter("item") as { getKey(): string }).getKey();
+    if (key) {
+      (UIComponent.getRouterFor(this) as Router).navTo(key);
     }
+  }
 }
 ```
 
@@ -4724,9 +4756,9 @@ import BaseController from "./Base.controller";
 import models from "../model/models";
 
 export default class App extends BaseController {
-    public onInit(): void {
-        models.bindRoot(this.getView()!);
-    }
+  public onInit(): void {
+    models.bindRoot(this.getView()!);
+  }
 }
 ```
 
@@ -4781,8 +4813,7 @@ The five controllers start as:
 ```ts
 import BaseController from "./Base.controller";
 
-export default class Settings extends BaseController {
-}
+export default class Settings extends BaseController {}
 ```
 
 (name and class per view: `Items`, `Recipients`, `Invoices`, `Graves`.)
@@ -4821,10 +4852,12 @@ git commit -m "feat: UI5 TypeScript app shell with routing and E2E harness"
 ### Task 14: Settings, Items, and Recipients views (Stories 1–3)
 
 **Files:**
+
 - Modify: `frontend/src/view/Settings.view.xml`, `frontend/src/controller/Settings.controller.ts`, `frontend/src/view/Items.view.xml`, `frontend/src/controller/Items.controller.ts`, `frontend/src/view/Recipients.view.xml`, `frontend/src/controller/Recipients.controller.ts`, `frontend/src/model/api.ts` (create), `frontend/src/i18n/i18n.properties` (add keys), `frontend/src/view/fragments/ItemDialog.fragment.xml` (create), `frontend/src/view/fragments/RecipientDialog.fragment.xml` (create)
 - Test: `e2e/tests/masterdata.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `/odata/Settings` (GET/PATCH), `/odata/VatRates`, `/odata/InvoiceItems`, `/odata/Recipients`; `BaseController`.
 - Produces: `api.patchSettings`, `api.createVatRate`, `api.deleteVatRate`, `api.createItem`, `api.createRecipient`, `api.showError(controller, code, fallbackMessage)` (maps known error codes to German i18n texts, MessageBox otherwise).
 
@@ -4835,43 +4868,53 @@ git commit -m "feat: UI5 TypeScript app shell with routing and E2E harness"
 ```ts
 import { test, expect } from "@playwright/test";
 
-test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
-    await page.goto("/index.html");
+test("settings: stamp word validation and VAT rate (Story 1)", async ({
+  page,
+}) => {
+  await page.goto("/index.html");
 
-    await page.getByLabel("Stempelwort").fill("");
-    await page.getByRole("button", { name: "Speichern" }).click();
-    await expect(page.locator(".sapMMessageToast, .sapMDialog")).toContainText("Stempelwort");
+  await page.getByLabel("Stempelwort").fill("");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.locator(".sapMMessageToast, .sapMDialog")).toContainText(
+    "Stempelwort",
+  );
 
-    await page.getByLabel("Stempelwort").fill("Kopie");
-    await page.getByLabel("VAT-Satz").fill("7");
-    await page.getByRole("button", { name: "VAT-Satz hinzufügen" }).click();
-    await page.getByRole("button", { name: "Speichern" }).click();
+  await page.getByLabel("Stempelwort").fill("Kopie");
+  await page.getByLabel("VAT-Satz").fill("7");
+  await page.getByRole("button", { name: "VAT-Satz hinzufügen" }).click();
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await expect(page.locator(".sapMListTbl")).toContainText("7");
+  await expect(page.locator(".sapMListTbl")).toContainText("7");
 });
 
-test("items: create an item without default price (Story 2)", async ({ page }) => {
-    await page.request.post("http://localhost:8080/odata/VatRates", { data: { Rate: 7 } });
-    await page.goto("/index.html#/items");
-    await page.getByRole("button", { name: "Leistung anlegen" }).click();
-    await page.getByLabel("Nummer").fill("1001");
-    await page.getByLabel("Bezeichnung").fill("Grabpflege");
-    await page.getByLabel("VAT-Satz").fill("7");
-    await page.getByRole("button", { name: "Speichern" }).click();
+test("items: create an item without default price (Story 2)", async ({
+  page,
+}) => {
+  await page.request.post("http://localhost:8080/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.goto("/index.html#/items");
+  await page.getByRole("button", { name: "Leistung anlegen" }).click();
+  await page.getByLabel("Nummer").fill("1001");
+  await page.getByLabel("Bezeichnung").fill("Grabpflege");
+  await page.getByLabel("VAT-Satz").fill("7");
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await expect(page.locator("table")).toContainText("1001");
-    await expect(page.locator("table")).toContainText("Grabpflege");
+  await expect(page.locator("table")).toContainText("1001");
+  await expect(page.locator("table")).toContainText("Grabpflege");
 });
 
-test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
-    await page.goto("/index.html#/recipients");
-    await page.getByRole("button", { name: "Empfänger anlegen" }).click();
-    await page.getByLabel("Name").fill("Familie Mahr");
-    await page.getByLabel("Adresse").fill("Musterstraße 1\n12345 Musterstadt");
-    await page.getByRole("button", { name: "Speichern" }).click();
+test("recipients: create and search a recipient (Story 3)", async ({
+  page,
+}) => {
+  await page.goto("/index.html#/recipients");
+  await page.getByRole("button", { name: "Empfänger anlegen" }).click();
+  await page.getByLabel("Name").fill("Familie Mahr");
+  await page.getByLabel("Adresse").fill("Musterstraße 1\n12345 Musterstadt");
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await page.getByRole("searchbox").fill("Mahr");
-    await expect(page.locator("table")).toContainText("Familie Mahr");
+  await page.getByRole("searchbox").fill("Mahr");
+  await expect(page.locator("table")).toContainText("Familie Mahr");
 });
 ```
 
@@ -4891,76 +4934,93 @@ import ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 
 function toJson(response: Response): Promise<any> {
-    return response.json().catch(() => ({}));
+  return response.json().catch(() => ({}));
 }
 
 async function ensureOk(response: Response): Promise<void> {
-    if (response.ok) {
-        return;
-    }
+  if (response.ok) {
+    return;
+  }
 
-    const body = await toJson(response);
-    throw new Error(body?.error?.code ?? `HTTP ${response.status}`);
+  const body = await toJson(response);
+  throw new Error(body?.error?.code ?? `HTTP ${response.status}`);
 }
 
 function post(url: string, payload: unknown): Promise<Response> {
-    return fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 const CODE_TO_I18N: Record<string, string> = {
-    StampWordRequired: "errorStampWordRequired",
-    PriceRequired: "errorPriceRequired",
-    RecipientAddressRequired: "errorRecipientAddressRequired",
-    ItemNumberExists: "errorItemNumberExists",
-    VatRateExists: "errorVatRateExists",
-    VatRateNotConfigured: "errorVatRateNotConfigured",
-    InvalidVatRate: "errorInvalidVatRate",
-    GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
-    JobAlreadyRunning: "errorJobAlreadyRunning",
+  StampWordRequired: "errorStampWordRequired",
+  PriceRequired: "errorPriceRequired",
+  RecipientAddressRequired: "errorRecipientAddressRequired",
+  ItemNumberExists: "errorItemNumberExists",
+  VatRateExists: "errorVatRateExists",
+  VatRateNotConfigured: "errorVatRateNotConfigured",
+  InvalidVatRate: "errorInvalidVatRate",
+  GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
+  JobAlreadyRunning: "errorJobAlreadyRunning",
 };
 
-export async function showError(controller: Controller, error: unknown): Promise<void> {
-    const raw = error instanceof Error ? error.message : String(error);
-    const key = CODE_TO_I18N[raw] ?? "errorGeneric";
-    const bundle = (controller.getOwnerComponent()!.getModel("i18n") as ResourceModel)
-        .getResourceBundle() as ResourceBundle;
-    let text = bundle.getText(key);
-    if (key === "errorGeneric") {
-        text = `${text} (${raw})`;
-    }
+export async function showError(
+  controller: Controller,
+  error: unknown,
+): Promise<void> {
+  const raw = error instanceof Error ? error.message : String(error);
+  const key = CODE_TO_I18N[raw] ?? "errorGeneric";
+  const bundle = (
+    controller.getOwnerComponent()!.getModel("i18n") as ResourceModel
+  ).getResourceBundle() as ResourceBundle;
+  let text = bundle.getText(key);
+  if (key === "errorGeneric") {
+    text = `${text} (${raw})`;
+  }
 
-    await MessageBox.error(text);
+  await MessageBox.error(text);
 }
 
-export async function patchSettings(payload: Record<string, unknown>): Promise<void> {
-    const response = await fetch("/odata/Settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
-    await ensureOk(response);
+export async function patchSettings(
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const response = await fetch("/odata/Settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  await ensureOk(response);
 }
 
 export async function createVatRate(rate: number): Promise<void> {
-    await ensureOk(await post("/odata/VatRates", { Rate: rate }));
+  await ensureOk(await post("/odata/VatRates", { Rate: rate }));
 }
 
 export async function deleteVatRate(id: number): Promise<void> {
-    await ensureOk(await fetch(`/odata/VatRates(${id})`, { method: "DELETE" }));
+  await ensureOk(await fetch(`/odata/VatRates(${id})`, { method: "DELETE" }));
 }
 
 export async function createItem(item: {
-    Number: string; Description: string; VatRate: number; DefaultPrice?: number | null;
+  Number: string;
+  Description: string;
+  VatRate: number;
+  DefaultPrice?: number | null;
 }): Promise<void> {
-    await ensureOk(await post("/odata/InvoiceItems", { ...item, DefaultPrice: item.DefaultPrice ?? null }));
+  await ensureOk(
+    await post("/odata/InvoiceItems", {
+      ...item,
+      DefaultPrice: item.DefaultPrice ?? null,
+    }),
+  );
 }
 
-export async function createRecipient(recipient: { Name: string; Address: string }): Promise<void> {
-    await ensureOk(await post("/odata/Recipients", recipient));
+export async function createRecipient(recipient: {
+  Name: string;
+  Address: string;
+}): Promise<void> {
+  await ensureOk(await post("/odata/Recipients", recipient));
 }
 ```
 
@@ -5055,61 +5115,64 @@ import Input from "sap/m/Input";
 import MessageBox from "sap/m/MessageBox";
 
 export default class Settings extends BaseController {
-    public onInit(): void {
-        const view = this.getView()!;
-        const model = view.getModel("odata") as ODataModel;
-        // bind the view to the /Settings singleton; tables use absolute paths
-        const context = model.createBindingContext("/Settings") as Context;
-        view.setBindingContext(context, "odata");
+  public onInit(): void {
+    const view = this.getView()!;
+    const model = view.getModel("odata") as ODataModel;
+    // bind the view to the /Settings singleton; tables use absolute paths
+    const context = model.createBindingContext("/Settings") as Context;
+    view.setBindingContext(context, "odata");
+  }
+
+  public async onSave(): Promise<void> {
+    const context = this.getView()!.getBindingContext("odata") as Context;
+    try {
+      await api.patchSettings({
+        StampWord: context.getProperty("StampWord"),
+        EndingText: context.getProperty("EndingText"),
+      });
+      await MessageBox.information(
+        (this.getView()!.getModel("i18n") as any)
+          .getResourceBundle()
+          .getText("saved"),
+      );
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
+  public async onAddVatRate(): Promise<void> {
+    const input = this.byId("newVatRate") as Input;
+    const rate = Number(input.getValue());
+    if (!rate || rate <= 0) {
+      await api.showError(this, new Error("InvalidVatRate"));
+      return;
     }
 
-    public async onSave(): Promise<void> {
-        const context = this.getView()!.getBindingContext("odata") as Context;
-        try {
-            await api.patchSettings({
-                StampWord: context.getProperty("StampWord"),
-                EndingText: context.getProperty("EndingText"),
-            });
-            await MessageBox.information((this.getView()!.getModel("i18n") as any)
-                .getResourceBundle().getText("saved"));
-        } catch (error) {
-            await api.showError(this, error);
-        }
+    try {
+      await api.createVatRate(rate);
+      input.setValue("");
+      this.refreshVatRates();
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public async onAddVatRate(): Promise<void> {
-        const input = this.byId("newVatRate") as Input;
-        const rate = Number(input.getValue());
-        if (!rate || rate <= 0) {
-            await api.showError(this, new Error("InvalidVatRate"));
-            return;
-        }
-
-        try {
-            await api.createVatRate(rate);
-            input.setValue("");
-            this.refreshVatRates();
-        } catch (error) {
-            await api.showError(this, error);
-        }
+  public async onDeleteVatRate(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("odata") as Context;
+    const id = context.getProperty("Id") as number;
+    try {
+      await api.deleteVatRate(id);
+      this.refreshVatRates();
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public async onDeleteVatRate(event: any): Promise<void> {
-        const context = (event.getSource().getBindingContext("odata") as Context);
-        const id = context.getProperty("Id") as number;
-        try {
-            await api.deleteVatRate(id);
-            this.refreshVatRates();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    private refreshVatRates(): void {
-        const table = this.byId("vatRates");
-        const binding = (table as any).getBinding("items") as ODataListBinding;
-        binding.refresh();
-    }
+  private refreshVatRates(): void {
+    const table = this.byId("vatRates");
+    const binding = (table as any).getBinding("items") as ODataListBinding;
+    binding.refresh();
+  }
 }
 ```
 
@@ -5177,56 +5240,63 @@ import Fragment from "sap/ui/core/Fragment";
 import Input from "sap/m/Input";
 
 export default class Items extends BaseController {
-    public onInit(): void {
-        models.bindRoot(this.getView()!);
+  public onInit(): void {
+    models.bindRoot(this.getView()!);
+  }
+
+  public onSearch(event: any): void {
+    const term = event.getParameter("query") as string;
+    const binding = (this.byId("itemsTable") as any).getBinding(
+      "items",
+    ) as ODataListBinding;
+    if (!term) {
+      binding.filter([]);
+      return;
     }
 
-    public onSearch(event: any): void {
-        const term = event.getParameter("query") as string;
-        const binding = (this.byId("itemsTable") as any).getBinding("items") as ODataListBinding;
-        if (!term) {
-            binding.filter([]);
-            return;
-        }
+    binding.filter(
+      new Filter({
+        filters: [
+          new Filter("Number", FilterOperator.Contains, term),
+          new Filter("Description", FilterOperator.Contains, term),
+        ],
+        and: false,
+      }),
+    );
+  }
 
-        binding.filter(new Filter({
-            filters: [
-                new Filter("Number", FilterOperator.Contains, term),
-                new Filter("Description", FilterOperator.Contains, term),
-            ],
-            and: false,
-        }));
-    }
+  public async onCreateItem(): Promise<void> {
+    const dialog = (await Fragment.load({
+      name: "burkard.invoicing.view.fragments.ItemDialog",
+      controller: this,
+    })) as any;
+    (this.getView() as any).addDependent(dialog);
+    dialog.open();
+  }
 
-    public async onCreateItem(): Promise<void> {
-        const dialog = await Fragment.load({
-            name: "burkard.invoicing.view.fragments.ItemDialog",
-            controller: this,
-        }) as any;
-        (this.getView() as any).addDependent(dialog);
-        dialog.open();
+  public async onDialogSave(event: any): Promise<void> {
+    const dialog = event.getSource().getParent() as any;
+    try {
+      await api.createItem({
+        Number: (this.byId("itemNumber") as Input).getValue(),
+        Description: (this.byId("itemDescription") as Input).getValue(),
+        VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
+        DefaultPrice: (this.byId("itemDefaultPrice") as Input).getValue()
+          ? Number((this.byId("itemDefaultPrice") as Input).getValue())
+          : null,
+      });
+      dialog.close();
+      (
+        (this.byId("itemsTable") as any).getBinding("items") as ODataListBinding
+      ).refresh();
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public async onDialogSave(event: any): Promise<void> {
-        const dialog = event.getSource().getParent() as any;
-        try {
-            await api.createItem({
-                Number: (this.byId("itemNumber") as Input).getValue(),
-                Description: (this.byId("itemDescription") as Input).getValue(),
-                VatRate: Number((this.byId("itemVatRate") as Input).getValue()),
-                DefaultPrice: (this.byId("itemDefaultPrice") as Input).getValue()
-                    ? Number((this.byId("itemDefaultPrice") as Input).getValue()) : null,
-            });
-            dialog.close();
-            ((this.byId("itemsTable") as any).getBinding("items") as ODataListBinding).refresh();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public onDialogCancel(event: any): void {
-        (event.getSource().getParent() as any).close();
-    }
+  public onDialogCancel(event: any): void {
+    (event.getSource().getParent() as any).close();
+  }
 }
 ```
 
@@ -5315,47 +5385,53 @@ import Fragment from "sap/ui/core/Fragment";
 import Input from "sap/m/Input";
 
 export default class Recipients extends BaseController {
-    public onInit(): void {
-        models.bindRoot(this.getView()!);
+  public onInit(): void {
+    models.bindRoot(this.getView()!);
+  }
+
+  public onSearch(event: any): void {
+    const term = event.getParameter("query") as string;
+    const binding = (this.byId("recipientsTable") as any).getBinding(
+      "items",
+    ) as ODataListBinding;
+    if (!term) {
+      binding.filter([]);
+      return;
     }
 
-    public onSearch(event: any): void {
-        const term = event.getParameter("query") as string;
-        const binding = (this.byId("recipientsTable") as any).getBinding("items") as ODataListBinding;
-        if (!term) {
-            binding.filter([]);
-            return;
-        }
+    binding.filter(new Filter("Name", FilterOperator.Contains, term));
+  }
 
-        binding.filter(new Filter("Name", FilterOperator.Contains, term));
-    }
+  public async onCreateRecipient(): Promise<void> {
+    const dialog = (await Fragment.load({
+      name: "burkard.invoicing.view.fragments.RecipientDialog",
+      controller: this,
+    })) as any;
+    (this.getView() as any).addDependent(dialog);
+    dialog.open();
+  }
 
-    public async onCreateRecipient(): Promise<void> {
-        const dialog = await Fragment.load({
-            name: "burkard.invoicing.view.fragments.RecipientDialog",
-            controller: this,
-        }) as any;
-        (this.getView() as any).addDependent(dialog);
-        dialog.open();
+  public async onDialogSave(event: any): Promise<void> {
+    const dialog = event.getSource().getParent() as any;
+    try {
+      await api.createRecipient({
+        Name: (this.byId("recipientName") as Input).getValue(),
+        Address: (this.byId("recipientAddress") as Input).getValue(),
+      });
+      dialog.close();
+      (
+        (this.byId("recipientsTable") as any).getBinding(
+          "items",
+        ) as ODataListBinding
+      ).refresh();
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public async onDialogSave(event: any): Promise<void> {
-        const dialog = event.getSource().getParent() as any;
-        try {
-            await api.createRecipient({
-                Name: (this.byId("recipientName") as Input).getValue(),
-                Address: (this.byId("recipientAddress") as Input).getValue(),
-            });
-            dialog.close();
-            ((this.byId("recipientsTable") as any).getBinding("items") as ODataListBinding).refresh();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public onDialogCancel(event: any): void {
-        (event.getSource().getParent() as any).close();
-    }
+  public onDialogCancel(event: any): void {
+    (event.getSource().getParent() as any).close();
+  }
 }
 ```
 
@@ -5417,11 +5493,13 @@ git commit -m "feat: settings, items and recipients views"
 ### Task 15: Invoices view — create, edit (revision), downloads (Stories 4, 8, 9)
 
 **Files:**
+
 - Modify: `frontend/src/view/Invoices.view.xml`, `frontend/src/controller/Invoices.controller.ts`, `frontend/src/model/api.ts` (add `createInvoice`, `createRevision`, `fetchDocuments`, `bulkDownload`, `downloadBlob`), `frontend/src/i18n/i18n.properties` (add keys)
 - Create: `frontend/src/view/fragments/InvoiceDialog.fragment.xml`
 - Test: `e2e/tests/invoices.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `POST /odata/CreateInvoice`, `POST /odata/CreateRevision`, `GET /odata/Invoices({id})/Documents`, `GET /odata/Invoices({id})/Lines`, `GET /odata/Documents({id})/$value`, `POST /odata/BulkDownloadDocuments`.
 - Produces: `api.createInvoice(recipientId, lines)`, `api.createRevision(invoiceId, recipientId, lines)`, `api.fetchDocuments(invoiceId) → DocumentDto[]`, `api.bulkDownload(kind)` (triggers browser download), `api.downloadBlob`.
 
@@ -5432,51 +5510,75 @@ git commit -m "feat: settings, items and recipients views"
 ```ts
 import { test, expect } from "@playwright/test";
 
-async function seedMasterData(page: import("@playwright/test").Page): Promise<void> {
-    // direct API calls keep the test focused on the UI flow
-    await page.request.post("http://localhost:8080/odata/VatRates", { data: { Rate: 7 } });
-    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
-        data: { Number: "9001", Description: "Grabpflege", VatRate: 7, DefaultPrice: null },
-    });
-    await page.request.post("http://localhost:8080/odata/Recipients", {
-        data: { Name: "Familie Mahr", Address: "Musterstraße 1\n12345 Musterstadt" },
-    });
+async function seedMasterData(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  // direct API calls keep the test focused on the UI flow
+  await page.request.post("http://localhost:8080/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+    data: {
+      Number: "9001",
+      Description: "Grabpflege",
+      VatRate: 7,
+      DefaultPrice: null,
+    },
+  });
+  await page.request.post("http://localhost:8080/odata/Recipients", {
+    data: {
+      Name: "Familie Mahr",
+      Address: "Musterstraße 1\n12345 Musterstadt",
+    },
+  });
 }
 
-test("create an invoice with a mandatory price and download documents (Story 4, 8)", async ({ page }) => {
-    await seedMasterData(page);
-    await page.goto("/index.html#/invoices");
+test("create an invoice with a mandatory price and download documents (Story 4, 8)", async ({
+  page,
+}) => {
+  await seedMasterData(page);
+  await page.goto("/index.html#/invoices");
 
-    await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-    await page.locator("[id$='invoiceDialog--recipient']").click(); // Select opens popover
-    await page.locator("li.sapMSelectListItem", { hasText: "Familie Mahr" }).click();
-    await page.locator("[id$='lineItem']").click();
-    await page.locator("li.sapMSelectListItem", { hasText: "Grabpflege" }).click();
-    await page.getByLabel("Anzahl").fill("2");
-    await page.getByLabel("Preis").fill("120");
-    await page.getByRole("button", { name: "Speichern" }).click();
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await page.locator("[id$='invoiceDialog--recipient']").click(); // Select opens popover
+  await page
+    .locator("li.sapMSelectListItem", { hasText: "Familie Mahr" })
+    .click();
+  await page.locator("[id$='lineItem']").click();
+  await page
+    .locator("li.sapMSelectListItem", { hasText: "Grabpflege" })
+    .click();
+  await page.getByLabel("Anzahl").fill("2");
+  await page.getByLabel("Preis").fill("120");
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await expect(page.locator("table")).toContainText(/2026-0001/);
+  await expect(page.locator("table")).toContainText(/2026-0001/);
 
-    const downloadPromise = page.waitForEvent("download");
-    await page.locator("table").getByText("Rechnung").first().click();
-    const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain(".pdf");
-    expect(download.suggestedFilename()).not.toContain("Kopie");
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("table").getByText("Rechnung").first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain(".pdf");
+  expect(download.suggestedFilename()).not.toContain("Kopie");
 });
 
-test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
-    await seedMasterData(page);
-    await page.goto("/index.html#/invoices");
+test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
+  page,
+}) => {
+  await seedMasterData(page);
+  await page.goto("/index.html#/invoices");
 
-    await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-    await page.locator("[id$='invoiceDialog--recipient']").click();
-    await page.locator("li.sapMSelectListItem", { hasText: "Familie Mahr" }).click();
-    await page.locator("[id$='lineItem']").click();
-    await page.locator("li.sapMSelectListItem", { hasText: "Grabpflege" }).click();
-    await page.getByRole("button", { name: "Speichern" }).click();
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await page.locator("[id$='invoiceDialog--recipient']").click();
+  await page
+    .locator("li.sapMSelectListItem", { hasText: "Familie Mahr" })
+    .click();
+  await page.locator("[id$='lineItem']").click();
+  await page
+    .locator("li.sapMSelectListItem", { hasText: "Grabpflege" })
+    .click();
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await expect(page.locator(".sapMDialog")).toContainText("Preis");
+  await expect(page.locator(".sapMDialog")).toContainText("Preis");
 });
 ```
 
@@ -5491,51 +5593,68 @@ Add to `frontend/src/model/api.ts`:
 
 ```ts
 export interface InvoiceLineDto {
-    itemId: number;
-    count: number;
-    unitPrice: number | null;
+  itemId: number;
+  count: number;
+  unitPrice: number | null;
 }
 
 export interface DocumentDto {
-    Id: number;
-    FileName: string;
+  Id: number;
+  FileName: string;
 }
 
-export async function createInvoice(recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
-    await ensureOk(await post("/odata/CreateInvoice", { recipientId, lines }));
+export async function createInvoice(
+  recipientId: number,
+  lines: InvoiceLineDto[],
+): Promise<void> {
+  await ensureOk(await post("/odata/CreateInvoice", { recipientId, lines }));
 }
 
-export async function createRevision(invoiceId: number, recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
-    await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
+export async function createRevision(
+  invoiceId: number,
+  recipientId: number,
+  lines: InvoiceLineDto[],
+): Promise<void> {
+  await ensureOk(
+    await post("/odata/CreateRevision", { invoiceId, recipientId, lines }),
+  );
 }
 
-export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
-    const response = await fetch(`/odata/Invoices(${invoiceId})/Documents`);
-    await ensureOk(response);
-    const body = await response.json();
-    return body.value as DocumentDto[];
+export async function fetchDocuments(
+  invoiceId: number,
+): Promise<DocumentDto[]> {
+  const response = await fetch(`/odata/Invoices(${invoiceId})/Documents`);
+  await ensureOk(response);
+  const body = await response.json();
+  return body.value as DocumentDto[];
 }
 
 export function downloadUrl(documentId: number): string {
-    return `/odata/Documents(${documentId})/$value`;
+  return `/odata/Documents(${documentId})/$value`;
 }
 
-export async function bulkDownload(kind: "Normal" | "Copy", fileName: string): Promise<void> {
-    const response = await post("/odata/BulkDownloadDocuments", { kind });
-    await ensureOk(response);
-    const blob = await response.blob();
-    await downloadBlob(blob, fileName);
+export async function bulkDownload(
+  kind: "Normal" | "Copy",
+  fileName: string,
+): Promise<void> {
+  const response = await post("/odata/BulkDownloadDocuments", { kind });
+  await ensureOk(response);
+  const blob = await response.blob();
+  await downloadBlob(blob, fileName);
 }
 
-export async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+export async function downloadBlob(
+  blob: Blob,
+  fileName: string,
+): Promise<void> {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 ```
 
@@ -5619,127 +5738,152 @@ import Select from "sap/m/Select";
 import JSONModel from "sap/ui/model/json/JSONModel";
 
 export default class Invoices extends BaseController {
-    public onInit(): void {
-        models.bindRoot(this.getView()!);
+  public onInit(): void {
+    models.bindRoot(this.getView()!);
+  }
+
+  public onHalfYearChange(event: any): void {
+    const key = (event.getSource() as Select).getSelectedKey();
+    const binding = (this.byId("invoicesTable") as any).getBinding(
+      "items",
+    ) as ODataListBinding;
+    if (!key) {
+      binding.filter([]);
+      return;
     }
 
-    public onHalfYearChange(event: any): void {
-        const key = (event.getSource() as Select).getSelectedKey();
-        const binding = (this.byId("invoicesTable") as any).getBinding("items") as ODataListBinding;
-        if (!key) {
-            binding.filter([]);
-            return;
-        }
+    const [year, half] = key.split("-").map(Number);
+    binding.filter(
+      new Filter({
+        filters: [
+          new Filter("PeriodYear", FilterOperator.EQ, year),
+          new Filter("PeriodHalf", FilterOperator.EQ, half),
+        ],
+        and: true,
+      }),
+    );
+  }
 
-        const [year, half] = key.split("-").map(Number);
-        binding.filter(new Filter({
-            filters: [
-                new Filter("PeriodYear", FilterOperator.EQ, year),
-                new Filter("PeriodHalf", FilterOperator.EQ, half),
-            ],
-            and: true,
-        }));
+  public async onCreateInvoice(): Promise<void> {
+    await this.openInvoiceDialog(null);
+  }
+
+  public async onEditInvoice(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("odata") as Context;
+    await this.openInvoiceDialog(context);
+  }
+
+  private async openInvoiceDialog(
+    invoiceContext: Context | null,
+  ): Promise<void> {
+    if (!this._dialog) {
+      this._dialog = (await Fragment.load({
+        name: "burkard.invoicing.view.fragments.InvoiceDialog",
+        controller: this,
+      })) as any;
+      (this.getView() as any).addDependent(this._dialog);
     }
 
-    public async onCreateInvoice(): Promise<void> {
-        await this.openInvoiceDialog(null);
+    const lines = invoiceContext
+      ? await this.loadLines(invoiceContext.getProperty("Id") as number)
+      : [];
+    this._dialog.setModel(
+      new JSONModel({
+        recipientId: invoiceContext?.getProperty("RecipientId") ?? null,
+        invoiceId: invoiceContext?.getProperty("Id") ?? null,
+        lines,
+      }),
+      "invoiceDraft",
+    );
+    this._dialog.open();
+  }
+
+  private async loadLines(invoiceId: number): Promise<any[]> {
+    const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
+    const body = await response.json();
+    return (body.value as any[]).map((line) => ({
+      itemId: line.ItemId,
+      count: line.Count,
+      unitPrice: line.UnitPrice,
+    }));
+  }
+
+  public onAddLine(event: any): void {
+    const model = this._dialog.getModel("invoiceDraft") as JSONModel;
+    const lines = (model.getProperty("/lines") as any[]) ?? [];
+    lines.push({ itemId: null, count: 1, unitPrice: null });
+    model.setProperty("/lines", lines);
+  }
+
+  public async onInvoiceDialogSave(): Promise<void> {
+    const model = this._dialog.getModel("invoiceDraft") as JSONModel;
+    const draft = model.getData() as any;
+    const lines = (draft.lines as any[]).map((line) => ({
+      itemId: Number(line.itemId),
+      count: Number(line.count),
+      unitPrice: line.unitPrice ? Number(line.unitPrice) : null,
+    }));
+
+    try {
+      if (draft.invoiceId) {
+        await api.createRevision(
+          Number(draft.invoiceId),
+          Number(draft.recipientId),
+          lines,
+        );
+      } else {
+        await api.createInvoice(Number(draft.recipientId), lines);
+      }
+
+      this._dialog.close();
+      (
+        (this.byId("invoicesTable") as any).getBinding(
+          "items",
+        ) as ODataListBinding
+      ).refresh();
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public async onEditInvoice(event: any): Promise<void> {
-        const context = event.getSource().getBindingContext("odata") as Context;
-        await this.openInvoiceDialog(context);
+  public onInvoiceDialogCancel(): void {
+    this._dialog.close();
+  }
+
+  public async onDownloadNormal(event: any): Promise<void> {
+    await this.download(
+      event.getSource().getBindingContext("odata") as Context,
+      false,
+    );
+  }
+
+  public async onDownloadCopy(event: any): Promise<void> {
+    await this.download(
+      event.getSource().getBindingContext("odata") as Context,
+      true,
+    );
+  }
+
+  private async download(context: Context, isCopy: boolean): Promise<void> {
+    const invoiceId = context.getProperty("Id") as number;
+    const documents = await api.fetchDocuments(invoiceId);
+    const match = documents.find(
+      (d) => d.FileName.includes("Kopie") === isCopy,
+    );
+    if (match) {
+      window.open(api.downloadUrl(match.Id), "_blank");
     }
+  }
 
-    private async openInvoiceDialog(invoiceContext: Context | null): Promise<void> {
-        if (!this._dialog) {
-            this._dialog = await Fragment.load({
-                name: "burkard.invoicing.view.fragments.InvoiceDialog",
-                controller: this,
-            }) as any;
-            (this.getView() as any).addDependent(this._dialog);
-        }
+  public async onBulkNormal(): Promise<void> {
+    await api.bulkDownload("Normal", "rechnungen.zip");
+  }
 
-        const lines = invoiceContext
-            ? await this.loadLines(invoiceContext.getProperty("Id") as number)
-            : [];
-        this._dialog.setModel(new JSONModel({
-            recipientId: invoiceContext?.getProperty("RecipientId") ?? null,
-            invoiceId: invoiceContext?.getProperty("Id") ?? null,
-            lines,
-        }), "invoiceDraft");
-        this._dialog.open();
-    }
+  public async onBulkCopy(): Promise<void> {
+    await api.bulkDownload("Copy", "kopien.zip");
+  }
 
-    private async loadLines(invoiceId: number): Promise<any[]> {
-        const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
-        const body = await response.json();
-        return (body.value as any[]).map((line) => ({
-            itemId: line.ItemId,
-            count: line.Count,
-            unitPrice: line.UnitPrice,
-        }));
-    }
-
-    public onAddLine(event: any): void {
-        const model = this._dialog.getModel("invoiceDraft") as JSONModel;
-        const lines = (model.getProperty("/lines") as any[]) ?? [];
-        lines.push({ itemId: null, count: 1, unitPrice: null });
-        model.setProperty("/lines", lines);
-    }
-
-    public async onInvoiceDialogSave(): Promise<void> {
-        const model = this._dialog.getModel("invoiceDraft") as JSONModel;
-        const draft = model.getData() as any;
-        const lines = (draft.lines as any[]).map((line) => ({
-            itemId: Number(line.itemId),
-            count: Number(line.count),
-            unitPrice: line.unitPrice ? Number(line.unitPrice) : null,
-        }));
-
-        try {
-            if (draft.invoiceId) {
-                await api.createRevision(Number(draft.invoiceId), Number(draft.recipientId), lines);
-            } else {
-                await api.createInvoice(Number(draft.recipientId), lines);
-            }
-
-            this._dialog.close();
-            ((this.byId("invoicesTable") as any).getBinding("items") as ODataListBinding).refresh();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public onInvoiceDialogCancel(): void {
-        this._dialog.close();
-    }
-
-    public async onDownloadNormal(event: any): Promise<void> {
-        await this.download(event.getSource().getBindingContext("odata") as Context, false);
-    }
-
-    public async onDownloadCopy(event: any): Promise<void> {
-        await this.download(event.getSource().getBindingContext("odata") as Context, true);
-    }
-
-    private async download(context: Context, isCopy: boolean): Promise<void> {
-        const invoiceId = context.getProperty("Id") as number;
-        const documents = await api.fetchDocuments(invoiceId);
-        const match = documents.find((d) => d.FileName.includes("Kopie") === isCopy);
-        if (match) {
-            window.open(api.downloadUrl(match.Id), "_blank");
-        }
-    }
-
-    public async onBulkNormal(): Promise<void> {
-        await api.bulkDownload("Normal", "rechnungen.zip");
-    }
-
-    public async onBulkCopy(): Promise<void> {
-        await api.bulkDownload("Copy", "kopien.zip");
-    }
-
-    private _dialog: any;
+  private _dialog: any;
 }
 ```
 
@@ -5822,11 +5966,13 @@ git commit -m "feat: invoice creation, revision and document downloads"
 ### Task 16: Graves view — management, half-year status, generation with blocking progress (Stories 5, 6, 13)
 
 **Files:**
+
 - Modify: `frontend/src/view/Graves.view.xml`, `frontend/src/controller/Graves.controller.ts`, `frontend/src/model/api.ts` (add `generateGraveInvoices`, `fetchGraveStatus`, `createGrave`, `deleteGraveLink`, `createGraveItemLink`, `createGraveRecipientLink`, `fetchGrave`), `frontend/src/i18n/i18n.properties` (add keys)
 - Create: `frontend/src/view/fragments/GraveDialog.fragment.xml`, `frontend/src/view/fragments/GenerateDialog.fragment.xml`
 - Test: `e2e/tests/graves.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `/odata/Graves`, `/odata/GraveItems`, `/odata/GraveRecipients`, `POST /odata/GenerateGraveInvoices`, `GET /odata/GraveInvoicingStatus`, `GET /odata/Jobs({id})`.
 - Produces: `api.generateGraveInvoices(year, half) → JobDto`; `api.fetchGraveStatus(year, half) → { value: [{Id, GraveNumber, Invoiced}] }`; blocking progress helper `pollJob(jobId, onDone)` in the controller.
 
@@ -5837,82 +5983,119 @@ git commit -m "feat: invoice creation, revision and document downloads"
 ```ts
 import { test, expect } from "@playwright/test";
 
-async function seedManyGraves(page: import("@playwright/test").Page, count: number): Promise<void> {
-    await page.request.post("http://localhost:8080/odata/VatRates", { data: { Rate: 7 } });
-    const item = await (await page.request.post("http://localhost:8080/odata/InvoiceItems", {
-        data: { Number: "8001", Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 },
-    })).json();
-    const recipient = await (await page.request.post("http://localhost:8080/odata/Recipients", {
-        data: { Name: "Anna Beispiel", Address: "Hauptstraße 1" },
-    })).json();
+async function seedManyGraves(
+  page: import("@playwright/test").Page,
+  count: number,
+): Promise<void> {
+  await page.request.post("http://localhost:8080/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  const item = await (
+    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+      data: {
+        Number: "8001",
+        Description: "Grabpflege",
+        VatRate: 7,
+        DefaultPrice: 100,
+      },
+    })
+  ).json();
+  const recipient = await (
+    await page.request.post("http://localhost:8080/odata/Recipients", {
+      data: { Name: "Anna Beispiel", Address: "Hauptstraße 1" },
+    })
+  ).json();
 
-    for (let i = 1; i <= count; i++) {
-        const grave = await (await page.request.post("http://localhost:8080/odata/Graves", {
-            data: { GraveNumber: `G-${String(i).padStart(3, "0")}`, StartDate: "2026-01-01", EndDate: "2040-12-31" },
-        })).json();
-        await page.request.post("http://localhost:8080/odata/GraveItems", {
-            data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
-        });
-        await page.request.post("http://localhost:8080/odata/GraveRecipients", {
-            data: { GraveId: grave.Id, RecipientId: recipient.Id },
-        });
-    }
+  for (let i = 1; i <= count; i++) {
+    const grave = await (
+      await page.request.post("http://localhost:8080/odata/Graves", {
+        data: {
+          GraveNumber: `G-${String(i).padStart(3, "0")}`,
+          StartDate: "2026-01-01",
+          EndDate: "2040-12-31",
+        },
+      })
+    ).json();
+    await page.request.post("http://localhost:8080/odata/GraveItems", {
+      data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
+    });
+    await page.request.post("http://localhost:8080/odata/GraveRecipients", {
+      data: { GraveId: grave.Id, RecipientId: recipient.Id },
+    });
+  }
 }
 
-test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({ page }) => {
-    await seedManyGraves(page, 60);
-    await page.goto("/index.html#/graves");
-    await expect(page.locator("table")).toContainText("G-001");
+test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
+  page,
+}) => {
+  await seedManyGraves(page, 60);
+  await page.goto("/index.html#/graves");
+  await expect(page.locator("table")).toContainText("G-001");
 
-    await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
-    await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
 
-    // blocking progress indicator is visible while the job runs
-    await expect(page.locator(".sapMBusyDialog")).toBeVisible({ timeout: 5000 });
-    await expect(page.locator(".sapMBusyDialog")).not.toBeVisible({ timeout: 90000 });
+  // blocking progress indicator is visible while the job runs
+  await expect(page.locator(".sapMBusyDialog")).toBeVisible({ timeout: 5000 });
+  await expect(page.locator(".sapMBusyDialog")).not.toBeVisible({
+    timeout: 90000,
+  });
 
-    // status column now shows all graves as invoiced
-    await expect(page.locator("table").getByText("erstellt").first()).toBeVisible();
+  // status column now shows all graves as invoiced
+  await expect(
+    page.locator("table").getByText("erstellt").first(),
+  ).toBeVisible();
 
-    // dismiss the success message, then a second generation is prevented
-    await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
-    await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
-    await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
-    await expect(page.locator(".sapMDialog")).toContainText("bereits");
+  // dismiss the success message, then a second generation is prevented
+  await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
+  await expect(page.locator(".sapMDialog")).toContainText("bereits");
 });
 
-test("create a grave and link item and recipient (Story 5)", async ({ page }) => {
-    await page.request.post("http://localhost:8080/odata/VatRates", { data: { Rate: 7 } });
-    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
-        data: { Number: "8002", Description: "Pflege", VatRate: 7, DefaultPrice: 50 },
-    });
-    await page.request.post("http://localhost:8080/odata/Recipients", {
-        data: { Name: "Bert Beispiel", Address: "Nebenweg 2" },
-    });
+test("create a grave and link item and recipient (Story 5)", async ({
+  page,
+}) => {
+  await page.request.post("http://localhost:8080/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+    data: {
+      Number: "8002",
+      Description: "Pflege",
+      VatRate: 7,
+      DefaultPrice: 50,
+    },
+  });
+  await page.request.post("http://localhost:8080/odata/Recipients", {
+    data: { Name: "Bert Beispiel", Address: "Nebenweg 2" },
+  });
 
-    await page.goto("/index.html#/graves");
-    await page.getByRole("button", { name: "Grab anlegen" }).click();
-    await page.getByLabel("Grabnummer").fill("X-100");
-    await page.getByLabel("Beginn").fill("2026-01-01");
-    await page.getByLabel("Ende").fill("2040-12-31");
-    await page.getByRole("button", { name: "Speichern" }).click();
+  await page.goto("/index.html#/graves");
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await page.getByLabel("Grabnummer").fill("X-100");
+  await page.getByLabel("Beginn").fill("2026-01-01");
+  await page.getByLabel("Ende").fill("2040-12-31");
+  await page.getByRole("button", { name: "Speichern" }).click();
 
-    await expect(page.locator("table")).toContainText("X-100");
+  await expect(page.locator("table")).toContainText("X-100");
 
-    // open the edit dialog and add the item and recipient links
-    await page.locator("table").getByText("Bearbeiten").first().click();
-    await page.locator("[id$='linkItem']").click();
-    await page.locator("li.sapMSelectListItem", { hasText: "8002" }).click();
-    await page.locator("[id$='linkCount']").fill("1");
-    await page.getByRole("button", { name: "Hinzufügen" }).first().click();
-    await expect(page.locator(".sapMDialog")).toContainText("8002");
+  // open the edit dialog and add the item and recipient links
+  await page.locator("table").getByText("Bearbeiten").first().click();
+  await page.locator("[id$='linkItem']").click();
+  await page.locator("li.sapMSelectListItem", { hasText: "8002" }).click();
+  await page.locator("[id$='linkCount']").fill("1");
+  await page.getByRole("button", { name: "Hinzufügen" }).first().click();
+  await expect(page.locator(".sapMDialog")).toContainText("8002");
 
-    await page.locator("[id$='linkRecipient']").click();
-    await page.locator("li.sapMSelectListItem", { hasText: "Bert Beispiel" }).click();
-    await page.getByRole("button", { name: "Hinzufügen" }).last().click();
-    await expect(page.locator(".sapMDialog")).toContainText("Bert Beispiel");
+  await page.locator("[id$='linkRecipient']").click();
+  await page
+    .locator("li.sapMSelectListItem", { hasText: "Bert Beispiel" })
+    .click();
+  await page.getByRole("button", { name: "Hinzufügen" }).last().click();
+  await expect(page.locator(".sapMDialog")).toContainText("Bert Beispiel");
 
-    await page.getByRole("button", { name: "Speichern" }).click();
+  await page.getByRole("button", { name: "Speichern" }).click();
 });
 ```
 
@@ -5927,63 +6110,100 @@ Add to `frontend/src/model/api.ts`:
 
 ```ts
 export interface JobDto {
-    Id: number;
-    Status: string;
-    ProgressPercent: number;
-    ResultJson?: string;
+  Id: number;
+  Status: string;
+  ProgressPercent: number;
+  ResultJson?: string;
 }
 
-export async function generateGraveInvoices(year: number, half: number): Promise<JobDto> {
-    const response = await post("/odata/GenerateGraveInvoices", { year, half });
-    await ensureOk(response);
-    return (await response.json()) as JobDto;
+export async function generateGraveInvoices(
+  year: number,
+  half: number,
+): Promise<JobDto> {
+  const response = await post("/odata/GenerateGraveInvoices", { year, half });
+  await ensureOk(response);
+  return (await response.json()) as JobDto;
 }
 
-export async function fetchGraveStatus(year: number, half: number): Promise<any[]> {
-    const response = await fetch(`/odata/GraveInvoicingStatus?year=${year}&half=${half}`);
-    await ensureOk(response);
-    const body = await response.json();
-    return body.value as any[];
+export async function fetchGraveStatus(
+  year: number,
+  half: number,
+): Promise<any[]> {
+  const response = await fetch(
+    `/odata/GraveInvoicingStatus?year=${year}&half=${half}`,
+  );
+  await ensureOk(response);
+  const body = await response.json();
+  return body.value as any[];
 }
 
 export async function createGrave(grave: {
-    GraveNumber: string; StartDate: string; EndDate: string;
+  GraveNumber: string;
+  StartDate: string;
+  EndDate: string;
 }): Promise<number> {
-    const response = await post("/odata/Graves", grave);
-    await ensureOk(response);
-    const body = await response.json();
-    return body.Id as number;
+  const response = await post("/odata/Graves", grave);
+  await ensureOk(response);
+  const body = await response.json();
+  return body.Id as number;
 }
 
-export async function createGraveItemLink(graveId: number, itemId: number, count: number): Promise<void> {
-    await ensureOk(await post("/odata/GraveItems", { GraveId: graveId, ItemId: itemId, Count: count }));
+export async function createGraveItemLink(
+  graveId: number,
+  itemId: number,
+  count: number,
+): Promise<void> {
+  await ensureOk(
+    await post("/odata/GraveItems", {
+      GraveId: graveId,
+      ItemId: itemId,
+      Count: count,
+    }),
+  );
 }
 
-export async function createGraveRecipientLink(graveId: number, recipientId: number): Promise<void> {
-    await ensureOk(await post("/odata/GraveRecipients", { GraveId: graveId, RecipientId: recipientId }));
+export async function createGraveRecipientLink(
+  graveId: number,
+  recipientId: number,
+): Promise<void> {
+  await ensureOk(
+    await post("/odata/GraveRecipients", {
+      GraveId: graveId,
+      RecipientId: recipientId,
+    }),
+  );
 }
 
 export async function fetchGraveDetails(graveId: number): Promise<any> {
-    const response = await fetch(`/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`);
-    await ensureOk(response);
-    return response.json();
+  const response = await fetch(
+    `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`,
+  );
+  await ensureOk(response);
+  return response.json();
 }
 
-export async function patchGrave(graveId: number, fields: Record<string, unknown>): Promise<void> {
-    const response = await fetch(`/odata/Graves(${graveId})`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-    });
-    await ensureOk(response);
+export async function patchGrave(
+  graveId: number,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const response = await fetch(`/odata/Graves(${graveId})`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  await ensureOk(response);
 }
 
 export async function deleteGraveItemLink(linkId: number): Promise<void> {
-    await ensureOk(await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }));
+  await ensureOk(
+    await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }),
+  );
 }
 
 export async function deleteGraveRecipientLink(linkId: number): Promise<void> {
-    await ensureOk(await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }));
+  await ensureOk(
+    await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }),
+  );
 }
 ```
 
@@ -6065,252 +6285,287 @@ import BusyDialog from "sap/m/BusyDialog";
 import MessageBox from "sap/m/MessageBox";
 
 export default class Graves extends BaseController {
-    public onInit(): void {
-        models.bindRoot(this.getView()!);
-        this.getView()!.setModel(new JSONModel({ statuses: {} }), "status");
-        void this.refreshStatus();
+  public onInit(): void {
+    models.bindRoot(this.getView()!);
+    this.getView()!.setModel(new JSONModel({ statuses: {} }), "status");
+    void this.refreshStatus();
+  }
+
+  public statusFormatter(
+    graveId: number,
+    statuses: Record<string, any>,
+  ): string {
+    const bundle = (
+      this.getView()!.getModel("i18n") as any
+    ).getResourceBundle();
+    return statuses?.[String(graveId)]?.Invoiced
+      ? bundle.getText("statusInvoiced")
+      : bundle.getText("statusOpen");
+  }
+
+  public onHalfYearChange(): void {
+    void this.refreshStatus();
+  }
+
+  private async refreshStatus(): Promise<void> {
+    const [year, half] = (this.byId("halfYearSelect") as Select)
+      .getSelectedKey()
+      .split("-")
+      .map(Number);
+    try {
+      const rows = await api.fetchGraveStatus(year, half);
+      const statuses: Record<string, any> = {};
+      for (const row of rows) {
+        statuses[String(row.Id)] = row;
+      }
+
+      (this.getView()!.getModel("status") as JSONModel).setProperty(
+        "/statuses",
+        statuses,
+      );
+    } catch (error) {
+      await api.showError(this, error);
     }
+  }
 
-    public statusFormatter(graveId: number, statuses: Record<string, any>): string {
-        const bundle = (this.getView()!.getModel("i18n") as any).getResourceBundle();
-        return statuses?.[String(graveId)]?.Invoiced
-            ? bundle.getText("statusInvoiced")
-            : bundle.getText("statusOpen");
-    }
+  public async onCreateGrave(): Promise<void> {
+    await this.openGraveDialog(null);
+  }
 
-    public onHalfYearChange(): void {
-        void this.refreshStatus();
-    }
+  public async onEditGrave(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("odata") as Context;
+    await this.openGraveDialog(context);
+  }
 
-    private async refreshStatus(): Promise<void> {
-        const [year, half] = (this.byId("halfYearSelect") as Select).getSelectedKey()
-            .split("-").map(Number);
-        try {
-            const rows = await api.fetchGraveStatus(year, half);
-            const statuses: Record<string, any> = {};
-            for (const row of rows) {
-                statuses[String(row.Id)] = row;
-            }
+  private async openGraveDialog(graveContext: Context | null): Promise<void> {
+    const dialog = (await Fragment.load({
+      name: "burkard.invoicing.view.fragments.GraveDialog",
+      controller: this,
+    })) as any;
+    (this.getView() as any).addDependent(dialog);
+    this._graveDialog = dialog;
 
-            (this.getView()!.getModel("status") as JSONModel).setProperty("/statuses", statuses);
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public async onCreateGrave(): Promise<void> {
-        await this.openGraveDialog(null);
-    }
-
-    public async onEditGrave(event: any): Promise<void> {
-        const context = event.getSource().getBindingContext("odata") as Context;
-        await this.openGraveDialog(context);
-    }
-
-    private async openGraveDialog(graveContext: Context | null): Promise<void> {
-        const dialog = await Fragment.load({
-            name: "burkard.invoicing.view.fragments.GraveDialog",
-            controller: this,
-        }) as any;
-        (this.getView() as any).addDependent(dialog);
-        this._graveDialog = dialog;
-
-        if (graveContext) {
-            const details = await api.fetchGraveDetails(graveContext.getProperty("Id") as number);
-            dialog.setModel(new JSONModel({
-                Id: details.Id,
-                GraveNumber: details.GraveNumber,
-                StartDate: details.StartDate,
-                EndDate: details.EndDate,
-                Items: details.Items.map((link: any) => ({
-                    Id: link.Id,
-                    Number: link.Item.Number,
-                    Count: link.Count,
-                })),
-                Recipients: details.Recipients.map((link: any) => ({
-                    Id: link.Id,
-                    Name: link.Recipient.Name,
-                })),
-            }), "graveDraft");
-        } else {
-            dialog.setModel(new JSONModel({ Items: [], Recipients: [] }), "graveDraft");
-        }
-
-        dialog.open();
-    }
-
-    public async onGraveDialogSave(event: any): Promise<void> {
-        const dialog = event.getSource().getParent() as any;
-        const draft = (dialog.getModel("graveDraft") as JSONModel).getData() as any;
-        try {
-            if (draft.Id) {
-                await api.patchGrave(Number(draft.Id), {
-                    GraveNumber: (this.byId("graveNumber") as Input).getValue(),
-                    StartDate: (this.byId("graveStart") as any).getValue(),
-                    EndDate: (this.byId("graveEnd") as any).getValue(),
-                });
-            } else {
-                await api.createGrave({
-                    GraveNumber: (this.byId("graveNumber") as Input).getValue(),
-                    StartDate: (this.byId("graveStart") as any).getValue(),
-                    EndDate: (this.byId("graveEnd") as any).getValue(),
-                });
-            }
-
-            dialog.close();
-            ((this.byId("gravesTable") as any).getBinding("items") as ODataListBinding).refresh();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public onGraveDialogCancel(event: any): void {
-        (event.getSource().getParent() as any).close();
-    }
-
-    public async onAddItemLink(): Promise<void> {
-        const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-        const graveId = draft.getProperty("/Id");
-        if (!graveId) {
-            await api.showError(this, new Error("GraveNotSaved"));
-            return;
-        }
-
-        try {
-            await api.createGraveItemLink(
-                Number(graveId),
-                Number((this.byId("linkItem") as Select).getSelectedKey()),
-                Number((this.byId("linkCount") as Input).getValue()));
-            await this.reloadGraveLinks();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public async onAddRecipientLink(): Promise<void> {
-        const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-        const graveId = draft.getProperty("/Id");
-        if (!graveId) {
-            await api.showError(this, new Error("GraveNotSaved"));
-            return;
-        }
-
-        try {
-            await api.createGraveRecipientLink(
-                Number(graveId),
-                Number((this.byId("linkRecipient") as Select).getSelectedKey()));
-            await this.reloadGraveLinks();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public async onDeleteItemLink(event: any): Promise<void> {
-        const context = event.getSource().getBindingContext("graveDraft") as any;
-        try {
-            await api.deleteGraveItemLink(context.getProperty("Id") as number);
-            await this.reloadGraveLinks();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    public async onDeleteRecipientLink(event: any): Promise<void> {
-        const context = event.getSource().getBindingContext("graveDraft") as any;
-        try {
-            await api.deleteGraveRecipientLink(context.getProperty("Id") as number);
-            await this.reloadGraveLinks();
-        } catch (error) {
-            await api.showError(this, error);
-        }
-    }
-
-    private async reloadGraveLinks(): Promise<void> {
-        const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-        const details = await api.fetchGraveDetails(Number(draft.getProperty("/Id")));
-        draft.setProperty("/Items", details.Items.map((link: any) => ({
+    if (graveContext) {
+      const details = await api.fetchGraveDetails(
+        graveContext.getProperty("Id") as number,
+      );
+      dialog.setModel(
+        new JSONModel({
+          Id: details.Id,
+          GraveNumber: details.GraveNumber,
+          StartDate: details.StartDate,
+          EndDate: details.EndDate,
+          Items: details.Items.map((link: any) => ({
             Id: link.Id,
             Number: link.Item.Number,
             Count: link.Count,
-        })));
-        draft.setProperty("/Recipients", details.Recipients.map((link: any) => ({
+          })),
+          Recipients: details.Recipients.map((link: any) => ({
             Id: link.Id,
             Name: link.Recipient.Name,
-        })));
+          })),
+        }),
+        "graveDraft",
+      );
+    } else {
+      dialog.setModel(
+        new JSONModel({ Items: [], Recipients: [] }),
+        "graveDraft",
+      );
     }
 
-    public async onGenerateInvoices(): Promise<void> {
-        if (this._running) {
-            return;
-        }
+    dialog.open();
+  }
 
-        const dialog = await Fragment.load({
-            name: "burkard.invoicing.view.fragments.GenerateDialog",
-            controller: this,
-        }) as any;
-        (this.getView() as any).addDependent(dialog);
-        dialog.open();
+  public async onGraveDialogSave(event: any): Promise<void> {
+    const dialog = event.getSource().getParent() as any;
+    const draft = (dialog.getModel("graveDraft") as JSONModel).getData() as any;
+    try {
+      if (draft.Id) {
+        await api.patchGrave(Number(draft.Id), {
+          GraveNumber: (this.byId("graveNumber") as Input).getValue(),
+          StartDate: (this.byId("graveStart") as any).getValue(),
+          EndDate: (this.byId("graveEnd") as any).getValue(),
+        });
+      } else {
+        await api.createGrave({
+          GraveNumber: (this.byId("graveNumber") as Input).getValue(),
+          StartDate: (this.byId("graveStart") as any).getValue(),
+          EndDate: (this.byId("graveEnd") as any).getValue(),
+        });
+      }
+
+      dialog.close();
+      (
+        (this.byId("gravesTable") as any).getBinding(
+          "items",
+        ) as ODataListBinding
+      ).refresh();
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
+  public onGraveDialogCancel(event: any): void {
+    (event.getSource().getParent() as any).close();
+  }
+
+  public async onAddItemLink(): Promise<void> {
+    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const graveId = draft.getProperty("/Id");
+    if (!graveId) {
+      await api.showError(this, new Error("GraveNotSaved"));
+      return;
     }
 
-    public async onGenerateDialogSave(event: any): Promise<void> {
-        const dialog = event.getSource().getParent() as any;
-        const year = Number((this.byId("genYear") as Select).getSelectedKey());
-        const half = Number((this.byId("genHalf") as Select).getSelectedKey());
+    try {
+      await api.createGraveItemLink(
+        Number(graveId),
+        Number((this.byId("linkItem") as Select).getSelectedKey()),
+        Number((this.byId("linkCount") as Input).getValue()),
+      );
+      await this.reloadGraveLinks();
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
 
-        this._running = true;
-        dialog.close();
-        const busy = new BusyDialog({ title: this.i18nText("generationRunning") });
-        busy.open();
-
-        try {
-            const job = await api.generateGraveInvoices(year, half);
-            const finished = await this.pollJob(job.Id);
-            if (finished.Status === "Failed") {
-                await MessageBox.error(this.i18nText("generationFailed"));
-            } else {
-                const result = JSON.parse(finished.ResultJson ?? "{}") as any;
-                await MessageBox.information(
-                    `${this.i18nText("generationDone")}: ${result.InvoicedGraves ?? 0}` +
-                    (result.SkippedGraves?.length
-                        ? ` (${this.i18nText("skippedGraves")}: ${result.SkippedGraves.join(", ")})`
-                        : ""));
-            }
-
-            await this.refreshStatus();
-        } catch (error) {
-            await api.showError(this, error);
-        } finally {
-            busy.close();
-            this._running = false;
-        }
+  public async onAddRecipientLink(): Promise<void> {
+    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const graveId = draft.getProperty("/Id");
+    if (!graveId) {
+      await api.showError(this, new Error("GraveNotSaved"));
+      return;
     }
 
-    public onGenerateDialogCancel(event: any): void {
-        (event.getSource().getParent() as any).close();
+    try {
+      await api.createGraveRecipientLink(
+        Number(graveId),
+        Number((this.byId("linkRecipient") as Select).getSelectedKey()),
+      );
+      await this.reloadGraveLinks();
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
+  public async onDeleteItemLink(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("graveDraft") as any;
+    try {
+      await api.deleteGraveItemLink(context.getProperty("Id") as number);
+      await this.reloadGraveLinks();
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
+  public async onDeleteRecipientLink(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("graveDraft") as any;
+    try {
+      await api.deleteGraveRecipientLink(context.getProperty("Id") as number);
+      await this.reloadGraveLinks();
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
+  private async reloadGraveLinks(): Promise<void> {
+    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const details = await api.fetchGraveDetails(
+      Number(draft.getProperty("/Id")),
+    );
+    draft.setProperty(
+      "/Items",
+      details.Items.map((link: any) => ({
+        Id: link.Id,
+        Number: link.Item.Number,
+        Count: link.Count,
+      })),
+    );
+    draft.setProperty(
+      "/Recipients",
+      details.Recipients.map((link: any) => ({
+        Id: link.Id,
+        Name: link.Recipient.Name,
+      })),
+    );
+  }
+
+  public async onGenerateInvoices(): Promise<void> {
+    if (this._running) {
+      return;
     }
 
-    private async pollJob(jobId: number): Promise<api.JobDto> {
-        while (true) {
-            const response = await fetch(`/odata/Jobs(${jobId})`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+    const dialog = (await Fragment.load({
+      name: "burkard.invoicing.view.fragments.GenerateDialog",
+      controller: this,
+    })) as any;
+    (this.getView() as any).addDependent(dialog);
+    dialog.open();
+  }
 
-            const job = (await response.json()) as api.JobDto;
-            if (job.Status === "Succeeded" || job.Status === "Failed") {
-                return job;
-            }
+  public async onGenerateDialogSave(event: any): Promise<void> {
+    const dialog = event.getSource().getParent() as any;
+    const year = Number((this.byId("genYear") as Select).getSelectedKey());
+    const half = Number((this.byId("genHalf") as Select).getSelectedKey());
 
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
+    this._running = true;
+    dialog.close();
+    const busy = new BusyDialog({ title: this.i18nText("generationRunning") });
+    busy.open();
+
+    try {
+      const job = await api.generateGraveInvoices(year, half);
+      const finished = await this.pollJob(job.Id);
+      if (finished.Status === "Failed") {
+        await MessageBox.error(this.i18nText("generationFailed"));
+      } else {
+        const result = JSON.parse(finished.ResultJson ?? "{}") as any;
+        await MessageBox.information(
+          `${this.i18nText("generationDone")}: ${result.InvoicedGraves ?? 0}` +
+            (result.SkippedGraves?.length
+              ? ` (${this.i18nText("skippedGraves")}: ${result.SkippedGraves.join(", ")})`
+              : ""),
+        );
+      }
+
+      await this.refreshStatus();
+    } catch (error) {
+      await api.showError(this, error);
+    } finally {
+      busy.close();
+      this._running = false;
     }
+  }
 
-    private i18nText(key: string): string {
-        return (this.getView()!.getModel("i18n") as any).getResourceBundle().getText(key);
+  public onGenerateDialogCancel(event: any): void {
+    (event.getSource().getParent() as any).close();
+  }
+
+  private async pollJob(jobId: number): Promise<api.JobDto> {
+    while (true) {
+      const response = await fetch(`/odata/Jobs(${jobId})`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const job = (await response.json()) as api.JobDto;
+      if (job.Status === "Succeeded" || job.Status === "Failed") {
+        return job;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
+  }
 
-    private _running = false;
-    private _graveDialog: any;
+  private i18nText(key: string): string {
+    return (this.getView()!.getModel("i18n") as any)
+      .getResourceBundle()
+      .getText(key);
+  }
+
+  private _running = false;
+  private _graveDialog: any;
 }
 ```
 
@@ -6458,9 +6713,11 @@ git commit -m "feat: grave management, half-year status and blocking generation"
 ### Task 17: Combined release image, CI, and release workflow
 
 **Files:**
+
 - Create: `Dockerfile` (repo root), `.github/workflows/ci.yml`, `.github/workflows/release.yml`
 
 **Interfaces:**
+
 - Consumes: `frontend` UI5 build (`dist/`), `backend` solution.
 - Produces: combined image `ghcr.io/<owner>/<repo>:<version>` and `:latest`; CI on PRs; manual release with semver bump (patch/minor/major).
 

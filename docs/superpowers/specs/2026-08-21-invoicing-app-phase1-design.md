@@ -8,16 +8,16 @@ get their own spec → plan → implementation cycle.
 
 ## 1. Recorded Decisions
 
-| Topic | Decision |
-|---|---|
-| Phasing | Phase 1 = Stories 1–9; Phase 2 = Stories 10–13 |
-| Document engine | QuestPDF (deterministic in-memory layout, per-page overlays) |
-| UI languages | German only for now; i18n resource-bundle mechanism in place |
-| Backend runtime | ASP.NET Core on .NET 10 LTS, OData v4 via ASP.NET Core OData 8.x |
-| Frontend | OpenUI5 with TypeScript (UI5 tooling TS template), OData V4 model |
-| Background jobs | In-process job runner: SQLite `Jobs` table + `BackgroundService` worker |
+| Topic             | Decision                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| Phasing           | Phase 1 = Stories 1–9; Phase 2 = Stories 10–13                                     |
+| Document engine   | QuestPDF (deterministic in-memory layout, per-page overlays)                       |
+| UI languages      | German only for now; i18n resource-bundle mechanism in place                       |
+| Backend runtime   | ASP.NET Core on .NET 10 LTS, OData v4 via ASP.NET Core OData 8.x                   |
+| Frontend          | OpenUI5 with TypeScript (UI5 tooling TS template), OData V4 model                  |
+| Background jobs   | In-process job runner: SQLite `Jobs` table + `BackgroundService` worker            |
 | Invoice numbering | Year + sequence + revision suffix: `2026-0001`, revisions `2026-0001-R1`, `-R2`, … |
-| Deployment model | One combined container image (see deviation D-1) |
+| Deployment model  | One combined container image (see deviation D-1)                                   |
 
 ### D-1: Deviation from Principle I (recorded justification)
 
@@ -57,18 +57,18 @@ All monetary values stored as `decimal` (EF Core → SQLite `TEXT`, invariant
 culture). All rounding math done in integer cents; per-VAT-rate totals rounded
 half-up once.
 
-| Entity | Key fields |
-|---|---|
-| `VatRate` | `Rate` (e.g. 7.0, 19.0) — the globally selectable list (Story 1) |
-| `GlobalSettings` | single row: `EndingText` (multi-line, preserved verbatim), `StampWord` (default "Kopie", never empty) |
-| `InvoiceItem` | `Number` (unique), `Description`, `VatRate`, `DefaultPrice?` (nullable — Story 2) |
-| `Recipient` | `Name`, `Address` (multi-line) |
-| `Grave` | `GraveNumber`, `StartDate`, `EndDate`, `CreatedAt`; children `GraveItem` (ItemId, `Count`), `GraveRecipient` (RecipientId) |
-| `Invoice` | `RootId`, `RevisionNumber` (0 = original), `Year` (invoice-number year = year of generation, incl. historical half-year generations), `Sequence`, computed `InvoiceNumber`, `GraveId?`, `PeriodYear?` + `PeriodHalf?` (invoiced half-year period, e.g. H1 2025, only for grave invoices), `SharePercent?`, snapshots: `RecipientName`, `RecipientAddress`, `EndingText`, `StampWord`, `GeneratedAt` |
-| `InvoiceLine` | `ItemId?`, `ItemNumber`, `Description`, `Count`, `UnitPrice` (required even if item has no default price), `VatRate` (from item), line total = count × unit price |
-| `Document` | `InvoiceId`, `Kind` (Normal \| Copy), `Content` (PDF BLOB), `FileName`, `GeneratedAt` |
-| `GraveInvoiceRun` | `GraveId`, `Year`, `Half` (1 \| 2), `JobId` — **unique (GraveId, Year, Half)** → duplicate prevention at DB level |
-| `Job` | `Type`, `Status` (Queued \| Running \| Succeeded \| Failed), `ProgressPercent`, `Total`, `Processed`, `Result` (JSON), timestamps |
+| Entity            | Key fields                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VatRate`         | `Rate` (e.g. 7.0, 19.0) — the globally selectable list (Story 1)                                                                                                                                                                                                                                                                                                                                    |
+| `GlobalSettings`  | single row: `EndingText` (multi-line, preserved verbatim), `StampWord` (default "Kopie", never empty)                                                                                                                                                                                                                                                                                               |
+| `InvoiceItem`     | `Number` (unique), `Description`, `VatRate`, `DefaultPrice?` (nullable — Story 2)                                                                                                                                                                                                                                                                                                                   |
+| `Recipient`       | `Name`, `Address` (multi-line)                                                                                                                                                                                                                                                                                                                                                                      |
+| `Grave`           | `GraveNumber`, `StartDate`, `EndDate`, `CreatedAt`; children `GraveItem` (ItemId, `Count`), `GraveRecipient` (RecipientId)                                                                                                                                                                                                                                                                          |
+| `Invoice`         | `RootId`, `RevisionNumber` (0 = original), `Year` (invoice-number year = year of generation, incl. historical half-year generations), `Sequence`, computed `InvoiceNumber`, `GraveId?`, `PeriodYear?` + `PeriodHalf?` (invoiced half-year period, e.g. H1 2025, only for grave invoices), `SharePercent?`, snapshots: `RecipientName`, `RecipientAddress`, `EndingText`, `StampWord`, `GeneratedAt` |
+| `InvoiceLine`     | `ItemId?`, `ItemNumber`, `Description`, `Count`, `UnitPrice` (required even if item has no default price), `VatRate` (from item), line total = count × unit price                                                                                                                                                                                                                                   |
+| `Document`        | `InvoiceId`, `Kind` (Normal \| Copy), `Content` (PDF BLOB), `FileName`, `GeneratedAt`                                                                                                                                                                                                                                                                                                               |
+| `GraveInvoiceRun` | `GraveId`, `Year`, `Half` (1 \| 2), `JobId` — **unique (GraveId, Year, Half)** → duplicate prevention at DB level                                                                                                                                                                                                                                                                                   |
+| `Job`             | `Type`, `Status` (Queued \| Running \| Succeeded \| Failed), `ProgressPercent`, `Total`, `Processed`, `Result` (JSON), timestamps                                                                                                                                                                                                                                                                   |
 
 **Semantics:**
 
@@ -138,16 +138,16 @@ half-up once.
 App shell (toolpage + side navigation) with router; a single OData V4 model
 bound to `/odata`.
 
-| View | Purpose |
-|---|---|
-| Settings | VAT rate list, multi-line ending text, stamp word (non-empty validation) — Story 1 |
-| Items | master-detail catalogue, search by number — Story 2 |
-| Recipients | master-detail, search — Story 3 |
-| Graves | list + detail (dates, items with counts, recipients); half-year selector; invoicing status via `GraveInvoicingStatus`; not-yet-invoiced first for the current half-year — Stories 5, 6.4/6.5, 9 |
-| Invoices | list with half-year filter; detail with lines, totals per VAT rate, both documents (normal vs. copy distinguishable), revision history — Stories 4, 8, 9 |
-| New Invoice dialog | recipient picker (create on the fly — Story 3.2); lines by item number, count, price (pre-filled default, required otherwise); live totals; save → `CreateInvoice` — Story 4 |
-| Edit Invoice dialog | edits → `CreateRevision`; revision number shown prominently |
-| Generate Grave Invoices dialog | half-year selection → `GenerateGraveInvoices` — Story 6 |
+| View                           | Purpose                                                                                                                                                                                         |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settings                       | VAT rate list, multi-line ending text, stamp word (non-empty validation) — Story 1                                                                                                              |
+| Items                          | master-detail catalogue, search by number — Story 2                                                                                                                                             |
+| Recipients                     | master-detail, search — Story 3                                                                                                                                                                 |
+| Graves                         | list + detail (dates, items with counts, recipients); half-year selector; invoicing status via `GraveInvoicingStatus`; not-yet-invoiced first for the current half-year — Stories 5, 6.4/6.5, 9 |
+| Invoices                       | list with half-year filter; detail with lines, totals per VAT rate, both documents (normal vs. copy distinguishable), revision history — Stories 4, 8, 9                                        |
+| New Invoice dialog             | recipient picker (create on the fly — Story 3.2); lines by item number, count, price (pre-filled default, required otherwise); live totals; save → `CreateInvoice` — Story 4                    |
+| Edit Invoice dialog            | edits → `CreateRevision`; revision number shown prominently                                                                                                                                     |
+| Generate Grave Invoices dialog | half-year selection → `GenerateGraveInvoices` — Story 6                                                                                                                                         |
 
 **Blocking progress (Story 13):** non-closable blocking dialog with
 `ProgressIndicator`, polling `GET /odata/Jobs({id})` at ~1 s. Trigger actions
