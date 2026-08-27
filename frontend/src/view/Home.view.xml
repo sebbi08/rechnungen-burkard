@@ -1,5 +1,4 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.f"
-    xmlns:core="sap.ui.core"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core"
     controllerName="burkard.invoicing.controller.Home" displayBlock="true">
     <Page showHeader="false" class="sapUiResponsiveContentPadding">
         <content>
@@ -7,46 +6,64 @@
                 <Title text="{i18n>homeWelcome}" level="H1" textAlign="Center" />
                 <Text text="{i18n>homeSubtitle}" textAlign="Center" class="sapUiTinyMarginTop" />
             </VBox>
-            <f:GridContainer id="homeTiles" class="sapUiMediumMarginBottom">
-                <f:layout>
-                    <f:GridContainerSettings rowSize="11rem" columnSize="11rem" gap="1rem" />
-                </f:layout>
-                <GenericTile mode="HeaderMode" headerImage="sap-icon://settings"
-                    header="{i18n>menuSettings}" subheader="{i18n>tileSettingsSub}"
+            <FlexBox id="homeTiles" justifyContent="Center" alignItems="Start" wrap="Wrap"
+                class="sapUiMediumMarginBottom">
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuSettings}"
                     press=".onTilePress">
                     <customData>
                         <core:CustomData key="route" value="settings" />
                     </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://settings" />
+                        </TileContent>
+                    </tileContent>
                 </GenericTile>
-                <GenericTile mode="HeaderMode" headerImage="sap-icon://product"
-                    header="{i18n>menuItems}" subheader="{i18n>tileItemsSub}"
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuItems}"
                     press=".onTilePress">
                     <customData>
                         <core:CustomData key="route" value="items" />
                     </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://product" />
+                        </TileContent>
+                    </tileContent>
                 </GenericTile>
-                <GenericTile mode="HeaderMode" headerImage="sap-icon://group-2"
-                    header="{i18n>menuRecipients}" subheader="{i18n>tileRecipientsSub}"
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuRecipients}"
                     press=".onTilePress">
                     <customData>
                         <core:CustomData key="route" value="recipients" />
                     </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://group-2" />
+                        </TileContent>
+                    </tileContent>
                 </GenericTile>
-                <GenericTile mode="HeaderMode" headerImage="sap-icon://documents"
-                    header="{i18n>menuInvoices}" subheader="{i18n>tileInvoicesSub}"
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuInvoices}"
                     press=".onTilePress">
                     <customData>
                         <core:CustomData key="route" value="invoices" />
                     </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://documents" />
+                        </TileContent>
+                    </tileContent>
                 </GenericTile>
-                <GenericTile mode="HeaderMode" headerImage="sap-icon://home-share"
-                    header="{i18n>menuGraves}" subheader="{i18n>tileGravesSub}"
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuGraves}"
                     press=".onTilePress">
                     <customData>
                         <core:CustomData key="route" value="graves" />
                     </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://home-share" />
+                        </TileContent>
+                    </tileContent>
                 </GenericTile>
-            </f:GridContainer>
+            </FlexBox>
         </content>
     </Page>
 </mvc:View>

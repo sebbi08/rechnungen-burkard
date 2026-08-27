@@ -10,7 +10,6 @@ framework:
   name: OpenUI5
   version: "1.151.0"
   libraries:
-    - name: sap.f
     - name: sap.m
     - name: sap.ui.core
     - name: sap.ui.layout
