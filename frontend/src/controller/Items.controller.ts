@@ -58,6 +58,14 @@ export default class Items extends BaseController {
       })) as any;
     }
 
+    // the fragment is reused, so force the VAT list to re-read from the
+    // service; otherwise rates added or deleted in the settings stay stale
+    (
+      (this.byId("itemVatRate") as Select).getBinding(
+        "items",
+      ) as ODataListBinding
+    ).refresh();
+
     if (context) {
       (this.byId("itemNumber") as Input).setValue(
         context.getProperty("Number") as string,
