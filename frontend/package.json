@@ -11,6 +11,7 @@
     "@openui5/types": "~1.151.0",
     "@ui5/cli": "^4.0.0",
     "typescript": "^5.5.0",
+    "ui5-middleware-hmr": "^0.1.0",
     "ui5-middleware-simpleproxy": "^3.0.0",
     "ui5-tooling-transpile": "^3.0.0"
   }
