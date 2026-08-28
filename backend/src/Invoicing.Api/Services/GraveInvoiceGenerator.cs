@@ -20,9 +20,10 @@ public sealed class GraveInvoiceGenerator
     }
 
     /// <summary>Generates all invoices for one grave and half-year in a single
-    /// transaction. Returns null when the grave must be skipped (no recipients,
-    /// no items, or an item without default price), otherwise the created invoices.</summary>
-    public async Task<List<Invoice>?> GenerateForGraveAsync(Grave grave, int year, int half, CancellationToken ct)
+    /// transaction. Returns a result with a skip reason when the grave must be
+    /// skipped (no recipients, no items, or an item without default price),
+    /// otherwise the created invoices.</summary>
+    public async Task<GraveGenerationResult> GenerateForGraveAsync(Grave grave, int year, int half, CancellationToken ct)
     {
         var recipients = await _db.GraveRecipients
             .Where(r => r.GraveId == grave.Id)
@@ -34,14 +35,19 @@ public sealed class GraveInvoiceGenerator
             .Include(i => i.Item)
             .ToListAsync(ct);
 
-        if (recipients.Count == 0 || graveItems.Count == 0)
+        if (recipients.Count == 0)
         {
-            return null;
+            return new GraveGenerationResult(null, "NoRecipients");
+        }
+
+        if (graveItems.Count == 0)
+        {
+            return new GraveGenerationResult(null, "NoItems");
         }
 
         if (graveItems.Any(i => i.Item.DefaultPrice is null))
         {
-            return null;
+            return new GraveGenerationResult(null, "ItemWithoutPrice");
         }
 
         // total gross in cents: per line round(net cents * (100+rate)/100)
@@ -123,7 +129,7 @@ public sealed class GraveInvoiceGenerator
         });
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return invoices;
+        return new GraveGenerationResult(invoices, null);
     }
 
     /// <summary>Distributes a share (in gross cents) across the grave's lines;
@@ -159,3 +165,7 @@ public sealed class GraveInvoiceGenerator
         return lines;
     }
 }
+
+/// <summary>Result of generating a grave's invoices: either the created invoices
+/// or a machine-readable skip reason.</summary>
+public sealed record GraveGenerationResult(List<Invoice>? Invoices, string? SkipReason);

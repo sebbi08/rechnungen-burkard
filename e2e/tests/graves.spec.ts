@@ -105,14 +105,42 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   // status column now shows graves as invoiced
   await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
 
-  // dismiss the success message, then a second generation is prevented
+  // a second generation must not create duplicate invoices: either it is
+  // blocked with the German "already invoiced" message (when every grave is
+  // invoiced) or it re-runs and invoices no grave again (leftover graves
+  // without priced items stay skipped)
+  const invoiceCount = async (): Promise<number> => {
+    const response = await page.request.get(
+      "http://localhost:8080/odata/Invoices/$count?$filter=PeriodYear eq 2026 and PeriodHalf eq 1",
+    );
+    return Number(await response.text());
+  };
+
+  // dismiss the success message, then run the second generation
   await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
+  const countBefore = await invoiceCount();
+  expect(countBefore).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
   await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
-  // the blocking error dialog shows the German "already invoiced" message
-  await expect(page.locator(".sapMDialog.sapMMessageBox")).toContainText(
-    "bereits",
-  );
+  // the busy dialog only appears when a job actually runs (409 case: not at all)
+  await page
+    .locator(".sapMBusyDialog")
+    .waitFor({ state: "visible", timeout: 3000 })
+    .catch(() => {});
+  await page
+    .locator(".sapMBusyDialog")
+    .waitFor({ state: "hidden", timeout: 90000 })
+    .catch(() => {});
+  const resultBox = page.locator(".sapMDialog.sapMMessageBox");
+  await expect(resultBox).toBeVisible();
+  const resultText = await resultBox.innerText();
+  expect(
+    resultText.includes("bereits") || resultText.includes("Erstellt: 0"),
+  ).toBeTruthy();
+  await page.locator(".sapMDialog").getByRole("button").first().click();
+
+  // and no invoice may have been added for the half-year
+  expect(await invoiceCount()).toBe(countBefore);
 });
 
 test("create a grave and link item and recipient (Story 5)", async ({
@@ -183,4 +211,123 @@ test("create a grave and link item and recipient (Story 5)", async ({
   ).toContainText(recipientName);
 
   await page.getByRole("button", { name: "Speichern" }).click();
+});
+
+test("linking an item without a default price is rejected (Story 6)", async ({
+  page,
+}) => {
+  const noPriceItemNumber = `NP-${RUN}`;
+  const graveNumber = `NPG-${RUN}`;
+  await page.request.post("http://localhost:8080/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  const noPriceItem = await (
+    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+      data: {
+        Number: noPriceItemNumber,
+        Description: "Ohne Preis",
+        VatRate: 7,
+        DefaultPrice: null,
+      },
+    })
+  ).json();
+  const grave = await (
+    await page.request.post("http://localhost:8080/odata/Graves", {
+      data: {
+        GraveNumber: graveNumber,
+        StartDate: "2026-01-01",
+        EndDate: "2040-12-31",
+      },
+    })
+  ).json();
+
+  await page.goto("/index.html#/graves");
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  await expect(gravesTable).toContainText(graveNumber);
+
+  await gravesTable
+    .locator("tbody tr", { hasText: graveNumber })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await page.locator(".sapMDialog .sapMSlt[id$='linkItem']").click();
+  await page
+    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
+      hasText: noPriceItemNumber,
+    })
+    .click();
+  await page.locator("[id$='linkCount-inner']").fill("1");
+  await page.getByRole("button", { name: "Hinzufügen" }).first().click();
+
+  // the link is rejected with the German "missing price" message
+  const errorBox = page.locator(".sapMDialog.sapMMessageBox");
+  await expect(errorBox).toContainText("fehlt ein Preis");
+  await errorBox.getByRole("button").first().click();
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+
+  // no link may have been created for the rejected item
+  const links = await (
+    await page.request.get(
+      `http://localhost:8080/odata/GraveItems?$filter=GraveId eq ${grave.Id}&$select=ItemId`,
+    )
+  ).json();
+  const linkedIds = (links.value ?? []).map((link: any) => link.ItemId);
+  expect(linkedIds).not.toContain(noPriceItem.Id);
+});
+
+test("generation result names the skip reason for an unpriced item (Story 6)", async ({
+  page,
+}) => {
+  const graveNumber = `SK-${RUN}`;
+  const noPriceItem = await (
+    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+      data: {
+        Number: `SP-${RUN}`,
+        Description: "Ohne Preis",
+        VatRate: 7,
+        DefaultPrice: null,
+      },
+    })
+  ).json();
+  const recipient = await (
+    await page.request.post("http://localhost:8080/odata/Recipients", {
+      data: { Name: `Skip Beispiel ${RUN}`, Address: "Kiesweg 3" },
+    })
+  ).json();
+  const grave = await (
+    await page.request.post("http://localhost:8080/odata/Graves", {
+      data: {
+        GraveNumber: graveNumber,
+        StartDate: "2026-01-01",
+        EndDate: "2040-12-31",
+      },
+    })
+  ).json();
+  await page.request.post("http://localhost:8080/odata/GraveItems", {
+    data: { GraveId: grave.Id, ItemId: noPriceItem.Id, Count: 1 },
+  });
+  await page.request.post("http://localhost:8080/odata/GraveRecipients", {
+    data: { GraveId: grave.Id, RecipientId: recipient.Id },
+  });
+
+  // 2030 H2 is not used by the other tests, so no duplicate conflicts
+  const start = await page.request.post(
+    "http://localhost:8080/odata/GenerateGraveInvoices",
+    { data: { year: 2030, half: 2 } },
+  );
+  const jobRef = await start.json();
+  let job: any;
+  for (let i = 0; i < 80; i++) {
+    job = await (
+      await page.request.get(
+        `http://localhost:8080/odata/Jobs(${jobRef.Id})`,
+      )
+    ).json();
+    if (job.Status === "Succeeded" || job.Status === "Failed") {
+      break;
+    }
+    await page.waitForTimeout(250);
+  }
+  expect(job.Status).toBe("Succeeded");
+  expect(job.ResultJson).toContain(graveNumber);
+  expect(job.ResultJson).toContain("ItemWithoutPrice");
 });

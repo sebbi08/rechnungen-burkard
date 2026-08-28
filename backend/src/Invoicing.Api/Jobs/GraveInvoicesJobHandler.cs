@@ -8,6 +8,8 @@ namespace Burkard.Invoicing.Api.Jobs;
 
 public sealed record GraveInvoicesPayload(int Year, int Half);
 
+public sealed record GraveSkip(string Number, string Reason);
+
 public sealed class GraveInvoicesJobHandler : IJobHandler
 {
     private readonly IServiceScopeFactory _scopeFactory;
@@ -35,16 +37,16 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
             .ToListAsync(ct);
 
         var todo = graves.Where(g => !invoiced.Contains(g.Id)).ToList();
-        var skipped = new List<string>();
+        var skipped = new List<GraveSkip>();
         var processed = 0;
 
         foreach (var grave in todo)
         {
             ct.ThrowIfCancellationRequested();
-            var invoices = await generator.GenerateForGraveAsync(grave, payload.Year, payload.Half, ct);
-            if (invoices is null)
+            var result = await generator.GenerateForGraveAsync(grave, payload.Year, payload.Half, ct);
+            if (result.SkipReason is not null)
             {
-                skipped.Add(grave.GraveNumber);
+                skipped.Add(new GraveSkip(grave.GraveNumber, result.SkipReason));
             }
 
             processed++;

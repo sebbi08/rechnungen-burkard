@@ -204,10 +204,23 @@ export default class Graves extends BaseController {
       return;
     }
 
+    // an item without a default price would make the whole grave get skipped
+    // during invoice generation, so reject the link right away
+    const linkItem = this.byId("linkItem") as Select;
+    const itemKey = linkItem.getSelectedKey();
+    const contexts = (linkItem.getBinding("items") as ODataListBinding).getContexts() as Context[];
+    const itemContext = contexts.find(
+      (context) => String(context.getProperty("Id")) === itemKey,
+    );
+    if (itemContext && itemContext.getProperty("DefaultPrice") == null) {
+      await api.showError(this, new Error("PriceRequired"));
+      return;
+    }
+
     try {
       await api.createGraveItemLink(
         Number(graveId),
-        Number((this.byId("linkItem") as Select).getSelectedKey()),
+        Number(itemKey),
         Number((this.byId("linkCount") as Input).getValue()),
       );
       await this.reloadGraveLinks();
@@ -372,10 +385,20 @@ export default class Graves extends BaseController {
     }
 
     const result = JSON.parse(finished.ResultJson ?? "{}") as any;
+    const skipped = (result.SkippedGraves ?? [])
+      .map((entry: any) => {
+        const number = typeof entry === "string" ? entry : entry.Number;
+        const reason =
+          typeof entry === "object" && entry.Reason
+            ? this.i18nText(`skipReason${entry.Reason}`)
+            : "";
+        return reason ? `${number} (${reason})` : String(number);
+      })
+      .join(", ");
     const message =
       `${this.i18nText("generationDone")}: ${result.InvoicedGraves ?? 0}` +
-      (result.SkippedGraves?.length
-        ? ` (${this.i18nText("skippedGraves")}: ${result.SkippedGraves.join(", ")})`
+      (skipped
+        ? ` (${this.i18nText("skippedGraves")}: ${skipped})`
         : "");
     // non-blocking: the busy dialog must close while the result message
     // stays open for the user to dismiss
