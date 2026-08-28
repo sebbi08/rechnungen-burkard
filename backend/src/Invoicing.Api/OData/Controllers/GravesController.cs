@@ -1,33 +1,34 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Attributes;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
 public class GravesController : ODataController
 {
     private readonly AppDbContext _db;
+    private readonly GraveService _graves;
+    private readonly ILogger<GravesController> _logger;
 
-    public GravesController(AppDbContext db) => _db = db;
+    public GravesController(AppDbContext db, GraveService graves, ILogger<GravesController> logger)
+    {
+        _db = db;
+        _graves = graves;
+        _logger = logger;
+    }
 
     [EnableQuery]
     public IQueryable<Grave> Get() => _db.Graves.AsNoTracking();
 
     // The OData single-result $expand validator rejects collection navigations
     // ("The property 'Items' cannot be used in the $expand query option"), so
-    // build the expected payload explicitly: PascalCase, same shape the EDM
-    // serializer would produce for $expand=Items($expand=Item),
-    // Recipients($expand=Recipient).
-    private static readonly JsonSerializerOptions PascalCaseJson = new()
-    {
-        PropertyNamingPolicy = null,
-    };
-
+    // build the expected payload explicitly: same shape the EDM serializer
+    // would produce for $expand=Items($expand=Item),Recipients($expand=Recipient).
     public IActionResult Get([FromRoute] long key)
     {
         var grave = _db.Graves
@@ -49,6 +50,7 @@ public class GravesController : ODataController
             {
                 i.Id,
                 i.Count,
+                i.UnitPrice,
                 Item = new { i.Item.Id, i.Item.Number, i.Item.Description, i.Item.DefaultPrice, i.Item.VatRate },
             }).ToList(),
             Recipients = grave.Recipients.Select(r => new
@@ -58,7 +60,7 @@ public class GravesController : ODataController
             }).ToList(),
         };
 
-        return new JsonResult(result, PascalCaseJson);
+        return new JsonResult(result, ODataJsonDefaults.PascalCase);
     }
 
     public IActionResult Post([FromBody] Grave? grave)
@@ -125,7 +127,7 @@ public class GravesController : ODataController
     {
         if (string.IsNullOrWhiteSpace(term))
         {
-            return Ok(new { value = Array.Empty<object>() });
+            return new JsonResult(new { value = Array.Empty<object>() }, ODataJsonDefaults.PascalCase);
         }
 
         var graves = await _db.Graves
@@ -144,6 +146,62 @@ public class GravesController : ODataController
                         || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
-        return Ok(new { value = matches });
+        return new JsonResult(new { value = matches }, ODataJsonDefaults.PascalCase);
+    }
+
+    // The grave dialog collects the grave, its items and its recipients before
+    // anything is saved, so the whole set arrives as one request.
+    [ODataAttributeRouting]
+    [HttpPost("odata/SaveGrave")]
+    public async Task<IActionResult> Save([FromBody] SaveGraveRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
+        if (!DateOnly.TryParse(request.StartDate, out var startDate)
+            || !DateOnly.TryParse(request.EndDate, out var endDate))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidDate", message = "The start and end dates are required." }
+            });
+        }
+
+        try
+        {
+            var grave = await _graves.SaveAsync(request.GraveId, request.GraveNumber ?? "", startDate, endDate,
+                request.Items ?? new List<GraveItemInput>(), request.RecipientIds ?? new List<long>(),
+                HttpContext.RequestAborted);
+            // PascalCase like every other entity payload; MVC's default camelCase
+            // would make this the odd one out
+            return new JsonResult(new { grave.Id }, ODataJsonDefaults.PascalCase);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            // Letting the exception escape would cause the test host to rethrow it on
+            // the client instead of producing a 500 response; mirror production behavior.
+            _logger.LogError(ex, "SaveGrave failed");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+        }
+    }
+
+    public sealed class SaveGraveRequest
+    {
+        public long? GraveId { get; set; }
+        public string? GraveNumber { get; set; }
+        public string? StartDate { get; set; }
+        public string? EndDate { get; set; }
+        public List<GraveItemInput>? Items { get; set; }
+        public List<long>? RecipientIds { get; set; }
     }
 }

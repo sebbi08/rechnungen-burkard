@@ -1,11 +1,10 @@
 import BusyDialog from "sap/m/BusyDialog";
+import { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Input from "sap/m/Input";
 import MessageBox from "sap/m/MessageBox";
 import Select from "sap/m/Select";
 import TextArea from "sap/m/TextArea";
 import Item from "sap/ui/core/Item";
-import Filter from "sap/ui/model/Filter";
-import FilterOperator from "sap/ui/model/FilterOperator";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
@@ -22,7 +21,10 @@ export default class Graves extends BaseController {
     // odata model is not visible via view.getModel() yet
     const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
     view.setBindingContext(model.createBindingContext("/") as Context, "odata");
-    view.setModel(new JSONModel({ statuses: {} }), "status");
+    // The overview lists graves that are still open for the selected half-year
+    // first (FR-028). That order depends on the half-year, so the rows come from
+    // the status endpoint rather than from a plain Graves list binding.
+    view.setModel(new JSONModel({ graves: [] }), "status");
 
     // half-year options are generated at runtime; default to the current
     // year's first half, matching the generate dialog's default half
@@ -36,16 +38,8 @@ export default class Graves extends BaseController {
     void this.refreshStatus();
   }
 
-  public statusFormatter(
-    graveId: number,
-    statuses: Record<string, any>,
-  ): string {
-    const bundle = (
-      this.getView()!.getModel("i18n") as any
-    ).getResourceBundle();
-    return statuses?.[String(graveId)]?.Invoiced
-      ? bundle.getText("statusInvoiced")
-      : bundle.getText("statusOpen");
+  public statusFormatter(invoiced: boolean | null | undefined): string {
+    return this.i18nText(invoiced ? "statusInvoiced" : "statusOpen");
   }
 
   public formatDate(value: Date | string | null | undefined): string {
@@ -61,35 +55,21 @@ export default class Graves extends BaseController {
   }
 
   public async onSearchGraves(event: any): Promise<void> {
+    // the backend search is Unicode-aware (umlauts), so it decides which graves
+    // match; the ids it returns narrow the rows the overview already holds
+    this._searchIds = null;
     const term = event.getParameter("query") as string;
-    const binding = (this.byId("gravesTable") as any).getBinding(
-      "items",
-    ) as ODataListBinding;
-    if (!term) {
-      binding.filter([]);
-      return;
-    }
-
-    try {
-      // the backend search is Unicode-aware (umlauts); filter the table
-      // by the returned numeric ids, which are immune to case folding
-      const matches = await api.searchGraves(term);
-      const ids = matches.map((match) => Number(match.id));
-      if (!ids.length) {
-        // no match: filter to an impossible id so the table renders empty
-        binding.filter(new Filter("Id", FilterOperator.EQ, -1));
+    if (term) {
+      try {
+        const matches = await api.searchGraves(term);
+        this._searchIds = new Set(matches.map((match) => Number(match.Id)));
+      } catch (error) {
+        await api.showError(this, error);
         return;
       }
-
-      binding.filter(
-        new Filter({
-          filters: ids.map((id) => new Filter("Id", FilterOperator.EQ, id)),
-          and: false,
-        }),
-      );
-    } catch (error) {
-      await api.showError(this, error);
     }
+
+    this.applyRows();
   }
 
   private async refreshStatus(): Promise<void> {
@@ -98,19 +78,22 @@ export default class Graves extends BaseController {
       .split("-")
       .map(Number);
     try {
-      const rows = await api.fetchGraveStatus(year, half);
-      const statuses: Record<string, any> = {};
-      for (const row of rows) {
-        statuses[String(row.Id)] = row;
-      }
-
-      (this.getView()!.getModel("status") as JSONModel).setProperty(
-        "/statuses",
-        statuses,
-      );
+      this._rows = await api.fetchGraveStatus(year, half);
+      this.applyRows();
     } catch (error) {
       await api.showError(this, error);
     }
+  }
+
+  /// The rows the table shows: the status order, narrowed to the last search.
+  private applyRows(): void {
+    const rows = this._searchIds
+      ? this._rows.filter((row) => this._searchIds!.has(Number(row.Id)))
+      : this._rows;
+    (this.getView()!.getModel("status") as JSONModel).setProperty(
+      "/graves",
+      rows,
+    );
   }
 
   public async onCreateGrave(): Promise<void> {
@@ -118,11 +101,11 @@ export default class Graves extends BaseController {
   }
 
   public async onEditGrave(event: any): Promise<void> {
-    const context = event.getSource().getBindingContext("odata") as Context;
-    await this.openGraveDialog(context);
+    const context = event.getSource().getBindingContext("status");
+    await this.openGraveDialog(Number(context.getProperty("Id")));
   }
 
-  private async openGraveDialog(graveContext: Context | null): Promise<void> {
+  private async openGraveDialog(graveId: number | null): Promise<void> {
     if (!this._graveDialog) {
       // loadFragment passes this controller and the view ID prefix so that
       // this.byId(...) finds the dialog controls and IDs stay unique
@@ -131,62 +114,158 @@ export default class Graves extends BaseController {
       })) as any;
     }
 
-    if (graveContext) {
-      const details = await api.fetchGraveDetails(
-        graveContext.getProperty("Id") as number,
-      );
-      this._graveDialog.setModel(
-        new JSONModel({
-          Id: details.Id,
-          GraveNumber: details.GraveNumber,
-          StartDate: details.StartDate,
-          EndDate: details.EndDate,
-          Items: details.Items.map((link: any) => ({
-            Id: link.Id,
-            Number: link.Item.Number,
-            Count: link.Count,
-          })),
-          Recipients: details.Recipients.map((link: any) => ({
-            Id: link.Id,
-            Name: link.Recipient.Name,
-          })),
-        }),
-        "graveDraft",
-      );
-    } else {
-      this._graveDialog.setModel(
-        new JSONModel({ Items: [], Recipients: [] }),
-        "graveDraft",
-      );
-    }
+    // everything the dialog collects lives in this draft until it is saved, so
+    // items and recipients can be added before the grave itself exists
+    this._graveDialog.setModel(
+      new JSONModel(
+        graveId != null
+          ? await this.loadGraveDraft(graveId)
+          : {
+              Id: null,
+              GraveNumber: "",
+              StartDate: "",
+              EndDate: "",
+              Items: [],
+              Recipients: [],
+            },
+      ),
+      "graveDraft",
+    );
 
     this._graveDialog.open();
   }
 
-  public async onGraveDialogSave(event: any): Promise<void> {
-    const dialog = event.getSource().getParent() as any;
-    const draft = (dialog.getModel("graveDraft") as JSONModel).getData() as any;
-    try {
-      if (draft.Id) {
-        await api.patchGrave(Number(draft.Id), {
-          GraveNumber: (this.byId("graveNumber") as Input).getValue(),
-          StartDate: (this.byId("graveStart") as any).getValue(),
-          EndDate: (this.byId("graveEnd") as any).getValue(),
-        });
-      } else {
-        await api.createGrave({
-          GraveNumber: (this.byId("graveNumber") as Input).getValue(),
-          StartDate: (this.byId("graveStart") as any).getValue(),
-          EndDate: (this.byId("graveEnd") as any).getValue(),
-        });
-      }
+  private async loadGraveDraft(graveId: number): Promise<any> {
+    const details = await api.fetchGraveDetails(graveId);
+    return {
+      Id: details.Id,
+      GraveNumber: details.GraveNumber,
+      StartDate: details.StartDate,
+      EndDate: details.EndDate,
+      Items: details.Items.map((link: any) => ({
+        // the ComboBox matches its keys as strings
+        itemId: String(link.Item.Id),
+        itemNumber: link.Item.Number,
+        description: link.Item.Description,
+        count: link.Count,
+        unitPrice: link.UnitPrice,
+        defaultPrice: link.Item.DefaultPrice,
+      })),
+      Recipients: details.Recipients.map((link: any) => ({
+        recipientId: String(link.Recipient.Id),
+        name: link.Recipient.Name,
+      })),
+    };
+  }
 
-      dialog.close();
-      (
-        (this.byId("gravesTable") as any).getBinding(
-          "items",
-        ) as ODataListBinding
-      ).refresh();
+  public onGraveItemSelected(event: ComboBox$SelectionChangeEvent): void {
+    // the ComboBox writes the key itself; fill in what the row shows alongside it
+    const itemContext = event
+      .getParameter("selectedItem")
+      ?.getBindingContext("odata");
+    const rowContext = event.getSource().getBindingContext("graveDraft");
+    if (!itemContext || !rowContext) {
+      return;
+    }
+
+    const model = rowContext.getModel() as JSONModel;
+    const path = rowContext.getPath();
+    model.setProperty(
+      path + "/itemNumber",
+      itemContext.getProperty("Number") as string,
+    );
+    model.setProperty(
+      path + "/description",
+      itemContext.getProperty("Description") as string,
+    );
+    // an empty price falls back to this, which the input shows as its placeholder
+    model.setProperty(
+      path + "/defaultPrice",
+      itemContext.getProperty("DefaultPrice"),
+    );
+  }
+
+  public onAddItemLink(): void {
+    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const rows = (model.getProperty("/Items") as any[]) ?? [];
+    rows.push({
+      itemId: "",
+      itemNumber: "",
+      description: "",
+      count: 1,
+      unitPrice: null,
+      defaultPrice: null,
+    });
+    model.setProperty("/Items", rows);
+  }
+
+  public async onAddRecipientLink(): Promise<void> {
+    const select = this.byId("linkRecipient") as Select;
+    const selected = select.getSelectedItem();
+    if (!selected) {
+      return;
+    }
+
+    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const rows = (model.getProperty("/Recipients") as any[]) ?? [];
+    const recipientId = select.getSelectedKey();
+    if (rows.some((row) => row.recipientId === recipientId)) {
+      await api.showError(this, new Error("GraveRecipientLinkExists"));
+      return;
+    }
+
+    rows.push({ recipientId, name: selected.getText() });
+    model.setProperty("/Recipients", rows);
+  }
+
+  public onDeleteItemLink(event: any): void {
+    this.removeDraftRow(event, "Items");
+  }
+
+  public onDeleteRecipientLink(event: any): void {
+    this.removeDraftRow(event, "Recipients");
+  }
+
+  private removeDraftRow(event: any, collection: string): void {
+    const context = event.getSource().getBindingContext("graveDraft") as any;
+    const model = context.getModel() as JSONModel;
+    const rows = model.getProperty(`/${collection}`) as any[];
+    // the row's binding path ends in its index, e.g. "/Items/2"
+    rows.splice(Number(context.getPath().split("/").pop()), 1);
+    model.setProperty(`/${collection}`, rows);
+  }
+
+  public async onGraveDialogSave(): Promise<void> {
+    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
+    const draft = model.getData() as any;
+    const items = draft.Items as any[];
+    if (items.some((row) => !row.itemId)) {
+      await api.showError(this, new Error("ItemRequired"));
+      return;
+    }
+
+    try {
+      await api.saveGrave({
+        graveId: draft.Id != null ? Number(draft.Id) : null,
+        graveNumber: draft.GraveNumber ?? "",
+        startDate: draft.StartDate ?? "",
+        endDate: draft.EndDate ?? "",
+        items: items.map((row) => ({
+          itemId: Number(row.itemId),
+          count: Number(row.count),
+          // a price of 0 is a real value, not a missing one
+          unitPrice:
+            row.unitPrice == null || row.unitPrice === ""
+              ? null
+              : Number(row.unitPrice),
+        })),
+        recipientIds: (draft.Recipients as any[]).map((row) =>
+          Number(row.recipientId),
+        ),
+      });
+
+      this._graveDialog.close();
+      await this.refreshStatus();
     } catch (error) {
       await api.showError(this, error);
     }
@@ -194,58 +273,6 @@ export default class Graves extends BaseController {
 
   public onGraveDialogCancel(event: any): void {
     (event.getSource().getParent() as any).close();
-  }
-
-  public async onAddItemLink(): Promise<void> {
-    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const graveId = draft.getProperty("/Id");
-    if (!graveId) {
-      await api.showError(this, new Error("GraveNotSaved"));
-      return;
-    }
-
-    // an item without a default price would make the whole grave get skipped
-    // during invoice generation, so reject the link right away
-    const linkItem = this.byId("linkItem") as Select;
-    const itemKey = linkItem.getSelectedKey();
-    const contexts = (linkItem.getBinding("items") as ODataListBinding).getContexts() as Context[];
-    const itemContext = contexts.find(
-      (context) => String(context.getProperty("Id")) === itemKey,
-    );
-    if (itemContext && itemContext.getProperty("DefaultPrice") == null) {
-      await api.showError(this, new Error("PriceRequired"));
-      return;
-    }
-
-    try {
-      await api.createGraveItemLink(
-        Number(graveId),
-        Number(itemKey),
-        Number((this.byId("linkCount") as Input).getValue()),
-      );
-      await this.reloadGraveLinks();
-    } catch (error) {
-      await api.showError(this, error);
-    }
-  }
-
-  public async onAddRecipientLink(): Promise<void> {
-    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const graveId = draft.getProperty("/Id");
-    if (!graveId) {
-      await api.showError(this, new Error("GraveNotSaved"));
-      return;
-    }
-
-    try {
-      await api.createGraveRecipientLink(
-        Number(graveId),
-        Number((this.byId("linkRecipient") as Select).getSelectedKey()),
-      );
-      await this.reloadGraveLinks();
-    } catch (error) {
-      await api.showError(this, error);
-    }
   }
 
   public async onNewRecipient(): Promise<void> {
@@ -281,48 +308,6 @@ export default class Graves extends BaseController {
 
   public onQuickRecipientCancel(event: any): void {
     (event.getSource().getParent() as any).close();
-  }
-
-  public async onDeleteItemLink(event: any): Promise<void> {
-    const context = event.getSource().getBindingContext("graveDraft") as any;
-    try {
-      await api.deleteGraveItemLink(context.getProperty("Id") as number);
-      await this.reloadGraveLinks();
-    } catch (error) {
-      await api.showError(this, error);
-    }
-  }
-
-  public async onDeleteRecipientLink(event: any): Promise<void> {
-    const context = event.getSource().getBindingContext("graveDraft") as any;
-    try {
-      await api.deleteGraveRecipientLink(context.getProperty("Id") as number);
-      await this.reloadGraveLinks();
-    } catch (error) {
-      await api.showError(this, error);
-    }
-  }
-
-  private async reloadGraveLinks(): Promise<void> {
-    const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const details = await api.fetchGraveDetails(
-      Number(draft.getProperty("/Id")),
-    );
-    draft.setProperty(
-      "/Items",
-      details.Items.map((link: any) => ({
-        Id: link.Id,
-        Number: link.Item.Number,
-        Count: link.Count,
-      })),
-    );
-    draft.setProperty(
-      "/Recipients",
-      details.Recipients.map((link: any) => ({
-        Id: link.Id,
-        Name: link.Recipient.Name,
-      })),
-    );
   }
 
   public async onGenerateInvoices(): Promise<void> {
@@ -361,7 +346,9 @@ export default class Graves extends BaseController {
     let failure: unknown = null;
     try {
       const job = await api.generateGraveInvoices(year, half);
-      finished = await this.pollJob(job.Id);
+      finished = await this.pollJob(job.Id, (percent) =>
+        busy.setTitle(this.i18nText("generationProgress").replace("{0}", String(percent))),
+      );
     } catch (error) {
       failure = error;
     } finally {
@@ -410,7 +397,10 @@ export default class Graves extends BaseController {
     (event.getSource().getParent() as any).close();
   }
 
-  private async pollJob(jobId: number): Promise<api.JobDto> {
+  private async pollJob(
+    jobId: number,
+    onProgress: (percent: number) => void,
+  ): Promise<api.JobDto> {
     const deadline = Date.now() + Graves.JOB_TIMEOUT_MS;
     while (true) {
       if (Date.now() > deadline) {
@@ -427,10 +417,14 @@ export default class Graves extends BaseController {
         return job;
       }
 
+      onProgress(job.ProgressPercent ?? 0);
+
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
+  private _rows: api.GraveStatusRow[] = [];
+  private _searchIds: Set<number> | null = null;
   private _running = false;
   private _graveDialog: any;
   private _quickDialog: any;

@@ -11,47 +11,58 @@
                 <DatePicker id="graveEnd" width="16rem" displayFormat="yyyy-MM-dd"
                     valueFormat="yyyy-MM-dd" value="{graveDraft>/EndDate}" />
                 <Panel headerText="{i18n>graveItems}">
-                    <Table id="graveItemsTable" items="{graveDraft>/Items}">
+                    <Table id="graveItemsTable" items="{graveDraft>/Items}"
+                        autoPopinMode="true" popinLayout="Block">
                         <columns>
-                            <Column><Text text="{i18n>itemNumber}" /></Column>
-                            <Column><Text text="{i18n>itemCount}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
+                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
+                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
-                                    <Text text="{graveDraft>Number}" />
-                                    <Text text="{graveDraft>Count}" />
+                                    <ComboBox id="graveItem" width="10rem"
+                                        selectedKey="{graveDraft>itemId}"
+                                        showSecondaryValues="true"
+                                        items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
+                                        selectionChange=".onGraveItemSelected">
+                                        <core:ListItem key="{odata>Id}"
+                                            text="{odata>Number}" additionalText="{odata>Description}" />
+                                    </ComboBox>
+                                    <Text text="{graveDraft>description}" wrapping="true" />
+                                    <Input value="{graveDraft>count}" type="Number" width="5rem"
+                                        ariaLabel="{i18n>itemCount}" />
+                                    <!-- empty means "use the item's default price", which the
+                                         placeholder shows; a typed price overrides it -->
+                                    <Input value="{graveDraft>unitPrice}" type="Number" width="7rem"
+                                        placeholder="{graveDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
                                     <Button text="{i18n>delete}" press=".onDeleteItemLink" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <HBox class="sapUiSmallMarginTop">
-                        <Select id="linkItem" width="12rem"
-                            items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}">
-                            <core:Item key="{odata>Id}" text="{odata>Number}" />
-                        </Select>
-                        <Input id="linkCount" type="Number" width="6rem" value="1" ariaLabel="{i18n>itemCount}" />
-                        <Button text="{i18n>add}" press=".onAddItemLink" />
-                    </HBox>
+                    <Button text="{i18n>addLine}" press=".onAddItemLink" class="sapUiSmallMarginTop" />
                 </Panel>
                 <Panel headerText="{i18n>graveRecipients}">
-                    <Table id="graveRecipientsTable" items="{graveDraft>/Recipients}">
+                    <Table id="graveRecipientsTable" items="{graveDraft>/Recipients}"
+                        autoPopinMode="true" popinLayout="Block">
                         <columns>
-                            <Column><Text text="{i18n>recipientName}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>recipientName}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
-                                    <Text text="{graveDraft>Name}" />
+                                    <Text text="{graveDraft>name}" />
                                     <Button text="{i18n>delete}" press=".onDeleteRecipientLink" type="Transparent" />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <HBox class="sapUiSmallMarginTop">
+                    <!-- wraps so the select and both buttons stay usable on a phone -->
+                    <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop">
                         <Select id="linkRecipient" width="12rem"
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                             <core:Item key="{odata>Id}" text="{odata>Name}" />

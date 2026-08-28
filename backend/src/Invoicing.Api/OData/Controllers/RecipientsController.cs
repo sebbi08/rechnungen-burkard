@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -11,8 +12,13 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class RecipientsController : ODataController
 {
     private readonly AppDbContext _db;
+    private readonly RecipientNumberService _numbers;
 
-    public RecipientsController(AppDbContext db) => _db = db;
+    public RecipientsController(AppDbContext db, RecipientNumberService numbers)
+    {
+        _db = db;
+        _numbers = numbers;
+    }
 
     [EnableQuery]
     public IQueryable<Recipient> Get() => _db.Recipients.AsNoTracking();
@@ -36,6 +42,21 @@ public class RecipientsController : ODataController
         var error = Validate(recipient);
         if (error is not null) return BadRequest(error);
 
+        // the recipient number identifies the row in the import mapping file; a
+        // client that does not care (the quick-create dialog, the UI form) gets
+        // the next free one assigned
+        if (string.IsNullOrWhiteSpace(recipient.Number))
+        {
+            recipient.Number = _numbers.Next();
+        }
+        else if (_db.Recipients.Any(r => r.Number == recipient.Number))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "RecipientNumberExists", message = "This recipient number already exists." }
+            });
+        }
+
         _db.Recipients.Add(recipient);
         _db.SaveChanges();
         return Created(recipient);
@@ -57,6 +78,22 @@ public class RecipientsController : ODataController
         delta.Patch(recipient);
         var error = Validate(recipient);
         if (error is not null) return BadRequest(error);
+
+        if (string.IsNullOrWhiteSpace(recipient.Number))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "RecipientNumberRequired", message = "The recipient number is required." }
+            });
+        }
+
+        if (_db.Recipients.Any(r => r.Number == recipient.Number && r.Id != recipient.Id))
+        {
+            return BadRequest(new
+            {
+                error = new { code = "RecipientNumberExists", message = "This recipient number already exists." }
+            });
+        }
 
         _db.SaveChanges();
         return Updated(recipient);

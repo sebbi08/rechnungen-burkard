@@ -1,4 +1,6 @@
 import type ResourceBundle from "sap/base/i18n/ResourceBundle";
+import BusyDialog from "sap/m/BusyDialog";
+import { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Input from "sap/m/Input";
 import Select from "sap/m/Select";
 import TextArea from "sap/m/TextArea";
@@ -77,15 +79,7 @@ export default class Invoices extends BaseController {
 
     const lines = invoiceContext
       ? await this.loadLines(invoiceContext.getProperty("Id") as number)
-      : [
-          {
-            itemId: null,
-            itemNumber: "",
-            count: 1,
-            unitPrice: null,
-            description: "",
-          },
-        ];
+      : [Invoices.emptyLine()];
     this._dialog.setModel(
       new JSONModel({
         recipientId: invoiceContext?.getProperty("RecipientId") ?? null,
@@ -105,83 +99,117 @@ export default class Invoices extends BaseController {
       }
       const body = await response.json();
       return (body.value as any[]).map((line) => ({
-        itemId: line.ItemId,
+        // the ComboBox matches its keys as strings
+        itemId: line.ItemId != null ? String(line.ItemId) : "",
         itemNumber: line.ItemNumber,
         count: line.Count,
         unitPrice: line.UnitPrice,
+        defaultPrice: null,
         description: line.Description,
       }));
     } catch (error) {
       await api.showError(this, error);
-      return [
-        {
-          itemId: null,
-          itemNumber: "",
-          count: 1,
-          unitPrice: null,
-          description: "",
-        },
-      ];
+      return [Invoices.emptyLine()];
     }
   }
 
-  public onLineItemSelected(event: any): void {
-    // keep the selected item's key and text in the row's draft model
-    const selected = event.getParameter("selectedItem") as any;
-    const itemContext = selected?.getBindingContext("odata") as Context | undefined;
+  public onLineItemSelected(event: ComboBox$SelectionChangeEvent): void {
+    // the ComboBox writes its key into the draft itself; fill in what the row
+    // shows alongside it
+    const selected = event.getParameter("selectedItem");
+    const rowContext = event.getSource().getBindingContext("invoiceDraft");
+    if (!selected || !rowContext) {
+      return;
+    }
+    const itemContext = selected.getBindingContext("odata");
     if (!itemContext) {
       return;
     }
-    const rowContext = event.getSource().getBindingContext("invoiceDraft");
-    if (!rowContext) {
-      return;
-    }
-    rowContext.setProperty(
-      "itemId",
-      Number(itemContext.getProperty("Id")),
-    );
-    rowContext.setProperty(
-      "itemNumber",
+
+    const path = rowContext.getPath();
+    const model = rowContext.getModel() as JSONModel;
+    model.setProperty(
+      path + "/itemNumber",
       itemContext.getProperty("Number") as string,
     );
-    rowContext.setProperty(
-      "description",
+    model.setProperty(
+      path + "/description",
       itemContext.getProperty("Description") as string,
+    );
+    // the item's default price is pre-filled and stays overridable; an item
+    // without one leaves the field empty so a price has to be typed
+    const defaultPrice = itemContext.getProperty("DefaultPrice");
+    model.setProperty(path + "/defaultPrice", defaultPrice);
+    model.setProperty(
+      path + "/unitPrice",
+      defaultPrice != null ? Number(defaultPrice) : null,
     );
   }
 
   public onAddLine(): void {
     const model = this._dialog.getModel("invoiceDraft") as JSONModel;
     const lines = (model.getProperty("/lines") as any[]) ?? [];
-    lines.push({
-      itemId: null,
-      itemNumber: "",
-      count: 1,
-      unitPrice: null,
-      description: "",
-    });
+    lines.push(Invoices.emptyLine());
     model.setProperty("/lines", lines);
   }
 
+  private static emptyLine(): Record<string, unknown> {
+    return {
+      itemId: "",
+      itemNumber: "",
+      count: 1,
+      unitPrice: null,
+      defaultPrice: null,
+      description: "",
+    };
+  }
+
   public async onInvoiceDialogSave(): Promise<void> {
+    // a second press while the first invoice is still being created would
+    // create a second one; the busy dialog below blocks the interface, this
+    // guard covers the moment before it is on screen
+    if (this._saving) {
+      return;
+    }
+
     const model = this._dialog.getModel("invoiceDraft") as JSONModel;
     const draft = model.getData() as any;
-    const lines = (draft.lines as any[]).map((line) => ({
+    const rows = draft.lines as any[];
+    if (rows.some((row) => !row.itemId)) {
+      await api.showError(this, new Error("ItemRequired"));
+      return;
+    }
+
+    const lines = rows.map((line) => ({
       itemId: Number(line.itemId),
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
-      unitPrice: line.unitPrice != null ? Number(line.unitPrice) : null,
+      unitPrice:
+        line.unitPrice == null || line.unitPrice === ""
+          ? null
+          : Number(line.unitPrice),
     }));
 
+    // The invoice goes to the recipient the dialog shows. The dialog is built
+    // once and reused, so its select keeps the selection of the previous open
+    // while the draft of this open starts out empty — reading the draft would
+    // send recipient 0 and fail with RecipientNotFound.
+    const recipientId = Number(
+      (this.byId("recipient") as Select).getSelectedKey(),
+    );
+
+    // long-running task: creating an invoice renders its documents, so the
+    // interface is blocked until it finishes
+    this._saving = true;
+    const busy = new BusyDialog({ title: this.i18nText("invoiceRunning") });
+    busy.open();
+
+    let failure: unknown = null;
     try {
       if (draft.invoiceId) {
-        await api.createRevision(
-          Number(draft.invoiceId),
-          Number(draft.recipientId),
-          lines,
-        );
+        await api.createRevision(Number(draft.invoiceId), recipientId, lines);
       } else {
-        await api.createInvoice(Number(draft.recipientId), lines);
+        await api.createInvoice(recipientId, lines);
       }
 
       this._dialog.close();
@@ -191,7 +219,15 @@ export default class Invoices extends BaseController {
         ) as ODataListBinding
       ).refresh();
     } catch (error) {
-      await api.showError(this, error);
+      failure = error;
+    } finally {
+      // close the busy dialog before any error message opens
+      busy.close();
+      this._saving = false;
+    }
+
+    if (failure) {
+      await api.showError(this, failure);
     }
   }
 
@@ -255,9 +291,8 @@ export default class Invoices extends BaseController {
     try {
       const invoiceId = context.getProperty("Id") as number;
       const documents = await api.fetchDocuments(invoiceId);
-      const match = documents.find(
-        (d) => d.FileName.includes("Kopie") === isCopy,
-      );
+      const wanted = isCopy ? "Copy" : "Normal";
+      const match = documents.find((d) => d.Kind === wanted);
       if (match) {
         window.open(api.downloadUrl(match.Id), "_blank");
       }
@@ -315,6 +350,7 @@ export default class Invoices extends BaseController {
     return value != null && value > 0 ? `R${value}` : "";
   }
 
+  private _saving = false;
   private _quickDialog: any;
   private _dialog: any;
 }

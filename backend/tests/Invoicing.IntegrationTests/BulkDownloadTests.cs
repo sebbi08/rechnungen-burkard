@@ -18,7 +18,7 @@ public class BulkDownloadTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
         var item = new InvoiceItem { Number = "7001", Description = "X", VatRate = 7m, DefaultPrice = 10m };
-        var recipient = new Recipient { Name = "X", Address = "Y" };
+        var recipient = new Recipient { Number = "E-0001", Name = "X", Address = "Y" };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();

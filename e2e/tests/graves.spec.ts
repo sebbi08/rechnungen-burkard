@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-// Unique per test run: the dev DB persists between runs, so fixed numbers would
-// either collide with pre-existing rows or make assertions vacuous.
+// Unique per test run. `npm test` starts with an empty database, but
+// `npm run test:dev` runs against the dev stack, where fixed numbers would
+// collide with pre-existing rows or make assertions vacuous.
 const RUN = Date.now();
 
 async function seedGraveGenerationData(
@@ -9,11 +10,11 @@ async function seedGraveGenerationData(
   count: number,
 ): Promise<string> {
   // VatRate 7 may already exist from previous runs; a 409 here is harmless.
-  await page.request.post("http://localhost:8080/odata/VatRates", {
+  await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
   const item = await (
-    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+    await page.request.post("/odata/InvoiceItems", {
       data: {
         Number: `8001-${RUN}`,
         Description: "Grabpflege",
@@ -23,7 +24,7 @@ async function seedGraveGenerationData(
     })
   ).json();
   const recipient = await (
-    await page.request.post("http://localhost:8080/odata/Recipients", {
+    await page.request.post("/odata/Recipients", {
       data: { Name: `Anna Beispiel ${RUN}`, Address: "Hauptstraße 1" },
     })
   ).json();
@@ -34,12 +35,12 @@ async function seedGraveGenerationData(
   // grave totals are not inflated.
   const itemLinks = await (
     await page.request.get(
-      "http://localhost:8080/odata/GraveItems?$select=GraveId",
+      "/odata/GraveItems?$select=GraveId",
     )
   ).json();
   const recipientLinks = await (
     await page.request.get(
-      "http://localhost:8080/odata/GraveRecipients?$select=GraveId",
+      "/odata/GraveRecipients?$select=GraveId",
     )
   ).json();
   const withItems = new Set<number>(
@@ -49,16 +50,16 @@ async function seedGraveGenerationData(
     (recipientLinks.value ?? []).map((link: any) => link.GraveId),
   );
   const existing = await (
-    await page.request.get("http://localhost:8080/odata/Graves?$select=Id")
+    await page.request.get("/odata/Graves?$select=Id")
   ).json();
   for (const grave of existing.value ?? []) {
     if (!withItems.has(grave.Id)) {
-      await page.request.post("http://localhost:8080/odata/GraveItems", {
+      await page.request.post("/odata/GraveItems", {
         data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
       });
     }
     if (!withRecipients.has(grave.Id)) {
-      await page.request.post("http://localhost:8080/odata/GraveRecipients", {
+      await page.request.post("/odata/GraveRecipients", {
         data: { GraveId: grave.Id, RecipientId: recipient.Id },
       });
     }
@@ -67,7 +68,7 @@ async function seedGraveGenerationData(
   const firstGraveNumber = `G-${RUN}-001`;
   for (let i = 1; i <= count; i++) {
     const grave = await (
-      await page.request.post("http://localhost:8080/odata/Graves", {
+      await page.request.post("/odata/Graves", {
         data: {
           GraveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
           StartDate: "2026-01-01",
@@ -75,10 +76,10 @@ async function seedGraveGenerationData(
         },
       })
     ).json();
-    await page.request.post("http://localhost:8080/odata/GraveItems", {
+    await page.request.post("/odata/GraveItems", {
       data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
     });
-    await page.request.post("http://localhost:8080/odata/GraveRecipients", {
+    await page.request.post("/odata/GraveRecipients", {
       data: { GraveId: grave.Id, RecipientId: recipient.Id },
     });
   }
@@ -105,21 +106,10 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   // status column now shows graves as invoiced
   await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
 
-  // a second generation must not create duplicate invoices: either it is
-  // blocked with the German "already invoiced" message (when every grave is
-  // invoiced) or it re-runs and invoices no grave again (leftover graves
-  // without priced items stay skipped)
-  const invoiceCount = async (): Promise<number> => {
-    const response = await page.request.get(
-      "http://localhost:8080/odata/Invoices/$count?$filter=PeriodYear eq 2026 and PeriodHalf eq 1",
-    );
-    return Number(await response.text());
-  };
-
   // dismiss the success message, then run the second generation
   await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
-  const countBefore = await invoiceCount();
-  expect(countBefore).toBeGreaterThan(0);
+  expect(await periodInvoices(page)).not.toHaveLength(0);
+
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
   await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
   // the busy dialog only appears when a job actually runs (409 case: not at all)
@@ -131,29 +121,61 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
     .locator(".sapMBusyDialog")
     .waitFor({ state: "hidden", timeout: 90000 })
     .catch(() => {});
+  // either the German "already invoiced" message (when every grave is invoiced)
+  // or the result of a second run
   const resultBox = page.locator(".sapMDialog.sapMMessageBox");
   await expect(resultBox).toBeVisible();
   const resultText = await resultBox.innerText();
   expect(
-    resultText.includes("bereits") || resultText.includes("Erstellt: 0"),
+    resultText.includes("bereits") || resultText.includes("Erstellt"),
   ).toBeTruthy();
   await page.locator(".sapMDialog").getByRole("button").first().click();
 
-  // and no invoice may have been added for the half-year
-  expect(await invoiceCount()).toBe(countBefore);
+  // FR-027: no grave and recipient may end up with two invoices for the same
+  // half-year. Asserting the pairs rather than a total keeps this immune to the
+  // graves other specs create in parallel, which a second run may legitimately
+  // invoice for the first time.
+  const pairs = await periodInvoices(page);
+  const seen = pairs.map((i) => `${i.GraveId}:${i.RecipientId}`);
+  expect(new Set(seen).size).toBe(seen.length);
 });
 
-test("create a grave and link item and recipient (Story 5)", async ({
+interface PeriodInvoice {
+  GraveId: number;
+  RecipientId: number;
+}
+
+/** Every grave invoice of the 2026 first half-year, paged past the service's
+ *  200-row limit so the duplicate check sees all of them. */
+async function periodInvoices(
+  page: import("@playwright/test").Page,
+): Promise<PeriodInvoice[]> {
+  const pageSize = 200;
+  const all: PeriodInvoice[] = [];
+  for (let skip = 0; ; skip += pageSize) {
+    const response = await page.request.get(
+      "/odata/Invoices?$filter=PeriodYear eq 2026 and PeriodHalf eq 1" +
+        `&$select=GraveId,RecipientId&$orderby=Id&$top=${pageSize}&$skip=${skip}`,
+    );
+    const batch = (await response.json()).value as PeriodInvoice[];
+    all.push(...batch);
+    if (batch.length < pageSize) {
+      return all;
+    }
+  }
+}
+
+test("create a grave with item, price and recipient in one save (Story 5)", async ({
   page,
 }) => {
   const itemNumber = `8002-${RUN}`;
   const recipientName = `Bert Beispiel ${RUN}`;
   const graveNumber = `X-${RUN}`;
 
-  await page.request.post("http://localhost:8080/odata/VatRates", {
+  await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
-  await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+  await page.request.post("/odata/InvoiceItems", {
     data: {
       Number: itemNumber,
       Description: "Pflege",
@@ -161,7 +183,7 @@ test("create a grave and link item and recipient (Story 5)", async ({
       DefaultPrice: 50,
     },
   });
-  await page.request.post("http://localhost:8080/odata/Recipients", {
+  await page.request.post("/odata/Recipients", {
     data: { Name: recipientName, Address: "Nebenweg 2" },
   });
 
@@ -169,35 +191,23 @@ test("create a grave and link item and recipient (Story 5)", async ({
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
 
   await page.getByRole("button", { name: "Grab anlegen" }).click();
-  // scope to the dialog: the new toolbar search field's accessible name also
+  // scope to the dialog: the toolbar search field's accessible name also
   // contains "Grabnummer" and would win the race while the dialog loads
   const graveDialog = page.locator(".sapMDialog");
   await graveDialog.getByLabel("Grabnummer").fill(graveNumber);
   await graveDialog.getByLabel("Beginn").fill("2026-01-01");
   await graveDialog.getByLabel("Ende").fill("2040-12-31");
-  await page.getByRole("button", { name: "Speichern" }).click();
 
-  await expect(gravesTable).toContainText(graveNumber);
-
-  // open the edit dialog for the newly created grave and add the item and
-  // recipient links; ".first()" would edit an unrelated pre-existing row
-  await gravesTable
-    .locator("tbody tr", { hasText: graveNumber })
-    .getByRole("button", { name: "Bearbeiten" })
-    .click();
-  await page.locator(".sapMDialog .sapMSlt[id$='linkItem']").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: itemNumber,
-    })
-    .click();
-  await page.locator("[id$='linkCount-inner']").fill("1");
-  await page.getByRole("button", { name: "Hinzufügen" }).first().click();
-  // scope to the dialog's own items table: the select keeps a hidden inline
-  // copy of its options in the DOM, which would make a dialog-wide assertion vacuous
-  await expect(page.locator("[id$='graveItemsTable-listUl']")).toContainText(
-    itemNumber,
+  // the grave does not exist yet: item and recipient are collected in the dialog
+  await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  const itemInput = page.locator(
+    ".sapMDialog input[id*='graveItem-'][id$='-inner']",
   );
+  await itemInput.click();
+  await itemInput.fill(itemNumber);
+  await page.locator("div.sapMPopover li", { hasText: itemNumber }).click();
+  await graveDialog.getByLabel("Anzahl").fill("2");
+  await graveDialog.getByLabel("Preis").fill("55");
 
   await page.locator(".sapMDialog .sapMSlt[id$='linkRecipient']").click();
   await page
@@ -205,73 +215,105 @@ test("create a grave and link item and recipient (Story 5)", async ({
       hasText: recipientName,
     })
     .click();
-  await page.getByRole("button", { name: "Hinzufügen" }).last().click();
+  // "Hinzufügen" alone also matches the item table's "Zeile hinzufügen"
+  await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   await expect(
     page.locator("[id$='graveRecipientsTable-listUl']"),
   ).toContainText(recipientName);
 
+  // nothing has been persisted so far — one save writes the grave and both links
   await page.getByRole("button", { name: "Speichern" }).click();
-});
-
-test("linking an item without a default price is rejected (Story 6)", async ({
-  page,
-}) => {
-  const noPriceItemNumber = `NP-${RUN}`;
-  const graveNumber = `NPG-${RUN}`;
-  await page.request.post("http://localhost:8080/odata/VatRates", {
-    data: { Rate: 7 },
-  });
-  const noPriceItem = await (
-    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
-      data: {
-        Number: noPriceItemNumber,
-        Description: "Ohne Preis",
-        VatRate: 7,
-        DefaultPrice: null,
-      },
-    })
-  ).json();
-  const grave = await (
-    await page.request.post("http://localhost:8080/odata/Graves", {
-      data: {
-        GraveNumber: graveNumber,
-        StartDate: "2026-01-01",
-        EndDate: "2040-12-31",
-      },
-    })
-  ).json();
-
-  await page.goto("/index.html#/graves");
-  const gravesTable = page.locator("[id$='gravesTable-listUl']");
   await expect(gravesTable).toContainText(graveNumber);
 
+  const graves = await (
+    await page.request.get(
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`,
+    )
+  ).json();
+  const graveId = graves.value[0].Id;
+  const links = await (
+    await page.request.get(
+      `/odata/GraveItems?$filter=GraveId eq ${graveId}`,
+    )
+  ).json();
+  expect(links.value).toHaveLength(1);
+  expect(Number(links.value[0].Count)).toBe(2);
+  expect(Number(links.value[0].UnitPrice)).toBe(55);
+  const recipientLinks = await (
+    await page.request.get(
+      `/odata/GraveRecipients?$filter=GraveId eq ${graveId}`,
+    )
+  ).json();
+  expect(recipientLinks.value).toHaveLength(1);
+
+  // reopening the grave shows the saved count and price again
   await gravesTable
     .locator("tbody tr", { hasText: graveNumber })
     .getByRole("button", { name: "Bearbeiten" })
     .click();
-  await page.locator(".sapMDialog .sapMSlt[id$='linkItem']").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: noPriceItemNumber,
-    })
-    .click();
-  await page.locator("[id$='linkCount-inner']").fill("1");
-  await page.getByRole("button", { name: "Hinzufügen" }).first().click();
+  await expect(graveDialog.getByLabel("Anzahl")).toHaveValue("2");
+  await expect(graveDialog.getByLabel("Preis")).toHaveValue("55");
+  await page.getByRole("button", { name: "Abbrechen" }).click();
+});
 
-  // the link is rejected with the German "missing price" message
+test("an item without a default price needs an explicit price (Story 6)", async ({
+  page,
+}) => {
+  const noPriceItemNumber = `NP-${RUN}`;
+  const graveNumber = `NPG-${RUN}`;
+  await page.request.post("/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.request.post("/odata/InvoiceItems", {
+    data: {
+      Number: noPriceItemNumber,
+      Description: "Ohne Preis",
+      VatRate: 7,
+      DefaultPrice: null,
+    },
+  });
+
+  await page.goto("/index.html#/graves");
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  const graveDialog = page.locator(".sapMDialog");
+
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await graveDialog.getByLabel("Grabnummer").fill(graveNumber);
+  await graveDialog.getByLabel("Beginn").fill("2026-01-01");
+  await graveDialog.getByLabel("Ende").fill("2040-12-31");
+  await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  const itemInput = page.locator(
+    ".sapMDialog input[id*='graveItem-'][id$='-inner']",
+  );
+  await itemInput.click();
+  await itemInput.fill(noPriceItemNumber);
+  await page
+    .locator("div.sapMPopover li", { hasText: noPriceItemNumber })
+    .click();
+
+  // no price anywhere: saving is rejected with the German "missing price" message
+  await page.getByRole("button", { name: "Speichern" }).click();
   const errorBox = page.locator(".sapMDialog.sapMMessageBox");
   await expect(errorBox).toContainText("fehlt ein Preis");
   await errorBox.getByRole("button").first().click();
-  await page.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(gravesTable).not.toContainText(graveNumber);
 
-  // no link may have been created for the rejected item
-  const links = await (
+  // entering the price in the dialog makes the same grave saveable
+  await graveDialog.getByLabel("Preis").fill("40");
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(gravesTable).toContainText(graveNumber);
+
+  const graves = await (
     await page.request.get(
-      `http://localhost:8080/odata/GraveItems?$filter=GraveId eq ${grave.Id}&$select=ItemId`,
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`,
     )
   ).json();
-  const linkedIds = (links.value ?? []).map((link: any) => link.ItemId);
-  expect(linkedIds).not.toContain(noPriceItem.Id);
+  const links = await (
+    await page.request.get(
+      `/odata/GraveItems?$filter=GraveId eq ${graves.value[0].Id}`,
+    )
+  ).json();
+  expect(Number(links.value[0].UnitPrice)).toBe(40);
 });
 
 test("generation result names the skip reason for an unpriced item (Story 6)", async ({
@@ -279,7 +321,7 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
 }) => {
   const graveNumber = `SK-${RUN}`;
   const noPriceItem = await (
-    await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+    await page.request.post("/odata/InvoiceItems", {
       data: {
         Number: `SP-${RUN}`,
         Description: "Ohne Preis",
@@ -289,12 +331,12 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
     })
   ).json();
   const recipient = await (
-    await page.request.post("http://localhost:8080/odata/Recipients", {
+    await page.request.post("/odata/Recipients", {
       data: { Name: `Skip Beispiel ${RUN}`, Address: "Kiesweg 3" },
     })
   ).json();
   const grave = await (
-    await page.request.post("http://localhost:8080/odata/Graves", {
+    await page.request.post("/odata/Graves", {
       data: {
         GraveNumber: graveNumber,
         StartDate: "2026-01-01",
@@ -302,16 +344,16 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
       },
     })
   ).json();
-  await page.request.post("http://localhost:8080/odata/GraveItems", {
+  await page.request.post("/odata/GraveItems", {
     data: { GraveId: grave.Id, ItemId: noPriceItem.Id, Count: 1 },
   });
-  await page.request.post("http://localhost:8080/odata/GraveRecipients", {
+  await page.request.post("/odata/GraveRecipients", {
     data: { GraveId: grave.Id, RecipientId: recipient.Id },
   });
 
   // 2030 H2 is not used by the other tests, so no duplicate conflicts
   const start = await page.request.post(
-    "http://localhost:8080/odata/GenerateGraveInvoices",
+    "/odata/GenerateGraveInvoices",
     { data: { year: 2030, half: 2 } },
   );
   const jobRef = await start.json();
@@ -319,7 +361,7 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
   for (let i = 0; i < 80; i++) {
     job = await (
       await page.request.get(
-        `http://localhost:8080/odata/Jobs(${jobRef.Id})`,
+        `/odata/Jobs(${jobRef.Id})`,
       )
     ).json();
     if (job.Status === "Succeeded" || job.Status === "Failed") {

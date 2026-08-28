@@ -3,21 +3,35 @@
     <Page title="{i18n>menuItems}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
         <subHeader>
-            <Toolbar>
-                <SearchField width="16rem" search=".onSearch" placeholder="{i18n>searchByNumber}" />
+            <!-- OverflowToolbar so a narrow screen moves actions into the "..."
+                 menu instead of truncating their labels -->
+            <OverflowToolbar id="itemsToolbar">
+                <SearchField width="16rem" search=".onSearch" placeholder="{i18n>searchByNumber}">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </SearchField>
                 <ToolbarSpacer />
-                <Button text="{i18n>createItem}" press=".onCreateItem" type="Emphasized" />
-            </Toolbar>
+                <Button text="{i18n>createItem}" press=".onCreateItem" type="Emphasized">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="High" />
+                    </layoutData>
+                </Button>
+            </OverflowToolbar>
         </subHeader>
         <content>
+            <!-- autoPopinMode collapses the less important columns into a pop-in
+                 block below the row as the screen gets narrower -->
             <Table id="itemsTable" class="sapUiSmallMarginTop"
-                items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}">
+                autoPopinMode="true" popinLayout="Block"
+                items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}"
+                noDataText="{i18n>noData}">
                         <columns>
-                            <Column><Text text="{i18n>itemNumber}" /></Column>
-                            <Column><Text text="{i18n>itemDescription}" /></Column>
-                            <Column><Text text="{i18n>vatRate}" /></Column>
-                            <Column><Text text="{i18n>itemDefaultPrice}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
+                            <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDefaultPrice}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>

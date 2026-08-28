@@ -1,4 +1,5 @@
 <mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
+    xmlns:core="sap.ui.core"
     xmlns:form="sap.ui.layout.form"
     controllerName="burkard.invoicing.controller.Settings" displayBlock="true">
     <Page title="{i18n>menuSettings}" titleLevel="H1" showNavButton="true"
@@ -7,19 +8,26 @@
             <Panel headerText="{i18n>menuSettings}" class="sapUiSmallMarginBottom">
                 <form:SimpleForm editable="true" layout="ResponsiveGridLayout">
                     <Label text="{i18n>settingsStampWord}" labelFor="stampWord" />
-                    <Input id="stampWord" value="{path: 'odata>/Settings/StampWord', mode: 'OneWay'}" width="20rem" />
+                    <Input id="stampWord" value="{path: 'odata>/Settings/StampWord', mode: 'OneWay'}" width="100%" />
                     <Label text="{i18n>settingsEndingText}" labelFor="endingText" />
                     <TextArea id="endingText" value="{path: 'odata>/Settings/EndingText', mode: 'OneWay'}" rows="6" width="100%" />
+                    <Label text="{i18n>settingsDocumentLanguage}" labelFor="documentLanguage" />
+                    <Select id="documentLanguage" width="100%"
+                        selectedKey="{path: 'odata>/Settings/Language', mode: 'OneWay'}">
+                        <core:Item key="de" text="{i18n>languageDe}" />
+                        <core:Item key="en" text="{i18n>languageEn}" />
+                    </Select>
                 </form:SimpleForm>
                 <Button id="save" text="{i18n>save}" type="Emphasized" press=".onSave"
                     class="sapUiSmallMarginTop" />
             </Panel>
             <Panel headerText="{i18n>settingsVatRates}" class="sapUiSmallMarginBottom">
                 <content>
-                    <Table id="vatRates" items="{odata>/VatRates}" noDataText="{i18n>noData}">
+                    <Table id="vatRates" items="{odata>/VatRates}" noDataText="{i18n>noData}"
+                        autoPopinMode="true" popinLayout="Block">
                         <columns>
-                            <Column><Text text="{i18n>vatRate}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>vatRate}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
@@ -30,7 +38,9 @@
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <HBox alignItems="Center" class="sapUiMediumMarginTop">
+                    <!-- wraps so the field and its button stay side by side on a wide screen
+                         and stack on a phone -->
+                    <HBox alignItems="Center" wrap="Wrap" class="sapUiMediumMarginTop">
                         <Label text="{i18n>vatRate}" labelFor="newVatRate" class="sapUiSmallMarginEnd" />
                         <Input id="newVatRate" type="Number" width="8rem" class="sapUiSmallMarginEnd" />
                         <Button text="{i18n>addVatRate}" press=".onAddVatRate" />

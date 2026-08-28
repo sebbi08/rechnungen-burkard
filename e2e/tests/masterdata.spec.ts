@@ -14,8 +14,8 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
   await expect(page.locator(".sapMDialog")).toHaveCount(0);
 
   await page.getByLabel("Stempelwort").fill("Kopie");
-  await page.getByLabel("VAT-Satz").fill("7");
-  await page.getByRole("button", { name: "VAT-Satz hinzufügen" }).click();
+  await page.getByLabel("MwSt.-Satz").fill("7");
+  await page.getByRole("button", { name: "MwSt.-Satz hinzufügen" }).click();
   // on reruns the rate may already exist: dismiss the blocking error dialog
   const errorDialog = page.locator(".sapMDialog");
   await errorDialog
@@ -45,7 +45,7 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
 test("items: create an item without default price (Story 2)", async ({
   page,
 }) => {
-  await page.request.post("http://localhost:8080/odata/VatRates", {
+  await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
   await page.goto("/index.html#/items");
@@ -71,10 +71,10 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({
   const number = `E2E-ITEM-${ts}`;
   const original = `Original ${ts}`;
   const changed = `Geändert ${ts}`;
-  await page.request.post("http://localhost:8080/odata/VatRates", {
+  await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
-  await page.request.post("http://localhost:8080/odata/InvoiceItems", {
+  await page.request.post("/odata/InvoiceItems", {
     data: {
       Number: number,
       Description: original,
@@ -141,7 +141,7 @@ test("recipients: edit an existing recipient via the row dialog (Story 3)", asyn
   const ts = Date.now();
   const name = `Vorher ${ts}`;
   const changed = `Geändert ${ts}`;
-  await page.request.post("http://localhost:8080/odata/Recipients", {
+  await page.request.post("/odata/Recipients", {
     data: { Name: name, Address: "Alte Gasse 1" },
   });
 
@@ -173,7 +173,7 @@ test("graves: search by number narrows the list and empty search shows nothing (
 }) => {
   const ts = Date.now();
   const graveNumber = `SUCHE-${ts}`;
-  await page.request.post("http://localhost:8080/odata/Graves", {
+  await page.request.post("/odata/Graves", {
     data: {
       GraveNumber: graveNumber,
       StartDate: "2026-01-01",
@@ -183,7 +183,8 @@ test("graves: search by number narrows the list and empty search shows nothing (
 
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
-  // the newest grave is visible without search (Id desc order)
+  // graves still open for the selected half-year are listed first, so a
+  // freshly created one is in the table right away
   await expect(gravesTable).toContainText(graveNumber);
 
   const search = page.getByRole("searchbox");

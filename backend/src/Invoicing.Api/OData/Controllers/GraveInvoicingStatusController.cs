@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Burkard.Invoicing.Api.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
@@ -9,17 +8,12 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 [Route("odata")]
 public class GraveInvoicingStatusController : ODataController
 {
-    // The endpoint returns an OData-style { value: [...] } payload with the same
-    // PascalCase keys the EDM-serialized entities use.
-    private static readonly JsonSerializerOptions PascalCaseJson = new()
-    {
-        PropertyNamingPolicy = null,
-    };
-
     private readonly AppDbContext _db;
 
     public GraveInvoicingStatusController(AppDbContext db) => _db = db;
 
+    /// <summary>The grave overview for one half-year: graves that still need an
+    /// invoice for it come first (FR-028), each with the flag the list shows.</summary>
     [HttpGet("GraveInvoicingStatus")]
     public async Task<IActionResult> Status([FromQuery] int year, [FromQuery] int half)
     {
@@ -29,18 +23,22 @@ public class GraveInvoicingStatusController : ODataController
             .ToHashSet();
 
         var graves = await _db.Graves
-            .OrderBy(g => !invoicedIds.Contains(g.Id))
+            // false sorts before true, so ordering by "is invoiced" puts the
+            // graves that are still open at the top
+            .OrderBy(g => invoicedIds.Contains(g.Id))
             .ThenBy(g => g.GraveNumber)
-            .Select(g => new { g.Id, g.GraveNumber })
+            .Select(g => new { g.Id, g.GraveNumber, g.StartDate, g.EndDate })
             .ToListAsync();
 
         var value = graves.Select(g => new
         {
             g.Id,
             g.GraveNumber,
+            g.StartDate,
+            g.EndDate,
             Invoiced = invoicedIds.Contains(g.Id),
         });
 
-        return new JsonResult(new { value }, PascalCaseJson);
+        return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);
     }
 }

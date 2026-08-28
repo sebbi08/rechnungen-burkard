@@ -51,6 +51,9 @@ export default class Recipients extends BaseController {
     }
 
     if (context) {
+      (this.byId("recipientNumber") as Input).setValue(
+        context.getProperty("Number") as string,
+      );
       (this.byId("recipientName") as Input).setValue(
         context.getProperty("Name") as string,
       );
@@ -59,6 +62,7 @@ export default class Recipients extends BaseController {
       );
       this._editId = context.getProperty("Id") as number;
     } else {
+      (this.byId("recipientNumber") as Input).setValue("");
       (this.byId("recipientName") as Input).setValue("");
       (this.byId("recipientAddress") as TextArea).setValue("");
       this._editId = null;
@@ -71,15 +75,19 @@ export default class Recipients extends BaseController {
 
   public async onDialogSave(event: any): Promise<void> {
     const dialog = event.getSource().getParent() as any;
+    const number = (this.byId("recipientNumber") as Input).getValue().trim();
     const fields = {
       Name: (this.byId("recipientName") as Input).getValue(),
       Address: (this.byId("recipientAddress") as TextArea).getValue(),
     };
     try {
       if (this._editId != null) {
-        await api.updateRecipient(this._editId, fields);
+        await api.updateRecipient(this._editId, { ...fields, Number: number });
       } else {
-        await api.createRecipient(fields);
+        // an empty number means "assign the next free one"
+        await api.createRecipient(
+          number ? { ...fields, Number: number } : fields,
+        );
       }
       dialog.close();
       this._editId = null;

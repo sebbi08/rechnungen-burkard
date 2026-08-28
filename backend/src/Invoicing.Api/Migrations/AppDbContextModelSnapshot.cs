@@ -57,6 +57,10 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("StampWord")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -134,6 +138,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal?>("UnitPrice")
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ItemId");
@@ -183,6 +190,10 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Language")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -358,7 +369,14 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
 
                     b.ToTable("Recipients");
                 });

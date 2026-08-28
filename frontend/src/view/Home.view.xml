@@ -63,6 +63,17 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
+                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuImportExport}"
+                    press=".onTilePress">
+                    <customData>
+                        <core:CustomData key="route" value="importExport" />
+                    </customData>
+                    <tileContent>
+                        <TileContent>
+                            <ImageContent src="sap-icon://upload-to-cloud" />
+                        </TileContent>
+                    </tileContent>
+                </GenericTile>
             </FlexBox>
         </content>
     </Page>

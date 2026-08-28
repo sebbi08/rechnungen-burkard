@@ -43,7 +43,24 @@ const CODE_TO_I18N: Record<string, string> = {
   GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
   JobAlreadyRunning: "errorJobAlreadyRunning",
   JobTimeout: "errorJobTimeout",
-  GraveNotSaved: "errorGraveNotSaved",
+  GraveNumberRequired: "errorGraveNumberRequired",
+  InvalidDate: "errorInvalidDate",
+  InvalidCount: "errorInvalidCount",
+  ItemRequired: "errorItemRequired",
+  GraveItemLinkExists: "errorGraveItemLinkExists",
+  GraveRecipientLinkExists: "errorGraveRecipientLinkExists",
+  GraveNotFound: "errorGraveNotFound",
+  ItemNotFound: "errorItemNotFound",
+  RecipientNotFound: "errorRecipientNotFound",
+  RecipientNameRequired: "errorRecipientNameRequired",
+  RecipientNumberExists: "errorRecipientNumberExists",
+  RecipientNumberRequired: "errorRecipientNumberRequired",
+  ItemNumberRequired: "errorItemNumberRequired",
+  ItemDescriptionRequired: "errorItemDescriptionRequired",
+  InvoiceNotFound: "errorInvoiceNotFound",
+  NoLines: "errorNoLines",
+  LanguageNotSupported: "errorLanguageNotSupported",
+  ArchiveRequired: "errorArchiveRequired",
 };
 
 export async function showError(
@@ -113,6 +130,7 @@ export async function updateItem(
 }
 
 export async function createRecipient(recipient: {
+  Number?: string;
   Name: string;
   Address: string;
 }): Promise<number> {
@@ -126,6 +144,7 @@ export async function createRecipient(recipient: {
 export async function updateRecipient(
   id: number,
   fields: {
+    Number?: string;
     Name?: string;
     Address?: string;
   },
@@ -142,6 +161,7 @@ export interface InvoiceLineDto {
 export interface DocumentDto {
   Id: number;
   FileName: string;
+  Kind: "Normal" | "Copy";
 }
 
 export async function createInvoice(
@@ -167,7 +187,7 @@ export async function fetchDocuments(
   // only the id and file name are needed for the download links; keep the
   // PDF blobs out of the response
   const response = await fetch(
-    `/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName`,
+    `/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName,Kind`,
   );
   await ensureOk(response);
   const body = await response.json();
@@ -266,22 +286,30 @@ export async function generateGraveInvoices(
   return (await response.json()) as JobDto;
 }
 
+export interface GraveStatusRow {
+  Id: number;
+  GraveNumber: string;
+  StartDate: string;
+  EndDate: string;
+  Invoiced: boolean;
+}
+
 export async function fetchGraveStatus(
   year: number,
   half: number,
-): Promise<any[]> {
+): Promise<GraveStatusRow[]> {
   const response = await fetch(
     `/odata/GraveInvoicingStatus?year=${year}&half=${half}`,
   );
   await ensureOk(response);
   const body = await response.json();
-  return body.value as any[];
+  return body.value as GraveStatusRow[];
 }
 
 export interface GraveSearchResult {
-  id: number;
-  graveNumber: string;
-  recipientNames: string[];
+  Id: number;
+  GraveNumber: string;
+  RecipientNames: string[];
 }
 
 export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
@@ -293,53 +321,29 @@ export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
   return body.value as GraveSearchResult[];
 }
 
-export async function createGrave(grave: {
-  GraveNumber: string;
-  StartDate: string;
-  EndDate: string;
-}): Promise<number> {
-  const response = await post("/odata/Graves", grave);
+export interface GraveItemInput {
+  itemId: number;
+  count: number;
+  unitPrice: number | null;
+}
+
+export interface SaveGraveInput {
+  graveId: number | null;
+  graveNumber: string;
+  startDate: string;
+  endDate: string;
+  items: GraveItemInput[];
+  recipientIds: number[];
+}
+
+// The grave dialog keeps everything in a client-side draft, so the grave and
+// its complete set of item and recipient links are saved in one request.
+export async function saveGrave(input: SaveGraveInput): Promise<number> {
+  const response = await post("/odata/SaveGrave", input);
   await ensureOk(response);
   const body = await response.json();
-  return body.Id as number;
-}
-
-export async function patchGrave(
-  graveId: number,
-  fields: Record<string, unknown>,
-): Promise<void> {
-  const response = await fetch(`/odata/Graves(${graveId})`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(fields),
-  });
-  await ensureOk(response);
-}
-
-export async function createGraveItemLink(
-  graveId: number,
-  itemId: number,
-  count: number,
-): Promise<void> {
-  await ensureOk(
-    await post("/odata/GraveItems", {
-      GraveId: graveId,
-      ItemId: itemId,
-      Count: count,
-    }),
-  );
-}
-
-export async function createGraveRecipientLink(
-  graveId: number,
-  recipientId: number,
-): Promise<void> {
-  await ensureOk(
-    await post("/odata/GraveRecipients", {
-      GraveId: graveId,
-      RecipientId: recipientId,
-    }),
-  );
+  // OData entity responses are PascalCase; accept camelCase defensively
+  return (body.Id ?? body.id) as number;
 }
 
 export async function fetchGraveDetails(graveId: number): Promise<any> {
@@ -350,14 +354,47 @@ export async function fetchGraveDetails(graveId: number): Promise<any> {
   return response.json();
 }
 
-export async function deleteGraveItemLink(linkId: number): Promise<void> {
-  await ensureOk(
-    await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }),
-  );
+export interface ImportProblem {
+  file: string;
+  row: number | null;
+  code: string;
+  message: string;
 }
 
-export async function deleteGraveRecipientLink(linkId: number): Promise<void> {
-  await ensureOk(
-    await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }),
-  );
+export interface ImportSummary {
+  recipients: number;
+  items: number;
+  graves: number;
+  itemLinks: number;
+  recipientLinks: number;
+}
+
+/** Thrown when the archive was rejected: nothing was imported and every
+ *  problem is listed with the file and row it belongs to. */
+export class ImportRejectedError extends Error {
+  public constructor(public readonly problems: ImportProblem[]) {
+    super("ImportInvalid");
+  }
+}
+
+export async function downloadImportTemplate(fileName: string): Promise<void> {
+  const response = await fetch("/odata/ImportTemplate");
+  await ensureOk(response);
+  await downloadBlob(await response.blob(), fileName);
+}
+
+export async function importArchive(file: File): Promise<ImportSummary> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch("/odata/ImportArchive", { method: "POST", body });
+  if (response.ok) {
+    return (await response.json()).summary as ImportSummary;
+  }
+
+  const payload = await toJson(response);
+  if (Array.isArray(payload?.problems)) {
+    throw new ImportRejectedError(payload.problems as ImportProblem[]);
+  }
+
+  throw new Error(payload?.error?.code ?? `HTTP ${response.status}`);
 }

@@ -3,23 +3,35 @@
     <Page title="{i18n>menuRecipients}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
         <subHeader>
-            <Toolbar>
-                <SearchField width="16rem" search=".onSearch" placeholder="{i18n>searchByName}" />
+            <OverflowToolbar id="recipientsToolbar">
+                <SearchField width="16rem" search=".onSearch" placeholder="{i18n>searchByName}">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </SearchField>
                 <ToolbarSpacer />
-                <Button text="{i18n>createRecipient}" press=".onCreateRecipient" type="Emphasized" />
-            </Toolbar>
+                <Button text="{i18n>createRecipient}" press=".onCreateRecipient" type="Emphasized">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="High" />
+                    </layoutData>
+                </Button>
+            </OverflowToolbar>
         </subHeader>
         <content>
             <Table id="recipientsTable" class="sapUiSmallMarginTop"
-                items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
+                autoPopinMode="true" popinLayout="Block"
+                items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+                noDataText="{i18n>noData}">
                         <columns>
-                            <Column><Text text="{i18n>recipientName}" /></Column>
-                            <Column><Text text="{i18n>recipientAddress}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>recipientNumber}" /></Column>
+                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>recipientAddress}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
+                                    <Text text="{odata>Number}" />
                                     <Text text="{odata>Name}" />
                                     <Text text="{odata>Address}" />
                                     <Button text="{i18n>edit}" press=".onEditRecipient" type="Transparent" />

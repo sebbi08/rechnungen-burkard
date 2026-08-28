@@ -1,18 +1,18 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog title="{i18n>createItem}">
+    <Dialog title="{i18n>createItem}" stretch="{device>/system/phone}" contentWidth="20rem">
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>itemNumber}" labelFor="itemNumber" />
-                <Input id="itemNumber" width="20rem" />
+                <Input id="itemNumber" width="100%" />
                 <Label text="{i18n>itemDescription}" labelFor="itemDescription" />
-                <Input id="itemDescription" width="20rem" />
+                <Input id="itemDescription" width="100%" />
                 <Label text="{i18n>vatRate}" labelFor="itemVatRate" />
-                <Select id="itemVatRate" width="20rem" forceSelection="false"
+                <Select id="itemVatRate" width="100%" forceSelection="false"
                     items="{path: 'odata>/VatRates', parameters: {$orderby: 'Rate asc'}}">
                     <core:Item key="{odata>Rate}" text="{odata>Rate}" />
                 </Select>
                 <Label text="{i18n>itemDefaultPrice}" labelFor="itemDefaultPrice" />
-                <Input id="itemDefaultPrice" type="Number" width="20rem" />
+                <Input id="itemDefaultPrice" type="Number" width="100%" />
             </VBox>
         </content>
         <beginButton>

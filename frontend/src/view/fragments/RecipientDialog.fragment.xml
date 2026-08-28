@@ -1,11 +1,13 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog title="{i18n>createRecipient}">
+    <Dialog title="{i18n>createRecipient}" stretch="{device>/system/phone}" contentWidth="20rem">
         <content>
             <VBox class="sapUiMediumMargin">
+                <Label text="{i18n>recipientNumber}" labelFor="recipientNumber" />
+                <Input id="recipientNumber" width="100%" placeholder="{i18n>recipientNumberHint}" />
                 <Label text="{i18n>recipientName}" labelFor="recipientName" />
-                <Input id="recipientName" width="20rem" />
+                <Input id="recipientName" width="100%" />
                 <Label text="{i18n>recipientAddress}" labelFor="recipientAddress" />
-                <TextArea id="recipientAddress" rows="4" width="20rem" />
+                <TextArea id="recipientAddress" rows="4" width="100%" />
             </VBox>
         </content>
         <beginButton>

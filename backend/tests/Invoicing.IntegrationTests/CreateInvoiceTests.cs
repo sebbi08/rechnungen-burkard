@@ -31,6 +31,7 @@ public class CreateInvoiceTests
         };
         var recipient = new Recipient
         {
+            Number = "E-0004",
             Name = "Familie Mahr",
             Address = "Musterstraße 1\n12345 Musterstadt",
         };
@@ -89,7 +90,7 @@ public class CreateInvoiceTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 19m });
         var item = new InvoiceItem { Number = "4002", Description = "No price", VatRate = 19m, DefaultPrice = null };
-        var recipient = new Recipient { Name = "X", Address = "Y" };
+        var recipient = new Recipient { Number = "E-0001", Name = "X", Address = "Y" };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
@@ -113,7 +114,7 @@ public class CreateInvoiceTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 19m });
         var item = new InvoiceItem { Number = "4003", Description = "X", VatRate = 19m, DefaultPrice = 1m };
-        var recipient = new Recipient { Name = "No address", Address = "" };
+        var recipient = new Recipient { Number = "E-0002", Name = "No address", Address = "" };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
@@ -174,7 +175,7 @@ public class CreateInvoiceTests
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.VatRates.Add(new VatRate { Rate = 7m });
                 var item = new InvoiceItem { Number = "4004", Description = "X", VatRate = 7m, DefaultPrice = 1m };
-                var recipient = new Recipient { Name = "X", Address = "Y" };
+                var recipient = new Recipient { Number = "E-0003", Name = "X", Address = "Y" };
                 db.InvoiceItems.Add(item);
                 db.Recipients.Add(recipient);
                 await db.SaveChangesAsync();

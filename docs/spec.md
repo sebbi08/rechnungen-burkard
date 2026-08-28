@@ -134,7 +134,8 @@ and that a normal document and a stamped copy both result.
 ### User Story 5 - Manage Graves (Priority: P2)
 
 A user manages graves, each with a grave number, start and end date, a creation
-date, one or more invoicing items (each with a count), and one or more recipients.
+date, one or more invoicing items (each with a count and an optional price that
+overrides the item's default), and one or more recipients.
 
 **Why this priority**: Graves are the core business object; their configuration is
 needed before half-year invoices can be generated.
@@ -149,6 +150,10 @@ one invoicing item, and two recipients, then listing and searching it.
    **Then** the grave is stored with a creation date and is searchable.
 2. **Given** the user searches for a grave, **When** they enter a grave number or
    recipient name, **Then** matching graves are returned.
+3. **Given** a new grave that has not been saved yet, **When** the user adds items
+   and recipients, **Then** they are stored together with the grave on save.
+4. **Given** an item without a default price, **When** the user enters a price for
+   it on the grave, **Then** the grave is saved and that price is billed.
 
 ---
 
@@ -449,8 +454,12 @@ non-interactive until completion, and the task runs exactly once.
 **Graves**
 
 - **FR-018**: A grave MUST have a grave number, a start date, and an end date.
-- **FR-019**: A grave MUST support one or more invoicing items, each with a count.
+- **FR-019**: A grave MUST support one or more invoicing items, each with a count
+  and an optional price that overrides the item's default price for that grave.
+  An item is billable for a grave when it has either of the two prices.
 - **FR-020**: A grave MUST support one or more recipients.
+- **FR-020a**: Users MUST be able to add a grave's items and recipients before the
+  grave is saved; the grave and its links MUST be stored together in one step.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each containing only that recipient's share of the
   evenly split total.

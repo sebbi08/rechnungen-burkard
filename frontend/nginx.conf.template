@@ -1,0 +1,27 @@
+# nginx's envsubst entrypoint fills ${BACKEND_URL} in at container start, so the
+# same image can point at any backend deployment.
+server {
+    listen 8080;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /odata/ {
+        proxy_pass ${BACKEND_URL}/odata/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # importing an archive uploads a whole ZIP
+        client_max_body_size 32m;
+        proxy_read_timeout 600s;
+    }
+
+    location /healthz {
+        proxy_pass ${BACKEND_URL}/healthz;
+    }
+}

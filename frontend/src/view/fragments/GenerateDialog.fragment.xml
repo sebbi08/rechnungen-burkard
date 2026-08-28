@@ -1,10 +1,10 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog title="{i18n>generateInvoices}">
+    <Dialog title="{i18n>generateInvoices}" stretch="{device>/system/phone}" contentWidth="16rem">
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>halfYear}" labelFor="genYear" />
-                <Select id="genYear" width="10rem" />
-                <Select id="genHalf" width="10rem" selectedKey="1">
+                <Select id="genYear" width="100%" />
+                <Select id="genHalf" width="100%" selectedKey="1">
                     <core:Item key="1" text="H1" />
                     <core:Item key="2" text="H2" />
                 </Select>

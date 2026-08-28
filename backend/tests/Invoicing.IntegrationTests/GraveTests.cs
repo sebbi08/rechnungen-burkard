@@ -134,8 +134,8 @@ public class GraveTests
             using var searchJson = await ODataJson.ReadAsync(search);
             var value = searchJson.RootElement.GetProperty("value").EnumerateArray().ToList();
             Assert.Single(value);
-            Assert.Equal(graveId, value[0].GetProperty("id").GetInt64());
-            Assert.Equal("Özdemir", value[0].GetProperty("recipientNames")[0].GetString());
+            Assert.Equal(graveId, value[0].GetProperty("Id").GetInt64());
+            Assert.Equal("Özdemir", value[0].GetProperty("RecipientNames")[0].GetString());
         }
     }
 

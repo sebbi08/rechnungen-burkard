@@ -26,7 +26,5 @@ services:
       ]
     ports:
       - "8080:8080"
-      # WebSocket port of the ui5-middleware-hmr middleware
-      - "35739:35739"
 volumes:
   frontend-node-modules:

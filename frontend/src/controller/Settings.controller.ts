@@ -1,4 +1,5 @@
 import Input from "sap/m/Input";
+import Select from "sap/m/Select";
 import MessageBox from "sap/m/MessageBox";
 import TextArea from "sap/m/TextArea";
 import Context from "sap/ui/model/odata/v4/Context";
@@ -23,6 +24,7 @@ export default class Settings extends BaseController {
       await api.patchSettings({
         StampWord: (this.byId("stampWord") as Input).getValue(),
         EndingText: (this.byId("endingText") as TextArea).getValue(),
+        Language: (this.byId("documentLanguage") as Select).getSelectedKey(),
       });
       await MessageBox.information(
         (this.getView()!.getModel("i18n") as any)

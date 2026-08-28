@@ -2,6 +2,7 @@ using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Api.Services.Import;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,10 @@ builder.Services.AddScoped<DocumentDataBuilder>();
 builder.Services.AddSingleton<IDocumentGenerator, QuestPdfDocumentGenerator>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<GraveInvoiceGenerator>();
+builder.Services.AddScoped<GraveService>();
+builder.Services.AddScoped<RecipientNumberService>();
+builder.Services.AddScoped<ImportValidator>();
+builder.Services.AddScoped<ImportService>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<IJobHandler, GraveInvoicesJobHandler>();

@@ -3,23 +3,44 @@
     <Page title="{i18n>menuInvoices}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
         <subHeader>
-            <Toolbar>
-                <Select id="halfYearFilter" width="12rem" change=".onHalfYearChange" />
+            <!-- the bulk downloads are the first to move into the "..." menu; the
+                 create action stays on the toolbar as long as it fits -->
+            <OverflowToolbar id="invoicesToolbar">
+                <Select id="halfYearFilter" width="12rem" change=".onHalfYearChange">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </Select>
                 <ToolbarSpacer />
-                <Button text="{i18n>bulkNormal}" press=".onBulkNormal" />
-                <Button text="{i18n>bulkCopy}" press=".onBulkCopy" />
-                <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized" />
-            </Toolbar>
+                <Button text="{i18n>bulkNormal}" press=".onBulkNormal">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </Button>
+                <Button text="{i18n>bulkCopy}" press=".onBulkCopy">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </Button>
+                <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="High" />
+                    </layoutData>
+                </Button>
+            </OverflowToolbar>
         </subHeader>
         <content>
             <Table id="invoicesTable" class="sapUiSmallMarginTop" growing="true" growingThreshold="50"
-                items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}">
+                autoPopinMode="true" popinLayout="Block"
+                items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}"
+                noDataText="{i18n>noData}">
                         <columns>
-                            <Column><Text text="{i18n>invoiceNumber}" /></Column>
-                            <Column><Text text="{i18n>recipientName}" /></Column>
-                            <Column><Text text="{i18n>invoiceDate}" /></Column>
-                            <Column><Text text="{i18n>revision}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>invoiceNumber}" /></Column>
+                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>invoiceDate}" /></Column>
+                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>revision}" /></Column>
+                            <!-- wide enough for the three actions to stay on one line -->
+                            <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
@@ -33,7 +54,9 @@
                                         <Text text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
                                             visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
                                     </HBox>
-                                    <HBox>
+                                    <!-- wraps in the pop-in, where the three actions sit
+                                         below the row instead of next to it -->
+                                    <HBox wrap="Wrap">
                                         <Button text="{i18n>downloadNormal}" press=".onDownloadNormal" type="Transparent" />
                                         <Button text="{i18n>downloadCopy}" press=".onDownloadCopy" type="Transparent" />
                                         <Button text="{i18n>editInvoice}" press=".onEditInvoice" type="Transparent" />

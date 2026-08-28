@@ -1,36 +1,60 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
     controllerName="burkard.invoicing.controller.Graves" displayBlock="true">
     <Page title="{i18n>menuGraves}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
         <subHeader>
-            <Toolbar>
-                <SearchField width="16rem" search=".onSearchGraves" placeholder="{i18n>searchGrave}" />
-                <Label text="{i18n>halfYear}" labelFor="halfYearSelect" />
-                <Select id="halfYearSelect" width="10rem" change=".onHalfYearChange" />
+            <!-- the half-year label and its select share a group so they always
+                 move into the "..." menu together -->
+            <OverflowToolbar id="gravesToolbar">
+                <SearchField width="16rem" search=".onSearchGraves" placeholder="{i18n>searchGrave}">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </SearchField>
+                <Label text="{i18n>halfYear}" labelFor="halfYearSelect">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Label>
+                <Select id="halfYearSelect" width="10rem" change=".onHalfYearChange">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Select>
                 <ToolbarSpacer />
-                <Button text="{i18n>createGrave}" press=".onCreateGrave" />
-                <Button text="{i18n>generateInvoices}" press=".onGenerateInvoices" type="Emphasized" />
-            </Toolbar>
+                <Button text="{i18n>createGrave}" press=".onCreateGrave">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </Button>
+                <Button text="{i18n>generateInvoices}" press=".onGenerateInvoices" type="Emphasized">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="High" />
+                    </layoutData>
+                </Button>
+            </OverflowToolbar>
         </subHeader>
         <content>
+            <!-- rows come from the half-year status endpoint, which lists the graves
+                 still open for the selected half-year first (FR-028) -->
             <Table id="gravesTable" class="sapUiSmallMarginTop"
-                items="{path: 'odata>/Graves', parameters: {$orderby: 'Id desc'}}"
+                autoPopinMode="true" popinLayout="Block"
+                items="{status>/graves}"
                 noDataText="{i18n>noData}">
                         <columns>
-                            <Column><Text text="{i18n>graveNumber}" /></Column>
-                            <Column><Text text="{i18n>startDate}" /></Column>
-                            <Column><Text text="{i18n>endDate}" /></Column>
-                            <Column><Text text="{i18n>invoicingStatus}" /></Column>
-                            <Column />
+                            <Column importance="High"><Text text="{i18n>graveNumber}" /></Column>
+                            <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>startDate}" /></Column>
+                            <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>endDate}" /></Column>
+                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>invoicingStatus}" /></Column>
+                            <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
-                                    <Text text="{odata>GraveNumber}" />
-                                    <Text text="{path: 'odata>StartDate', formatter: '.formatDate'}" />
-                                    <Text text="{path: 'odata>EndDate', formatter: '.formatDate'}" />
-                                    <Text core:require="{Integer: 'sap/ui/model/type/Integer'}"
-                                        text="{parts: [{path: 'odata>Id', type: 'Integer', formatOptions: {groupingEnabled: false}}, {path: 'status>/statuses'}], formatter: '.statusFormatter'}" />
+                                    <Text text="{status>GraveNumber}" />
+                                    <Text text="{path: 'status>StartDate', formatter: '.formatDate'}" />
+                                    <Text text="{path: 'status>EndDate', formatter: '.formatDate'}" />
+                                    <Text text="{path: 'status>Invoiced', formatter: '.statusFormatter'}" />
                                     <Button text="{i18n>edit}" press=".onEditGrave" type="Transparent" />
                                 </cells>
                             </ColumnListItem>

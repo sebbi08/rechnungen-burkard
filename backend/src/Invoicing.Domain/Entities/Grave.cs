@@ -17,6 +17,8 @@ public sealed class GraveItem
     public long GraveId { get; set; }
     public long ItemId { get; set; }
     public int Count { get; set; }
+    // per-grave price override; null falls back to the item's default price
+    public decimal? UnitPrice { get; set; }
     public InvoiceItem Item { get; set; } = null!;
 }
 

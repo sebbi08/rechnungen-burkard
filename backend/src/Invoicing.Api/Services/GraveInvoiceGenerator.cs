@@ -11,17 +11,20 @@ public sealed class GraveInvoiceGenerator
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
     private readonly DocumentDataBuilder _dataBuilder;
+    private readonly IDocumentGenerator _documents;
 
-    public GraveInvoiceGenerator(AppDbContext db, InvoiceNumberService numbers, DocumentDataBuilder dataBuilder)
+    public GraveInvoiceGenerator(AppDbContext db, InvoiceNumberService numbers,
+        DocumentDataBuilder dataBuilder, IDocumentGenerator documents)
     {
         _db = db;
         _numbers = numbers;
         _dataBuilder = dataBuilder;
+        _documents = documents;
     }
 
     /// <summary>Generates all invoices for one grave and half-year in a single
     /// transaction. Returns a result with a skip reason when the grave must be
-    /// skipped (no recipients, no items, or an item without default price),
+    /// skipped (no recipients, no items, or an item with no price at all),
     /// otherwise the created invoices.</summary>
     public async Task<GraveGenerationResult> GenerateForGraveAsync(Grave grave, int year, int half, CancellationToken ct)
     {
@@ -45,27 +48,18 @@ public sealed class GraveInvoiceGenerator
             return new GraveGenerationResult(null, "NoItems");
         }
 
-        if (graveItems.Any(i => i.Item.DefaultPrice is null))
+        if (graveItems.Any(i => EffectivePrice(i) is null))
         {
             return new GraveGenerationResult(null, "ItemWithoutPrice");
         }
 
-        // total gross in cents: per line round(net cents * (100+rate)/100)
-        static long TotalCents(GraveItem item)
-        {
-            var netCents = (long)Math.Round(item.Count * item.Item.DefaultPrice!.Value * 100m,
-                0, MidpointRounding.AwayFromZero);
-            return (long)Math.Round(netCents * (100m + item.Item.VatRate) / 100m,
-                0, MidpointRounding.AwayFromZero);
-        }
+        // Each line is split across the recipients on its own, so every invoice
+        // keeps the grave's items in their configured proportion; splitting the
+        // grave total instead would rewrite each line's unit price.
+        var lineShares = graveItems
+            .Select(item => ShareCalculator.SplitCents(GrossCents(item), recipients.Count))
+            .ToList();
 
-        long totalCents = 0;
-        foreach (var item in graveItems)
-        {
-            totalCents += TotalCents(item);
-        }
-
-        var shares = ShareCalculator.SplitCents(totalCents, recipients.Count);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / recipients.Count;
         var now = DateTime.UtcNow;
@@ -90,29 +84,30 @@ public sealed class GraveInvoiceGenerator
                 RecipientAddress = recipients[r].Address,
                 EndingText = settings.EndingText,
                 StampWord = settings.StampWord,
+                Language = settings.Language,
                 GeneratedAt = now,
             };
 
-            invoice.Lines = DistributeShare(shares[r], graveItems);
+            invoice.Lines = BuildLines(graveItems, lineShares, r);
             _db.Invoices.Add(invoice);
             await _db.SaveChangesAsync(ct);
             invoice.RootId = invoice.Id;
 
-            var data = _dataBuilder.Build(invoice, DocumentTexts.ShareText(sharePercent));
+            var data = _dataBuilder.Build(invoice);
             invoice.Documents = new List<Document>
             {
                 new()
                 {
                     Kind = DocumentKind.Normal,
-                    FileName = $"{invoice.InvoiceNumber}.pdf",
-                    Content = DocumentService.GeneratePdf(data, isCopy: false),
+                    FileName = DocumentNaming.NormalFileName(invoice.InvoiceNumber),
+                    Content = _documents.Generate(data, isCopy: false),
                     GeneratedAt = now,
                 },
                 new()
                 {
                     Kind = DocumentKind.Copy,
-                    FileName = $"{invoice.InvoiceNumber}-Kopie.pdf",
-                    Content = DocumentService.GeneratePdf(data, isCopy: true),
+                    FileName = DocumentNaming.CopyFileName(invoice.InvoiceNumber),
+                    Content = _documents.Generate(data, isCopy: true),
                     GeneratedAt = now,
                 },
             };
@@ -132,18 +127,31 @@ public sealed class GraveInvoiceGenerator
         return new GraveGenerationResult(invoices, null);
     }
 
-    /// <summary>Distributes a share (in gross cents) across the grave's lines;
-    /// the remainder is handed out one cent at a time to the first lines so the
-    /// sum is exact. Each line's net is derived back from its gross cents.</summary>
-    private static List<InvoiceLine> DistributeShare(long shareCents, List<GraveItem> graveItems)
-    {
-        var distributed = ShareCalculator.SplitCents(shareCents, graveItems.Count);
+    /// <summary>The price a grave's line is billed at: the link's own price when
+    /// the grave overrides it, otherwise the item's default price.</summary>
+    private static decimal? EffectivePrice(GraveItem item) => item.UnitPrice ?? item.Item.DefaultPrice;
 
+    /// <summary>Gross total in cents for one of the grave's items: per line
+    /// round(net cents × (100 + rate) / 100).</summary>
+    private static long GrossCents(GraveItem item)
+    {
+        var netCents = (long)Math.Round(item.Count * EffectivePrice(item)!.Value * 100m,
+            0, MidpointRounding.AwayFromZero);
+        return (long)Math.Round(netCents * (100m + item.Item.VatRate) / 100m,
+            0, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>The lines of one recipient's invoice: every grave item appears
+    /// with its configured count and this recipient's cent-exact share of that
+    /// item's gross, from which the line's net and unit price are derived.</summary>
+    private static List<InvoiceLine> BuildLines(List<GraveItem> graveItems,
+        List<long[]> lineShares, int recipientIndex)
+    {
         var lines = new List<InvoiceLine>(graveItems.Count);
         for (var i = 0; i < graveItems.Count; i++)
         {
             var item = graveItems[i];
-            var lineGross = distributed[i];
+            var lineGross = lineShares[i][recipientIndex];
             var lineNet = (long)Math.Round(lineGross * 100m / (100m + item.Item.VatRate),
                 0, MidpointRounding.AwayFromZero);
             var unitPrice = lineNet / 100m / item.Count;

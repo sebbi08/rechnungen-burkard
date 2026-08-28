@@ -56,7 +56,7 @@ public sealed class InvoiceService
     public async Task<Invoice> CreateRevisionAsync(long invoiceId, long recipientId,
         IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
     {
-        var original = await _db.Invoices
+        var edited = await _db.Invoices
             .SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
@@ -71,25 +71,35 @@ public sealed class InvoiceService
             throw new ValidationException("RecipientAddressRequired", "The recipient address is required.");
         }
 
+        // The revision number continues the whole chain, not just the row that was
+        // edited: editing an older revision (or the same one twice) must still
+        // produce the next free number instead of colliding on (Year, Sequence,
+        // RevisionNumber).
+        var lastRevision = await _db.Invoices
+            .Where(i => i.RootId == edited.RootId)
+            .MaxAsync(i => (int?)i.RevisionNumber, ct) ?? edited.RevisionNumber;
+        var revisionNumber = lastRevision + 1;
+
         var now = DateTime.UtcNow;
-        var baseNumber = InvoiceNumberFormatter.StripRevision(original.InvoiceNumber);
+        var baseNumber = InvoiceNumberFormatter.StripRevision(edited.InvoiceNumber);
 
         var revision = new Invoice
         {
-            RootId = original.RootId,
-            RevisionNumber = original.RevisionNumber + 1,
-            Year = original.Year,
-            Sequence = original.Sequence,
-            InvoiceNumber = InvoiceNumberFormatter.ForRevision(baseNumber, original.RevisionNumber + 1),
-            GraveId = original.GraveId,
-            PeriodYear = original.PeriodYear,
-            PeriodHalf = original.PeriodHalf,
-            SharePercent = original.SharePercent,
+            RootId = edited.RootId,
+            RevisionNumber = revisionNumber,
+            Year = edited.Year,
+            Sequence = edited.Sequence,
+            InvoiceNumber = InvoiceNumberFormatter.ForRevision(baseNumber, revisionNumber),
+            GraveId = edited.GraveId,
+            PeriodYear = edited.PeriodYear,
+            PeriodHalf = edited.PeriodHalf,
+            SharePercent = edited.SharePercent,
             RecipientId = recipient.Id,
             RecipientName = recipient.Name,
             RecipientAddress = recipient.Address,
             EndingText = settings.EndingText,
             StampWord = settings.StampWord,
+            Language = settings.Language,
             GeneratedAt = now,
             Lines = lines,
         };
@@ -98,31 +108,33 @@ public sealed class InvoiceService
         _db.Invoices.Add(revision);
         await _db.SaveChangesAsync(ct);
 
-        var shareText = original.SharePercent is { } sharePercent
-            ? DocumentTexts.ShareText(sharePercent)
-            : null;
-        var data = _dataBuilder.Build(revision, shareText);
-        revision.Documents = new List<Document>
+        revision.Documents = BuildDocuments(revision, now);
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return revision;
+    }
+
+    private List<Document> BuildDocuments(Invoice invoice, DateTime now)
+    {
+        var data = _dataBuilder.Build(invoice);
+        return new List<Document>
         {
             new()
             {
                 Kind = DocumentKind.Normal,
-                FileName = $"{revision.InvoiceNumber}.pdf",
+                FileName = DocumentNaming.NormalFileName(invoice.InvoiceNumber),
                 Content = _documents.Generate(data, isCopy: false),
                 GeneratedAt = now,
             },
             new()
             {
                 Kind = DocumentKind.Copy,
-                FileName = $"{revision.InvoiceNumber}-Kopie.pdf",
+                FileName = DocumentNaming.CopyFileName(invoice.InvoiceNumber),
                 Content = _documents.Generate(data, isCopy: true),
                 GeneratedAt = now,
             },
         };
-
-        await _db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return revision;
     }
 
     private async Task<List<InvoiceLine>> BuildLinesAsync(IReadOnlyList<InvoiceLineInput> inputs, CancellationToken ct)
@@ -193,6 +205,7 @@ public sealed class InvoiceService
             RecipientAddress = recipient.Address,
             EndingText = settings.EndingText,
             StampWord = settings.StampWord,
+            Language = settings.Language,
             GeneratedAt = now,
             Lines = lines,
         };
@@ -202,24 +215,7 @@ public sealed class InvoiceService
         await _db.SaveChangesAsync(ct);
         invoice.RootId = invoice.Id;
 
-        var data = _dataBuilder.Build(invoice, shareText: null);
-        invoice.Documents = new List<Document>
-        {
-            new()
-            {
-                Kind = DocumentKind.Normal,
-                FileName = $"{invoice.InvoiceNumber}.pdf",
-                Content = _documents.Generate(data, isCopy: false),
-                GeneratedAt = now,
-            },
-            new()
-            {
-                Kind = DocumentKind.Copy,
-                FileName = $"{invoice.InvoiceNumber}-Kopie.pdf",
-                Content = _documents.Generate(data, isCopy: true),
-                GeneratedAt = now,
-            },
-        };
+        invoice.Documents = BuildDocuments(invoice, now);
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

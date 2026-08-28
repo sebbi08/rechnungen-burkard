@@ -1,11 +1,23 @@
 # syntax=docker/dockerfile:1
 
 FROM node:22 AS frontend
+ARG VERSION=0.0.0
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+RUN npm ci
 COPY frontend/ ./
-RUN npm run build
+# stamp the released version into the manifest via ui5's replaceVersion task
+RUN npm pkg set version="${VERSION}" && npm run build
+# The runtime bundle ships debug copies, source maps and test pages that a
+# deployment never serves; dropping them keeps the image a fraction of the size.
+RUN rm -rf dist/test-resources \
+ && find dist/resources -name '*-dbg.js' -delete \
+ && find dist/resources -name '*.js.map' -delete \
+ && find dist/resources -name '*.less' -delete
+# OpenUI5 is Apache-2.0 and is redistributed inside the image, so its license
+# travels with it (constitution VI).
+RUN cp "$(find /root/.ui5/framework/packages/@openui5/sap.ui.core -maxdepth 2 -name LICENSE.txt | head -1)" \
+      dist/OPENUI5-LICENSE.txt
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 ARG VERSION=0.0.0

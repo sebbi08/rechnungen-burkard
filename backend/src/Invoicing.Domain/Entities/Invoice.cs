@@ -17,6 +17,7 @@ public sealed class Invoice
     public string RecipientAddress { get; set; } = "";
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
+    public string Language { get; set; } = "de"; // document language at generation time
     public DateTime GeneratedAt { get; set; } // UTC
     public List<InvoiceLine> Lines { get; set; } = new();
     public List<Document> Documents { get; set; } = new();

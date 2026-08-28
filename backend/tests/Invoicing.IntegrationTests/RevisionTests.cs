@@ -21,7 +21,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
         var item = new InvoiceItem { Number = "5001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-        var recipient = new Recipient { Name = "Familie Mahr", Address = "Altstraße 1\n11111 Altstadt" };
+        var recipient = new Recipient { Number = "E-0001", Name = "Familie Mahr", Address = "Altstraße 1\n11111 Altstadt" };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
@@ -88,6 +88,39 @@ public class RevisionTests : IClassFixture<ApiTestHost>
     }
 
     [Fact]
+    public async Task Editing_the_same_invoice_twice_produces_two_revisions()
+    {
+        using var host = new ApiTestHost();
+        var (invoiceId, itemId, recipientId, _) = await SeedInvoiceAsync(host);
+        using var client = host.CreateClient();
+
+        // both edits start from the original row, the way the invoice list offers
+        // an edit button on every revision
+        for (var attempt = 1; attempt <= 2; attempt++)
+        {
+            var response = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
+            {
+                invoiceId,
+                recipientId,
+                lines = new[] { new { itemId, count = attempt, unitPrice = (decimal?)null } },
+            }));
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            using var json = await ODataJson.ReadAsync(response);
+            Assert.EndsWith($"-R{attempt}", json.RootElement.GetProperty("InvoiceNumber").GetString());
+        }
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chain = await db.Invoices
+            .Where(i => i.RootId == invoiceId)
+            .OrderBy(i => i.RevisionNumber)
+            .ToListAsync();
+        Assert.Equal(new[] { 0, 1, 2 }, chain.Select(i => i.RevisionNumber));
+        // the original is still the one-line invoice it was issued as
+        Assert.Single(await db.InvoiceLines.Where(l => l.InvoiceId == invoiceId).ToListAsync());
+    }
+
+    [Fact]
     public async Task Revision_with_blank_recipient_address_fails()
     {
         using var host = new ApiTestHost();
@@ -129,7 +162,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.VatRates.Add(new VatRate { Rate = 7m });
             var item = new InvoiceItem { Number = "5002", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-            var recipient = new Recipient { Name = "Max Beispiel", Address = "Hauptstraße 2\n99999 Musterdorf" };
+            var recipient = new Recipient { Number = "E-0002", Name = "Max Beispiel", Address = "Hauptstraße 2\n99999 Musterdorf" };
             db.InvoiceItems.Add(item);
             db.Recipients.Add(recipient);
             var grave = new Grave

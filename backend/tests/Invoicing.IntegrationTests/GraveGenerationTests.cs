@@ -24,9 +24,9 @@ public class GraveGenerationTests
         db.VatRates.Add(new VatRate { Rate = 7m });
         var item = new InvoiceItem { Number = "6001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
         db.InvoiceItems.Add(item);
-        var r1 = new Recipient { Name = "Anna", Address = "A-Straße 1" };
-        var r2 = new Recipient { Name = "Bert", Address = "B-Straße 2" };
-        var r3 = new Recipient { Name = "Carla", Address = "C-Straße 3" };
+        var r1 = new Recipient { Number = "E-0001", Name = "Anna", Address = "A-Straße 1" };
+        var r2 = new Recipient { Number = "E-0002", Name = "Bert", Address = "B-Straße 2" };
+        var r3 = new Recipient { Number = "E-0003", Name = "Carla", Address = "C-Straße 3" };
         db.Recipients.AddRange(r1, r2, r3);
         await db.SaveChangesAsync();
 
@@ -148,9 +148,9 @@ public class GraveGenerationTests
             db.InvoiceItems.Add(item);
             var recipients = new[]
             {
-                new Recipient { Name = "Anna", Address = "A-Straße 1" },
-                new Recipient { Name = "Bert", Address = "B-Straße 2" },
-                new Recipient { Name = "Carla", Address = "C-Straße 3" },
+                new Recipient { Number = "E-0004", Name = "Anna", Address = "A-Straße 1" },
+                new Recipient { Number = "E-0005", Name = "Bert", Address = "B-Straße 2" },
+                new Recipient { Number = "E-0006", Name = "Carla", Address = "C-Straße 3" },
             };
             db.Recipients.AddRange(recipients);
             var grave = new Grave
@@ -198,6 +198,59 @@ public class GraveGenerationTests
 
             Assert.Equal(new List<long> { 7133, 7133, 7134 }, grosses);
             Assert.Equal(21400, grosses.Sum());
+        }
+    }
+
+    [Fact]
+    public async Task Generation_bills_the_link_price_instead_of_the_items_default_price()
+    {
+        using var host = new ApiTestHost();
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.VatRates.Add(new VatRate { Rate = 7m });
+            // the item itself has no price at all: only the link makes the grave billable
+            var item = new InvoiceItem { Number = "6002", Description = "Sonderpflege", VatRate = 7m, DefaultPrice = null };
+            var priced = new InvoiceItem { Number = "6003", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
+            db.InvoiceItems.AddRange(item, priced);
+            var recipient = new Recipient { Number = "E-0007", Name = "Anna", Address = "A-Straße 1" };
+            db.Recipients.Add(recipient);
+            var grave = new Grave
+            {
+                GraveNumber = "G-4",
+                StartDate = new DateOnly(2020, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+
+            db.GraveItems.AddRange(
+                new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 1, UnitPrice = 40m },
+                // an explicit price also overrides an item that has a default
+                new GraveItem { GraveId = grave.Id, ItemId = priced.Id, Count = 1, UnitPrice = 60m });
+            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = recipient.Id });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = host.CreateClient();
+        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2029, half = 1 }));
+        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
+        using var startJson = await ODataJson.ReadAsync(start);
+        var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
+        Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
+
+        {
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var invoice = await db.Invoices.Include(i => i.Lines)
+                .SingleAsync(i => i.PeriodYear == 2029 && i.PeriodHalf == 1);
+
+            // 40.00 + 60.00 net, each +7% VAT → 42.80 + 64.20 = 107.00 gross
+            var grossCents = (long)Math.Round(invoice.Lines.Sum(l =>
+                Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m));
+            Assert.Equal(10700, grossCents);
         }
     }
 
@@ -251,6 +304,31 @@ public class GraveGenerationTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
         Assert.Equal("JobAlreadyRunning", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Status_endpoint_lists_graves_still_open_for_the_half_year_first()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 }));
+        using var startJson = await ODataJson.ReadAsync(start);
+        var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
+        Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
+
+        var status = await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1");
+        using var json = await ODataJson.ReadAsync(status);
+        var rows = json.RootElement.GetProperty("value").EnumerateArray().ToList();
+        var invoiced = rows.Select(r => r.GetProperty("Invoiced").GetBoolean()).ToList();
+
+        // G-3 has no recipients, so it stays open while G-1 and G-2 were invoiced
+        Assert.Contains(false, invoiced);
+        Assert.Contains(true, invoiced);
+        Assert.Equal(invoiced.OrderBy(i => i), invoiced);
+        Assert.False(invoiced[0]);
     }
 
     [Fact]

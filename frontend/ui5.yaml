@@ -13,6 +13,7 @@ framework:
     - name: sap.m
     - name: sap.ui.core
     - name: sap.ui.layout
+    - name: sap.ui.unified
     - name: themelib_sap_horizon
 builder:
   customTasks:
@@ -25,11 +26,6 @@ server:
   customMiddleware:
     - name: ui5-tooling-transpile-middleware
       afterMiddleware: compression
-    # - name: ui5-middleware-hmr
-    #   afterMiddleware: compression
-    #   configuration:
-    #     port: 35739
-    #     watchPath: "src"
     - name: ui5-middleware-simpleproxy
       afterMiddleware: compression
       mountPath: /odata

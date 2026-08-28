@@ -3,37 +3,42 @@
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
-                <HBox>
+                <HBox wrap="Wrap" alignItems="Center">
+                    <!-- OneWay: the draft pre-selects a recipient, the control
+                         owns the selection from there on (see onInvoiceDialogSave) -->
                     <Select id="recipient" width="20rem"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
-                        selectedKey="{invoiceDraft>/recipientId}">
+                        selectedKey="{path: 'invoiceDraft>/recipientId', mode: 'OneWay'}">
                         <core:Item key="{odata>Id}" text="{odata>Name}" />
                     </Select>
                     <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent"
                         class="sapUiTinyMarginBegin" />
                 </HBox>
-                <Table id="lineTable" items="{invoiceDraft>/lines}">
+                <Table id="lineTable" items="{invoiceDraft>/lines}"
+                    autoPopinMode="true" popinLayout="Block">
                     <columns>
-                        <Column><Text text="{i18n>itemNumber}" /></Column>
-                        <Column><Text text="{i18n>itemDescription}" /></Column>
-                        <Column><Text text="{i18n>itemCount}" /></Column>
-                        <Column><Text text="{i18n>itemPrice}" /></Column>
+                        <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
                     </columns>
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <Input id="lineItem" width="10rem" showSuggestion="true"
-                                    value="{invoiceDraft>itemNumber}"
-                                    suggestionItems="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
-                                    suggestionItemSelected=".onLineItemSelected">
-                                    <suggestionItems>
-                                        <core:Item key="{odata>Id}"
-                                            text="{= ${odata>Number} + ' — ' + ${odata>Description} }" />
-                                    </suggestionItems>
-                                </Input>
+                                <ComboBox id="lineItem" width="10rem"
+                                    selectedKey="{invoiceDraft>itemId}"
+                                    showSecondaryValues="true"
+                                    items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
+                                    selectionChange=".onLineItemSelected">
+                                        <core:ListItem key="{odata>Id}"
+                                            text="{odata>Number}" additionalText="{odata>Description}"/>
+                                </ComboBox>
                                 <Text text="{invoiceDraft>description}" wrapping="true" />
                                 <Input value="{invoiceDraft>count}" type="Number" ariaLabel="{i18n>itemCount}" />
-                                <Input value="{invoiceDraft>unitPrice}" type="Number" ariaLabel="{i18n>itemPrice}" />
+                                <!-- pre-filled with the item's default price; clearing it or
+                                     typing another one overrides it for this invoice -->
+                                <Input value="{invoiceDraft>unitPrice}" type="Number"
+                                    placeholder="{invoiceDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
                             </cells>
                         </ColumnListItem>
                     </items>

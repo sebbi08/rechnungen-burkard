@@ -9,6 +9,7 @@ public sealed class InvoiceDocumentData
     public string? ShareText { get; set; }
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
+    public string Language { get; set; } = DocumentTexts.DefaultLanguage;
     public IReadOnlyList<LineData> Lines { get; set; } = Array.Empty<LineData>();
     public IReadOnlyList<VatSummary> VatSummaries { get; set; } = Array.Empty<VatSummary>();
     public decimal NetTotal { get; set; }

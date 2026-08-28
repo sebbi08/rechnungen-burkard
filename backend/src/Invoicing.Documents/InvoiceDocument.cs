@@ -7,15 +7,17 @@ namespace Burkard.Invoicing.Documents;
 
 internal sealed class InvoiceDocument : IDocument
 {
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
-
     private readonly InvoiceDocumentData _data;
     private readonly bool _isCopy;
+    private readonly DocumentTexts _texts;
+    private readonly CultureInfo _culture;
 
     public InvoiceDocument(InvoiceDocumentData data, bool isCopy)
     {
         _data = data;
         _isCopy = isCopy;
+        _texts = DocumentTexts.For(data.Language);
+        _culture = _texts.Culture;
     }
 
     public DocumentMetadata GetMetadata() => new()
@@ -54,8 +56,8 @@ internal sealed class InvoiceDocument : IDocument
 
             page.Header().Column(column =>
             {
-                column.Item().Text(DocumentTexts.InvoiceTitle(_data.InvoiceNumber)).FontSize(18).SemiBold();
-                column.Item().Text(_data.GeneratedAt.ToString("dd.MM.yyyy"));
+                column.Item().Text(_texts.InvoiceTitle(_data.InvoiceNumber)).FontSize(18).SemiBold();
+                column.Item().Text(_data.GeneratedAt.ToString("d", _culture));
                 column.Item().PaddingTop(10).Text(_data.RecipientName).SemiBold();
                 column.Item().Text(_data.RecipientAddress);
             });
@@ -80,19 +82,19 @@ internal sealed class InvoiceDocument : IDocument
 
                     table.Header(header =>
                     {
-                        header.Cell().Element(HeaderCell).Text(DocumentTexts.ColumnDescription);
-                        header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnCount);
-                        header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnUnitPrice);
-                        header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnVat);
-                        header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnTotal);
+                        header.Cell().Element(HeaderCell).Text(_texts.ColumnDescription);
+                        header.Cell().Element(HeaderCell).AlignRight().Text(_texts.ColumnCount);
+                        header.Cell().Element(HeaderCell).AlignRight().Text(_texts.ColumnUnitPrice);
+                        header.Cell().Element(HeaderCell).AlignRight().Text(_texts.ColumnVat);
+                        header.Cell().Element(HeaderCell).AlignRight().Text(_texts.ColumnTotal);
                     });
 
                     foreach (var line in _data.Lines)
                     {
                         table.Cell().Text(line.Description);
-                        table.Cell().AlignRight().Text(line.Count.ToString());
+                        table.Cell().AlignRight().Text(line.Count.ToString(_culture));
                         table.Cell().AlignRight().Text(UnitPrice(line.UnitPrice));
-                        table.Cell().AlignRight().Text($"{line.VatRate.ToString("0.#", German)}{DocumentTexts.VatRateSuffix}");
+                        table.Cell().AlignRight().Text($"{line.VatRate.ToString("0.#", _culture)}{_texts.VatRateSuffix}");
                         table.Cell().AlignRight().Text(Money(line.LineTotal));
                     }
                 });
@@ -101,13 +103,13 @@ internal sealed class InvoiceDocument : IDocument
                 {
                     foreach (var vat in _data.VatSummaries)
                     {
-                        summary.Item().Text(DocumentTexts.NetForRate(vat.Rate, vat.NetTotal));
-                        summary.Item().Text(DocumentTexts.VatForRate(vat.Rate, vat.VatAmount));
+                        summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
+                        summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
                     }
 
-                    summary.Item().PaddingTop(6).Text(DocumentTexts.NetTotal(_data.NetTotal)).SemiBold();
-                    summary.Item().Text(DocumentTexts.VatTotal(_data.TotalVat)).SemiBold();
-                    summary.Item().Text(DocumentTexts.GrossTotal(_data.GrossTotal)).SemiBold().FontSize(13);
+                    summary.Item().PaddingTop(6).Text(_texts.NetTotal(_data.NetTotal)).SemiBold();
+                    summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
+                    summary.Item().Text(_texts.GrossTotal(_data.GrossTotal)).SemiBold().FontSize(13);
                 });
 
                 if (!string.IsNullOrEmpty(_data.EndingText))
@@ -118,19 +120,19 @@ internal sealed class InvoiceDocument : IDocument
 
             page.Footer().AlignCenter().Text(text =>
             {
-                text.Span(DocumentTexts.PageFooterPageOf + " ");
+                text.Span(_texts.PageFooterPageOf + " ");
                 text.CurrentPageNumber();
-                text.Span(DocumentTexts.PageFooterOf);
+                text.Span(_texts.PageFooterOf);
                 text.TotalPages();
             });
         });
     }
 
-    private static string Money(decimal value) => value.ToString("N2", German);
+    private string Money(decimal value) => value.ToString("N2", _culture);
 
     // at least 2, up to 3 decimals (e.g. 120,00 or 33,335) — unit prices are rounded
     // to 3 decimals so persisted line grosses stay exact to the cent.
-    private static string UnitPrice(decimal value) => value.ToString("#,0.00#", German);
+    private string UnitPrice(decimal value) => value.ToString("#,0.00#", _culture);
 
     private static IContainer HeaderCell(IContainer container) =>
         container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingBottom(3);
