@@ -15,16 +15,23 @@
                 <Table id="lineTable" items="{invoiceDraft>/lines}">
                     <columns>
                         <Column><Text text="{i18n>itemNumber}" /></Column>
+                        <Column><Text text="{i18n>itemDescription}" /></Column>
                         <Column><Text text="{i18n>itemCount}" /></Column>
                         <Column><Text text="{i18n>itemPrice}" /></Column>
                     </columns>
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <Select id="lineItem" items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}"
-                                    selectedKey="{invoiceDraft>itemId}">
-                                    <core:Item key="{odata>Id}" text="{odata>Number}" />
-                                </Select>
+                                <Input id="lineItem" width="10rem" showSuggestion="true"
+                                    value="{invoiceDraft>itemNumber}"
+                                    suggestionItems="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
+                                    suggestionItemSelected=".onLineItemSelected">
+                                    <suggestionItems>
+                                        <core:Item key="{odata>Id}"
+                                            text="{= ${odata>Number} + ' — ' + ${odata>Description} }" />
+                                    </suggestionItems>
+                                </Input>
+                                <Text text="{invoiceDraft>description}" wrapping="true" />
                                 <Input value="{invoiceDraft>count}" type="Number" ariaLabel="{i18n>itemCount}" />
                                 <Input value="{invoiceDraft>unitPrice}" type="Number" ariaLabel="{i18n>itemPrice}" />
                             </cells>

@@ -77,7 +77,15 @@ export default class Invoices extends BaseController {
 
     const lines = invoiceContext
       ? await this.loadLines(invoiceContext.getProperty("Id") as number)
-      : [{ itemId: null, count: 1, unitPrice: null }];
+      : [
+          {
+            itemId: null,
+            itemNumber: "",
+            count: 1,
+            unitPrice: null,
+            description: "",
+          },
+        ];
     this._dialog.setModel(
       new JSONModel({
         recipientId: invoiceContext?.getProperty("RecipientId") ?? null,
@@ -98,19 +106,60 @@ export default class Invoices extends BaseController {
       const body = await response.json();
       return (body.value as any[]).map((line) => ({
         itemId: line.ItemId,
+        itemNumber: line.ItemNumber,
         count: line.Count,
         unitPrice: line.UnitPrice,
+        description: line.Description,
       }));
     } catch (error) {
       await api.showError(this, error);
-      return [{ itemId: null, count: 1, unitPrice: null }];
+      return [
+        {
+          itemId: null,
+          itemNumber: "",
+          count: 1,
+          unitPrice: null,
+          description: "",
+        },
+      ];
     }
+  }
+
+  public onLineItemSelected(event: any): void {
+    // keep the selected item's key and text in the row's draft model
+    const selected = event.getParameter("selectedItem") as any;
+    const itemContext = selected?.getBindingContext("odata") as Context | undefined;
+    if (!itemContext) {
+      return;
+    }
+    const rowContext = event.getSource().getBindingContext("invoiceDraft");
+    if (!rowContext) {
+      return;
+    }
+    rowContext.setProperty(
+      "itemId",
+      Number(itemContext.getProperty("Id")),
+    );
+    rowContext.setProperty(
+      "itemNumber",
+      itemContext.getProperty("Number") as string,
+    );
+    rowContext.setProperty(
+      "description",
+      itemContext.getProperty("Description") as string,
+    );
   }
 
   public onAddLine(): void {
     const model = this._dialog.getModel("invoiceDraft") as JSONModel;
     const lines = (model.getProperty("/lines") as any[]) ?? [];
-    lines.push({ itemId: null, count: 1, unitPrice: null });
+    lines.push({
+      itemId: null,
+      itemNumber: "",
+      count: 1,
+      unitPrice: null,
+      description: "",
+    });
     model.setProperty("/lines", lines);
   }
 

@@ -63,11 +63,13 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
       hasText: RECIPIENT_NAME,
     })
     .click();
-  await page.locator(".sapMDialog .sapMSlt[id*='lineItem']").click();
-  // the item select shows item numbers; 9001 is the number this test seeds
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "9001" })
-    .click();
+  // the item field is a typeahead input: type the number, then pick the suggestion
+  const lineInput = page.locator(
+    ".sapMDialog input[id*='lineItem'][id$='-inner']",
+  );
+  await lineInput.click();
+  await lineInput.fill("9001");
+  await page.locator("div.sapMPopover li", { hasText: "9001" }).click();
   await page.getByLabel("Anzahl").fill("2");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -105,10 +107,12 @@ test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
       hasText: RECIPIENT_NAME,
     })
     .click();
-  await page.locator(".sapMDialog .sapMSlt[id*='lineItem']").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "9001" })
-    .click();
+  const lineInput = page.locator(
+    ".sapMDialog input[id*='lineItem'][id$='-inner']",
+  );
+  await lineInput.click();
+  await lineInput.fill("9001");
+  await page.locator("div.sapMPopover li", { hasText: "9001" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   // the create dialog renders "Preis" as a column header and stays in the DOM
@@ -158,12 +162,12 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({
     quickName,
   );
 
-  await page.locator(".sapMDialog .sapMSlt[id*='lineItem']").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: itemNumber,
-    })
-    .click();
+  const lineInput = page.locator(
+    ".sapMDialog input[id*='lineItem'][id$='-inner']",
+  );
+  await lineInput.click();
+  await lineInput.fill(itemNumber);
+  await page.locator("div.sapMPopover li", { hasText: itemNumber }).click();
   await page.getByLabel("Anzahl").fill("1");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
