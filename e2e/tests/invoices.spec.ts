@@ -81,17 +81,33 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
     invoicesTable.locator("tbody tr", { hasText: RECIPIENT_NAME }),
   ).toBeVisible();
 
-  // download the normal document from the row of this run's invoice,
-  // not from the first row (which a parallel grave run may replace)
-  const downloadPromise = page.waitForEvent("download");
+  // open the normal document from the row of this run's invoice, not from the
+  // first row (which a parallel grave run may replace): it opens in a new tab
+  // and the browser shows it instead of downloading it
+  const tabPromise = page.context().waitForEvent("page");
+  const documentRequest = page
+    .context()
+    .waitForEvent("request", (request) =>
+      /\/odata\/Documents\(\d+\)\/\$value$/.test(request.url()),
+    );
   await invoicesTable
     .locator("tbody tr", { hasText: RECIPIENT_NAME })
     .getByRole("button", { name: "Rechnung", exact: true })
     .first()
     .click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toContain(".pdf");
-  expect(download.suggestedFilename()).not.toContain("Kopie");
+  const tab = await tabPromise;
+  // what the tab renders is up to the browser — a headless one has no PDF
+  // viewer — so the assertion is on the document it navigates to
+  const documentUrl = (await documentRequest).url();
+  await tab.close();
+
+  // that document is the normal PDF, served for display instead of download
+  const document = await page.request.get(documentUrl);
+  expect(document.headers()["content-type"]).toBe("application/pdf");
+  const disposition = document.headers()["content-disposition"] ?? "";
+  expect(disposition).toContain("inline");
+  expect(disposition).toContain(".pdf");
+  expect(disposition).not.toContain("Kopie");
 });
 
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({

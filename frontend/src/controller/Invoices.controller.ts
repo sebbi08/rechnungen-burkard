@@ -274,29 +274,42 @@ export default class Invoices extends BaseController {
   }
 
   public async onDownloadNormal(event: any): Promise<void> {
-    await this.download(
+    await this.openDocument(
       event.getSource().getBindingContext("odata") as Context,
       false,
     );
   }
 
   public async onDownloadCopy(event: any): Promise<void> {
-    await this.download(
+    await this.openDocument(
       event.getSource().getBindingContext("odata") as Context,
       true,
     );
   }
 
-  private async download(context: Context, isCopy: boolean): Promise<void> {
+  /** Opens the invoice's PDF in a new tab, where the browser displays it. */
+  private async openDocument(context: Context, isCopy: boolean): Promise<void> {
+    // The tab is opened before the documents are fetched: one opened after the
+    // await no longer belongs to the click, and browsers block it as a popup.
+    const tab = window.open("", "_blank");
     try {
       const invoiceId = context.getProperty("Id") as number;
       const documents = await api.fetchDocuments(invoiceId);
       const wanted = isCopy ? "Copy" : "Normal";
       const match = documents.find((d) => d.Kind === wanted);
-      if (match) {
-        window.open(api.downloadUrl(match.Id), "_blank");
+      if (!match) {
+        tab?.close();
+        return;
+      }
+
+      if (tab) {
+        tab.location.href = api.documentUrl(match.Id);
+      } else {
+        // a browser that refused the empty tab may still allow a real URL
+        window.open(api.documentUrl(match.Id), "_blank");
       }
     } catch (error) {
+      tab?.close();
       await api.showError(this, error);
     }
   }

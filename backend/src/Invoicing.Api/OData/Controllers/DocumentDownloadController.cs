@@ -1,6 +1,7 @@
 using Burkard.Invoicing.Api.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.Net.Http.Headers;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
@@ -20,6 +21,12 @@ public class DocumentDownloadController : ODataController
             return NotFound();
         }
 
-        return File(document.Content, "application/pdf", document.FileName);
+        // inline, so the browser shows the invoice in the tab the UI opens for
+        // it; the file name still travels along for a save from the viewer
+        var disposition = new ContentDispositionHeaderValue("inline");
+        disposition.SetHttpFileName(document.FileName);
+        Response.Headers.ContentDisposition = disposition.ToString();
+
+        return File(document.Content, "application/pdf");
     }
 }

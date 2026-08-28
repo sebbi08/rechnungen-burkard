@@ -42,9 +42,12 @@ public class DocumentDownloadTests : IClassFixture<ApiTestHost>
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
         var bytes = await response.Content.ReadAsByteArrayAsync();
         Assert.Equal(stored.Content, bytes);
+        // shown in the browser instead of downloaded, but still carrying the
+        // invoice's file name for when the viewer saves it
         var disposition = response.Content.Headers.ContentDisposition;
         Assert.NotNull(disposition);
-        Assert.Contains(".pdf", disposition!.FileNameStar ?? disposition.FileName ?? "");
+        Assert.Equal("inline", disposition!.DispositionType);
+        Assert.Contains(".pdf", disposition.FileNameStar ?? disposition.FileName ?? "");
     }
 
     [Fact]

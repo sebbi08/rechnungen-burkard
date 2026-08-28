@@ -194,7 +194,8 @@ export async function fetchDocuments(
   return body.value as DocumentDto[];
 }
 
-export function downloadUrl(documentId: number): string {
+/** The document's URL; the backend serves it for display in the browser. */
+export function documentUrl(documentId: number): string {
   return `/odata/Documents(${documentId})/$value`;
 }
 
