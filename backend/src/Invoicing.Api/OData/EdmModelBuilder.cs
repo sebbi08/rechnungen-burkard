@@ -15,6 +15,7 @@ public static class EdmModelBuilder
         b.EntitySet<Grave>("Graves");
         b.EntitySet<GraveItem>("GraveItems");
         b.EntitySet<GraveRecipient>("GraveRecipients");
+        b.EntitySet<GraveInvoiceRun>("GraveInvoiceRuns");
         b.EntitySet<Invoice>("Invoices");
         b.EntitySet<Document>("Documents");
         b.EntitySet<Job>("Jobs");
