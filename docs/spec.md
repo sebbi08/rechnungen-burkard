@@ -154,6 +154,9 @@ one invoicing item, and two recipients, then listing and searching it.
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
    it on the grave, **Then** the grave is saved and that price is billed.
+5. **Given** a grave with recipients, **When** the user tries to change its
+   recipients, **Then** the change is rejected and the grave keeps the
+   recipients it was created with.
 
 ---
 
@@ -217,47 +220,55 @@ invoice content remains readable.
 ### User Story 8 - Download Normal Invoices and Copies Separately (Priority: P2)
 
 A user downloads normal invoices and copies via separate actions: normal invoice
-downloads never contain copies, and copies have their own bulk download.
+downloads never contain copies, and a copy is always downloaded on its own —
+there is no bulk download for copies.
 
 **Why this priority**: Keeping the two document kinds separate in downloads
 prevents accidentally sending copies where originals are expected.
 
 **Independent Test**: Can be fully tested by bulk-downloading normal invoices and
-verifying no copy is included, then bulk-downloading copies and verifying only
-copies are included.
+verifying no copy is included, then downloading a single copy and verifying only
+that copy results.
 
 **Acceptance Scenarios**:
 
 1. **Given** generated invoices with copies, **When** the user bulk-downloads
    normal invoices, **Then** only the normal documents are downloaded and no
    copies are included.
-2. **Given** generated invoices with copies, **When** the user triggers the copy
-   bulk download, **Then** only copies are downloaded.
+2. **Given** generated invoices with copies, **When** the user downloads a copy,
+   **Then** only that copy is downloaded; there is no bulk download for copies.
 3. **Given** an invoice with a copy, **When** the user downloads the invoice
    document, **Then** only the normal document is downloaded; the copy requires
    its own download action.
 
 ---
 
-### User Story 9 - Browse, Filter, and Bulk Download (Priority: P3)
+### User Story 9 - Browse Invoices and Bulk-Download Grave Invoices (Priority: P3)
 
-A user browses invoices by half-year, sees at a glance which graves were or were
-not invoiced for a selected period, and bulk-downloads documents via the separate
-normal and copy actions.
+A user browses the invoices that are not tied to a grave in a searchable list,
+one row per invoice chain, finding them by invoice number, recipient, date, or
+total. Grave invoices are browsed through their grave instead; from the grave
+overview, a user bulk-downloads the normal documents of a selected half-year's
+grave invoices.
 
 **Why this priority**: These conveniences build on the core flows and improve
 day-to-day efficiency.
 
-**Independent Test**: Can be fully tested by selecting different half-years,
-verifying ordering and filtering, and downloading batches.
+**Independent Test**: Can be fully tested by searching the invoice overview by
+each of the four criteria, then selecting a half-year on the grave overview and
+bulk-downloading its normal invoices.
 
 **Acceptance Scenarios**:
 
-1. **Given** multiple invoices exist, **When** the user triggers the bulk download
-   of normal invoices, **Then** all selected normal invoices are downloaded as
-   documents, with no copies included.
-2. **Given** the user browses an invoice, **When** they open its documents,
-   **Then** the normal document and the copy are listed and distinguishable.
+1. **Given** non-grave invoices with several revisions exist, **When** the user
+   opens the invoice overview, **Then** each invoice chain is listed once, showing
+   its latest revision.
+2. **Given** the user searches the invoice overview, **When** they enter an
+   invoice number, a recipient's name or address, a date, or a total, **Then**
+   matching invoices are returned.
+3. **Given** a half-year is selected on the grave overview, **When** the user
+   triggers the bulk download, **Then** the normal documents of that half-year's
+   grave invoices are downloaded, with no copies included.
 
 ---
 
@@ -382,6 +393,9 @@ non-interactive until completion, and the task runs exactly once.
 - What happens when a generated invoice is edited? The previous version is kept
   unchanged and the new document is saved as a revision with a clearly marked
   number.
+- What happens when the recipient invoices of a grave and half-year no longer
+  carry the same lines? The edit is refused with a clear message instead of
+  picking one of them.
 - What happens when the stamp word is empty? Saving the configuration must be
   rejected.
 - What happens when the stamp word is very long? The stamp must still fit on the
@@ -460,6 +474,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-020**: A grave MUST support one or more recipients.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
+- **FR-020b**: A grave's set of recipients MUST be fixed when the grave is
+  created and MUST NOT change afterwards.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each containing only that recipient's share of the
   evenly split total.
@@ -489,9 +505,16 @@ non-interactive until completion, and the task runs exactly once.
 
 **Invoice revisions**
 
-- **FR-033**: Users MUST be able to edit a generated invoice.
-- **FR-034**: Editing an invoice MUST create a new revision; the previously
-  generated version MUST be preserved unchanged.
+- **FR-033**: Users MUST be able to edit a generated invoice. A grave invoice
+  MUST NOT be edited on its own; it MUST be edited only through its grave (see
+  FR-034a).
+- **FR-034**: Editing a non-grave invoice MUST create a new revision; the
+  previously generated version MUST be preserved unchanged.
+- **FR-034a**: Editing a grave invoice MUST create a new revision for every
+  recipient of that grave and half-year, splitting the edited amounts the same
+  way generation splits them.
+- **FR-034b**: The edit MUST start from the amounts as they were invoiced for
+  that half-year, not from the grave's current configuration.
 - **FR-035**: The invoice number of a revision MUST clearly indicate that it is a
   new revision of an existing invoice.
 - **FR-036**: Invoices MUST NOT be deletable.
@@ -516,9 +539,11 @@ non-interactive until completion, and the task runs exactly once.
 
 **Downloads**
 
-- **FR-045**: Users MUST be able to bulk-download generated invoices.
+- **FR-045**: Users MUST be able to bulk-download the normal documents of the
+  grave invoices of a selected half-year.
 - **FR-046**: Bulk download of normal invoices MUST NOT include copies.
-- **FR-047**: The system MUST provide a separate bulk download action for copies.
+- **FR-047**: Copies MUST be downloadable only individually, from the invoice
+  and grave detail pages; there MUST be no bulk download for copies.
 - **FR-048**: Downloading a single invoice MUST deliver only the normal document;
   the copy MUST be downloadable via its own action.
 
@@ -561,6 +586,17 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-064**: The application MUST support multiple languages for all
   user-visible text.
 
+**Invoice lists and detail pages**
+
+- **FR-065**: A bulk download MUST contain only the latest revision of each
+  invoice.
+- **FR-066**: Invoice lists MUST show the latest revision of each invoice;
+  earlier revisions MUST remain visible on the invoice's detail page.
+- **FR-067**: The system MUST provide detail pages for an invoice, a grave, and
+  a grave invoice, each showing every revision of the invoices it covers.
+- **FR-068**: Users MUST be able to search invoices by invoice number, recipient
+  name, recipient address, invoice date, and invoice total.
+
 ### Key Entities _(include if feature involves data)_
 
 - **Recipient**: A person or organization; has a recipient number, a name, and an
@@ -569,14 +605,19 @@ non-interactive until completion, and the task runs exactly once.
 - **Invoice Item**: A catalogue entry identified by a number, with a text, a VAT
   rate, and an optional default price.
 - **Grave**: Identified by a grave number; has a start date, end date, creation
-  date, one or more invoicing items (with counts), and one or more recipients.
+  date, one or more invoicing items (with counts), and one or more recipients,
+  fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
   invoice per recipient carrying that recipient's share and a percentage note) or
   to a single recipient (non-grave). Carries invoice lines, VAT, ending text,
   generation date, and a unique invoice number. Edits create new revisions;
   previous revisions are preserved and invoices cannot be deleted.
 - **Invoice Line**: A single item on an invoice; has a count, a price per item,
-  and a line total.
+  and a line total. On a grave invoice, a line also carries the price it was
+  split from before the even split across recipients; this is null on
+  non-grave invoices and on grave invoices generated before this was recorded,
+  in which case the price is reconstructed from the recipients' shares — a
+  best-effort calculation that can be a cent or two off for very small amounts.
 - **Invoice Document**: The generated PDF for an invoice revision; each revision
   has two documents — a normal document and a stamped copy.
 - **VAT Rate**: A globally configured percentage, assigned to invoice items and
@@ -602,8 +643,8 @@ non-interactive until completion, and the task runs exactly once.
   equals the invoice total, within the smallest currency unit.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
-- **SC-006**: A bulk download of N normal invoices yields exactly N documents and
-  never contains a copy.
+- **SC-006**: A bulk download of N normal grave invoices for a half-year yields
+  exactly N documents, never a copy and never a superseded revision.
 - **SC-007**: Changing a recipient's name or address never alters previously
   generated invoices (100% immutability of historical invoices).
 - **SC-008**: 100% of invoice edits preserve the previous version and produce a
@@ -614,7 +655,8 @@ non-interactive until completion, and the task runs exactly once.
   generation, diagonally across every page, with invoice content still legible.
 - **SC-011**: Changing the stamp word affects only future copies; 100% of existing
   documents remain unchanged.
-- **SC-012**: A copy bulk download of N invoices yields exactly N copies.
+- **SC-012**: Every copy is downloadable individually from the detail pages of
+  the invoice it belongs to.
 - **SC-013**: Users can tell the normal invoice apart from the copy at a glance
   without opening both documents.
 - **SC-014**: A user can download the import template, fill it, and prepare a
@@ -640,6 +682,9 @@ non-interactive until completion, and the task runs exactly once.
 - When an amount is split evenly among recipients, any remainder in the smallest
   currency unit is assigned to the first recipient so shares always sum to the
   total.
+- For grave invoices generated before their pre-split price was recorded on
+  each line, that price is reconstructed from the recipients' shares, which can
+  be a cent or two off for very small amounts.
 - Generated documents are PDFs.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.
