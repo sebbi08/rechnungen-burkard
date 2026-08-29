@@ -1,4 +1,4 @@
-import type { GraveStatusRow, YearHalfOption } from "./api";
+import type { GraveStatusRow, ImportProblem, YearHalfOption } from "./api";
 
 /**
  * What a view or a dialog holds while the user works in it.
@@ -52,6 +52,11 @@ export interface RecipientDraft {
   number: string;
   name: string;
   address: string;
+}
+
+/** The report shown after a rejected archive. */
+export interface ImportView {
+  problems: ImportProblem[];
 }
 
 export interface SettingsView {

@@ -1,15 +1,14 @@
 import BusyDialog from "sap/m/BusyDialog";
 import MessageBox from "sap/m/MessageBox";
-import Panel from "sap/m/Panel";
-import JSONModel from "sap/ui/model/json/JSONModel";
 import type FileUploader from "sap/ui/unified/FileUploader";
 import type { FileUploader$ChangeEvent } from "sap/ui/unified/FileUploader";
 import * as api from "../model/api";
+import type { ImportView } from "../model/state";
 import BaseController from "./Base.controller";
 
 export default class ImportExport extends BaseController {
   public onInit(): void {
-    this.getView()!.setModel(new JSONModel({ problems: [] }), "import");
+    this.setState<ImportView>("import", { problems: [] });
   }
 
   public formatRow(row: number | null | undefined): string {
@@ -61,7 +60,7 @@ export default class ImportExport extends BaseController {
     if (summary) {
       this.showProblems([]);
       this.reset();
-      await MessageBox.information(
+      MessageBox.information(
         `${this.i18nText("importDone")}\n${this.formatSummary(summary)}`,
       );
       return;
@@ -69,7 +68,7 @@ export default class ImportExport extends BaseController {
 
     if (failure instanceof api.ImportRejectedError) {
       this.showProblems(failure.problems);
-      await MessageBox.error(this.i18nText("importRejected"));
+      MessageBox.error(this.i18nText("importRejected"));
       return;
     }
 
@@ -86,15 +85,14 @@ export default class ImportExport extends BaseController {
   }
 
   private showProblems(problems: api.ImportProblem[]): void {
-    (this.getView()!.getModel("import") as JSONModel).setProperty(
-      "/problems",
-      problems,
-    );
-    (this.byId("problemsPanel") as Panel).setVisible(problems.length > 0);
+    // the panel's visibility follows the model; see ImportExport.view.xml
+    this.state<ImportView>("import").setProperty("/problems", problems);
   }
 
   private reset(): void {
     this._file = null;
+    // FileUploader.clear() resets the native file input. Its bindable `value`
+    // property does not, so this one needs the control itself.
     (this.byId("archiveUpload") as FileUploader).clear();
   }
 
