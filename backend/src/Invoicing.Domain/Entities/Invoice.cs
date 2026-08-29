@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Burkard.Invoicing.Domain.Entities;
 
 public sealed class Invoice
@@ -32,6 +34,14 @@ public sealed class InvoiceLine
     public string Description { get; set; } = "";
     public int Count { get; set; }
     public decimal UnitPrice { get; set; }
+    /// <summary>On a grave invoice, the line's price before it was split across
+    /// the grave's recipients. Null on non-grave invoices and on grave invoices
+    /// generated before this column existed.
+    /// <see cref="NotMappedAttribute"/> until the migration that backs it with a
+    /// column lands (a later task); without it, EF Core's model-vs-migrations
+    /// check on <c>Database.Migrate()</c> fails startup everywhere.</summary>
+    [NotMapped]
+    public decimal? GraveUnitPrice { get; set; }
     public decimal VatRate { get; set; }
     public int LineNumber { get; set; }
 }

@@ -1,0 +1,85 @@
+using System;
+using System.Linq;
+using Burkard.Invoicing.Domain;
+using Xunit;
+
+namespace Burkard.Invoicing.IntegrationTests;
+
+public class GraveInvoiceSplitterTests
+{
+    private static GraveLine Line(int count, decimal unitPrice, decimal vatRate) =>
+        new(ItemId: 1, ItemNumber: "1001", Description: "Grabpflege", count, unitPrice, vatRate);
+
+    [Fact]
+    public void One_recipient_gets_the_grave_line_unchanged()
+    {
+        var split = GraveInvoiceSplitter.Split(new[] { Line(2, 120m, 7m) }, 1);
+
+        var line = Assert.Single(Assert.Single(split));
+        Assert.Equal(2, line.Count);
+        Assert.Equal(120m, line.UnitPrice);
+        Assert.Equal(7m, line.VatRate);
+        Assert.Equal(1, line.LineNumber);
+        Assert.Equal("1001", line.ItemNumber);
+    }
+
+    [Fact]
+    public void Every_line_is_split_on_its_own_so_proportions_survive()
+    {
+        var split = GraveInvoiceSplitter.Split(
+            new[] { Line(2, 120m, 7m), Line(1, 50m, 19m) }, 2);
+
+        Assert.Equal(2, split.Count);
+        Assert.All(split, lines => Assert.Equal(2, lines.Count));
+        Assert.All(split, lines => Assert.Equal(60m, lines[0].UnitPrice));
+        Assert.All(split, lines => Assert.Equal(25m, lines[1].UnitPrice));
+        // the count stays the grave's count; only the price is a share
+        Assert.All(split, lines => Assert.Equal(2, lines[0].Count));
+        Assert.All(split, lines => Assert.Equal(new[] { 1, 2 }, lines.Select(l => l.LineNumber)));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void Combine_is_the_inverse_of_split(int recipients)
+    {
+        var lines = new[] { Line(2, 120m, 7m), Line(3, 33.33m, 19m), Line(1, 1000m, 7m) };
+
+        var combined = GraveInvoiceSplitter.Combine(GraveInvoiceSplitter.Split(lines, recipients));
+
+        Assert.Equal(lines.Select(l => l.UnitPrice), combined.Select(l => l.UnitPrice));
+        Assert.Equal(lines.Select(l => l.Count), combined.Select(l => l.Count));
+        Assert.Equal(lines.Select(l => l.ItemNumber), combined.Select(l => l.ItemNumber));
+        Assert.Equal(lines.Select(l => l.VatRate), combined.Select(l => l.VatRate));
+    }
+
+    // Documented limitation, not a wish: splitting on gross cents and storing a
+    // rounded net unit price is not reversible for very small amounts. This is
+    // why InvoiceLine.GraveUnitPrice exists and Combine is only the fallback for
+    // invoices generated before that column.
+    [Fact]
+    public void Combine_is_lossy_for_amounts_too_small_to_round_cleanly()
+    {
+        var lines = new[] { Line(1, 2.60m, 19m) };
+
+        var combined = Assert.Single(GraveInvoiceSplitter.Combine(GraveInvoiceSplitter.Split(lines, 3)));
+
+        Assert.Equal(2.62m, combined.UnitPrice);
+    }
+
+    [Fact]
+    public void Zero_recipients_throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => GraveInvoiceSplitter.Split(new[] { Line(1, 100m, 7m) }, 0));
+    }
+
+    [Fact]
+    public void Combining_nothing_throws()
+    {
+        Assert.Throws<ArgumentException>(
+            () => GraveInvoiceSplitter.Combine(Array.Empty<System.Collections.Generic.IReadOnlyList<Domain.Entities.InvoiceLine>>()));
+    }
+}
