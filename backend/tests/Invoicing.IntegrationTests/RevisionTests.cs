@@ -149,7 +149,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
     }
 
     [Fact]
-    public async Task Revision_of_grave_invoice_keeps_share_percent_and_documents()
+    public async Task Revising_a_grave_invoice_through_the_plain_action_is_rejected()
     {
         // own host: this test seeds the same vat rate as the other tests in
         // this class, so the shared fixture database would collide
@@ -216,19 +216,13 @@ public class RevisionTests : IClassFixture<ApiTestHost>
             recipientId,
             lines = new[] { new { itemId, count = 2, unitPrice = (decimal?)null } },
         }));
-        Assert.Equal(HttpStatusCode.Created, revisionResponse.StatusCode);
+
+        Assert.Equal(HttpStatusCode.BadRequest, revisionResponse.StatusCode);
+        using var json = await ODataJson.ReadAsync(revisionResponse);
+        Assert.Equal("GraveInvoiceRevisionRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
 
         using var scope2 = host.Services.CreateScope();
         var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
-        var original = await db2.Invoices.SingleAsync(i => i.Id == invoiceId);
-        var revision = await db2.Invoices
-            .Include(i => i.Documents)
-            .SingleAsync(i => i.RootId == invoiceId && i.RevisionNumber == 1);
-
-        // the revision must keep the share statement data of the original
-        Assert.NotNull(original.SharePercent);
-        Assert.Equal(original.SharePercent, revision.SharePercent);
-        Assert.Equal(2, revision.Documents.Count);
-        Assert.All(revision.Documents, d => Assert.NotEmpty(d.Content));
+        Assert.Equal(1, await db2.Invoices.CountAsync(i => i.RootId == invoiceId));
     }
 }

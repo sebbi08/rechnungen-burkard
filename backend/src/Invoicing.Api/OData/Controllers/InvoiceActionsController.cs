@@ -12,13 +12,16 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class InvoiceActionsController : ODataController
 {
     private readonly InvoiceService _service;
+    private readonly GraveInvoiceRevisionService _graveRevisions;
     private readonly JobService _jobs;
     private readonly AppDbContext _db;
     private readonly ILogger<InvoiceActionsController> _logger;
 
-    public InvoiceActionsController(InvoiceService service, JobService jobs, AppDbContext db, ILogger<InvoiceActionsController> logger)
+    public InvoiceActionsController(InvoiceService service, GraveInvoiceRevisionService graveRevisions,
+        JobService jobs, AppDbContext db, ILogger<InvoiceActionsController> logger)
     {
         _service = service;
+        _graveRevisions = graveRevisions;
         _jobs = jobs;
         _db = db;
         _logger = logger;
@@ -99,6 +102,43 @@ public class InvoiceActionsController : ODataController
         }
     }
 
+    [HttpPost("CreateGraveInvoiceRevision")]
+    public async Task<IActionResult> CreateGraveInvoiceRevision([FromBody] CreateGraveInvoiceRevisionRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "InvalidRequest", message = "The request body is required." }
+            });
+        }
+
+        if (request.Lines is null || request.Lines.Count == 0)
+        {
+            return BadRequest(new
+            {
+                error = new { code = "NoLines", message = "At least one line is required." }
+            });
+        }
+
+        try
+        {
+            var revisions = await _graveRevisions.CreateAsync(
+                request.InvoiceId, request.Lines, HttpContext.RequestAborted);
+            return Ok(revisions);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CreateGraveInvoiceRevision failed");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+        }
+    }
+
     [HttpPost("GenerateGraveInvoices")]
     public async Task<IActionResult> GenerateGraveInvoices([FromBody] GenerateGraveInvoicesRequest? request)
     {
@@ -162,6 +202,14 @@ public class InvoiceActionsController : ODataController
     {
         public long InvoiceId { get; set; }
         public long RecipientId { get; set; }
+        public List<InvoiceLineInput> Lines { get; set; } = new();
+    }
+
+    public sealed class CreateGraveInvoiceRevisionRequest
+    {
+        public long InvoiceId { get; set; }
+        /// <summary>Grave-level lines: the grave's count at the grave's price,
+        /// before the even split across its recipients.</summary>
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }
 }

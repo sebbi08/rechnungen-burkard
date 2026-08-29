@@ -1,7 +1,6 @@
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
-using Burkard.Invoicing.Documents;
 using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services;
@@ -17,16 +16,14 @@ public sealed class InvoiceService
 {
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
-    private readonly DocumentDataBuilder _dataBuilder;
-    private readonly IDocumentGenerator _documents;
+    private readonly InvoiceDocumentFactory _documentFactory;
 
     public InvoiceService(AppDbContext db, InvoiceNumberService numbers,
-        DocumentDataBuilder dataBuilder, IDocumentGenerator documents)
+        InvoiceDocumentFactory documentFactory)
     {
         _db = db;
         _numbers = numbers;
-        _dataBuilder = dataBuilder;
-        _documents = documents;
+        _documentFactory = documentFactory;
     }
 
     public async Task<Invoice> CreateAsync(long recipientId, IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
@@ -59,6 +56,16 @@ public sealed class InvoiceService
         var edited = await _db.Invoices
             .SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
+
+        // A grave invoice is one recipient's share of one grave bill: revising it
+        // alone would leave the other recipients disagreeing with it. Grave
+        // invoices must go through CreateGraveInvoiceRevision, which revises every
+        // recipient of the grave and half-year at once.
+        if (edited.GraveId is not null)
+        {
+            throw new ValidationException("GraveInvoiceRevisionRequired",
+                "A grave invoice must be revised for all of its recipients at once.");
+        }
 
         var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
@@ -118,33 +125,11 @@ public sealed class InvoiceService
         _db.Invoices.Add(revision);
         await _db.SaveChangesAsync(ct);
 
-        revision.Documents = BuildDocuments(revision, now);
+        revision.Documents = _documentFactory.Build(revision, now);
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return revision;
-    }
-
-    private List<Document> BuildDocuments(Invoice invoice, DateTime now)
-    {
-        var data = _dataBuilder.Build(invoice);
-        return new List<Document>
-        {
-            new()
-            {
-                Kind = DocumentKind.Normal,
-                FileName = DocumentNaming.NormalFileName(invoice.InvoiceNumber),
-                Content = _documents.Generate(data, isCopy: false),
-                GeneratedAt = now,
-            },
-            new()
-            {
-                Kind = DocumentKind.Copy,
-                FileName = DocumentNaming.CopyFileName(invoice.InvoiceNumber),
-                Content = _documents.Generate(data, isCopy: true),
-                GeneratedAt = now,
-            },
-        };
     }
 
     private async Task<List<InvoiceLine>> BuildLinesAsync(IReadOnlyList<InvoiceLineInput> inputs, CancellationToken ct)
@@ -225,7 +210,7 @@ public sealed class InvoiceService
         await _db.SaveChangesAsync(ct);
         invoice.RootId = invoice.Id;
 
-        invoice.Documents = BuildDocuments(invoice, now);
+        invoice.Documents = _documentFactory.Build(invoice, now);
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
