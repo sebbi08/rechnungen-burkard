@@ -402,8 +402,7 @@ New keys in `i18n.properties` (German, the fallback bundle) and
 - Detail pages: `invoiceDetailTitle`, `graveDetailTitle`,
   `graveInvoiceDetailTitle`, `revisionOriginal`, `revisionLabel`, `lineTotal`,
   `netTotal`, `vatTotal`, `grossTotal`, `graveCreatedAt`,
-  `currentHalfYearStatus`, `graveInvoices`, `sharePercent`, `otherRecipients`,
-  `backToGrave`.
+  `currentHalfYearStatus`, `graveInvoices`, `sharePercent`, `otherRecipients`.
 - Dialogs: `graveEditWarning`, `graveRecipientsFixed`, `graveInvoiceEditWarning`.
 - Errors: `errorGraveRecipientsImmutable`, `errorNotAGraveInvoice`.
 

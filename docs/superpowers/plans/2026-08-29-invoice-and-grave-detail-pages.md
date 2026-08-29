@@ -110,10 +110,12 @@ too, which costs them nothing.
 `controller/InvoiceRevisions.controller.ts` · `controller/InvoiceEdit.controller.ts` ·
 `controller/GraveEdit.controller.ts`
 
-The revision panel markup is duplicated between `InvoiceDetail.view.xml` and
-`GraveInvoiceDetail.view.xml` on purpose: an XML fragment cannot serve as an
-aggregation-binding template, so sharing it would mean building the panels in
-JavaScript. The *logic* is shared through `InvoiceRevisions`.
+The revision panel markup is shared between `InvoiceDetail.view.xml` and
+`GraveInvoiceDetail.view.xml` as `view/fragments/RevisionPanel.fragment.xml`,
+used as the aggregation-binding template for the `{detail>/revisions}` `VBox`
+on both views (`<core:Fragment fragmentName="..." type="XML"/>` as the
+`VBox`'s sole item, cloned and bound once per revision the same way inline
+markup would be). The *logic* is shared through `InvoiceRevisions`.
 
 ---
 
