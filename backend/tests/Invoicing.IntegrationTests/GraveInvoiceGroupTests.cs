@@ -146,6 +146,75 @@ public class GraveInvoiceGroupTests
     }
 
     [Fact]
+    public async Task Rejects_a_group_whose_siblings_carry_different_line_counts()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, invoiceId, _) = await SeedInvoicedGraveAsync(host);
+
+        // Simulates a sibling revised on its own outside of generation: it gains a
+        // line the rest of the group does not have.
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var siblingInvoiceId = await db.Invoices
+                .Where(i => i.GraveId == graveId && i.Id != invoiceId)
+                .Select(i => i.Id)
+                .FirstAsync();
+            var template = await db.InvoiceLines.FirstAsync(l => l.InvoiceId == siblingInvoiceId);
+            db.InvoiceLines.Add(new InvoiceLine
+            {
+                InvoiceId = siblingInvoiceId,
+                ItemId = template.ItemId,
+                ItemNumber = template.ItemNumber,
+                Description = template.Description,
+                Count = 1,
+                UnitPrice = 5m,
+                VatRate = template.VatRate,
+                LineNumber = template.LineNumber + 1,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = host.CreateClient();
+        var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceId}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal("GraveInvoiceGroupInconsistent", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Falls_back_to_reconstruction_when_one_sibling_lacks_a_grave_unit_price()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, invoiceId, _) = await SeedInvoicedGraveAsync(host);
+
+        // Simulates a sibling revised on its own through the ordinary CreateRevision
+        // path, which never sets GraveUnitPrice: line counts still agree, so the
+        // group is consistent, but the stored price can no longer be trusted for
+        // the whole group and reconstruction from the recipients' shares kicks in.
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var siblingInvoiceId = await db.Invoices
+                .Where(i => i.GraveId == graveId && i.Id != invoiceId)
+                .Select(i => i.Id)
+                .FirstAsync();
+            var line = await db.InvoiceLines.SingleAsync(l => l.InvoiceId == siblingInvoiceId);
+            line.GraveUnitPrice = null;
+            await db.SaveChangesAsync();
+        }
+
+        using var client = host.CreateClient();
+        var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceId}");
+        response.EnsureSuccessStatusCode();
+        using var json = await ODataJson.ReadAsync(response);
+
+        var line2 = Assert.Single(json.RootElement.GetProperty("Lines").EnumerateArray().ToList());
+        Assert.Equal(2, line2.GetProperty("Count").GetInt32());
+        Assert.Equal(100m, line2.GetProperty("UnitPrice").GetDecimal());
+    }
+
+    [Fact]
     public async Task Runs_are_readable_per_grave()
     {
         using var host = new ApiTestHost();
