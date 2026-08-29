@@ -206,11 +206,22 @@ stack, whose database holds the user's data.
 
 ## Risks
 
-**Bound filters inside an OR multi-filter.** `Filter.isNeutral()` throws on a
-multi-filter, so neutrality of a nested bound filter must be confirmed on the
-running page rather than assumed. Verify in the browser against the e2e stack
-before relying on it. Fallback: Items keeps `.filter()` on `byId`, and the
-design's filter claim narrows to Recipients, whose filter is not nested.
+**Bound filters inside an OR multi-filter — resolved.** Confirmed against the
+pinned 1.151.0 sources rather than assumed:
+`ManagedObjectBindingSupport._createBoundFilter` recurses into
+`oFilter.aFilters` for a multi-filter, and `Filter.removeAllNeutrals` recurses
+likewise and returns `undefined` when every child is neutral. So an OR of two
+bound `Contains` filters whose value is `null` collapses to no filter at all,
+which is exactly the cleared-search behaviour Items needs. No fallback required.
+
+**`TypedJSONModel` row paths — resolved.** The row updates in
+`onLineItemSelected` build a path at runtime. String concatenation
+(`path + "/itemNumber"`) does not satisfy the typed path parameter, but a
+template literal does: `` `/lines/${index}/itemNumber` `` has type
+`` `/lines/${number}/itemNumber` ``, which is a member of
+`AbsoluteBindingPath<InvoiceDraft>`. Verified with `tsc --noEmit`, including
+four negative controls — a misspelt path, a misspelt row property, a wrong
+value type and a wrong read type all fail to compile.
 
 **`ODataModel.refresh()` returns `void`.** It cannot be awaited, so the
 quick-create flow — refresh the recipient list, then select the new recipient —
