@@ -47,7 +47,7 @@ These were settled before the design and are treated as fixed:
 
 ## Data Model
 
-One migration for this version (Principle IV), adding a single column.
+One migration for this version (Principle IV), adding two columns.
 
 ### `Invoice.IsLatestRevision` (bool, not null, default `true`)
 
@@ -65,6 +65,23 @@ An index on `(GraveId, IsLatestRevision)` backs the two list queries that use it
 
 The migration backfills existing rows: `true` where no sibling with a higher
 `RevisionNumber` shares the `RootId`, `false` otherwise.
+
+### `InvoiceLine.GraveUnitPrice` (decimal, nullable)
+
+On a grave invoice, the line's price **before** it was split across the
+recipients — the price the grave was invoiced at. `null` on non-grave invoices,
+and `null` on grave invoices generated before this migration.
+
+It exists because the split is not losslessly reversible. Each recipient's line
+stores a unit price rounded to three decimals, and recomputing the gross from
+that rounded price does not always return the share it came from. For a grave
+line of 2.60 EUR at 19% VAT across three recipients, reconstruction returns
+2.62. Storing the grave-level price removes the arithmetic from the read path
+entirely: what the edit dialog shows is what was invoiced.
+
+The migration adds the column without a backfill. Historical rows stay `null`
+and fall back to reconstruction (see below), which is best-effort; everything
+generated from here on is exact.
 
 **Why a stored column rather than a query.** "No sibling with a higher revision"
 cannot be expressed in an OData `$filter`, so without the column the invoice
@@ -95,15 +112,20 @@ computed as `round(round(count × unitPrice × 100) × (100 + vat) / 100)`, spli
 with `ShareCalculator.SplitCents`, and each recipient's line derives its net and
 a unit price rounded to three decimals from its share.
 
-`Combine` is the inverse. It sums each line's **gross cents** across the
-recipients — exact, because `SplitCents` guarantees the shares sum to the total —
-and derives the grave-level net and unit price from that sum.
+`Combine` is the best-effort inverse, used **only** for grave invoices
+generated before `GraveUnitPrice` existed. It sums each line's gross cents
+across the recipients and derives the grave-level net and unit price from that
+sum. It is exact for ordinary amounts and can land a cent or two off for very
+small ones, which is why it is a fallback for historical rows rather than the
+read path.
 
 `GraveInvoiceGenerator` is refactored onto `Split`, so one implementation of the
 rounding rules serves both generation and editing.
 
 **Testing**: `Combine(Split(lines, n)) == lines` for one, two, three and five
-recipients, including counts and prices that force remainders.
+recipients, including counts and prices that force remainders, and a test that
+pins the known lossy case so the limitation is documented rather than
+discovered.
 
 ## Backend API
 
@@ -195,9 +217,12 @@ generated after them.
 }
 ```
 
-`Lines` are `GraveInvoiceSplitter.Combine` applied to the sibling group, so the
-edit dialog opens on the grave as it was invoiced for that half-year. This is
-what keeps a later grave edit from leaking into a revision of an older period.
+`Lines` come from the stored `GraveUnitPrice` of any one sibling's lines, whose
+`Count` and `VatRate` are already the grave's. When those are `null` — a grave
+invoice generated before the migration — it falls back to
+`GraveInvoiceSplitter.Combine` over the whole sibling group. Either way the edit
+dialog opens on the grave as it was invoiced for that half-year, which is what
+keeps a later grave edit from leaking into a revision of an older period.
 
 It is a route rather than an EDM function because its payload is a report about
 a group of invoices, not an entity — the same reasoning D-001 already records
@@ -460,12 +485,17 @@ not hold, the fallback is a `SearchInvoices` route returning matching ids that
 the binding applies as an `Id` filter, which costs one more D-001 route and caps
 how many matches a single search can carry.
 
-**The reconstruction must be exact, not merely close.** `Combine` is only the
-inverse of `Split` because the generator rounds each recipient's unit price to
-three decimals so that `round(count × unitPrice × 100)` reproduces the derived
-net. The round-trip unit tests are what keep that property honest; if a future
-change alters the stored precision, they fail rather than silently shifting
-cents onto one recipient.
+**The existing generator loses cents on very small grave amounts.** Splitting
+2.60 EUR at 19% VAT across three recipients produces three invoices of 1.04 EUR
+— 3.12 EUR against a grave total of 3.09 EUR, which SC-004 says must agree
+within the smallest currency unit. The cause is that the split happens on gross
+cents while each line then stores a rounded net unit price the document re-grosses
+from. This is pre-existing behaviour, not something this work introduces, and
+`GraveInvoiceSplitter.Split` reproduces it exactly so the refactor changes no
+generated document. **Fixing it is out of scope here** — it would change the
+totals of documents already sent out — but it is worth a follow-up, and the
+splitter's tests pin the current behaviour so a later fix is a deliberate change
+rather than an accident.
 
 ## Out of Scope
 
