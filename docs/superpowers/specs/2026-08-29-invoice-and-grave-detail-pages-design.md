@@ -452,7 +452,10 @@ stack):
 - The grave detail page lists the grave's invoices grouped by half-year.
 - Editing a grave invoice from the grave detail page bumps **both** recipients'
   invoices to `-R1`.
-- `layout.spec.ts` gains the three detail routes in its small-screen sweep.
+- `layout.spec.ts` sweeps the detail pages it can reach on a small screen — the
+  invoice and grave detail pages. The grave-invoice page needs a generated
+  invoice, which only the grave spec may produce, and shares its markup with
+  the invoice detail page.
 
 ## Documentation updates
 
