@@ -44,31 +44,6 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     this._invoiceDialog.open();
   }
 
-  /**
-   * Which recipient a new invoice starts on.
-   *
-   * The select would fall back to its first item on its own, but that fallback
-   * is the control's and UI5 does not write it into the bound model — the save
-   * would then send recipient 0. Choosing the default here keeps the draft the
-   * one thing that says who is being invoiced. Newest first, which is the order
-   * the select lists them in.
-   */
-  private async newestRecipientId(): Promise<number | undefined> {
-    const binding = this.odata().bindList(
-      "/Recipients",
-      undefined,
-      undefined,
-      undefined,
-      { $orderby: "Id desc", $select: "Id" },
-    );
-    try {
-      const contexts = await binding.requestContexts(0, 1);
-      return contexts[0]?.getProperty("Id") as number | undefined;
-    } finally {
-      binding.destroy();
-    }
-  }
-
   private async loadLines(invoiceId: number): Promise<DraftLine[]> {
     try {
       const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
