@@ -3,8 +3,26 @@ import MessageBox from "sap/m/MessageBox";
 import type Controller from "sap/ui/core/mvc/Controller";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 
-function toJson(response: Response): Promise<any> {
-  return response.json().catch(() => ({}));
+/** What the backend puts in a failed response; absent when it sent no JSON. */
+interface ErrorBody {
+  error?: { code?: string };
+}
+
+/** An OData collection response: the rows arrive under `value`. */
+interface ODataCollection<T> {
+  value: T[];
+}
+
+/** An entity response. PascalCase from the EDM serialiser, camelCase from the
+ *  plain MVC routes under `/odata` (D-001), so accept either. */
+interface CreatedEntity {
+  Id?: number;
+  id?: number;
+}
+
+/** Reads a response body, answering `{}` rather than throwing on a non-JSON one. */
+function toJson<T>(response: Response): Promise<T> {
+  return response.json().catch(() => ({})) as Promise<T>;
 }
 
 async function ensureOk(response: Response): Promise<void> {
@@ -12,8 +30,8 @@ async function ensureOk(response: Response): Promise<void> {
     return;
   }
 
-  const body = await toJson(response);
-  throw new Error(body?.error?.code ?? `HTTP ${response.status}`);
+  const body = await toJson<ErrorBody>(response);
+  throw new Error(body.error?.code ?? `HTTP ${response.status}`);
 }
 
 function post(url: string, payload: unknown): Promise<Response> {
@@ -67,10 +85,11 @@ const CODE_TO_I18N: Record<string, string> = {
   GraveInvoiceRevisionRequired: "errorGraveInvoiceRevisionRequired",
 };
 
-export async function showError(
-  controller: Controller,
-  error: unknown,
-): Promise<void> {
+/**
+ * Opens the message box for a failed call. `MessageBox.error` returns as soon
+ * as the dialog is on screen, so there is nothing here to await.
+ */
+export function showError(controller: Controller, error: unknown): void {
   const raw = error instanceof Error ? error.message : String(error);
   const bundle = (
     controller.getOwnerComponent()!.getModel("i18n") as ResourceModel
@@ -80,12 +99,12 @@ export async function showError(
   // text; anything unexpected falls back to a generic MessageBox with the code.
   const key = CODE_TO_I18N[raw];
   if (key) {
-    await MessageBox.error(bundle.getText(key) ?? key);
+    MessageBox.error(bundle.getText(key) ?? key);
     return;
   }
 
   const generic = bundle.getText("errorGeneric") ?? "errorGeneric";
-  await MessageBox.error(`${generic} (${raw})`);
+  MessageBox.error(`${generic} (${raw})`);
 }
 
 export async function patchSettings(
@@ -140,9 +159,9 @@ export async function createRecipient(recipient: {
 }): Promise<number> {
   const response = await post("/odata/Recipients", recipient);
   await ensureOk(response);
-  const body = await response.json();
+  const body = await toJson<CreatedEntity>(response);
   // OData entity responses are PascalCase; accept camelCase defensively
-  return (body.Id ?? body.id) as number;
+  return (body.Id ?? body.id)!;
 }
 
 export async function updateRecipient(
@@ -194,8 +213,8 @@ export async function fetchDocuments(
     `/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName,Kind`,
   );
   await ensureOk(response);
-  const body = await response.json();
-  return body.value as DocumentDto[];
+  const body = await toJson<ODataCollection<DocumentDto>>(response);
+  return body.value;
 }
 
 /** The document's URL; the backend serves it for display in the browser. */
@@ -218,7 +237,7 @@ export async function bulkDownload(
   const response = await post("/odata/BulkDownloadDocuments", payload);
   await ensureOk(response);
   const blob = await response.blob();
-  await downloadBlob(blob, fileName);
+  downloadBlob(blob, fileName);
 }
 
 export interface YearHalfOption {
@@ -261,10 +280,7 @@ export function yearOptions(
   return options;
 }
 
-export async function downloadBlob(
-  blob: Blob,
-  fileName: string,
-): Promise<void> {
+export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -280,6 +296,15 @@ export interface JobDto {
   Status: string;
   ProgressPercent: number;
   ResultJson?: string;
+}
+
+/** A grave the run did not invoice, named and — since the reason column — explained. */
+export type SkippedGrave = string | { Number: string; Reason?: string };
+
+/** {@link JobDto.ResultJson}, parsed. */
+export interface GenerationResult {
+  InvoicedGraves?: number;
+  SkippedGraves?: SkippedGrave[];
 }
 
 export async function generateGraveInvoices(
@@ -307,8 +332,8 @@ export async function fetchGraveStatus(
     `/odata/GraveInvoicingStatus?year=${year}&half=${half}`,
   );
   await ensureOk(response);
-  const body = await response.json();
-  return body.value as GraveStatusRow[];
+  const body = await toJson<ODataCollection<GraveStatusRow>>(response);
+  return body.value;
 }
 
 export interface GraveSearchResult {
@@ -322,8 +347,8 @@ export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
     `/odata/SearchGraves?term=${encodeURIComponent(term)}`,
   );
   await ensureOk(response);
-  const body = await response.json();
-  return body.value as GraveSearchResult[];
+  const body = await toJson<ODataCollection<GraveSearchResult>>(response);
+  return body.value;
 }
 
 export interface GraveItemInput {
@@ -346,17 +371,50 @@ export interface SaveGraveInput {
 export async function saveGrave(input: SaveGraveInput): Promise<number> {
   const response = await post("/odata/SaveGrave", input);
   await ensureOk(response);
-  const body = await response.json();
+  const body = await toJson<CreatedEntity>(response);
   // OData entity responses are PascalCase; accept camelCase defensively
-  return (body.Id ?? body.id) as number;
+  return (body.Id ?? body.id)!;
 }
 
-export async function fetchGraveDetails(graveId: number): Promise<any> {
+/** An InvoiceItems row, as the grave expand returns it. */
+export interface ItemRow {
+  Id: number;
+  Number: string;
+  Description: string;
+  VatRate: number;
+  DefaultPrice: number | null;
+}
+
+export interface GraveItemLink {
+  Count: number;
+  /** The link's own price. Without one the item's default is billed. */
+  UnitPrice: number | null;
+  Item: ItemRow;
+}
+
+export interface GraveRecipientLink {
+  Recipient: { Id: number; Name: string; Address: string };
+}
+
+/** A Graves row with its item and recipient links expanded. */
+export interface GraveDetails {
+  Id: number;
+  GraveNumber: string;
+  StartDate: string;
+  EndDate: string;
+  CreatedAt: string;
+  Items: GraveItemLink[];
+  Recipients: GraveRecipientLink[];
+}
+
+export async function fetchGraveDetails(
+  graveId: number,
+): Promise<GraveDetails> {
   const response = await fetch(
     `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`,
   );
   await ensureOk(response);
-  return response.json();
+  return toJson<GraveDetails>(response);
 }
 
 export interface ImportProblem {
@@ -385,7 +443,7 @@ export class ImportRejectedError extends Error {
 export async function downloadImportTemplate(fileName: string): Promise<void> {
   const response = await fetch("/odata/ImportTemplate");
   await ensureOk(response);
-  await downloadBlob(await response.blob(), fileName);
+  downloadBlob(await response.blob(), fileName);
 }
 
 export async function importArchive(file: File): Promise<ImportSummary> {
@@ -393,15 +451,57 @@ export async function importArchive(file: File): Promise<ImportSummary> {
   body.append("file", file);
   const response = await fetch("/odata/ImportArchive", { method: "POST", body });
   if (response.ok) {
-    return (await response.json()).summary as ImportSummary;
+    const body = await toJson<{ summary: ImportSummary }>(response);
+    return body.summary;
   }
 
-  const payload = await toJson(response);
-  if (Array.isArray(payload?.problems)) {
-    throw new ImportRejectedError(payload.problems as ImportProblem[]);
+  const payload = await toJson<ErrorBody & { problems?: ImportProblem[] }>(response);
+  if (Array.isArray(payload.problems)) {
+    throw new ImportRejectedError(payload.problems);
   }
 
-  throw new Error(payload?.error?.code ?? `HTTP ${response.status}`);
+  throw new Error(payload.error?.code ?? `HTTP ${response.status}`);
+}
+
+/**
+ * An Invoices row as the OData V4 model hands it over. Edm.Decimal is
+ * serialised as a string, so every amount is converted where it is read.
+ */
+export interface InvoiceRow {
+  Id: number;
+  RootId: number;
+  InvoiceNumber: string;
+  RevisionNumber: number;
+  IsLatestRevision: boolean;
+  RecipientId: number;
+  RecipientName: string;
+  RecipientAddress: string;
+  GeneratedAt: string;
+  GraveId: number | null;
+  PeriodYear: number | null;
+  PeriodHalf: number | null;
+  SharePercent: number | string | null;
+  Lines?: InvoiceLineRow[];
+}
+
+export interface InvoiceLineRow {
+  LineNumber: number;
+  ItemId: number | null;
+  ItemNumber: string;
+  Description: string;
+  Count: number | string;
+  UnitPrice: number | string;
+  GraveUnitPrice: number | string | null;
+  VatRate: number | string;
+}
+
+/** A GraveInvoiceRuns row: which half-year a grave has already been invoiced for. */
+export interface GraveInvoiceRunRow {
+  Id: number;
+  GraveId: number;
+  Year: number;
+  Half: number;
+  CreatedAt: string;
 }
 
 export interface InvoiceLineAmounts {
@@ -458,8 +558,16 @@ export interface GraveInvoiceGroup {
   GraveNumber: string;
   PeriodYear: number;
   PeriodHalf: number;
-  Recipients: { Id: number; Name: string; InvoiceId: number; RootId: number }[];
+  Recipients: GraveInvoiceRecipient[];
   Lines: GraveInvoiceGroupLine[];
+}
+
+/** One recipient billed for a grave's half-year, and the invoice they got. */
+export interface GraveInvoiceRecipient {
+  Id: number;
+  Name: string;
+  InvoiceId: number;
+  RootId: number;
 }
 
 /** The grave, half-year and recipients a grave invoice belongs to, with the

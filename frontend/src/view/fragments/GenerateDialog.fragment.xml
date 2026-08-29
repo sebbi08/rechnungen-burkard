@@ -3,8 +3,11 @@
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>halfYear}" labelFor="genYear" />
-                <Select id="genYear" width="100%" />
-                <Select id="genHalf" width="100%" selectedKey="1">
+                <Select id="genYear" width="100%"
+                    items="{generateDraft>/yearOptions}" selectedKey="{generateDraft>/year}">
+                    <core:Item key="{generateDraft>key}" text="{generateDraft>text}" />
+                </Select>
+                <Select id="genHalf" width="100%" selectedKey="{generateDraft>/half}">
                     <core:Item key="1" text="H1" />
                     <core:Item key="2" text="H2" />
                 </Select>

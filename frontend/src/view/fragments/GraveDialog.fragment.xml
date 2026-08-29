@@ -74,8 +74,12 @@
                     <!-- wraps so the select and both buttons stay usable on a phone -->
                     <HBox id="graveRecipientsLink" wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop"
                         visible="{= ${graveDraft>/Id} === null }">
-                        <Select id="linkRecipient" width="12rem"
-                            items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
+                        <!-- forceSelection off for the same reason as the invoice
+                             dialog's: what is shown is what the draft holds -->
+                        <Select id="linkRecipient" width="12rem" forceSelection="false"
+                            items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+                            selectedKey="{graveDraft>/linkRecipientId}"
+                            change=".onLinkRecipientChange">
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
                         </Select>
                         <Button text="{i18n>add}" press=".onAddRecipientLink" />

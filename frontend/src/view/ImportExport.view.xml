@@ -22,7 +22,8 @@
             </Panel>
             <!-- the report is only shown after a rejected archive; every row names
                  the file and line the problem is in -->
-            <Panel id="problemsPanel" headerText="{i18n>importProblemsHeader}" visible="false">
+            <Panel id="problemsPanel" headerText="{i18n>importProblemsHeader}"
+                   visible="{= ${import>/problems}.length > 0 }">
                 <Table id="problemsTable" items="{import>/problems}" noDataText="{i18n>noData}"
                     autoPopinMode="true" popinLayout="Block">
                     <columns>

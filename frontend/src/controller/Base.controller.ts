@@ -1,8 +1,12 @@
+import type ResourceBundle from "sap/base/i18n/ResourceBundle";
 import Router from "sap/m/routing/Router";
+import Select from "sap/m/Select";
 import Controller from "sap/ui/core/mvc/Controller";
 import UIComponent from "sap/ui/core/UIComponent";
-import Context from "sap/ui/model/odata/v4/Context";
+import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
+import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
 import ODataModel from "sap/ui/model/odata/v4/ODataModel";
+import type ResourceModel from "sap/ui/model/resource/ResourceModel";
 import * as api from "../model/api";
 
 export default abstract class BaseController extends Controller {
@@ -24,9 +28,25 @@ export default abstract class BaseController extends Controller {
    */
   protected bindODataRoot(): void {
     this.getView()!.setBindingContext(
-      this.odata().createBindingContext("/") as Context,
+      this.odata().createBindingContext("/"),
       "odata",
     );
+  }
+
+  /**
+   * Puts a view's state into a model the XML can bind to, so no handler has to
+   * ask a control what it is showing. TypedJSONModel checks every path against
+   * `T`, which turns a mistyped binding path into a compile error.
+   */
+  protected setState<T extends object>(name: string, data: T): TypedJSONModel<T> {
+    const model = new TypedJSONModel<T>(data);
+    this.getView()!.setModel(model, name);
+    return model;
+  }
+
+  /** The model {@link setState} created, typed back to what it holds. */
+  protected state<T extends object>(name: string): TypedJSONModel<T> {
+    return this.getView()!.getModel(name) as TypedJSONModel<T>;
   }
 
   /**
@@ -34,10 +54,10 @@ export default abstract class BaseController extends Controller {
    * (D-002) — and hands back plain objects for a JSONModel. The detail pages
    * compute totals per revision, which a list binding cannot express.
    */
-  protected async readList(
+  protected async readList<T>(
     path: string,
     parameters: Record<string, unknown>,
-  ): Promise<any[]> {
+  ): Promise<T[]> {
     // The OData controller caps $top at 200 (Program.cs, SetMaxTop). A single
     // requestContexts(0, N) with N above that is rejected outright, so page
     // through in that size rather than assuming everything fits in one shot.
@@ -47,12 +67,12 @@ export default abstract class BaseController extends Controller {
       undefined,
       undefined,
       undefined,
-      parameters as any,
+      parameters,
     );
-    const rows: any[] = [];
+    const rows: T[] = [];
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const contexts = await binding.requestContexts(offset, PAGE_SIZE);
-      rows.push(...contexts.map((context) => context.getObject()));
+      rows.push(...contexts.map((context) => context.getObject() as T));
       if (contexts.length < PAGE_SIZE) {
         break;
       }
@@ -61,10 +81,41 @@ export default abstract class BaseController extends Controller {
     return rows;
   }
 
+  /**
+   * Re-reads a recipient select's list, waits for it, and answers which
+   * recipient a fresh draft should start on: the first row, which is the one
+   * the select displays because the list is ordered newest first.
+   *
+   * Both dialogs are built once and reused, so without the refresh the list is
+   * the one loaded on their first open and a recipient created since is missing
+   * from it. The default is taken from this same list rather than from a read of
+   * its own: two reads can disagree if a recipient is created between them, and
+   * the draft would then name someone the select cannot show.
+   *
+   * A select's own fallback is no use here — UI5 does not write it into the
+   * bound model — which is why the application picks. This reaches a list
+   * binding rather than view state, so it takes a control id: no binding syntax
+   * expresses "reload now, and tell me when".
+   */
+  protected async refreshRecipients(
+    selectId: string,
+  ): Promise<number | undefined> {
+    const binding = (this.byId(selectId) as Select).getBinding("items") as
+      | ODataListBinding
+      | undefined;
+    if (!binding) {
+      return undefined;
+    }
+    await binding.requestRefresh();
+    const contexts = await binding.requestContexts(0, 1);
+    return contexts[0]?.getProperty("Id") as number | undefined;
+  }
+
   protected i18nText(key: string): string {
-    return (this.getView()!.getModel("i18n") as any)
-      .getResourceBundle()
-      .getText(key);
+    const bundle = (
+      this.getView()!.getModel("i18n") as ResourceModel
+    ).getResourceBundle() as ResourceBundle;
+    return bundle.getText(key) ?? key;
   }
 
   public formatDate(value: Date | string | null | undefined): string {
@@ -124,7 +175,7 @@ export default abstract class BaseController extends Controller {
       }
     } catch (error) {
       tab?.close();
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 }

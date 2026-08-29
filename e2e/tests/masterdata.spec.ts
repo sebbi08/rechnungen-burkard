@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForDialogOpen } from "../dialog";
 import { createRow } from "../seed";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({
@@ -51,6 +52,7 @@ test("items: create an item without default price (Story 2)", async ({
   });
   await page.goto("/index.html#/items");
   await page.getByRole("button", { name: "Leistung anlegen" }).click();
+  await waitForDialogOpen(page);
   // scope to the dialog: the page search field's placeholder also contains "Nummer"
   await page.locator(".sapMDialog").getByLabel("Nummer").fill("1001");
   await page.getByLabel("Bezeichnung").fill("Grabpflege");
@@ -92,6 +94,7 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({
     .locator("tbody tr", { hasText: number })
     .getByRole("button", { name: "Bearbeiten" })
     .click();
+  await waitForDialogOpen(page);
   // the dialog pre-fills the row's current values
   await expect(page.locator(".sapMDialog").getByLabel("Nummer")).toHaveValue(
     number,
@@ -116,6 +119,7 @@ test("recipients: create and search a recipient (Story 3)", async ({
 
   const createRecipient = async (name: string) => {
     await page.getByRole("button", { name: "Empfänger anlegen" }).click();
+    await waitForDialogOpen(page);
     // scope to the dialog: the page search field's placeholder also contains "Name"
     await page.locator(".sapMDialog").getByLabel("Name").fill(name);
     await page.getByLabel("Adresse").fill("Musterstraße 1\n12345 Musterstadt");
@@ -154,6 +158,7 @@ test("recipients: edit an existing recipient via the row dialog (Story 3)", asyn
     .locator("tbody tr", { hasText: name })
     .getByRole("button", { name: "Bearbeiten" })
     .click();
+  await waitForDialogOpen(page);
   // the dialog pre-fills the row's current values
   await expect(page.locator(".sapMDialog").getByLabel("Name")).toHaveValue(
     name,

@@ -5,12 +5,18 @@
   "scripts": {
     "start": "ui5 serve",
     "build": "ui5 build --all --clean-dest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "ui5lint": "ui5lint"
   },
   "devDependencies": {
     "@openui5/types": "~1.151.0",
     "@ui5/cli": "^4.0.0",
+    "@ui5/linter": "^1.23.5",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.68.0",
     "ui5-middleware-simpleproxy": "^3.0.0",
     "ui5-tooling-transpile": "^3.0.0"
   }

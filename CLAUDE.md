@@ -23,12 +23,33 @@ not through the dev stack.
 To start over on the dev database — an explicitly destructive step, so ask
 first and commit before it: `scripts/reset-dev-db.sh`.
 
+## A dialog takes focus when it finishes opening
+
+`sap.m.Dialog` moves focus to its first field once its opening animation
+completes — about 230ms after `open()`. Playwright is faster than that, so a
+spec that starts filling a dialog straight away is still typing when the focus
+change lands, and anything focus-sensitive it has opened in the meantime (a
+ComboBox suggestion popover) closes underneath it.
+
+So a spec that opens a dialog calls `waitForDialogOpen(page)` from
+`e2e/dialog.ts` before touching it. The helper explains the mechanism.
+
+One deliberate exception: `invoices.spec.ts` does not use it. The wait moves
+when that spec reads the recipient select's label, and "the second invoice goes
+to the recipient the reopened dialog shows" then fails about four runs in five
+— including with the recipient handling reverted to what it was before the
+model refactor, so the spec is sensitive to the timing rather than to the
+control. Leave it as it is.
+
 ## Running the parts
 
 - **Dev stack**: `env "UID=$(id -u)" "GID=$(id -g)" docker compose up -d`
   (frontend on 8080, proxying `/odata` to the backend container).
 - **Backend tests**: `scripts/dotnet.sh test Invoicing.sln`.
-- **Frontend types**: `cd frontend && npm run typecheck`.
+- **Frontend checks**: `cd frontend && npm run typecheck`, then `npm run lint`
+  (ESLint with type-aware rules) and `npm run ui5lint` (deprecated APIs,
+  accessibility, manifest). All three must be clean; both linters are scoped to
+  `src`, since `dist/` holds the whole OpenUI5 runtime.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
   tablet projects only run `tests/layout.spec.ts`.
 - **Release scripts**: `scripts/test-release-scripts.sh`.

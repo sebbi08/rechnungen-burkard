@@ -1,18 +1,19 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog title="{i18n>createItem}" stretch="{device>/system/phone}" contentWidth="20rem">
+    <Dialog title="{= ${itemDraft>/id} === null ? ${i18n>createItem} : ${i18n>editItem} }"
+        stretch="{device>/system/phone}" contentWidth="20rem">
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>itemNumber}" labelFor="itemNumber" />
-                <Input id="itemNumber" width="100%" />
+                <Input id="itemNumber" width="100%" value="{itemDraft>/number}" />
                 <Label text="{i18n>itemDescription}" labelFor="itemDescription" />
-                <Input id="itemDescription" width="100%" />
+                <Input id="itemDescription" width="100%" value="{itemDraft>/description}" />
                 <Label text="{i18n>vatRate}" labelFor="itemVatRate" />
-                <Select id="itemVatRate" width="100%" forceSelection="false"
+                <Select id="itemVatRate" width="100%" forceSelection="false" selectedKey="{itemDraft>/vatRate}"
                     items="{path: 'odata>/VatRates', parameters: {$orderby: 'Rate asc'}}">
                     <core:Item key="{odata>Rate}" text="{odata>Rate}" />
                 </Select>
                 <Label text="{i18n>itemDefaultPrice}" labelFor="itemDefaultPrice" />
-                <Input id="itemDefaultPrice" type="Number" width="100%" />
+                <Input id="itemDefaultPrice" type="Number" width="100%" value="{itemDraft>/defaultPrice}" />
             </VBox>
         </content>
         <beginButton>

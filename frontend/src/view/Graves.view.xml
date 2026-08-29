@@ -1,4 +1,4 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core"
     controllerName="burkard.invoicing.controller.Graves" displayBlock="true">
     <Page title="{i18n>menuGraves}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
@@ -16,7 +16,9 @@
                         <OverflowToolbarLayoutData priority="Low" group="1" />
                     </layoutData>
                 </Label>
-                <Select id="halfYearSelect" width="10rem" change=".onHalfYearChange">
+                <Select id="halfYearSelect" width="10rem" change=".onHalfYearChange"
+                    items="{view>/halfYearOptions}" selectedKey="{view>/halfYear}">
+                    <core:Item key="{view>key}" text="{view>text}" />
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" group="1" />
                     </layoutData>

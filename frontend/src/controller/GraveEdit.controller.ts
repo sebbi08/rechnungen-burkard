@@ -1,11 +1,16 @@
+import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
-import { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
-import Input from "sap/m/Input";
-import Select from "sap/m/Select";
-import TextArea from "sap/m/TextArea";
-import JSONModel from "sap/ui/model/json/JSONModel";
-import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import type { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
+import Dialog from "sap/m/Dialog";
+import type { Select$ChangeEvent } from "sap/m/Select";
+import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
+import type {
+  DraftLine,
+  GraveDraft,
+  GraveInvoiceDraft,
+  QuickRecipientDraft,
+} from "../model/state";
 import InvoiceRevisions from "./InvoiceRevisions.controller";
 
 /**
@@ -19,17 +24,18 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   protected async openGraveDialog(graveId: number | null): Promise<void> {
     if (!this._graveDialog) {
-      // loadFragment passes this controller and the view ID prefix so that
-      // this.byId(...) finds the dialog controls and IDs stay unique
       this._graveDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.GraveDialog",
-      })) as any;
+      })) as Dialog;
     }
+
+    // the link select starts on whichever recipient this refreshed list shows first
+    const newest = await this.refreshRecipients("linkRecipient");
 
     // everything the dialog collects lives in this draft until it is saved, so
     // items and recipients can be added before the grave itself exists
     this._graveDialog.setModel(
-      new JSONModel(
+      new TypedJSONModel<GraveDraft>(
         graveId != null
           ? await this.loadGraveDraft(graveId)
           : {
@@ -39,6 +45,9 @@ export default abstract class GraveEdit extends InvoiceRevisions {
               EndDate: "",
               Items: [],
               Recipients: [],
+              // the link row is only offered while creating
+              linkRecipientId: String(newest ?? ""),
+              linkRecipientName: "",
             },
       ),
       "graveDraft",
@@ -47,14 +56,14 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     this._graveDialog.open();
   }
 
-  private async loadGraveDraft(graveId: number): Promise<any> {
+  private async loadGraveDraft(graveId: number): Promise<GraveDraft> {
     const details = await api.fetchGraveDetails(graveId);
     return {
       Id: details.Id,
       GraveNumber: details.GraveNumber,
       StartDate: details.StartDate,
       EndDate: details.EndDate,
-      Items: details.Items.map((link: any) => ({
+      Items: details.Items.map((link) => ({
         // the ComboBox matches its keys as strings
         itemId: String(link.Item.Id),
         itemNumber: link.Item.Number,
@@ -63,85 +72,124 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
       })),
-      Recipients: details.Recipients.map((link: any) => ({
+      Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
         name: link.Recipient.Name,
       })),
+      // an existing grave's recipients are fixed, so the link row stays hidden
+      linkRecipientId: "",
+      linkRecipientName: "",
     };
   }
 
   public onGraveItemSelected(event: ComboBox$SelectionChangeEvent): void {
     // the ComboBox writes the key itself; fill in what the row shows alongside it
-    const itemContext = event.getParameter("selectedItem")?.getBindingContext("odata");
+    const itemContext = event
+      .getParameter("selectedItem")
+      ?.getBindingContext("odata");
     const rowContext = event.getSource().getBindingContext("graveDraft");
     if (!itemContext || !rowContext) {
       return;
     }
 
-    const model = rowContext.getModel() as JSONModel;
-    const path = rowContext.getPath();
-    model.setProperty(path + "/itemNumber", itemContext.getProperty("Number") as string);
-    model.setProperty(path + "/description", itemContext.getProperty("Description") as string);
+    const model = this.graveDraft();
+    const row = Number(rowContext.getPath().split("/").pop());
+    model.setProperty(
+      `/Items/${row}/itemNumber`,
+      itemContext.getProperty("Number") as string,
+    );
+    model.setProperty(
+      `/Items/${row}/description`,
+      itemContext.getProperty("Description") as string,
+    );
     // an empty price falls back to this, which the input shows as its placeholder
-    model.setProperty(path + "/defaultPrice", itemContext.getProperty("DefaultPrice"));
+    model.setProperty(
+      `/Items/${row}/defaultPrice`,
+      itemContext.getProperty("DefaultPrice") as number | null,
+    );
   }
 
   public onAddItemLink(): void {
-    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const rows = (model.getProperty("/Items") as any[]) ?? [];
+    const model = this.graveDraft();
+    const rows = model.getProperty("/Items");
+    rows.push(GraveEdit.emptyLine());
+    model.setProperty("/Items", rows);
+  }
+
+  public onLinkRecipientChange(event: Select$ChangeEvent): void {
+    // the select writes its key into the draft; keep the name it shows too, so
+    // the added row can be labelled without looking the recipient up again
+    const selected = event.getParameter("selectedItem");
+    this.graveDraft().setProperty(
+      "/linkRecipientName",
+      selected?.getText() ?? "",
+    );
+  }
+
+  public async onAddRecipientLink(): Promise<void> {
+    const model = this.graveDraft();
+    const recipientId = model.getProperty("/linkRecipientId");
+    if (!recipientId) {
+      return;
+    }
+
+    const rows = model.getProperty("/Recipients");
+    if (rows.some((row) => row.recipientId === recipientId)) {
+      api.showError(this, new Error("GraveRecipientLinkExists"));
+      return;
+    }
+
     rows.push({
+      recipientId,
+      name: model.getProperty("/linkRecipientName") || (await this.recipientName(recipientId)),
+    });
+    model.setProperty("/Recipients", rows);
+  }
+
+  /** The name of a recipient the select shows but no change event named yet. */
+  private async recipientName(recipientId: string): Promise<string> {
+    const context = this.odata().bindContext(
+      `/Recipients(${recipientId})`,
+    ).getBoundContext();
+    const row = (await context.requestObject()) as { Name: string };
+    return row.Name;
+  }
+
+  public onDeleteItemLink(event: Button$PressEvent): void {
+    const model = this.graveDraft();
+    const rows = model.getProperty("/Items");
+    rows.splice(GraveEdit.rowIndex(event, "graveDraft"), 1);
+    model.setProperty("/Items", rows);
+  }
+
+  public onDeleteRecipientLink(event: Button$PressEvent): void {
+    const model = this.graveDraft();
+    const rows = model.getProperty("/Recipients");
+    rows.splice(GraveEdit.rowIndex(event, "graveDraft"), 1);
+    model.setProperty("/Recipients", rows);
+  }
+
+  /** The row's binding path ends in its index, e.g. "/Items/2". */
+  private static rowIndex(event: Button$PressEvent, model: string): number {
+    const context = event.getSource().getBindingContext(model)!;
+    return Number(context.getPath().split("/").pop());
+  }
+
+  private static emptyLine(): DraftLine {
+    return {
       itemId: "",
       itemNumber: "",
       description: "",
       count: 1,
       unitPrice: null,
       defaultPrice: null,
-    });
-    model.setProperty("/Items", rows);
-  }
-
-  public async onAddRecipientLink(): Promise<void> {
-    const select = this.byId("linkRecipient") as Select;
-    const selected = select.getSelectedItem();
-    if (!selected) {
-      return;
-    }
-
-    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const rows = (model.getProperty("/Recipients") as any[]) ?? [];
-    const recipientId = select.getSelectedKey();
-    if (rows.some((row) => row.recipientId === recipientId)) {
-      await api.showError(this, new Error("GraveRecipientLinkExists"));
-      return;
-    }
-
-    rows.push({ recipientId, name: selected.getText() });
-    model.setProperty("/Recipients", rows);
-  }
-
-  public onDeleteItemLink(event: any): void {
-    this.removeDraftRow(event, "Items");
-  }
-
-  public onDeleteRecipientLink(event: any): void {
-    this.removeDraftRow(event, "Recipients");
-  }
-
-  private removeDraftRow(event: any, collection: string): void {
-    const context = event.getSource().getBindingContext("graveDraft") as any;
-    const model = context.getModel() as JSONModel;
-    const rows = model.getProperty(`/${collection}`) as any[];
-    // the row's binding path ends in its index, e.g. "/Items/2"
-    rows.splice(Number(context.getPath().split("/").pop()), 1);
-    model.setProperty(`/${collection}`, rows);
+    };
   }
 
   public async onGraveDialogSave(): Promise<void> {
-    const model = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const draft = model.getData() as any;
-    const items = draft.Items as any[];
-    if (items.some((row) => !row.itemId)) {
-      await api.showError(this, new Error("ItemRequired"));
+    const draft = this.graveDraft().getData();
+    if (draft.Items.some((row) => !row.itemId)) {
+      api.showError(this, new Error("ItemRequired"));
       return;
     }
 
@@ -151,58 +199,67 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         graveNumber: draft.GraveNumber ?? "",
         startDate: draft.StartDate ?? "",
         endDate: draft.EndDate ?? "",
-        items: items.map((row) => ({
+        items: draft.Items.map((row) => ({
           itemId: Number(row.itemId),
           count: Number(row.count),
           // a price of 0 is a real value, not a missing one
           unitPrice:
-            row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+            row.unitPrice == null || row.unitPrice === ""
+              ? null
+              : Number(row.unitPrice),
         })),
-        recipientIds: (draft.Recipients as any[]).map((row) => Number(row.recipientId)),
+        recipientIds: draft.Recipients.map((row) => Number(row.recipientId)),
       });
 
       this._graveDialog.close();
       await this.refreshAfterSave();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
-  public onGraveDialogCancel(event: any): void {
-    (event.getSource().getParent() as any).close();
+  public onGraveDialogCancel(): void {
+    this._graveDialog.close();
   }
 
   public async onNewRecipient(): Promise<void> {
     if (!this._quickDialog) {
       this._quickDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.RecipientQuickCreate",
-      })) as any;
+      })) as Dialog;
     }
-    (this.byId("quickName") as Input).setValue("");
-    (this.byId("quickAddress") as TextArea).setValue("");
+    this._quickDialog.setModel(
+      new TypedJSONModel<QuickRecipientDraft>({ name: "", address: "" }),
+      "quickRecipientDraft",
+    );
     this._quickDialog.open();
   }
 
-  public async onQuickRecipientSave(event: any): Promise<void> {
-    const dialog = event.getSource().getParent() as any;
+  public async onQuickRecipientSave(): Promise<void> {
+    const quick = (
+      this._quickDialog.getModel(
+        "quickRecipientDraft",
+      ) as TypedJSONModel<QuickRecipientDraft>
+    ).getData();
     try {
       const id = await api.createRecipient({
-        Name: (this.byId("quickName") as Input).getValue(),
-        Address: (this.byId("quickAddress") as TextArea).getValue(),
+        Name: quick.name,
+        Address: quick.address,
       });
-      // refresh the link select's list so the new row is included, then
-      // select it; the parent grave dialog stays open
-      const select = this.byId("linkRecipient") as Select;
-      await (select.getBinding("items") as ODataListBinding).refresh();
-      select.setSelectedKey(String(id));
-      dialog.close();
+      // refresh the link select's list so the new row is included, then select
+      // it; the parent grave dialog stays open
+      await this.refreshRecipients("linkRecipient");
+      const model = this.graveDraft();
+      model.setProperty("/linkRecipientId", String(id));
+      model.setProperty("/linkRecipientName", quick.name);
+      this._quickDialog.close();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
-  public onQuickRecipientCancel(event: any): void {
-    (event.getSource().getParent() as any).close();
+  public onQuickRecipientCancel(): void {
+    this._quickDialog.close();
   }
 
   /**
@@ -215,14 +272,14 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     try {
       group = await api.fetchGraveInvoiceGroup(invoiceId);
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
       return;
     }
 
     if (!this._graveInvoiceDialog) {
       this._graveInvoiceDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.GraveInvoiceDialog",
-      })) as any;
+      })) as Dialog;
     }
 
     const warning = this.i18nText("graveInvoiceEditWarning")
@@ -230,7 +287,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
 
     this._graveInvoiceDialog.setModel(
-      new JSONModel({
+      new TypedJSONModel<GraveInvoiceDraft>({
         invoiceId,
         warning,
         lines: group.Lines.map((line) => ({
@@ -254,44 +311,45 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   public onGraveInvoiceItemSelected(event: ComboBox$SelectionChangeEvent): void {
     // the ComboBox writes the key itself; fill in what the row shows alongside it
-    const itemContext = event.getParameter("selectedItem")?.getBindingContext("odata");
+    const itemContext = event
+      .getParameter("selectedItem")
+      ?.getBindingContext("odata");
     const rowContext = event.getSource().getBindingContext("graveInvoiceDraft");
     if (!itemContext || !rowContext) {
       return;
     }
 
-    const model = rowContext.getModel() as JSONModel;
-    const path = rowContext.getPath();
-    model.setProperty(path + "/itemNumber", itemContext.getProperty("Number") as string);
-    model.setProperty(path + "/description", itemContext.getProperty("Description") as string);
-    const defaultPrice = itemContext.getProperty("DefaultPrice");
-    model.setProperty(path + "/defaultPrice", defaultPrice);
+    const model = this.graveInvoiceDraft();
+    const row = Number(rowContext.getPath().split("/").pop());
     model.setProperty(
-      path + "/unitPrice",
+      `/lines/${row}/itemNumber`,
+      itemContext.getProperty("Number") as string,
+    );
+    model.setProperty(
+      `/lines/${row}/description`,
+      itemContext.getProperty("Description") as string,
+    );
+    const defaultPrice = itemContext.getProperty("DefaultPrice") as
+      | number
+      | null;
+    model.setProperty(`/lines/${row}/defaultPrice`, defaultPrice);
+    model.setProperty(
+      `/lines/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
     );
   }
 
   public onAddGraveInvoiceLine(): void {
-    const model = this._graveInvoiceDialog.getModel("graveInvoiceDraft") as JSONModel;
-    const rows = (model.getProperty("/lines") as any[]) ?? [];
-    rows.push({
-      itemId: "",
-      itemNumber: "",
-      description: "",
-      count: 1,
-      unitPrice: null,
-      defaultPrice: null,
-    });
+    const model = this.graveInvoiceDraft();
+    const rows = model.getProperty("/lines");
+    rows.push(GraveEdit.emptyLine());
     model.setProperty("/lines", rows);
   }
 
-  public onDeleteGraveInvoiceLine(event: any): void {
-    const context = event.getSource().getBindingContext("graveInvoiceDraft") as any;
-    const model = context.getModel() as JSONModel;
-    const rows = model.getProperty("/lines") as any[];
-    // the row's binding path ends in its index, e.g. "/lines/2"
-    rows.splice(Number(context.getPath().split("/").pop()), 1);
+  public onDeleteGraveInvoiceLine(event: Button$PressEvent): void {
+    const model = this.graveInvoiceDraft();
+    const rows = model.getProperty("/lines");
+    rows.splice(GraveEdit.rowIndex(event, "graveInvoiceDraft"), 1);
     model.setProperty("/lines", rows);
   }
 
@@ -302,20 +360,20 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return;
     }
 
-    const model = this._graveInvoiceDialog.getModel("graveInvoiceDraft") as JSONModel;
-    const draft = model.getData() as any;
-    const rows = draft.lines as any[];
-    if (rows.some((row) => !row.itemId)) {
-      await api.showError(this, new Error("ItemRequired"));
+    const draft = this.graveInvoiceDraft().getData();
+    if (draft.lines.some((row) => !row.itemId)) {
+      api.showError(this, new Error("ItemRequired"));
       return;
     }
 
-    const lines = rows.map((row) => ({
+    const lines = draft.lines.map((row) => ({
       itemId: Number(row.itemId),
       count: Number(row.count),
       // a price of 0 is a real value, not a missing one
       unitPrice:
-        row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+        row.unitPrice == null || row.unitPrice === ""
+          ? null
+          : Number(row.unitPrice),
     }));
 
     // long-running task: a revision renders both documents for every recipient
@@ -337,7 +395,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     }
 
     if (failure) {
-      await api.showError(this, failure);
+      api.showError(this, failure);
     }
   }
 
@@ -345,9 +403,20 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     this._graveInvoiceDialog.close();
   }
 
-  private _savingGraveInvoice = false;
-  private _graveInvoiceDialog: any;
+  /** Both drafts live on their dialog rather than the view. */
+  private graveDraft(): TypedJSONModel<GraveDraft> {
+    return this._graveDialog.getModel("graveDraft") as TypedJSONModel<GraveDraft>;
+  }
 
-  protected _graveDialog: any;
-  private _quickDialog: any;
+  private graveInvoiceDraft(): TypedJSONModel<GraveInvoiceDraft> {
+    return this._graveInvoiceDialog.getModel(
+      "graveInvoiceDraft",
+    ) as TypedJSONModel<GraveInvoiceDraft>;
+  }
+
+  private _savingGraveInvoice = false;
+  private _graveInvoiceDialog!: Dialog;
+
+  protected _graveDialog!: Dialog;
+  private _quickDialog!: Dialog;
 }
