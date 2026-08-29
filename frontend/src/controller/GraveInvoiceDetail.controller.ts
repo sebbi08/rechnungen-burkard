@@ -1,5 +1,7 @@
-import JSONModel from "sap/ui/model/json/JSONModel";
+import type { Button$PressEvent } from "sap/m/Button";
+import type { Route$PatternMatchedEvent } from "sap/ui/core/routing/Route";
 import * as api from "../model/api";
+import { emptyRevisionDetail, type RevisionDetailView } from "../model/state";
 import GraveEdit from "./GraveEdit.controller";
 
 /** Every revision of one grave invoice, plus what makes it one: the grave, the
@@ -9,11 +11,16 @@ export default class GraveInvoiceDetail extends GraveEdit {
     this.bindODataRoot();
     this.router()
       .getRoute("graveInvoiceDetail")!
-      .attachPatternMatched(this.onRouteMatched, this);
+      // wrapped rather than passed directly: the handler is async and the
+      // event expects a void return
+      .attachPatternMatched((event) => void this.onRouteMatched(event));
   }
 
-  private async onRouteMatched(event: any): Promise<void> {
-    const args = event.getParameter("arguments");
+  private async onRouteMatched(event: Route$PatternMatchedEvent): Promise<void> {
+    const args = event.getParameter("arguments") as {
+      graveId: string;
+      rootId: string;
+    };
     this._graveId = Number(args.graveId);
     this._rootId = Number(args.rootId);
     await this.refresh();
@@ -23,29 +30,23 @@ export default class GraveInvoiceDetail extends GraveEdit {
     try {
       const chain = await this.loadChain(this._rootId);
       if (!chain.length) {
-        this.getView()!.setModel(
-          new JSONModel({ revisions: [], others: [] }),
-          "detail",
-        );
+        this.setState<RevisionDetailView>("detail", emptyRevisionDetail());
         return;
       }
 
-      const model = this.buildRevisionModel(chain);
-      const latestInvoiceId = model.getProperty("/latestInvoiceId") as number;
+      const detail = this.buildRevisionDetail(chain);
+      const latestInvoiceId = detail.latestInvoiceId!;
       const group = await api.fetchGraveInvoiceGroup(latestInvoiceId);
-      const share = model.getProperty("/sharePercent") as number | null;
+      const share = detail.sharePercent;
 
-      model.setProperty("/graveNumber", group.GraveNumber);
-      model.setProperty(
-        "/shareText",
-        share != null ? `${share.toFixed(1).replace(".", ",")} %` : "",
-      );
+      detail.graveNumber = group.GraveNumber;
+      detail.shareText =
+        share != null ? `${share.toFixed(1).replace(".", ",")} %` : "";
       // the siblings of this half-year, minus the invoice being shown
-      model.setProperty(
-        "/others",
-        group.Recipients.filter((r) => r.InvoiceId !== latestInvoiceId),
+      detail.others = group.Recipients.filter(
+        (r) => r.InvoiceId !== latestInvoiceId,
       );
-      this.getView()!.setModel(model, "detail");
+      this.setState<RevisionDetailView>("detail", detail);
     } catch (error) {
       api.showError(this, error);
     }
@@ -56,8 +57,8 @@ export default class GraveInvoiceDetail extends GraveEdit {
     this.router().navTo("graveDetail", { graveId: String(this._graveId) });
   }
 
-  public onOpenSibling(event: any): void {
-    const context = event.getSource().getBindingContext("detail");
+  public onOpenSibling(event: Button$PressEvent): void {
+    const context = event.getSource().getBindingContext("detail")!;
     this.router().navTo("graveInvoiceDetail", {
       graveId: String(this._graveId),
       rootId: String(context.getProperty("RootId")),
@@ -65,9 +66,9 @@ export default class GraveInvoiceDetail extends GraveEdit {
   }
 
   public async onEditGraveInvoice(): Promise<void> {
-    const invoiceId = (this.getView()!.getModel("detail") as JSONModel).getProperty(
+    const invoiceId = this.state<RevisionDetailView>("detail").getProperty(
       "/latestInvoiceId",
-    ) as number | null;
+    );
     if (invoiceId == null) {
       return;
     }
@@ -80,16 +81,23 @@ export default class GraveInvoiceDetail extends GraveEdit {
     await this.refresh();
   }
 
-  public async onDownloadRevisionNormal(event: any): Promise<void> {
+  public async onDownloadRevisionNormal(
+    event: Button$PressEvent,
+  ): Promise<void> {
     await this.downloadRevision(event, false);
   }
 
-  public async onDownloadRevisionCopy(event: any): Promise<void> {
+  public async onDownloadRevisionCopy(
+    event: Button$PressEvent,
+  ): Promise<void> {
     await this.downloadRevision(event, true);
   }
 
-  private async downloadRevision(event: any, isCopy: boolean): Promise<void> {
-    const context = event.getSource().getBindingContext("detail");
+  private async downloadRevision(
+    event: Button$PressEvent,
+    isCopy: boolean,
+  ): Promise<void> {
+    const context = event.getSource().getBindingContext("detail")!;
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }
 

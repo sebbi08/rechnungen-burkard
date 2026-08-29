@@ -558,8 +558,16 @@ export interface GraveInvoiceGroup {
   GraveNumber: string;
   PeriodYear: number;
   PeriodHalf: number;
-  Recipients: { Id: number; Name: string; InvoiceId: number; RootId: number }[];
+  Recipients: GraveInvoiceRecipient[];
   Lines: GraveInvoiceGroupLine[];
+}
+
+/** One recipient billed for a grave's half-year, and the invoice they got. */
+export interface GraveInvoiceRecipient {
+  Id: number;
+  Name: string;
+  InvoiceId: number;
+  RootId: number;
 }
 
 /** The grave, half-year and recipients a grave invoice belongs to, with the

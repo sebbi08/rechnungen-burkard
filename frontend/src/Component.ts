@@ -37,7 +37,7 @@ export default class Component extends UIComponent {
     // The root view's onInit runs before the view is aggregated into the
     // component, so component models are not visible there yet. Bind the
     // OData root context once the root control has been loaded.
-    this.rootControlLoaded().then((vRootControl) => {
+    void this.rootControlLoaded().then((vRootControl) => {
       if (vRootControl) {
         models.bindRoot(vRootControl as View);
       }

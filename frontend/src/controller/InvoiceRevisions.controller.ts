@@ -1,5 +1,10 @@
-import JSONModel from "sap/ui/model/json/JSONModel";
 import * as api from "../model/api";
+import {
+  emptyRevisionDetail,
+  type Revision,
+  type RevisionDetailView,
+  type RevisionLine,
+} from "../model/state";
 import BaseController from "./Base.controller";
 
 /**
@@ -13,7 +18,7 @@ export default abstract class InvoiceRevisions extends BaseController {
    * what every list row carries; a revision's id pasted into the URL resolves
    * through one extra read rather than showing an empty page.
    */
-  protected async loadChain(rootId: number): Promise<any[]> {
+  protected async loadChain(rootId: number): Promise<api.InvoiceRow[]> {
     const parameters = {
       $orderby: "RevisionNumber desc",
       $expand: "Lines,Documents($select=Id,FileName,Kind)",
@@ -40,10 +45,10 @@ export default abstract class InvoiceRevisions extends BaseController {
     });
   }
 
-  /** The model the header block and the revision panels bind to. */
-  protected buildRevisionModel(chain: any[]): JSONModel {
-    const revisions = chain.map((invoice, index) => {
-      const lines = ((invoice.Lines as any[]) ?? [])
+  /** What the header block and the revision panels bind to. */
+  protected buildRevisionDetail(chain: api.InvoiceRow[]): RevisionDetailView {
+    const revisions: Revision[] = chain.map((invoice, index) => {
+      const lines: RevisionLine[] = (invoice.Lines ?? [])
         .slice()
         .sort((a, b) => Number(a.LineNumber) - Number(b.LineNumber))
         .map((line) => {
@@ -82,7 +87,8 @@ export default abstract class InvoiceRevisions extends BaseController {
     });
 
     const latest = chain[0];
-    return new JSONModel({
+    return {
+      ...emptyRevisionDetail(),
       invoiceNumber: this.formatInvoiceNumber(latest.InvoiceNumber),
       recipientName: latest.RecipientName,
       recipientAddress: latest.RecipientAddress,
@@ -96,8 +102,9 @@ export default abstract class InvoiceRevisions extends BaseController {
         latest.PeriodYear != null && latest.PeriodHalf != null
           ? api.halfYearText(Number(latest.PeriodYear), Number(latest.PeriodHalf))
           : "",
-      sharePercent: latest.SharePercent != null ? Number(latest.SharePercent) : null,
+      sharePercent:
+        latest.SharePercent != null ? Number(latest.SharePercent) : null,
       revisions,
-    });
+    };
   }
 }

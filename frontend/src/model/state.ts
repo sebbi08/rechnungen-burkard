@@ -1,4 +1,9 @@
-import type { GraveStatusRow, ImportProblem, YearHalfOption } from "./api";
+import type {
+  GraveInvoiceRecipient,
+  GraveStatusRow,
+  ImportProblem,
+  YearHalfOption,
+} from "./api";
 
 /**
  * What a view or a dialog holds while the user works in it.
@@ -120,4 +125,71 @@ export interface GraveInvoiceDraft {
   invoiceId: number;
   warning: string;
   lines: DraftLine[];
+}
+
+/** One line of a revision, with its total worked out. */
+export interface RevisionLine {
+  Count: number;
+  UnitPrice: number;
+  VatRate: number;
+  ItemNumber: string;
+  Description: string;
+  LineTotal: number;
+}
+
+export interface Revision {
+  Id: number;
+  InvoiceNumber: string;
+  RevisionNumber: number;
+  GeneratedAt: string;
+  Title: string;
+  /** The current revision opens; the history stays collapsed. */
+  Expanded: boolean;
+  Lines: RevisionLine[];
+  NetTotal: number;
+  VatTotal: number;
+  GrossTotal: number;
+}
+
+/**
+ * An invoice chain as the two detail pages show it. The grave fields stay empty
+ * on a plain invoice; only the grave-invoice page fills them.
+ */
+export interface RevisionDetailView {
+  invoiceNumber: string;
+  recipientName: string;
+  recipientAddress: string;
+  /** The edit dialog reopens on this recipient. */
+  recipientId: number;
+  latestInvoiceId: number | null;
+  graveId: number | null;
+  periodYear: number | null;
+  periodHalf: number | null;
+  halfYear: string;
+  sharePercent: number | null;
+  revisions: Revision[];
+  graveNumber: string;
+  shareText: string;
+  /** The siblings of this half-year, minus the invoice being shown. */
+  others: GraveInvoiceRecipient[];
+}
+
+/** A detail page with nothing to show: an unknown or deleted invoice. */
+export function emptyRevisionDetail(): RevisionDetailView {
+  return {
+    invoiceNumber: "",
+    recipientName: "",
+    recipientAddress: "",
+    recipientId: 0,
+    latestInvoiceId: null,
+    graveId: null,
+    periodYear: null,
+    periodHalf: null,
+    halfYear: "",
+    sharePercent: null,
+    revisions: [],
+    graveNumber: "",
+    shareText: "",
+    others: [],
+  };
 }

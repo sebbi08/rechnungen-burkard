@@ -1,6 +1,49 @@
-import JSONModel from "sap/ui/model/json/JSONModel";
+import type { Button$PressEvent } from "sap/m/Button";
+import type { Route$PatternMatchedEvent } from "sap/ui/core/routing/Route";
 import * as api from "../model/api";
 import GraveEdit from "./GraveEdit.controller";
+
+/** One of the grave's item links, as the page lists them. */
+interface GraveItemRow {
+  Number: string;
+  Description: string;
+  Count: number;
+  Price: number;
+  VatRate: number;
+}
+
+interface GraveRecipientRow {
+  Name: string;
+  Address: string;
+}
+
+/** One invoice the grave has produced, summarised for the list. */
+interface GraveInvoiceRow {
+  Id: number;
+  RootId: number;
+  HalfYear: string;
+  RecipientName: string;
+  InvoiceNumber: string;
+  RevisionNumber: number;
+  GeneratedAt: string;
+  GrossTotal: number;
+}
+
+/** Everything this page shows about one grave. */
+interface GraveDetailView {
+  Id: number;
+  GraveNumber: string;
+  StartDate: string;
+  EndDate: string;
+  CreatedAt: string;
+  currentHalfYearLabel: string;
+  currentStatusText: string;
+  currentStatusAnnouncement: string;
+  currentInvoiced: boolean;
+  Items: GraveItemRow[];
+  Recipients: GraveRecipientRow[];
+  Invoices: GraveInvoiceRow[];
+}
 
 /** One grave: its configuration, this half-year's status, and every invoice it
  *  has produced across all half-years and recipients. */
@@ -9,11 +52,14 @@ export default class GraveDetail extends GraveEdit {
     this.bindODataRoot();
     this.router()
       .getRoute("graveDetail")!
-      .attachPatternMatched(this.onRouteMatched, this);
+      // wrapped rather than passed directly: the handler is async and the
+      // event expects a void return
+      .attachPatternMatched((event) => void this.onRouteMatched(event));
   }
 
-  private async onRouteMatched(event: any): Promise<void> {
-    this._graveId = Number(event.getParameter("arguments").graveId);
+  private async onRouteMatched(event: Route$PatternMatchedEvent): Promise<void> {
+    const args = event.getParameter("arguments") as { graveId: string };
+    this._graveId = Number(args.graveId);
     await this.refresh();
   }
 
@@ -39,8 +85,7 @@ export default class GraveDetail extends GraveEdit {
         (run) => Number(run.Year) === year && Number(run.Half) === half,
       );
 
-      this.getView()!.setModel(
-        new JSONModel({
+      this.setState<GraveDetailView>("grave", {
           Id: details.Id,
           GraveNumber: details.GraveNumber,
           StartDate: details.StartDate,
@@ -56,7 +101,7 @@ export default class GraveDetail extends GraveEdit {
             invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
           ),
           currentInvoiced: invoiced,
-          Items: (details.Items as any[]).map((link) => ({
+          Items: details.Items.map((link) => ({
             Number: link.Item.Number,
             Description: link.Item.Description,
             Count: link.Count,
@@ -64,12 +109,12 @@ export default class GraveDetail extends GraveEdit {
             Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
             VatRate: link.Item.VatRate,
           })),
-          Recipients: (details.Recipients as any[]).map((link) => ({
+          Recipients: details.Recipients.map((link) => ({
             Name: link.Recipient.Name,
             Address: link.Recipient.Address,
           })),
           Invoices: invoices.map((invoice) => {
-            const lines = ((invoice.Lines as any[]) ?? []).map((line) => ({
+            const lines = (invoice.Lines ?? []).map((line) => ({
               // the OData V4 model serialises Edm.Decimal as a string
               Count: Number(line.Count),
               UnitPrice: Number(line.UnitPrice),
@@ -89,9 +134,7 @@ export default class GraveDetail extends GraveEdit {
               GrossTotal: api.invoiceTotals(lines).gross,
             };
           }),
-        }),
-        "grave",
-      );
+      });
     } catch (error) {
       api.showError(this, error);
     }
@@ -110,29 +153,32 @@ export default class GraveDetail extends GraveEdit {
     await this.refresh();
   }
 
-  public onShowInvoiceDetails(event: any): void {
-    const context = event.getSource().getBindingContext("grave");
+  public onShowInvoiceDetails(event: Button$PressEvent): void {
+    const context = event.getSource().getBindingContext("grave")!;
     this.router().navTo("graveInvoiceDetail", {
       graveId: String(this._graveId),
       rootId: String(context.getProperty("RootId")),
     });
   }
 
-  public async onDownloadInvoiceNormal(event: any): Promise<void> {
+  public async onDownloadInvoiceNormal(event: Button$PressEvent): Promise<void> {
     await this.downloadRow(event, false);
   }
 
-  public async onDownloadInvoiceCopy(event: any): Promise<void> {
+  public async onDownloadInvoiceCopy(event: Button$PressEvent): Promise<void> {
     await this.downloadRow(event, true);
   }
 
-  private async downloadRow(event: any, isCopy: boolean): Promise<void> {
-    const context = event.getSource().getBindingContext("grave");
+  private async downloadRow(
+    event: Button$PressEvent,
+    isCopy: boolean,
+  ): Promise<void> {
+    const context = event.getSource().getBindingContext("grave")!;
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }
 
-  public async onEditGraveInvoice(event: any): Promise<void> {
-    const context = event.getSource().getBindingContext("grave");
+  public async onEditGraveInvoice(event: Button$PressEvent): Promise<void> {
+    const context = event.getSource().getBindingContext("grave")!;
     await this.openGraveInvoiceDialog(Number(context.getProperty("Id")));
   }
 
