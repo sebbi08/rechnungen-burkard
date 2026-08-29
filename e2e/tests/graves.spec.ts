@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per test run. `npm test` starts with an empty database, but
@@ -90,6 +91,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   await expect(gravesTable).toContainText(firstGraveNumber);
 
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForDialogOpen(page);
   await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
 
   // blocking progress indicator is visible while the job runs
@@ -109,6 +111,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   expect(await periodInvoices(page)).not.toHaveLength(0);
 
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForDialogOpen(page);
   await page.getByRole("button", { name: "Jetzt erzeugen" }).click();
   // the busy dialog only appears when a job actually runs (409 case: not at all)
   await page
@@ -189,6 +192,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
 
   await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForDialogOpen(page);
   // scope to the dialog: the toolbar search field's accessible name also
   // contains "Grabnummer" and would win the race while the dialog loads
   const graveDialog = page.locator(".sapMDialog");
@@ -249,6 +253,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
     .locator("tbody tr", { hasText: graveNumber })
     .getByRole("button", { name: "Bearbeiten" })
     .click();
+  await waitForDialogOpen(page);
   await expect(graveDialog.getByLabel("Anzahl")).toHaveValue("2");
   await expect(graveDialog.getByLabel("Preis")).toHaveValue("55");
   // the dialog is built once by loadFragment and reused: the first open above
@@ -291,6 +296,7 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   const graveDialog = page.locator(".sapMDialog");
 
   await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForDialogOpen(page);
   await graveDialog.getByLabel("Grabnummer").fill(graveNumber);
   await graveDialog.getByLabel("Beginn").fill("2026-01-01");
   await graveDialog.getByLabel("Ende").fill("2040-12-31");
@@ -395,6 +401,7 @@ test("editing a grave warns about future invoices and freezes its recipients", a
   const row = gravesTable.locator("tbody tr", { hasText: `F-${marker}` });
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Bearbeiten" }).click();
+  await waitForDialogOpen(page);
 
   const dialog = page.locator("[id$='graveDialog']");
   await expect(dialog).toContainText("nur auf künftig erstellte Rechnungen");
@@ -519,6 +526,7 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
     .locator("tbody tr", { hasText: names[0] })
     .getByRole("button", { name: "Bearbeiten" })
     .click();
+  await waitForDialogOpen(page);
 
   // the dialog names the half-year and both recipients it is about to revise
   const dialog = page.locator("[id$='graveInvoiceDialog']");

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Layout regressions on small screens: every list screen must fit the viewport
@@ -166,6 +167,9 @@ for (const screen of LIST_SCREENS) {
     }
 
     await pressToolbarAction(page, screen.toolbar, screen.action);
+    // the width assertion below is only meaningful once the dialog has
+    // finished animating in
+    await waitForDialogOpen(page);
     const dialog = page.locator(".sapMDialog");
     await expect(dialog).toBeVisible();
     await expectNoSidewaysScrolling(page);
