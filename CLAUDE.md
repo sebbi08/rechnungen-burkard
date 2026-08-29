@@ -31,6 +31,26 @@ first and commit before it: `scripts/reset-dev-db.sh`.
 - **Frontend types**: `cd frontend && npm run typecheck`.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
   tablet projects only run `tests/layout.spec.ts`.
+- **Release scripts**: `scripts/test-release-scripts.sh`.
+
+## Commit messages are linted
+
+Run `npm install` once at the repository root. It installs the `commit-msg`
+hook that checks the message against Conventional Commits, and without it the
+hook is simply absent — nothing warns you.
+
+The format is not cosmetic: `scripts/next-version.sh` reads these messages to
+decide whether the next release is a major, minor or patch, and
+`scripts/changelog-entry.sh` turns them into the changelog. `feat` gives a
+minor, `fix`/`perf`/`refactor` a patch, a `!` or a `BREAKING CHANGE:` footer a
+major, and docs/test/chore/ci/style/build release nothing on their own.
+
+Preview what a release would do, without releasing anything:
+
+```sh
+scripts/next-version.sh                       # e.g. 1.3.0
+scripts/changelog-entry.sh "$(scripts/next-version.sh)"
+```
 
 ## The dev container and the SDK container share `backend/obj`
 

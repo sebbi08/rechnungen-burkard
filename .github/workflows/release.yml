@@ -2,16 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        description: "Version bump"
-        required: true
-        type: choice
-        default: patch
-        options:
-          - patch
-          - minor
-          - major
 
 jobs:
   release:
@@ -24,18 +14,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Compute next version
+      # The bump comes from the Conventional Commits since the last tag, so a
+      # release never depends on remembering to pick the right one. Nothing
+      # worth releasing means no release: the script fails and says so.
+      - name: Work out the version and the changelog
         run: |
-          LATEST=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "v0.0.0")
-          CUR=${LATEST#v}
-          IFS=. read -r MAJ MIN PAT <<< "$CUR"
-          case "${{ github.event.inputs.bump }}" in
-            major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
-            minor) MIN=$((MIN+1)); PAT=0 ;;
-            patch) PAT=$((PAT+1)) ;;
-          esac
-          echo "NEW_VERSION=v${MAJ}.${MIN}.${PAT}" >> "$GITHUB_ENV"
-          echo "BUILD_VERSION=${MAJ}.${MIN}.${PAT}" >> "$GITHUB_ENV"
+          VERSION=$(scripts/next-version.sh)
+          echo "NEW_VERSION=v${VERSION}" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=${VERSION}" >> "$GITHUB_ENV"
+          scripts/changelog-entry.sh "$VERSION" > "$RUNNER_TEMP/entry.md"
+          cat "$RUNNER_TEMP/entry.md"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -55,12 +43,23 @@ jobs:
           docker push "$IMAGE:$VERSION"
           docker push "$IMAGE:latest"
 
-      - name: Create tag and GitHub release
+      # The changelog is committed before the tag is cut, so the tag points at
+      # the commit that carries its own entry.
+      - name: Record the release in the changelog
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          scripts/prepend-changelog.sh "$RUNNER_TEMP/entry.md"
+          git add CHANGELOG.md
+          git commit -m "chore: release ${{ env.NEW_VERSION }}"
+          git push origin HEAD:${{ github.ref_name }}
+
+      - name: Create tag and GitHub release
+        run: |
           git tag "${{ env.NEW_VERSION }}"
           git push origin "${{ env.NEW_VERSION }}"
-          gh release create "${{ env.NEW_VERSION }}" --title "${{ env.NEW_VERSION }}" --generate-notes
+          gh release create "${{ env.NEW_VERSION }}" \
+            --title "${{ env.NEW_VERSION }}" \
+            --notes-file "$RUNNER_TEMP/entry.md"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
