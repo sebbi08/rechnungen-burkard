@@ -9,10 +9,8 @@ const RUN = Date.now();
 /** The item field's suggestion list: a StandardListItem inside a popover. The
  *  grave dialog's recipient select leaves its own options in the DOM, and those
  *  are sapMSelectListItem, so scoping here keeps the two apart.
- *  ":visible" matters as much as the class: without it Playwright latches onto
- *  the picker's markup before it opens and then waits for that one element to
- *  become visible, which never happens if the picker re-renders when it opens. */
-const SUGGESTION = "div.sapMPopover:visible li.sapMSLI";
+ */
+const SUGGESTION = "div.sapMPopover li.sapMSLI";
 
 async function seedGraveGenerationData(
   page: import("@playwright/test").Page,

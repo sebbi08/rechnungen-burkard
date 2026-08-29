@@ -14,10 +14,8 @@ const RECIPIENT_NAME = `E2E 9001 ${Date.now()}`;
 
 /** The item field's suggestion list: a StandardListItem inside a popover. The
  *  recipient select's options are sapMSelectListItem, so this excludes them.
- *  ":visible" matters as much as the class: without it Playwright latches onto
- *  the picker's markup before it opens and then waits for that one element to
- *  become visible, which never happens if the picker re-renders when it opens. */
-const SUGGESTION = "div.sapMPopover:visible li.sapMSLI";
+ */
+const SUGGESTION = "div.sapMPopover li.sapMSLI";
 
 async function seedMasterData(
   page: import("@playwright/test").Page,
