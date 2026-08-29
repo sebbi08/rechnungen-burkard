@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createRow } from "../seed";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({
   page,

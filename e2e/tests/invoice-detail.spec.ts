@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createRow } from "../seed";
 
 // Unique per run: other specs write invoices into the same stack in parallel.
 const RUN = Date.now();
@@ -6,22 +7,10 @@ const RECIPIENT_NAME = `Detail ${RUN}`;
 
 test("the detail page shows every revision of an invoice", async ({ page }) => {
   await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  const item = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: { Number: `D${RUN}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 },
-    })
-  ).json();
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: RECIPIENT_NAME, Address: "Musterstraße 1\n12345 Musterstadt" },
-    })
-  ).json();
+  const item = await createRow(page, "/odata/InvoiceItems", { Number: `D${RUN}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 });
+  const recipient = await createRow(page, "/odata/Recipients", { Name: RECIPIENT_NAME, Address: "Musterstraße 1\n12345 Musterstadt" });
 
-  const created = await (
-    await page.request.post("/odata/CreateInvoice", {
-      data: { recipientId: recipient.Id, lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }] },
-    })
-  ).json();
+  const created = await createRow(page, "/odata/CreateInvoice", { recipientId: recipient.Id, lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }] });
   await page.request.post("/odata/CreateRevision", {
     data: {
       invoiceId: created.Id,

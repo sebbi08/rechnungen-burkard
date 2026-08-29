@@ -8,8 +8,11 @@ const RUN = Date.now();
 
 /** The item field's suggestion list: a StandardListItem inside a popover. The
  *  grave dialog's recipient select leaves its own options in the DOM, and those
- *  are sapMSelectListItem, so scoping here keeps the two apart. */
-const SUGGESTION = "div.sapMPopover li.sapMSLI";
+ *  are sapMSelectListItem, so scoping here keeps the two apart.
+ *  ":visible" matters as much as the class: without it Playwright latches onto
+ *  the picker's markup before it opens and then waits for that one element to
+ *  become visible, which never happens if the picker re-renders when it opens. */
+const SUGGESTION = "div.sapMPopover:visible li.sapMSLI";
 
 async function seedGraveGenerationData(
   page: import("@playwright/test").Page,
@@ -19,21 +22,13 @@ async function seedGraveGenerationData(
   await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
-  const item = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: {
+  const item = await createRow(page, "/odata/InvoiceItems", {
         Number: `8001-${RUN}`,
         Description: "Grabpflege",
         VatRate: 7,
         DefaultPrice: 100,
-      },
-    })
-  ).json();
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: `Anna Beispiel ${RUN}`, Address: "Hauptstraße 1" },
-    })
-  ).json();
+      });
+  const recipient = await createRow(page, "/odata/Recipients", { Name: `Anna Beispiel ${RUN}`, Address: "Hauptstraße 1" });
 
   // self-heal leftovers from interrupted runs: graves without item/recipient
   // links would be skipped by the generator and keep the duplicate check
@@ -73,15 +68,11 @@ async function seedGraveGenerationData(
 
   const firstGraveNumber = `G-${RUN}-001`;
   for (let i = 1; i <= count; i++) {
-    const grave = await (
-      await page.request.post("/odata/Graves", {
-        data: {
+    const grave = await createRow(page, "/odata/Graves", {
           GraveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
           StartDate: "2026-01-01",
           EndDate: "2040-12-31",
-        },
-      })
-    ).json();
+        });
     await page.request.post("/odata/GraveItems", {
       data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
     });
@@ -344,30 +335,18 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
   page,
 }) => {
   const graveNumber = `SK-${RUN}`;
-  const noPriceItem = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: {
+  const noPriceItem = await createRow(page, "/odata/InvoiceItems", {
         Number: `SP-${RUN}`,
         Description: "Ohne Preis",
         VatRate: 7,
         DefaultPrice: null,
-      },
-    })
-  ).json();
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: `Skip Beispiel ${RUN}`, Address: "Kiesweg 3" },
-    })
-  ).json();
-  const grave = await (
-    await page.request.post("/odata/Graves", {
-      data: {
+      });
+  const recipient = await createRow(page, "/odata/Recipients", { Name: `Skip Beispiel ${RUN}`, Address: "Kiesweg 3" });
+  const grave = await createRow(page, "/odata/Graves", {
         GraveNumber: graveNumber,
         StartDate: "2026-01-01",
         EndDate: "2040-12-31",
-      },
-    })
-  ).json();
+      });
   await page.request.post("/odata/GraveItems", {
     data: { GraveId: grave.Id, ItemId: noPriceItem.Id, Count: 1 },
   });
@@ -403,21 +382,9 @@ test("editing a grave warns about future invoices and freezes its recipients", a
 }) => {
   const marker = Date.now();
   await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  const item = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: { Number: `7100-${marker}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 },
-    })
-  ).json();
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: `Fest ${marker}`, Address: "Festweg 1" },
-    })
-  ).json();
-  const grave = await (
-    await page.request.post("/odata/Graves", {
-      data: { GraveNumber: `F-${marker}`, StartDate: "2026-01-01", EndDate: "2040-12-31" },
-    })
-  ).json();
+  const item = await createRow(page, "/odata/InvoiceItems", { Number: `7100-${marker}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 });
+  const recipient = await createRow(page, "/odata/Recipients", { Name: `Fest ${marker}`, Address: "Festweg 1" });
+  const grave = await createRow(page, "/odata/Graves", { GraveNumber: `F-${marker}`, StartDate: "2026-01-01", EndDate: "2040-12-31" });
   await page.request.post("/odata/GraveItems", {
     data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
   });

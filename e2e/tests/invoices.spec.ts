@@ -13,8 +13,11 @@ import { createRow, ensureRow } from "../seed";
 const RECIPIENT_NAME = `E2E 9001 ${Date.now()}`;
 
 /** The item field's suggestion list: a StandardListItem inside a popover. The
- *  recipient select's options are sapMSelectListItem, so this excludes them. */
-const SUGGESTION = "div.sapMPopover li.sapMSLI";
+ *  recipient select's options are sapMSelectListItem, so this excludes them.
+ *  ":visible" matters as much as the class: without it Playwright latches onto
+ *  the picker's markup before it opens and then waits for that one element to
+ *  become visible, which never happens if the picker re-renders when it opens. */
+const SUGGESTION = "div.sapMPopover:visible li.sapMSLI";
 
 async function seedMasterData(
   page: import("@playwright/test").Page,
@@ -206,29 +209,17 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
-  const item = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: {
+  const item = await createRow(page, "/odata/InvoiceItems", {
         Number: itemNumber,
         Description: "E2E Revision",
         VatRate: 7,
         DefaultPrice: null,
-      },
-    })
-  ).json();
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: recipientName, Address: "Revisionsweg 1" },
-    })
-  ).json();
-  const invoice = await (
-    await page.request.post("/odata/CreateInvoice", {
-      data: {
+      });
+  const recipient = await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Revisionsweg 1" });
+  const invoice = await createRow(page, "/odata/CreateInvoice", {
         recipientId: recipient.Id,
         lines: [{ itemId: item.Id, count: 1, unitPrice: 100 }],
-      },
-    })
-  ).json();
+      });
   const number = invoice.InvoiceNumber as string;
   expect(number).toMatch(/^\d{4}-\d{4}$/); // freshly created: no -R suffix
 
