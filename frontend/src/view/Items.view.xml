@@ -24,7 +24,14 @@
                  block below the row as the screen gets narrower -->
             <Table id="itemsTable" class="sapUiSmallMarginTop"
                 autoPopinMode="true" popinLayout="Block"
-                items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}}"
+                items="{
+                    path: 'odata>/InvoiceItems',
+                    parameters: {$orderby: 'Id desc'},
+                    boundFilters: {and: false, filters: [
+                        {path: 'Number', operator: 'Contains', value1: '{view>/searchTerm}'},
+                        {path: 'Description', operator: 'Contains', value1: '{view>/searchTerm}'}
+                    ]}
+                }"
                 noDataText="{i18n>noData}">
                         <columns>
                             <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
