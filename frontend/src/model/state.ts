@@ -1,4 +1,4 @@
-import type { YearHalfOption } from "./api";
+import type { GraveStatusRow, YearHalfOption } from "./api";
 
 /**
  * What a view or a dialog holds while the user works in it.
@@ -61,6 +61,11 @@ export interface SettingsDraft {
   stampWord: string;
   endingText: string;
   language: string;
+}
+
+/** The rows the grave overview shows: the half-year status order, filtered. */
+export interface GravesStatus {
+  graves: GraveStatusRow[];
 }
 
 export interface GravesView {

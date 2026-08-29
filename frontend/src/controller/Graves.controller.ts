@@ -1,30 +1,33 @@
+import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
+import Dialog from "sap/m/Dialog";
 import MessageBox from "sap/m/MessageBox";
-import Select from "sap/m/Select";
-import Item from "sap/ui/core/Item";
-import JSONModel from "sap/ui/model/json/JSONModel";
+import type { SearchField$SearchEvent } from "sap/m/SearchField";
+import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
+import type {
+  GenerateDraft,
+  GravesStatus,
+  GravesView,
+} from "../model/state";
 import GraveEdit from "./GraveEdit.controller";
 
 export default class Graves extends GraveEdit {
   private static readonly JOB_TIMEOUT_MS = 10 * 60 * 1000;
 
   public onInit(): void {
-    const view = this.getView()!;
     this.bindODataRoot();
     // The overview lists graves that are still open for the selected half-year
     // first (FR-028). That order depends on the half-year, so the rows come from
     // the status endpoint rather than from a plain Graves list binding.
-    view.setModel(new JSONModel({ graves: [] }), "status");
+    this.setState<GravesStatus>("status", { graves: [] });
 
     // half-year options are generated at runtime; default to the current
     // year's first half, matching the generate dialog's default half
-    const select = this.byId("halfYearSelect") as Select;
-    select.removeAllItems();
-    for (const option of api.halfYearOptions(2, 1)) {
-      select.addItem(new Item({ key: option.key, text: option.text }));
-    }
-    select.setSelectedKey(`${new Date().getFullYear()}-1`);
+    this.setState<GravesView>("view", {
+      halfYearOptions: api.halfYearOptions(2, 1),
+      halfYear: `${new Date().getFullYear()}-1`,
+    });
 
     void this.refreshStatus();
   }
@@ -47,11 +50,11 @@ export default class Graves extends GraveEdit {
     void this.refreshStatus();
   }
 
-  public async onSearchGraves(event: any): Promise<void> {
+  public async onSearchGraves(event: SearchField$SearchEvent): Promise<void> {
     // the backend search is Unicode-aware (umlauts), so it decides which graves
     // match; the ids it returns narrow the rows the overview already holds
     this._searchIds = null;
-    const term = event.getParameter("query") as string;
+    const term = event.getParameter("query") ?? "";
     if (term) {
       try {
         const matches = await api.searchGraves(term);
@@ -65,11 +68,17 @@ export default class Graves extends GraveEdit {
     this.applyRows();
   }
 
-  protected async refreshStatus(): Promise<void> {
-    const [year, half] = (this.byId("halfYearSelect") as Select)
-      .getSelectedKey()
+  /** "2026-1" -> [2026, 1]: the half-year the toolbar shows. */
+  private selectedHalfYear(): [number, number] {
+    const [year, half] = this.state<GravesView>("view")
+      .getProperty("/halfYear")
       .split("-")
       .map(Number);
+    return [year, half];
+  }
+
+  protected async refreshStatus(): Promise<void> {
+    const [year, half] = this.selectedHalfYear();
     try {
       this._rows = await api.fetchGraveStatus(year, half);
       this.applyRows();
@@ -83,23 +92,20 @@ export default class Graves extends GraveEdit {
     const rows = this._searchIds
       ? this._rows.filter((row) => this._searchIds!.has(Number(row.Id)))
       : this._rows;
-    (this.getView()!.getModel("status") as JSONModel).setProperty(
-      "/graves",
-      rows,
-    );
+    this.state<GravesStatus>("status").setProperty("/graves", rows);
   }
 
   public async onCreateGrave(): Promise<void> {
     await this.openGraveDialog(null);
   }
 
-  public async onEditGrave(event: any): Promise<void> {
-    const context = event.getSource().getBindingContext("status");
+  public async onEditGrave(event: Button$PressEvent): Promise<void> {
+    const context = event.getSource().getBindingContext("status")!;
     await this.openGraveDialog(Number(context.getProperty("Id")));
   }
 
-  public onShowGraveDetails(event: any): void {
-    const context = event.getSource().getBindingContext("status");
+  public onShowGraveDetails(event: Button$PressEvent): void {
+    const context = event.getSource().getBindingContext("status")!;
     this.router().navTo("graveDetail", {
       graveId: String(context.getProperty("Id")),
     });
@@ -111,10 +117,7 @@ export default class Graves extends GraveEdit {
    * is the one thing that could be mistaken for a bulk of originals.
    */
   public async onBulkGraveInvoices(): Promise<void> {
-    const [year, half] = (this.byId("halfYearSelect") as Select)
-      .getSelectedKey()
-      .split("-")
-      .map(Number);
+    const [year, half] = this.selectedHalfYear();
     try {
       await api.bulkDownload("Normal", "rechnungen.zip", year, half);
     } catch (error) {
@@ -134,27 +137,30 @@ export default class Graves extends GraveEdit {
     if (!this._generateDialog) {
       this._generateDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.GenerateDialog",
-      })) as any;
+      })) as Dialog;
     }
 
-    // year options are generated at runtime; default to the current year
-    const yearSelect = this.byId("genYear") as Select;
-    yearSelect.removeAllItems();
-    for (const option of api.yearOptions(1, 1)) {
-      yearSelect.addItem(new Item({ key: option.key, text: option.text }));
-    }
-    yearSelect.setSelectedKey(String(new Date().getFullYear()));
-
+    this._generateDialog.setModel(
+      new TypedJSONModel<GenerateDraft>({
+        // year options are generated at runtime; default to the current year
+        yearOptions: api.yearOptions(1, 1),
+        year: String(new Date().getFullYear()),
+        half: "1",
+      }),
+      "generateDraft",
+    );
     this._generateDialog.open();
   }
 
-  public async onGenerateDialogSave(event: any): Promise<void> {
-    const dialog = event.getSource().getParent() as any;
-    const year = Number((this.byId("genYear") as Select).getSelectedKey());
-    const half = Number((this.byId("genHalf") as Select).getSelectedKey());
+  public async onGenerateDialogSave(): Promise<void> {
+    const draft = (
+      this._generateDialog.getModel("generateDraft") as TypedJSONModel<GenerateDraft>
+    ).getData();
+    const year = Number(draft.year);
+    const half = Number(draft.half);
 
     this._running = true;
-    dialog.close();
+    this._generateDialog.close();
     const busy = new BusyDialog({ title: this.i18nText("generationRunning") });
     busy.open();
 
@@ -163,7 +169,9 @@ export default class Graves extends GraveEdit {
     try {
       const job = await api.generateGraveInvoices(year, half);
       finished = await this.pollJob(job.Id, (percent) =>
-        busy.setTitle(this.i18nText("generationProgress").replace("{0}", String(percent))),
+        busy.setTitle(
+          this.i18nText("generationProgress").replace("{0}", String(percent)),
+        ),
       );
     } catch (error) {
       failure = error;
@@ -183,13 +191,15 @@ export default class Graves extends GraveEdit {
     }
 
     if (finished.Status === "Failed") {
-      await MessageBox.error(this.i18nText("generationFailed"));
+      MessageBox.error(this.i18nText("generationFailed"));
       return;
     }
 
-    const result = JSON.parse(finished.ResultJson ?? "{}") as any;
+    const result = JSON.parse(
+      finished.ResultJson ?? "{}",
+    ) as api.GenerationResult;
     const skipped = (result.SkippedGraves ?? [])
-      .map((entry: any) => {
+      .map((entry) => {
         const number = typeof entry === "string" ? entry : entry.Number;
         const reason =
           typeof entry === "object" && entry.Reason
@@ -200,17 +210,15 @@ export default class Graves extends GraveEdit {
       .join(", ");
     const message =
       `${this.i18nText("generationDone")}: ${result.InvoicedGraves ?? 0}` +
-      (skipped
-        ? ` (${this.i18nText("skippedGraves")}: ${skipped})`
-        : "");
+      (skipped ? ` (${this.i18nText("skippedGraves")}: ${skipped})` : "");
     // non-blocking: the busy dialog must close while the result message
     // stays open for the user to dismiss
-    void MessageBox.information(message);
+    MessageBox.information(message);
     await this.refreshStatus();
   }
 
-  public onGenerateDialogCancel(event: any): void {
-    (event.getSource().getParent() as any).close();
+  public onGenerateDialogCancel(): void {
+    this._generateDialog.close();
   }
 
   private async pollJob(
@@ -218,7 +226,7 @@ export default class Graves extends GraveEdit {
     onProgress: (percent: number) => void,
   ): Promise<api.JobDto> {
     const deadline = Date.now() + Graves.JOB_TIMEOUT_MS;
-    while (true) {
+    for (;;) {
       if (Date.now() > deadline) {
         throw new Error("JobTimeout");
       }
@@ -242,5 +250,5 @@ export default class Graves extends GraveEdit {
   private _rows: api.GraveStatusRow[] = [];
   private _searchIds: Set<number> | null = null;
   private _running = false;
-  private _generateDialog: any;
+  private _generateDialog!: Dialog;
 }
