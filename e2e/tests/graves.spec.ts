@@ -253,6 +253,21 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
     .click();
   await expect(graveDialog.getByLabel("Anzahl")).toHaveValue("2");
   await expect(graveDialog.getByLabel("Preis")).toHaveValue("55");
+  // the dialog is built once by loadFragment and reused: the first open above
+  // was in create mode (Id === null, warnings hidden, recipient controls
+  // shown), and this is the same fragment instance reopened in edit mode
+  // (Id !== null) with a fresh graveDraft model. Asserting the edit-mode
+  // state here — not just in a fresh-page test — proves the visibility
+  // bindings re-evaluate when the draft model is replaced, not merely on
+  // first render.
+  await expect(graveDialog).toContainText("nur auf künftig erstellte Rechnungen");
+  await expect(graveDialog).toContainText("Empfänger eines Grabs");
+  // scoped to the recipients section: the Items panel has its own always-visible
+  // "Zeile hinzufügen" (contains "Hinzufügen" as a substring) and "Löschen" controls
+  const recipientsTable = graveDialog.locator("[id$='graveRecipientsTable']");
+  const recipientsLink = graveDialog.locator("[id$='graveRecipientsLink']");
+  await expect(recipientsLink.getByRole("button", { name: "Hinzufügen" })).toBeHidden();
+  await expect(recipientsTable.getByRole("button", { name: "Löschen" })).toBeHidden();
   await page.getByRole("button", { name: "Abbrechen" }).click();
 });
 
