@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -49,6 +50,91 @@ public class GraveInvoiceRevisionTests
         var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
         var invoiceId = (await verifyDb.Invoices.OrderBy(i => i.Id).FirstAsync(i => i.GraveId == graveId)).Id;
         return (graveId, itemId, invoiceId);
+    }
+
+    /// <summary>A grave with one item (count 1 at 10.01, 7% VAT — chosen so the
+    /// gross does not split evenly across two recipients) and two recipients
+    /// linked in reverse-alphabetical order (Zimmermann first, then Abel),
+    /// invoiced for 2032 H1.</summary>
+    private static async Task<(long GraveId, long ItemId, long InvoiceId)> SeedReverseAlphabeticalAsync(ApiTestHost host)
+    {
+        long graveId, itemId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.VatRates.Add(new VatRate { Rate = 7m });
+            var item = new InvoiceItem { Number = "2003", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 10.01m };
+            var zimmermann = new Recipient { Number = "E-0010", Name = "Zimmermann Zora", Address = "Z 1" };
+            var abel = new Recipient { Number = "E-0011", Name = "Abel Anton", Address = "A 2" };
+            db.InvoiceItems.Add(item);
+            db.Recipients.AddRange(zimmermann, abel);
+            var grave = new Grave
+            {
+                GraveNumber = "G-301",
+                StartDate = new DateOnly(2020, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            db.GraveItems.Add(new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 1 });
+            // linked in reverse-alphabetical order: Zimmermann's link gets the
+            // lower id, so generation (ordered by link id) puts her at split
+            // position 0 — while ordering siblings by RecipientName instead of
+            // Id would put Abel there on revision.
+            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = zimmermann.Id });
+            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = abel.Id });
+            await db.SaveChangesAsync();
+            (graveId, itemId) = (grave.Id, item.Id);
+        }
+
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2032, 1);
+
+        using var verify = host.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoiceId = (await verifyDb.Invoices.OrderBy(i => i.Id).FirstAsync(i => i.GraveId == graveId)).Id;
+        return (graveId, itemId, invoiceId);
+    }
+
+    [Fact]
+    public async Task A_revision_keeps_each_recipients_amount_at_their_original_split_position()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, invoiceId) = await SeedReverseAlphabeticalAsync(host);
+
+        // count 1 at 10.01 with 7% VAT grosses to 1071 cents (1001 net cents ×
+        // 1.07, rounded away from zero), which does not split evenly across two
+        // recipients: SplitCents(1071, 2) = [536, 535] — a genuine remainder cent.
+        Dictionary<string, decimal> before;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            before = await db.Invoices.Include(i => i.Lines)
+                .Where(i => i.GraveId == graveId)
+                .ToDictionaryAsync(i => i.RecipientName, i => i.Lines.Single().UnitPrice);
+        }
+        Assert.Equal(2, before.Count);
+
+        using var client = host.CreateClient();
+        var response = await client.PostAsync("/odata/CreateGraveInvoiceRevision", ODataJson.Body(new
+        {
+            invoiceId,
+            // the same amounts generation already used, submitted unchanged
+            lines = new[] { new { itemId, count = 1, unitPrice = (decimal?)10.01m } },
+        }));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verify = host.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var after = await verifyDb.Invoices.Include(i => i.Lines)
+            .Where(i => i.GraveId == graveId && i.IsLatestRevision)
+            .ToListAsync();
+
+        Assert.Equal(2, after.Count);
+        // a revision must not move the leftover cent to a different recipient
+        // than generation gave it to, even though the grave total stays exact
+        Assert.All(after, r => Assert.Equal(before[r.RecipientName], r.Lines.Single().UnitPrice));
     }
 
     [Fact]

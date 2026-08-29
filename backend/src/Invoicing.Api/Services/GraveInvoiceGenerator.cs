@@ -25,8 +25,12 @@ public sealed class GraveInvoiceGenerator
     /// otherwise the created invoices.</summary>
     public async Task<GraveGenerationResult> GenerateForGraveAsync(Grave grave, int year, int half, CancellationToken ct)
     {
+        // ordered explicitly by link id: GraveInvoiceRevisionService relies on
+        // this order matching the order invoice ids were assigned in below, so
+        // it can reproduce the same GraveInvoiceSplitter split on revision.
         var recipients = await _db.GraveRecipients
             .Where(r => r.GraveId == grave.Id)
+            .OrderBy(r => r.Id)
             .Select(r => r.Recipient)
             .ToListAsync(ct);
 

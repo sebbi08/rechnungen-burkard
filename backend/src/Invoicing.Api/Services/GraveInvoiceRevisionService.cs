@@ -38,8 +38,14 @@ public sealed class GraveInvoiceRevisionService
                         && i.PeriodYear == edited.PeriodYear
                         && i.PeriodHalf == edited.PeriodHalf
                         && i.IsLatestRevision)
-            .OrderBy(i => i.RecipientName)
-            .ThenBy(i => i.Id)
+            // generation assigned these ids in the order it split the grave's
+            // lines (one SaveChangesAsync per recipient, in recipient-list
+            // order), so ordering by id puts every recipient back at the same
+            // GraveInvoiceSplitter position generation gave them — ordering by
+            // name instead would hand SplitCents' remainder cent to whichever
+            // recipient sorts first alphabetically, silently moving it away
+            // from the recipient generation gave it to.
+            .OrderBy(i => i.Id)
             .ToListAsync(ct);
         if (siblings.Count == 0)
         {
