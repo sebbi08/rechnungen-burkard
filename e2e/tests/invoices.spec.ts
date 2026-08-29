@@ -1,10 +1,20 @@
 import { expect, test } from "@playwright/test";
+import { createRow, ensureRow } from "../seed";
 
 // Unique per run: the parallel grave generation (graves.spec.ts) inserts
 // invoices in bursts, and against the dev stack rows from earlier runs are
 // still there, so row-count and first-row assertions are invalid. A unique
 // recipient makes this spec's assertions independent of both.
-const RECIPIENT_NAME = `E2E ${Date.now()}`;
+// Deliberately contains the item number seeded below. The recipient select's
+// popover stays in the DOM — and briefly visible — after a recipient is picked,
+// so an unscoped suggestion locator would match its options too. This name keeps
+// that collision permanent instead of leaving it to whether the clock happens to
+// produce a timestamp containing the item number, which is how it first showed up.
+const RECIPIENT_NAME = `E2E 9001 ${Date.now()}`;
+
+/** The item field's suggestion list: a StandardListItem inside a popover. The
+ *  recipient select's options are sapMSelectListItem, so this excludes them. */
+const SUGGESTION = "div.sapMPopover li.sapMSLI";
 
 async function seedMasterData(
   page: import("@playwright/test").Page,
@@ -12,16 +22,12 @@ async function seedMasterData(
   // Direct API calls keep the test focused on the UI flow. VatRate 7 and
   // item 9001 may already exist from previous runs; the API then answers
   // 409, which is harmless because the existing rows are reused.
-  await page.request.post("/odata/VatRates", {
-    data: { Rate: 7 },
-  });
-  await page.request.post("/odata/InvoiceItems", {
-    data: {
-      Number: "9001",
-      Description: "Grabpflege",
-      VatRate: 7,
-      DefaultPrice: null,
-    },
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/InvoiceItems", {
+    Number: "9001",
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: null,
   });
   // Recipient names are not unique in the backend and both tests in this
   // file share the seeded recipient, so seed only when it does not exist
@@ -33,11 +39,9 @@ async function seedMasterData(
     )
   ).json();
   if (!(recipients.value as any[]).length) {
-    await page.request.post("/odata/Recipients", {
-      data: {
-        Name: RECIPIENT_NAME,
-        Address: "Musterstraße 1\n12345 Musterstadt",
-      },
+    await createRow(page, "/odata/Recipients", {
+      Name: RECIPIENT_NAME,
+      Address: "Musterstraße 1\n12345 Musterstadt",
     });
   }
 }
@@ -69,7 +73,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   );
   await lineInput.click();
   await lineInput.fill("9001");
-  await page.locator("div.sapMPopover li", { hasText: "9001" }).click();
+  await page.locator(SUGGESTION, { hasText: "9001" }).click();
   await page.getByLabel("Anzahl").fill("2");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -128,7 +132,7 @@ test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
   );
   await lineInput.click();
   await lineInput.fill("9001");
-  await page.locator("div.sapMPopover li", { hasText: "9001" }).click();
+  await page.locator(SUGGESTION, { hasText: "9001" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   // the create dialog renders "Preis" as a column header and stays in the DOM
@@ -183,7 +187,7 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({
   );
   await lineInput.click();
   await lineInput.fill(itemNumber);
-  await page.locator("div.sapMPopover li", { hasText: itemNumber }).click();
+  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
   await page.getByLabel("Anzahl").fill("1");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -253,21 +257,33 @@ async function seedOwnMasterData(
 ): Promise<{ itemNumber: string; recipientName: string; recipientId: number }> {
   const itemNumber = `${marker}-item`;
   const recipientName = `${marker}`;
-  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  await page.request.post("/odata/InvoiceItems", {
-    data: {
-      Number: itemNumber,
-      Description: "E2E",
-      VatRate: 7,
-      DefaultPrice: null,
-    },
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "E2E",
+    VatRate: 7,
+    DefaultPrice: null,
   });
-  const recipient = await (
-    await page.request.post("/odata/Recipients", {
-      data: { Name: recipientName, Address: "Musterweg 1\n12345 Musterstadt" },
-    })
-  ).json();
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Musterweg 1\n12345 Musterstadt",
+  });
   return { itemNumber, recipientName, recipientId: recipient.Id };
+}
+
+/** Invoices whose snapshotted recipient name matches, by name rather than id:
+ *  the caller knows what the dialog displayed, not which row it came from. */
+async function countInvoicesFor(
+  page: import("@playwright/test").Page,
+  recipientName: string,
+): Promise<number> {
+  const filter = encodeURIComponent(
+    `RecipientName eq '${recipientName.replace(/'/g, "''")}'`,
+  );
+  const response = await page.request.get(
+    `/odata/Invoices?$filter=${filter}&$select=Id`,
+  );
+  return ((await response.json()).value as unknown[]).length;
 }
 
 async function countInvoices(
@@ -289,14 +305,14 @@ async function fillLine(
   );
   await lineInput.click();
   await lineInput.fill(itemNumber);
-  await page.locator("div.sapMPopover li", { hasText: itemNumber }).click();
+  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
   await page.getByLabel("Preis").fill("120");
 }
 
 test("the second invoice goes to the recipient the reopened dialog shows", async ({
   page,
 }) => {
-  const { itemNumber, recipientName, recipientId } = await seedOwnMasterData(
+  const { itemNumber, recipientName } = await seedOwnMasterData(
     page,
     `Wieder ${Date.now()}`,
   );
@@ -317,19 +333,26 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
     invoicesTable.locator("tbody tr", { hasText: recipientName }),
   ).toBeVisible();
 
-  // second invoice: the dialog is reopened and still shows that recipient, so
-  // saving without touching the select must invoice exactly that recipient
+  // second invoice: the dialog is reopened and saved without touching the
+  // select. *Which* recipient it shows is not this test's business — a reopened
+  // dialog carries no draft selection, so the select falls back to the newest
+  // recipient, and a spec running beside this one may have created one since.
+  // What must hold is that the save invoices exactly the recipient on screen.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  await expect(page.locator(".sapMDialog .sapMSlt").first()).toContainText(
-    recipientName,
-  );
+  // the visible label; the select also renders a hidden native one
+  const shown = (
+    await page.locator(".sapMDialog .sapMSltLabel").first().innerText()
+  ).trim();
+  expect(shown).not.toBe("");
+  const before = await countInvoicesFor(page, shown);
+
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
 
-  // both invoices belong to that recipient; before the fix the second save
-  // sent recipient 0 and the backend answered "Der Empfänger wurde nicht
-  // gefunden", because the fresh draft never picked up the shown selection
-  await expect.poll(() => countInvoices(page, recipientId)).toBe(2);
+  // before the fix the second save sent recipient 0 and the backend answered
+  // "Der Empfänger wurde nicht gefunden", because the fresh draft never picked
+  // up the shown selection
+  await expect.poll(() => countInvoicesFor(page, shown)).toBe(before + 1);
 });
 
 test("a double click on save creates one invoice, not two", async ({

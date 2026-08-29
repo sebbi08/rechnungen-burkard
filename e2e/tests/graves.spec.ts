@@ -1,9 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { createRow, ensureRow } from "../seed";
 
 // Unique per test run. `npm test` starts with an empty database, but
 // `npm run test:dev` runs against the dev stack, where fixed numbers would
 // collide with pre-existing rows or make assertions vacuous.
 const RUN = Date.now();
+
+/** The item field's suggestion list: a StandardListItem inside a popover. The
+ *  grave dialog's recipient select leaves its own options in the DOM, and those
+ *  are sapMSelectListItem, so scoping here keeps the two apart. */
+const SUGGESTION = "div.sapMPopover li.sapMSLI";
 
 async function seedGraveGenerationData(
   page: import("@playwright/test").Page,
@@ -208,7 +214,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   );
   await itemInput.click();
   await itemInput.fill(itemNumber);
-  await page.locator("div.sapMPopover li", { hasText: itemNumber }).click();
+  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
   await graveDialog.getByLabel("Anzahl").fill("2");
   await graveDialog.getByLabel("Preis").fill("55");
 
@@ -306,7 +312,7 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   await itemInput.click();
   await itemInput.fill(noPriceItemNumber);
   await page
-    .locator("div.sapMPopover li", { hasText: noPriceItemNumber })
+    .locator(SUGGESTION, { hasText: noPriceItemNumber })
     .click();
 
   // no price anywhere: saving is rejected with the German "missing price" message
@@ -468,37 +474,31 @@ async function seedGrave(
   marker: string,
   recipientNames: string[],
 ): Promise<{ graveId: number; recipientNames: string[] }> {
-  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  const item = await (
-    await page.request.post("/odata/InvoiceItems", {
-      data: {
-        Number: `${marker}-item`,
-        Description: "Grabpflege",
-        VatRate: 7,
-        DefaultPrice: 100,
-      },
-    })
-  ).json();
-  const grave = await (
-    await page.request.post("/odata/Graves", {
-      data: {
-        GraveNumber: marker,
-        StartDate: "2026-01-01",
-        EndDate: "2040-12-31",
-      },
-    })
-  ).json();
-  await page.request.post("/odata/GraveItems", {
-    data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const grave = await createRow(page, "/odata/Graves", {
+    GraveNumber: marker,
+    StartDate: "2026-01-01",
+    EndDate: "2040-12-31",
+  });
+  await createRow(page, "/odata/GraveItems", {
+    GraveId: grave.Id,
+    ItemId: item.Id,
+    Count: 1,
   });
   for (const name of recipientNames) {
-    const recipient = await (
-      await page.request.post("/odata/Recipients", {
-        data: { Name: name, Address: "Musterweg 1" },
-      })
-    ).json();
-    await page.request.post("/odata/GraveRecipients", {
-      data: { GraveId: grave.Id, RecipientId: recipient.Id },
+    const recipient = await createRow(page, "/odata/Recipients", {
+      Name: name,
+      Address: "Musterweg 1",
+    });
+    await createRow(page, "/odata/GraveRecipients", {
+      GraveId: grave.Id,
+      RecipientId: recipient.Id,
     });
   }
   return { graveId: grave.Id, recipientNames };

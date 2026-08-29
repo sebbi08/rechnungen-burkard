@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createRow, ensureRow } from "../seed";
 
 // Layout regressions on small screens: every list screen must fit the viewport
 // without sideways scrolling, its actions must stay reachable (directly or
@@ -60,33 +61,8 @@ function seed(page: Page): Promise<void> {
   return seeding;
 }
 
-/**
- * Creates a row and returns it. The whole suite writes to one SQLite file, and
- * under the load of the parallel specs a write can fail; a failed attempt is
- * retried and a permanent failure names the status instead of dying on an
- * unparsable body.
- */
-async function createRow(
-  page: Page,
-  path: string,
-  data: Record<string, unknown>,
-): Promise<any> {
-  let failure = "no attempt";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const response = await page.request.post(path, { data });
-    const body = await response.text();
-    if (response.ok() && body) {
-      return JSON.parse(body);
-    }
-    failure = `HTTP ${response.status()} ${body}`;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error(`POST ${path} failed: ${failure}`);
-}
-
 async function seedRows(page: Page): Promise<void> {
-  // VatRate 7 may already exist; the API then answers 409, which is harmless
-  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: ITEM_NUMBER,
     Description: "Grabpflege mit einer längeren Beschreibung",
