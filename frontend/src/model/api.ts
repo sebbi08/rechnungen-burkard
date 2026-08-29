@@ -458,7 +458,7 @@ export interface GraveInvoiceGroup {
   GraveNumber: string;
   PeriodYear: number;
   PeriodHalf: number;
-  Recipients: { Id: number; Name: string; InvoiceId: number }[];
+  Recipients: { Id: number; Name: string; InvoiceId: number; RootId: number }[];
   Lines: GraveInvoiceGroupLine[];
 }
 

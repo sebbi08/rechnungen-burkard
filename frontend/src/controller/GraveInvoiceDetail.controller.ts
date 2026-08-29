@@ -60,7 +60,7 @@ export default class GraveInvoiceDetail extends GraveEdit {
     const context = event.getSource().getBindingContext("detail");
     this.router().navTo("graveInvoiceDetail", {
       graveId: String(this._graveId),
-      rootId: String(context.getProperty("InvoiceId")),
+      rootId: String(context.getProperty("RootId")),
     });
   }
 

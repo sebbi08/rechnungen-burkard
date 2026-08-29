@@ -634,6 +634,14 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   // the other recipient of the same half-year is listed
   await expect(detailPage.getByText(names[1])).toBeVisible();
 
+  // clicking that sibling opens their own grave-invoice detail page — this is
+  // the normal navigation path (as opposed to pasting a URL) and was never
+  // exercised before, so a route param regression (e.g. passing an id the
+  // route's RootId filter can't match) would have gone unnoticed
+  await detailPage.locator(".sapMSLI", { hasText: names[1] }).click();
+  await expect(detailPage.getByText(names[1], { exact: true })).toBeVisible();
+  await expect(detailPage.getByText(names[0])).toBeVisible();
+
   // back navigation returns to the grave, not to the home screen — via the
   // page's own nav-back button, not a positional lookup (the header also
   // carries an edit button)

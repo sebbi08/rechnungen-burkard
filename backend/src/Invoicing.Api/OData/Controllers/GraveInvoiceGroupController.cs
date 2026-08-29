@@ -89,7 +89,13 @@ public class GraveInvoiceGroupController : ODataController
             GraveNumber = graveNumber,
             PeriodYear = invoice.PeriodYear.Value,
             PeriodHalf = invoice.PeriodHalf.Value,
-            Recipients = siblings.Select(s => new { Id = s.RecipientId, Name = s.RecipientName, InvoiceId = s.Id }),
+            // RootId is what the frontend navigates siblings with — InvoiceId is
+            // that sibling's latest revision id, kept so the caller can filter the
+            // currently-shown invoice out of the list.
+            Recipients = siblings.Select(s => new
+            {
+                Id = s.RecipientId, Name = s.RecipientName, InvoiceId = s.Id, RootId = s.RootId,
+            }),
             Lines = GraveLines(orderedLines).Select(l => new
             {
                 l.ItemId, l.ItemNumber, l.Description, l.Count, l.UnitPrice, l.VatRate,
