@@ -30,6 +30,8 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run ui5lint
       - run: npm run build
 
   # The constitution puts integration and E2E tests ahead of unit tests, so the
