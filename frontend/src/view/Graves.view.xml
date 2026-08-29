@@ -60,6 +60,7 @@
                                     <Text text="{path: 'status>StartDate', formatter: '.formatDate'}" />
                                     <Text text="{path: 'status>EndDate', formatter: '.formatDate'}" />
                                     <ObjectStatus text="{path: 'status>Invoiced', formatter: '.statusFormatter'}"
+                                        stateAnnouncementText="{path: 'status>Invoiced', formatter: '.statusAnnouncement'}"
                                         state="{= ${status>Invoiced} ? 'Success' : 'Error' }"
                                         icon="{= ${status>Invoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
                                     <HBox wrap="Wrap">

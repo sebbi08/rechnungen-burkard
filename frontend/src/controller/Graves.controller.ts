@@ -29,6 +29,16 @@ export default class Graves extends GraveEdit {
     void this.refreshStatus();
   }
 
+  /**
+   * What a screen reader says about the status. Without it the red state is
+   * announced as a validation error, which an open half-year is not.
+   */
+  public statusAnnouncement(invoiced: boolean | null | undefined): string {
+    return this.i18nText(
+      invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
+    );
+  }
+
   public statusFormatter(invoiced: boolean | null | undefined): string {
     return this.i18nText(invoiced ? "statusInvoiced" : "statusOpen");
   }

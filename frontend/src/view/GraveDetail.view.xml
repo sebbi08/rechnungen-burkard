@@ -18,6 +18,7 @@
                     <!-- green when this half-year is done, red while it still needs
                          invoices — the same reading as the grave list -->
                     <ObjectStatus title="{grave>/currentHalfYearLabel}" text="{grave>/currentStatusText}"
+                        stateAnnouncementText="{grave>/currentStatusAnnouncement}"
                         state="{= ${grave>/currentInvoiced} ? 'Success' : 'Error' }"
                         icon="{= ${grave>/currentInvoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
                 </HBox>

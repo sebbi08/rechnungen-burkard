@@ -648,3 +648,23 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   await page.locator("[id$='graveInvoiceDetailPage-navButton']").click();
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
 });
+
+test("the half-year status announces its meaning, not a validation error", async ({
+  page,
+}) => {
+  const marker = `GA-${Date.now()}`;
+  await seedGrave(page, marker, [`Ansage ${marker}`]);
+
+  await page.goto("/index.html#/graves");
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  const status = gravesTable
+    .locator("tbody tr", { hasText: marker })
+    .locator(".sapMObjStatus");
+  await expect(status).toBeVisible();
+
+  // The red state otherwise makes a screen reader call an open half-year an
+  // invalid entry. The status carries its own announcement instead, which lives
+  // in a hidden span, so this reads the markup rather than the visible text.
+  const markup = await status.innerHTML();
+  expect(markup).toContain("Rechnungen offen");
+});

@@ -49,6 +49,10 @@ export default class GraveDetail extends GraveEdit {
             api.halfYearText(year, half),
           ),
           currentStatusText: this.i18nText(invoiced ? "statusInvoiced" : "statusOpen"),
+          // without this the red state is announced as a validation error
+          currentStatusAnnouncement: this.i18nText(
+            invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
+          ),
           currentInvoiced: invoiced,
           Items: (details.Items as any[]).map((link) => ({
             Number: link.Item.Number,
