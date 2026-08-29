@@ -1,10 +1,11 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.3.0 → 2.0.0 (backend protocol redefined: OData v4 + .NET)
-Modified principles: Principle I (Full-Stack Web Application) — interface
-  redefined from OData v2 to OData v4
-Added sections: none (Technology Constraints extended with .NET backend)
+Version change: 2.0.0 → 3.0.0 (release shape redefined: one container image)
+Modified principles: Principle I (Full-Stack Web Application) — frontend and
+  backend are no longer required to be independently deployable and
+  containerized; they ship together in a single image
+Added sections: none
 Removed sections: none
 Follow-up TODOs: none
 -->
@@ -17,10 +18,12 @@ Follow-up TODOs: none
 
 The application MUST be a web application composed of a frontend and a backend.
 The frontend and backend MUST communicate through a clear, documented interface
-using OData v4. Each side MUST be independently deployable and containerized.
+using OData v4. The two MUST be released together as a single container image.
 
 Rationale: A document-generation product requires both a user-facing interface
-and a backend that owns business logic and persistence.
+and a backend that owns business logic and persistence. One deployment target
+keeps the release and the operations around it small; what keeps the two sides
+separable is the OData interface, not a container boundary.
 
 ### II. Document Generation
 
@@ -118,4 +121,4 @@ PATCH for clarifications and wording fixes.
 Compliance with this constitution MUST be reviewed as part of code review and
 release. Deviations MUST be justified and recorded.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-08-15
+**Version**: 3.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-08-29

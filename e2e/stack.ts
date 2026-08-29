@@ -18,12 +18,12 @@ const COMPOSE_ARGS = [
 export function compose(...args: string[]): void {
   execFileSync("docker", [...COMPOSE_ARGS, ...args], {
     stdio: "inherit",
-    // building both images from cold takes a while
+    // building the image from cold takes a while
     timeout: 15 * 60 * 1000,
   });
 }
 
-/** Polls until the frontend serves and its /odata proxy reaches the backend. */
+/** Polls until the app serves and its OData endpoints answer. */
 export async function waitUntilReady(timeoutMs = 5 * 60 * 1000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   let lastError = "not started";

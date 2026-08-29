@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
 
+# The release image: the UI5 build is served from the API's wwwroot, so frontend
+# and backend ship as one container on one port and need no proxy between them.
 FROM node:22 AS frontend
 ARG VERSION=0.0.0
 WORKDIR /app/frontend

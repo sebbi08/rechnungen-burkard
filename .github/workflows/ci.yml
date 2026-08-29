@@ -32,19 +32,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
 
-  image:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build combined image
-        run: docker build -t invoicing:ci .
-      - name: Build backend image
-        run: docker build -f backend/Dockerfile -t invoicing-backend:ci .
-      - name: Build frontend image
-        run: docker build -f frontend/Dockerfile -t invoicing-frontend:ci .
-
   # The constitution puts integration and E2E tests ahead of unit tests, so the
-  # Playwright suite runs on every change, against the image that gets released.
+  # Playwright suite runs on every change, against the image that gets released
+  # — which also makes this the job that proves the image still builds.
   e2e:
     runs-on: ubuntu-latest
     steps:
@@ -52,7 +42,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build combined image
+      - name: Build the image
         run: docker build -t invoicing:e2e .
       - name: Start the app
         run: |
