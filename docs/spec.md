@@ -190,6 +190,10 @@ appears twice.
    first.
 5. **Given** the user selects a past or future half-year, **When** the view
    updates, **Then** the invoicing status for the selected half-year is displayed.
+6. **Given** a grave with two recipients has been invoiced for a half-year,
+   **When** the user edits one of those recipients' invoices, **Then** both
+   recipients receive a new revision carrying their share of the edited
+   amounts, and the previous invoices are preserved unchanged.
 
 ---
 
@@ -542,8 +546,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-045**: Users MUST be able to bulk-download the normal documents of the
   grave invoices of a selected half-year.
 - **FR-046**: Bulk download of normal invoices MUST NOT include copies.
-- **FR-047**: Copies MUST be downloadable only individually, from the invoice
-  and grave detail pages; there MUST be no bulk download for copies.
+- **FR-047**: A copy MUST be downloadable individually wherever an invoice is
+  listed or shown; copies MUST NOT be downloadable in bulk.
 - **FR-048**: Downloading a single invoice MUST deliver only the normal document;
   the copy MUST be downloadable via its own action.
 
