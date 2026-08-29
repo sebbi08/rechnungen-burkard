@@ -373,3 +373,49 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
   expect(job.ResultJson).toContain(graveNumber);
   expect(job.ResultJson).toContain("ItemWithoutPrice");
 });
+
+test("editing a grave warns about future invoices and freezes its recipients", async ({
+  page,
+}) => {
+  const marker = Date.now();
+  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
+  const item = await (
+    await page.request.post("/odata/InvoiceItems", {
+      data: { Number: `7100-${marker}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 },
+    })
+  ).json();
+  const recipient = await (
+    await page.request.post("/odata/Recipients", {
+      data: { Name: `Fest ${marker}`, Address: "Festweg 1" },
+    })
+  ).json();
+  const grave = await (
+    await page.request.post("/odata/Graves", {
+      data: { GraveNumber: `F-${marker}`, StartDate: "2026-01-01", EndDate: "2040-12-31" },
+    })
+  ).json();
+  await page.request.post("/odata/GraveItems", {
+    data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
+  });
+  await page.request.post("/odata/GraveRecipients", {
+    data: { GraveId: grave.Id, RecipientId: recipient.Id },
+  });
+
+  await page.goto("/index.html#/graves");
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  const row = gravesTable.locator("tbody tr", { hasText: `F-${marker}` });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Bearbeiten" }).click();
+
+  const dialog = page.locator("[id$='graveDialog']");
+  await expect(dialog).toContainText("nur auf künftig erstellte Rechnungen");
+  await expect(dialog).toContainText("Empfänger eines Grabs");
+  // the recipient stays visible but cannot be removed or added to; the item
+  // table has its own "Löschen"/"Hinzufügen" controls (always visible), so
+  // these are scoped to the recipients section specifically
+  await expect(dialog.getByText(`Fest ${marker}`)).toBeVisible();
+  const recipientsTable = dialog.locator("[id$='graveRecipientsTable']");
+  const recipientsLink = dialog.locator("[id$='graveRecipientsLink']");
+  await expect(recipientsLink.getByRole("button", { name: "Hinzufügen" })).toBeHidden();
+  await expect(recipientsTable.getByRole("button", { name: "Löschen" })).toBeHidden();
+});

@@ -1,7 +1,12 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog id="graveDialog" title="{i18n>createGrave}" stretch="true">
+    <Dialog id="graveDialog" stretch="true"
+        title="{= ${graveDraft>/Id} === null ? ${i18n>createGrave} : ${i18n>editGrave} }">
         <content>
             <VBox class="sapUiMediumMargin">
+                <!-- an edit changes the grave, never an invoice already issued
+                     from it; the invoices are snapshots -->
+                <MessageStrip type="Warning" showIcon="true" class="sapUiSmallMarginBottom"
+                    text="{i18n>graveEditWarning}" visible="{= ${graveDraft>/Id} !== null }" />
                 <Label text="{i18n>graveNumber}" labelFor="graveNumber" />
                 <Input id="graveNumber" width="16rem" value="{graveDraft>/GraveNumber}" />
                 <Label text="{i18n>startDate}" labelFor="graveStart" />
@@ -46,6 +51,10 @@
                     <Button text="{i18n>addLine}" press=".onAddItemLink" class="sapUiSmallMarginTop" />
                 </Panel>
                 <Panel headerText="{i18n>graveRecipients}">
+                    <!-- the even split across them is baked into every invoice the
+                         grave has generated, so the set is fixed at creation -->
+                    <MessageStrip type="Information" showIcon="true" class="sapUiSmallMarginBottom"
+                        text="{i18n>graveRecipientsFixed}" visible="{= ${graveDraft>/Id} !== null }" />
                     <Table id="graveRecipientsTable" items="{graveDraft>/Recipients}"
                         autoPopinMode="true" popinLayout="Block">
                         <columns>
@@ -56,13 +65,15 @@
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{graveDraft>name}" />
-                                    <Button text="{i18n>delete}" press=".onDeleteRecipientLink" type="Transparent" />
+                                    <Button text="{i18n>delete}" press=".onDeleteRecipientLink"
+                                        type="Transparent" visible="{= ${graveDraft>/Id} === null }" />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
                     <!-- wraps so the select and both buttons stay usable on a phone -->
-                    <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop">
+                    <HBox id="graveRecipientsLink" wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop"
+                        visible="{= ${graveDraft>/Id} === null }">
                         <Select id="linkRecipient" width="12rem"
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
