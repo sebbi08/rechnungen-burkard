@@ -10,8 +10,15 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers().AddOData(o =>
+{
+    // Without this, the no-$-prefix alias for the built-in $search option claims our
+    // custom "search" query option (InvoicesController.Get reads it from Request.Query),
+    // and OData's own query-option parser then 400s on an empty "search=" before our
+    // action code ever runs.
+    o.EnableNoDollarQueryOptions = false;
     o.Select().Filter().OrderBy().Count().SetMaxTop(200)
-     .AddRouteComponents("odata", EdmModelBuilder.Build()));
+     .AddRouteComponents("odata", EdmModelBuilder.Build());
+});
 
 var connectionString = builder.Configuration.GetConnectionString("Invoicing")
     ?? "Data Source=invoicing.db";
