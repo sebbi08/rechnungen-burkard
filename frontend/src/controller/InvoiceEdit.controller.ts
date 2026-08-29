@@ -1,11 +1,13 @@
-import { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
+import type { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import BusyDialog from "sap/m/BusyDialog";
-import Input from "sap/m/Input";
-import Select from "sap/m/Select";
-import TextArea from "sap/m/TextArea";
-import JSONModel from "sap/ui/model/json/JSONModel";
-import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
+import Dialog from "sap/m/Dialog";
+import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
+import type {
+  DraftLine,
+  InvoiceDraft,
+  QuickRecipientDraft,
+} from "../model/state";
 import InvoiceRevisions from "./InvoiceRevisions.controller";
 
 /**
@@ -21,30 +23,62 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     recipientId: number | null,
   ): Promise<void> {
     if (!this._invoiceDialog) {
-      // loadFragment passes this controller and the view ID prefix so that
-      // this.byId(...) finds the dialog controls and IDs stay unique
       this._invoiceDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.InvoiceDialog",
-      })) as any;
+      })) as Dialog;
     }
 
     const lines =
-      invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
+      invoiceId != null
+        ? await this.loadLines(invoiceId)
+        : [InvoiceEdit.emptyLine()];
     this._invoiceDialog.setModel(
-      new JSONModel({ recipientId, invoiceId, lines }),
+      new TypedJSONModel<InvoiceDraft>({
+        // the select matches its keys as strings
+        recipientId: String(recipientId ?? (await this.newestRecipientId()) ?? ""),
+        invoiceId,
+        lines,
+      }),
       "invoiceDraft",
     );
     this._invoiceDialog.open();
   }
 
-  private async loadLines(invoiceId: number): Promise<any[]> {
+  /**
+   * Which recipient a new invoice starts on.
+   *
+   * The select would fall back to its first item on its own, but that fallback
+   * is the control's and UI5 does not write it into the bound model — the save
+   * would then send recipient 0. Choosing the default here keeps the draft the
+   * one thing that says who is being invoiced. Newest first, which is the order
+   * the select lists them in.
+   */
+  private async newestRecipientId(): Promise<number | undefined> {
+    const binding = this.odata().bindList(
+      "/Recipients",
+      undefined,
+      undefined,
+      undefined,
+      { $orderby: "Id desc", $select: "Id" },
+    );
+    try {
+      const contexts = await binding.requestContexts(0, 1);
+      return contexts[0]?.getProperty("Id") as number | undefined;
+    } finally {
+      binding.destroy();
+    }
+  }
+
+  private async loadLines(invoiceId: number): Promise<DraftLine[]> {
     try {
       const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const body = await response.json();
-      return (body.value as any[]).map((line) => ({
+      const body = (await response.json()) as {
+        value: api.InvoiceLineRow[];
+      };
+      return body.value.map((line) => ({
         // the ComboBox matches its keys as strings
         itemId: line.ItemId != null ? String(line.ItemId) : "",
         itemNumber: line.ItemNumber,
@@ -72,31 +106,38 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       return;
     }
 
-    const path = rowContext.getPath();
-    const model = rowContext.getModel() as JSONModel;
-    model.setProperty(path + "/itemNumber", itemContext.getProperty("Number") as string);
+    // the row's binding path ends in its index, e.g. "/lines/2"; a template
+    // literal keeps the path checkable against InvoiceDraft
+    const row = Number(rowContext.getPath().split("/").pop());
+    const model = this.draft();
     model.setProperty(
-      path + "/description",
+      `/lines/${row}/itemNumber`,
+      itemContext.getProperty("Number") as string,
+    );
+    model.setProperty(
+      `/lines/${row}/description`,
       itemContext.getProperty("Description") as string,
     );
     // the item's default price is pre-filled and stays overridable; an item
     // without one leaves the field empty so a price has to be typed
-    const defaultPrice = itemContext.getProperty("DefaultPrice");
-    model.setProperty(path + "/defaultPrice", defaultPrice);
+    const defaultPrice = itemContext.getProperty("DefaultPrice") as
+      | number
+      | null;
+    model.setProperty(`/lines/${row}/defaultPrice`, defaultPrice);
     model.setProperty(
-      path + "/unitPrice",
+      `/lines/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
     );
   }
 
   public onAddLine(): void {
-    const model = this._invoiceDialog.getModel("invoiceDraft") as JSONModel;
-    const lines = (model.getProperty("/lines") as any[]) ?? [];
+    const model = this.draft();
+    const lines = model.getProperty("/lines");
     lines.push(InvoiceEdit.emptyLine());
     model.setProperty("/lines", lines);
   }
 
-  private static emptyLine(): Record<string, unknown> {
+  private static emptyLine(): DraftLine {
     return {
       itemId: "",
       itemNumber: "",
@@ -115,27 +156,25 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       return;
     }
 
-    const model = this._invoiceDialog.getModel("invoiceDraft") as JSONModel;
-    const draft = model.getData() as any;
-    const rows = draft.lines as any[];
-    if (rows.some((row) => !row.itemId)) {
+    const draft = this.draft().getData();
+    if (draft.lines.some((row) => !row.itemId)) {
       api.showError(this, new Error("ItemRequired"));
       return;
     }
 
-    const lines = rows.map((line) => ({
+    const lines = draft.lines.map((line) => ({
       itemId: Number(line.itemId),
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
       unitPrice:
-        line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
+        line.unitPrice == null || line.unitPrice === ""
+          ? null
+          : Number(line.unitPrice),
     }));
 
-    // The invoice goes to the recipient the dialog shows. The dialog is built
-    // once and reused, so its select keeps the selection of the previous open
-    // while the draft of this open starts out empty — reading the draft would
-    // send recipient 0 and fail with RecipientNotFound.
-    const recipientId = Number((this.byId("recipient") as Select).getSelectedKey());
+    // The select is bound two-way, so the draft holds the recipient the dialog
+    // is showing even though the dialog itself is built once and reused.
+    const recipientId = Number(draft.recipientId);
 
     // long-running task: creating an invoice renders its documents, so the
     // interface is blocked until it finishes
@@ -174,39 +213,48 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     if (!this._quickDialog) {
       this._quickDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.RecipientQuickCreate",
-      })) as any;
+      })) as Dialog;
     }
-    (this.byId("quickName") as Input).setValue("");
-    (this.byId("quickAddress") as TextArea).setValue("");
+    this._quickDialog.setModel(
+      new TypedJSONModel<QuickRecipientDraft>({ name: "", address: "" }),
+      "quickRecipientDraft",
+    );
     this._quickDialog.open();
   }
 
-  public async onQuickRecipientSave(event: any): Promise<void> {
-    const dialog = event.getSource().getParent() as any;
+  public async onQuickRecipientSave(): Promise<void> {
+    const quick = (
+      this._quickDialog.getModel(
+        "quickRecipientDraft",
+      ) as TypedJSONModel<QuickRecipientDraft>
+    ).getData();
     try {
       const id = await api.createRecipient({
-        Name: (this.byId("quickName") as Input).getValue(),
-        Address: (this.byId("quickAddress") as TextArea).getValue(),
+        Name: quick.name,
+        Address: quick.address,
       });
-      // refresh the recipient select's list so the new row is included,
-      // then select it in the parent invoice dialog, which stays open
-      const select = this.byId("recipient") as Select;
-      await (select.getBinding("items") as ODataListBinding).refresh();
-      (this._invoiceDialog.getModel("invoiceDraft") as JSONModel).setProperty(
-        "/recipientId",
-        id,
-      );
-      dialog.close();
+      // refresh the recipient select's list so the new row is included, then
+      // select it in the parent invoice dialog, which stays open
+      this.odata().refresh();
+      this.draft().setProperty("/recipientId", String(id));
+      this._quickDialog.close();
     } catch (error) {
       api.showError(this, error);
     }
   }
 
-  public onQuickRecipientCancel(event: any): void {
-    (event.getSource().getParent() as any).close();
+  public onQuickRecipientCancel(): void {
+    this._quickDialog.close();
+  }
+
+  /** The draft lives on the dialog rather than the view, so it is read there. */
+  private draft(): TypedJSONModel<InvoiceDraft> {
+    return this._invoiceDialog.getModel(
+      "invoiceDraft",
+    ) as TypedJSONModel<InvoiceDraft>;
   }
 
   private _savingInvoice = false;
-  private _quickDialog: any;
-  protected _invoiceDialog: any;
+  private _quickDialog!: Dialog;
+  protected _invoiceDialog!: Dialog;
 }

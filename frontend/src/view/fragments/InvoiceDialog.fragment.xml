@@ -4,11 +4,11 @@
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
                 <HBox wrap="Wrap" alignItems="Center">
-                    <!-- OneWay: the draft pre-selects a recipient, the control
-                         owns the selection from there on (see onInvoiceDialogSave) -->
+                    <!-- two-way: the draft is what the save reads, so it has to
+                         hold whatever the reused dialog is showing -->
                     <Select id="recipient" width="20rem"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
-                        selectedKey="{path: 'invoiceDraft>/recipientId', mode: 'OneWay'}">
+                        selectedKey="{invoiceDraft>/recipientId}">
                         <core:Item key="{odata>Id}" text="{odata>Name}" />
                     </Select>
                     <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent"

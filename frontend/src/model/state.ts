@@ -20,10 +20,11 @@ export interface DraftLine {
   itemId: string;
   itemNumber: string;
   description: string;
-  count: number;
+  /** A two-way bound Input writes a string back, so both shapes occur. */
+  count: number | string;
   /** Empty means "use the default"; 0 is a real price. */
-  unitPrice: number | null;
-  defaultPrice: number | null;
+  unitPrice: number | string | null;
+  defaultPrice: number | string | null;
 }
 
 export interface ItemsView {
