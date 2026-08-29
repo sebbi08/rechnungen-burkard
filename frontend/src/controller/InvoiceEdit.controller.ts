@@ -28,6 +28,9 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       })) as Dialog;
     }
 
+    // the draft starts on whichever recipient this refreshed list shows first
+    const newest = await this.refreshRecipients("recipient");
+
     const lines =
       invoiceId != null
         ? await this.loadLines(invoiceId)
@@ -35,7 +38,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     this._invoiceDialog.setModel(
       new TypedJSONModel<InvoiceDraft>({
         // the select matches its keys as strings
-        recipientId: String(recipientId ?? (await this.newestRecipientId()) ?? ""),
+        recipientId: String(recipientId ?? newest ?? ""),
         invoiceId,
         lines,
       }),
@@ -210,7 +213,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       });
       // refresh the recipient select's list so the new row is included, then
       // select it in the parent invoice dialog, which stays open
-      this.odata().refresh();
+      await this.refreshRecipients("recipient");
       this.draft().setProperty("/recipientId", String(id));
       this._quickDialog.close();
     } catch (error) {

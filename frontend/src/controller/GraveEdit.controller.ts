@@ -29,6 +29,9 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       })) as Dialog;
     }
 
+    // the link select starts on whichever recipient this refreshed list shows first
+    const newest = await this.refreshRecipients("linkRecipient");
+
     // everything the dialog collects lives in this draft until it is saved, so
     // items and recipients can be added before the grave itself exists
     this._graveDialog.setModel(
@@ -43,7 +46,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
               Items: [],
               Recipients: [],
               // the link row is only offered while creating
-              linkRecipientId: String((await this.newestRecipientId()) ?? ""),
+              linkRecipientId: String(newest ?? ""),
               linkRecipientName: "",
             },
       ),
@@ -245,7 +248,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       });
       // refresh the link select's list so the new row is included, then select
       // it; the parent grave dialog stays open
-      this.odata().refresh();
+      await this.refreshRecipients("linkRecipient");
       const model = this.graveDraft();
       model.setProperty("/linkRecipientId", String(id));
       model.setProperty("/linkRecipientName", quick.name);

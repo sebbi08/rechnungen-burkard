@@ -4,9 +4,10 @@
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
                 <HBox wrap="Wrap" alignItems="Center">
-                    <!-- two-way: the draft is what the save reads, so it has to
-                         hold whatever the reused dialog is showing -->
-                    <Select id="recipient" width="20rem"
+                    <!-- two-way, and forceSelection off: the draft is what the save
+                         reads, so the control must never select on its own. Its
+                         fallback would show a recipient the draft does not hold. -->
+                    <Select id="recipient" width="20rem" forceSelection="false"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                         selectedKey="{invoiceDraft>/recipientId}">
                         <core:Item key="{odata>Id}" text="{odata>Name}" />

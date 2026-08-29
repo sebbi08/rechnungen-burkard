@@ -152,6 +152,7 @@ Two sites, each with a comment saying why:
 |---|---|
 | `Invoices` — `invoicesTable` `.changeParameters({ search })` | A custom OData query option on a list binding. Not view state; no binding syntax expresses it. |
 | `ImportExport` — `archiveUpload.clear()` | `FileUploader.clear()` resets the native file input. The `value` property is bindable but does not do this. |
+| `Base` — `refreshRecipients(selectId)` | Reloads a recipient select's list and waits for it. No binding syntax expresses "reload now, and tell me when". Added during implementation; see below. |
 
 Reaching a list binding through its control is ordinary UI5. The anti-pattern is
 storing *state* in controls, and after this change none is.
@@ -228,19 +229,35 @@ value type and a wrong read type all fail to compile.
 re-applies its bound `selectedKey` when the refreshed items arrive.
 `invoices.spec.ts` Story 3.2 passes.
 
-**What the two-way binding did not fix, and how it was.** Binding the recipient
-`selectedKey` two-way was necessary but not sufficient. A reopened dialog starts
-on an empty draft, and the select's `forceSelection` then picks its first item —
-a control-side fallback UI5 deliberately does not write into the bound model, so
-the save still sent recipient 0. "The second invoice goes to the recipient the
-reopened dialog shows" caught this.
+**What the two-way binding did not fix.** This took three attempts, and the
+regression test caught every one of them. Worth recording, because each failure
+was a different lesson.
 
-The fix is not to read the control again. It is to make the default explicit:
-`BaseController.newestRecipientId()` chooses it, newest first, which is the
-order the selects list recipients in. The application now decides what is
-preselected instead of inheriting a control's fallback, which is the same
-principle as the rest of this change — the model is what says what is on screen.
-The grave dialog's recipient-link select uses the same helper.
+*First:* binding `selectedKey` two-way was necessary but not sufficient. A
+reopened dialog starts on an empty draft, and the select's `forceSelection` then
+picks its first item — a control-side fallback UI5 deliberately does not write
+into the bound model, so the save still sent recipient 0.
+
+*Second:* making the default explicit (an own read of the newest recipient, and
+`forceSelection="false"`) fixed the saved value but not what was displayed. The
+dialog is reused, so its recipient list was the one loaded on the first open; a
+recipient created since was missing from it, the bound key matched no loaded
+item, and the select went on showing the previous label. The draft was right and
+the screen was wrong — the same divergence, inverted.
+
+*Third:* refreshing that list was still not enough while the refresh and the
+"which is newest" read were two separate requests. Under the parallel suite a
+recipient created between them made them disagree again.
+
+What holds is one read: `refreshRecipients` reloads the select's list, waits for
+it, and answers with its first row — the very row the select displays, since the
+list is ordered newest first. The draft cannot name a recipient the select
+cannot show, because both come from the same response. Four consecutive
+full-suite runs pass.
+
+The general lesson: moving state out of controls is not enough on its own. Where
+a control has a fallback of its own, the application has to make that choice
+explicitly, and it has to make it from the same data the control is rendering.
 
 **Settings changes binding direction.** Moving from `OneWay` OData bindings to a
 JSON draft changes when the form is populated. `masterdata.spec.ts` covers save
