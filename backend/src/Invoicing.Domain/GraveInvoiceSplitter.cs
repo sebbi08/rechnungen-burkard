@@ -20,7 +20,14 @@ public static class GraveInvoiceSplitter
     /// <summary>The lines of each recipient's invoice. Every line is split on
     /// its own, so each invoice keeps the grave's items in their configured
     /// proportion; splitting the grave total instead would rewrite every unit
-    /// price.</summary>
+    /// price.
+    ///
+    /// The <em>net</em> is what divides: the fee being shared is a net one, and
+    /// each recipient's invoice then works out its own VAT from its own net, so
+    /// every document adds up on its own. Dividing the gross instead would force
+    /// one recipient's VAT to be whatever made the sum come out — a document that
+    /// does not add up. The recipients' gross totals may therefore differ from a
+    /// single invoice for the same grave by up to a cent each.</summary>
     public static IReadOnlyList<IReadOnlyList<InvoiceLine>> Split(
         IReadOnlyList<GraveLine> lines, int recipients)
     {
@@ -29,7 +36,7 @@ public static class GraveInvoiceSplitter
             throw new ArgumentOutOfRangeException(nameof(recipients));
         }
 
-        var shares = lines.Select(l => ShareCalculator.SplitCents(GrossCents(l.Count, l.UnitPrice, l.VatRate), recipients)).ToList();
+        var shares = lines.Select(l => ShareCalculator.SplitCents(NetCents(l.Count, l.UnitPrice), recipients)).ToList();
 
         var result = new List<IReadOnlyList<InvoiceLine>>(recipients);
         for (var r = 0; r < recipients; r++)
@@ -38,16 +45,19 @@ public static class GraveInvoiceSplitter
             for (var i = 0; i < lines.Count; i++)
             {
                 var line = lines[i];
-                var netCents = NetCents(shares[i][r], line.VatRate);
                 forRecipient.Add(new InvoiceLine
                 {
                     ItemId = line.ItemId,
                     ItemNumber = line.ItemNumber,
                     Description = line.Description,
                     Count = line.Count,
-                    // 3 decimals keep round(count × unitPrice × 100) exactly equal to the
-                    // derived net for realistic counts, so the persisted line gross stays exact.
-                    UnitPrice = decimal.Round(netCents / 100m / line.Count, 3, MidpointRounding.AwayFromZero),
+                    // 3 decimals keep round(count × unitPrice × 100) exactly equal to this
+                    // recipient's share, so the line bills what it was given. That holds
+                    // below a count of ten: the invoice prints at most three decimals, so
+                    // the smallest net step a line can express is count × 0.1 cents, and
+                    // storing more would make the printed price stop reproducing the
+                    // printed line total.
+                    UnitPrice = decimal.Round(shares[i][r] / 100m / line.Count, 3, MidpointRounding.AwayFromZero),
                     VatRate = line.VatRate,
                     LineNumber = i + 1,
                     GraveUnitPrice = line.UnitPrice,
@@ -61,9 +71,10 @@ public static class GraveInvoiceSplitter
     }
 
     /// <summary>The grave's lines, recovered from the recipients' invoices by
-    /// summing each line's gross cents. Best-effort: for amounts too small to
-    /// round cleanly it can land a cent or two off, which is why it only serves
-    /// grave invoices generated before <c>InvoiceLine.GraveUnitPrice</c>.</summary>
+    /// summing each line's net cents — the exact inverse of <see cref="Split"/>,
+    /// because the net is what was divided. It only serves grave invoices
+    /// generated before <c>InvoiceLine.GraveUnitPrice</c> was stored; for the
+    /// older ones among those, split on the gross, it stays approximate.</summary>
     public static IReadOnlyList<GraveLine> Combine(
         IReadOnlyList<IReadOnlyList<InvoiceLine>> perRecipient)
     {
@@ -82,8 +93,7 @@ public static class GraveInvoiceSplitter
         for (var i = 0; i < ordered[0].Count; i++)
         {
             var template = ordered[0][i];
-            var grossCents = ordered.Sum(lines => GrossCents(lines[i].Count, lines[i].UnitPrice, lines[i].VatRate));
-            var netCents = NetCents(grossCents, template.VatRate);
+            var netCents = ordered.Sum(lines => NetCents(lines[i].Count, lines[i].UnitPrice));
             result.Add(new GraveLine(
                 template.ItemId ?? 0,
                 template.ItemNumber,
@@ -96,13 +106,8 @@ public static class GraveInvoiceSplitter
         return result;
     }
 
-    /// <summary>Gross total in cents for one line: round(net cents × (100 + rate) / 100).</summary>
-    private static long GrossCents(int count, decimal unitPrice, decimal vatRate)
-    {
-        var netCents = (long)Math.Round(count * unitPrice * 100m, 0, MidpointRounding.AwayFromZero);
-        return (long)Math.Round(netCents * (100m + vatRate) / 100m, 0, MidpointRounding.AwayFromZero);
-    }
-
-    private static long NetCents(long grossCents, decimal vatRate) =>
-        (long)Math.Round(grossCents * 100m / (100m + vatRate), 0, MidpointRounding.AwayFromZero);
+    /// <summary>Net total in cents for one line, rounded the way
+    /// DocumentDataBuilder rounds it — so this is what the line actually bills.</summary>
+    private static long NetCents(int count, decimal unitPrice) =>
+        (long)Math.Round(count * unitPrice * 100m, 0, MidpointRounding.AwayFromZero);
 }

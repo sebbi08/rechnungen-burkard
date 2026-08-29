@@ -55,18 +55,48 @@ public class GraveInvoiceSplitterTests
         Assert.Equal(lines.Select(l => l.VatRate), combined.Select(l => l.VatRate));
     }
 
-    // Documented limitation, not a wish: splitting on gross cents and storing a
-    // rounded net unit price is not reversible for very small amounts. This is
-    // why InvoiceLine.GraveUnitPrice exists and Combine is only the fallback for
-    // invoices generated before that column.
+    /// <summary>The net cents a stored line actually bills: what
+    /// DocumentDataBuilder derives from the persisted count and unit price.</summary>
+    private static long BilledNetCents(Domain.Entities.InvoiceLine line) =>
+        (long)Math.Round(line.Count * line.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero);
+
+    // The fee being divided is the net one, so the net is what has to divide
+    // exactly: every recipient's invoice then adds up on its own, and together
+    // they bill the grave's net to the cent (SC-004).
     [Fact]
-    public void Combine_is_lossy_for_amounts_too_small_to_round_cleanly()
+    public void Net_shares_sum_exactly_to_the_grave_net()
+    {
+        var split = GraveInvoiceSplitter.Split(new[] { Line(1, 2.60m, 19m) }, 3);
+
+        var billed = split.Sum(lines => BilledNetCents(lines[0]));
+        Assert.Equal(260, billed);
+    }
+
+    [Fact]
+    public void Combine_is_exact_even_for_amounts_too_small_to_round_cleanly()
     {
         var lines = new[] { Line(1, 2.60m, 19m) };
 
         var combined = Assert.Single(GraveInvoiceSplitter.Combine(GraveInvoiceSplitter.Split(lines, 3)));
 
-        Assert.Equal(2.62m, combined.UnitPrice);
+        Assert.Equal(2.60m, combined.UnitPrice);
+    }
+
+    // A documented boundary, not a wish. A line stores a count and a unit price,
+    // and the invoice prints that price with at most three decimals, so the
+    // smallest net step a line can express is count x 0.1 cents. From a count of
+    // ten upwards the shares are therefore not always placeable to the cent.
+    // Storing more decimals would make the printed price stop reproducing the
+    // printed line total, which is the worse defect.
+    [Fact]
+    public void Split_cannot_place_every_cent_once_the_count_reaches_ten()
+    {
+        // grave net 40.02 over two recipients: 20.01 each, which 20 units cannot
+        // express in three decimals (1.0005 rounds to 1.001, billing 20.02)
+        var split = GraveInvoiceSplitter.Split(new[] { Line(20, 2.001m, 19m) }, 2);
+
+        var billed = split.Sum(lines => BilledNetCents(lines[0]));
+        Assert.Equal(4004, billed);
     }
 
     [Fact]

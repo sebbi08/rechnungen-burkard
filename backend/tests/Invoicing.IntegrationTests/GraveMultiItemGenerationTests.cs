@@ -153,9 +153,14 @@ public class GraveMultiItemGenerationTests
         var invoices = await db.Invoices.Include(i => i.Lines).OrderBy(i => i.Id).ToListAsync();
         Assert.Equal(3, invoices.Count);
 
-        // 10700 / 3 = 3566.67 and 1070 / 3 = 356.67: the cent remainders go to the
-        // first recipients, and the totals still sum to the grave's 11770 cents
-        Assert.Equal(11770, invoices.Sum(i => GrossCents(i)));
+        // 10000 / 3 = 3333.33 and 1000 / 3 = 333.33: the cent remainders go to the
+        // first recipients, and the nets sum to the grave's 11000 cents exactly
+        Assert.Equal(11000, invoices.Sum(i => NetCents(i)));
+
+        // Each invoice rounds its own VAT, once per line, so three of them come to
+        // 117.68 where a single invoice for the same grave would show 117.70 — under
+        // a cent per line per recipient, which is the trade for documents that add up.
+        Assert.Equal(11768, invoices.Sum(i => GrossCents(i)));
         Assert.All(invoices, i => Assert.All(i.Lines, l => Assert.True(l.UnitPrice > 0)));
 
         // every invoice keeps the 10:1 ratio between the two items
@@ -166,6 +171,12 @@ public class GraveMultiItemGenerationTests
             Assert.InRange(expensive / cheap, 9.9m, 10.1m);
         }
     }
+
+    /// <summary>What the invoice's persisted lines actually bill, net — the same
+    /// rounding DocumentDataBuilder applies.</summary>
+    private static long NetCents(Invoice invoice) =>
+        invoice.Lines.Sum(l => (long)Math.Round(
+            l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero));
 
     private static long GrossCents(Invoice invoice) =>
         invoice.Lines.Sum(l => (long)Math.Round(

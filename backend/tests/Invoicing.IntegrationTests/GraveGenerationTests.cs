@@ -137,7 +137,7 @@ public class GraveGenerationTests
     }
 
     [Fact]
-    public async Task Odd_three_way_split_keeps_persisted_line_gross_exact_to_the_cent()
+    public async Task Odd_three_way_split_bills_the_graves_net_exactly()
     {
         using var host = new ApiTestHost();
         {
@@ -184,20 +184,34 @@ public class GraveGenerationTests
                 .Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
                 .ToListAsync();
 
-            // 2 × 100.00 + 7% VAT = 214.00 gross for the grave; 3 recipients → 71.34 / 71.33 / 71.33
+            // 2 × 100.00 = 200.00 net for the grave; 3 recipients → 66.67 / 66.67 / 66.66.
+            // The net is the fee being shared, so the net is what has to come out exact.
             Assert.Equal(3, invoices.Count);
             Assert.All(invoices, i => Assert.Equal(100m / 3, i.SharePercent));
 
-            // gross per invoice recomputed from the PERSISTED lines:
-            // round(round(count × unitPrice × 100) × (100 + rate) / 100) per line, summed.
+            // net per invoice recomputed from the PERSISTED lines, the way
+            // DocumentDataBuilder derives it: round(count × unitPrice × 100) per line.
+            var nets = invoices
+                .Select(i => (long)i.Lines.Sum(l =>
+                    Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)))
+                .OrderBy(n => n)
+                .ToList();
+
+            Assert.Equal(new List<long> { 6666, 6667, 6667 }, nets);
+            Assert.Equal(20000, nets.Sum());
+
+            // Each invoice then works out its own VAT from its own net, so every one of
+            // them adds up on its own. Three invoices round their VAT three times, so
+            // together they come to 214.01 where a single invoice for the same grave
+            // would show 214.00 — under a cent per recipient, which is the trade.
             var grosses = invoices
                 .Select(i => (long)Math.Round(i.Lines.Sum(l =>
                     Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m)))
                 .OrderBy(g => g)
                 .ToList();
 
-            Assert.Equal(new List<long> { 7133, 7133, 7134 }, grosses);
-            Assert.Equal(21400, grosses.Sum());
+            Assert.Equal(new List<long> { 7133, 7134, 7134 }, grosses);
+            Assert.InRange(grosses.Sum(), 21400 - 3, 21400 + 3);
         }
     }
 

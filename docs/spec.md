@@ -483,6 +483,10 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each containing only that recipient's share of the
   evenly split total.
+- **FR-021a**: The split MUST divide the net total, so that the recipients' net
+  shares sum to the grave's net exactly and every invoice's VAT follows from its
+  own net. An invoice MUST NOT carry a VAT amount that its own net does not
+  produce.
 - **FR-022**: Each recipient invoice MUST state, above the item list, which
   percentage of the total grave invoice it represents.
 - **FR-023**: The system MUST record a creation date for each grave.
@@ -643,8 +647,10 @@ non-interactive until completion, and the task runs exactly once.
   per item) and correctly applied per-item VAT rates.
 - **SC-003**: Generating grave invoices for a half-year yields exactly one invoice
   per recipient, with zero duplicates across a batch of 50 or more graves.
-- **SC-004**: For graves with multiple recipients, the sum of the recipient shares
-  equals the invoice total, within the smallest currency unit.
+- **SC-004**: For graves with multiple recipients, the recipients' net shares sum
+  to the grave's net total exactly. Their gross totals may exceed or fall short of
+  a single invoice for the same grave by less than one currency unit per recipient,
+  because each invoice works out its own VAT.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
 - **SC-006**: A bulk download of N normal grave invoices for a half-year yields
@@ -683,9 +689,9 @@ non-interactive until completion, and the task runs exactly once.
 - A single currency (EUR) is used for all amounts in version 1.
 - A half-year is one of two periods: January 1 – June 30 and July 1 – December 31.
 - The "current half-year" is derived from the current date.
-- When an amount is split evenly among recipients, any remainder in the smallest
-  currency unit is assigned to the first recipient so shares always sum to the
-  total.
+- When a net amount is split evenly among recipients, any remainder in the
+  smallest currency unit is handed to the first recipients, so the net shares
+  always sum to the grave's net total.
 - For grave invoices generated before their pre-split price was recorded on
   each line, that price is reconstructed from the recipients' shares, which can
   be a cent or two off for very small amounts.
