@@ -193,6 +193,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsLatestRevision")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Language")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -236,6 +239,8 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("RootId");
+
+                    b.HasIndex("GraveId", "IsLatestRevision");
 
                     b.HasIndex("Year", "Sequence", "RevisionNumber")
                         .IsUnique();
@@ -282,6 +287,9 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("GraveUnitPrice")
                         .HasColumnType("TEXT");
 
                     b.Property<long>("InvoiceId")

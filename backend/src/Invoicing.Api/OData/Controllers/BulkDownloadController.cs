@@ -34,7 +34,10 @@ public class BulkDownloadController : ODataController
         }
 
         var kind = request.Kind == "Normal" ? DocumentKind.Normal : DocumentKind.Copy;
-        IQueryable<Document> query = _db.Documents.Where(d => d.Kind == kind);
+        // a superseded revision's documents were replaced; a bulk download must
+        // not put them next to the revision that replaced them
+        IQueryable<Document> query = _db.Documents
+            .Where(d => d.Kind == kind && d.Invoice != null && d.Invoice.IsLatestRevision);
         if (request.Year is not null && request.Half is not null)
         {
             query = query.Where(d => d.Invoice != null

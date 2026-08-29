@@ -105,6 +105,16 @@ public sealed class InvoiceService
         };
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        // the chain has exactly one latest revision, and it is now this one
+        var superseded = await _db.Invoices
+            .Where(i => i.RootId == edited.RootId && i.IsLatestRevision)
+            .ToListAsync(ct);
+        foreach (var invoice in superseded)
+        {
+            invoice.IsLatestRevision = false;
+        }
+
         _db.Invoices.Add(revision);
         await _db.SaveChangesAsync(ct);
 
