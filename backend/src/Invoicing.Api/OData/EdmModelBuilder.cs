@@ -18,6 +18,11 @@ public static class EdmModelBuilder
         b.EntitySet<GraveInvoiceRun>("GraveInvoiceRuns");
         b.EntitySet<Invoice>("Invoices");
         b.EntitySet<Document>("Documents");
+        // The PDF bytes are served only by DocumentDownloadController's $value
+        // route (a plain EF read, independent of the EDM). Leaving Content on the
+        // EDM would let one $expand=Documents pull every document's bytes through
+        // the query pipeline in a single response.
+        b.EntityType<Document>().Ignore(d => d.Content);
         b.EntitySet<Job>("Jobs");
         b.Singleton<GlobalSettings>("Settings");
         b.Action("CreateInvoice").ReturnsFromEntitySet<Invoice>("Invoices");

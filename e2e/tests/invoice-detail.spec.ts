@@ -51,6 +51,14 @@ test("the detail page shows every revision of an invoice", async ({ page }) => {
   // 3 × 100.00 net + 7% = 321,00
   await expect(page.getByText("321,00 €").first()).toBeVisible();
 
+  // the Original panel starts collapsed; expand it and check its own total
+  // rather than just trusting the one panel that starts open. A bug where
+  // every panel bound to the latest revision instead of its own row would
+  // still show the right number above and would pass without this.
+  await page.getByRole("button", { name: "Original", exact: true }).click();
+  // 2 × 100.00 net + 7% = 214,00
+  await expect(page.getByText("214,00 €").first()).toBeVisible();
+
   // both documents of a revision are reachable from its panel
   await expect(
     page.getByRole("button", { name: "Rechnung herunterladen" }).first(),
