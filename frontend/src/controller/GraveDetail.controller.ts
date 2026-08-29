@@ -125,8 +125,9 @@ export default class GraveDetail extends GraveEdit {
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }
 
-  public onEditGraveInvoice(): void {
-    // the grave-invoice dialog arrives in the next task
+  public async onEditGraveInvoice(event: any): Promise<void> {
+    const context = event.getSource().getBindingContext("grave");
+    await this.openGraveInvoiceDialog(Number(context.getProperty("Id")));
   }
 
   private _graveId = 0;

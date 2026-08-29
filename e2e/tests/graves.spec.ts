@@ -534,3 +534,37 @@ test("the grave detail page shows the grave, its status and its invoices", async
   await expect(row.getByRole("button", { name: "Rechnung herunterladen" })).toBeVisible();
   await expect(row.getByRole("button", { name: "Kopie herunterladen" })).toBeVisible();
 });
+
+test("editing a grave invoice revises every recipient", async ({ page }) => {
+  const marker = `GE-${Date.now()}`;
+  const names = [`Anna ${marker}`, `Bernd ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names);
+
+  // its own period, so the rows below belong to this test alone
+  await generateFor(page, 2038, 2);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(2);
+
+  await invoicesTable
+    .locator("tbody tr", { hasText: names[0] })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+
+  // the dialog names the half-year and both recipients it is about to revise
+  const dialog = page.locator("[id$='graveInvoiceDialog']");
+  await expect(dialog).toContainText("H2 2038");
+  await expect(dialog).toContainText(names[0]);
+  await expect(dialog).toContainText(names[1]);
+  // it opens on the grave's price, not on the 50.00 share each recipient pays
+  await expect(dialog.getByLabel("Preis")).toHaveValue("100");
+
+  await dialog.getByLabel("Preis").fill("200");
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+
+  // both recipients moved to R1, each at half of 1 × 200.00 + 7% = 107,00
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "R1" })).toHaveCount(2);
+  await expect(invoicesTable.getByText("107,00 €").first()).toBeVisible();
+});

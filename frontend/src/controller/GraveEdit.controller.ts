@@ -1,3 +1,4 @@
+import BusyDialog from "sap/m/BusyDialog";
 import { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Input from "sap/m/Input";
 import Select from "sap/m/Select";
@@ -203,6 +204,148 @@ export default abstract class GraveEdit extends InvoiceRevisions {
   public onQuickRecipientCancel(event: any): void {
     (event.getSource().getParent() as any).close();
   }
+
+  /**
+   * Opens the dialog on the grave's lines as they were invoiced for that
+   * half-year — read back from the invoices, not from the grave's current items,
+   * so a grave edited since then cannot leak into a revision of this period.
+   */
+  protected async openGraveInvoiceDialog(invoiceId: number): Promise<void> {
+    let group: api.GraveInvoiceGroup;
+    try {
+      group = await api.fetchGraveInvoiceGroup(invoiceId);
+    } catch (error) {
+      await api.showError(this, error);
+      return;
+    }
+
+    if (!this._graveInvoiceDialog) {
+      this._graveInvoiceDialog = (await this.loadFragment({
+        name: "burkard.invoicing.view.fragments.GraveInvoiceDialog",
+      })) as any;
+    }
+
+    const warning = this.i18nText("graveInvoiceEditWarning")
+      .replace("{0}", api.halfYearText(group.PeriodYear, group.PeriodHalf))
+      .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
+
+    this._graveInvoiceDialog.setModel(
+      new JSONModel({
+        invoiceId,
+        warning,
+        lines: group.Lines.map((line) => ({
+          // the ComboBox matches its keys as strings
+          itemId: String(line.ItemId),
+          itemNumber: line.ItemNumber,
+          description: line.Description,
+          count: Number(line.Count),
+          // the backend's decimal can carry more precision than the Input
+          // should show (e.g. a trailing .000); round to the currency's own
+          // 2 decimals so the field genuinely reads as the grave's price
+          unitPrice: Math.round(Number(line.UnitPrice) * 100) / 100,
+          defaultPrice: null,
+        })),
+      }),
+      "graveInvoiceDraft",
+    );
+    this._graveInvoiceDialog.open();
+  }
+
+  public onGraveInvoiceItemSelected(event: ComboBox$SelectionChangeEvent): void {
+    // the ComboBox writes the key itself; fill in what the row shows alongside it
+    const itemContext = event.getParameter("selectedItem")?.getBindingContext("odata");
+    const rowContext = event.getSource().getBindingContext("graveInvoiceDraft");
+    if (!itemContext || !rowContext) {
+      return;
+    }
+
+    const model = rowContext.getModel() as JSONModel;
+    const path = rowContext.getPath();
+    model.setProperty(path + "/itemNumber", itemContext.getProperty("Number") as string);
+    model.setProperty(path + "/description", itemContext.getProperty("Description") as string);
+    const defaultPrice = itemContext.getProperty("DefaultPrice");
+    model.setProperty(path + "/defaultPrice", defaultPrice);
+    model.setProperty(
+      path + "/unitPrice",
+      defaultPrice != null ? Number(defaultPrice) : null,
+    );
+  }
+
+  public onAddGraveInvoiceLine(): void {
+    const model = this._graveInvoiceDialog.getModel("graveInvoiceDraft") as JSONModel;
+    const rows = (model.getProperty("/lines") as any[]) ?? [];
+    rows.push({
+      itemId: "",
+      itemNumber: "",
+      description: "",
+      count: 1,
+      unitPrice: null,
+      defaultPrice: null,
+    });
+    model.setProperty("/lines", rows);
+  }
+
+  public onDeleteGraveInvoiceLine(event: any): void {
+    const context = event.getSource().getBindingContext("graveInvoiceDraft") as any;
+    const model = context.getModel() as JSONModel;
+    const rows = model.getProperty("/lines") as any[];
+    // the row's binding path ends in its index, e.g. "/lines/2"
+    rows.splice(Number(context.getPath().split("/").pop()), 1);
+    model.setProperty("/lines", rows);
+  }
+
+  public async onGraveInvoiceDialogSave(): Promise<void> {
+    // a second press would revise the group twice; the busy dialog blocks the
+    // interface, this guard covers the moment before it is on screen
+    if (this._savingGraveInvoice) {
+      return;
+    }
+
+    const model = this._graveInvoiceDialog.getModel("graveInvoiceDraft") as JSONModel;
+    const draft = model.getData() as any;
+    const rows = draft.lines as any[];
+    if (rows.some((row) => !row.itemId)) {
+      await api.showError(this, new Error("ItemRequired"));
+      return;
+    }
+
+    const lines = rows.map((row) => ({
+      itemId: Number(row.itemId),
+      count: Number(row.count),
+      // a price of 0 is a real value, not a missing one
+      unitPrice:
+        row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+    }));
+
+    // long-running task: a revision renders both documents for every recipient
+    this._savingGraveInvoice = true;
+    const busy = new BusyDialog({ title: this.i18nText("invoiceRunning") });
+    busy.open();
+
+    let failure: unknown = null;
+    try {
+      await api.createGraveInvoiceRevision(Number(draft.invoiceId), lines);
+      this._graveInvoiceDialog.close();
+      await this.refreshAfterSave();
+    } catch (error) {
+      failure = error;
+    } finally {
+      // close the busy dialog before any error message opens
+      busy.close();
+      this._savingGraveInvoice = false;
+    }
+
+    if (failure) {
+      await api.showError(this, failure);
+    }
+  }
+
+  public onGraveInvoiceDialogCancel(): void {
+    this._graveInvoiceDialog.close();
+  }
+
+  private _savingGraveInvoice = false;
+  private _graveInvoiceDialog: any;
 
   protected _graveDialog: any;
   private _quickDialog: any;
