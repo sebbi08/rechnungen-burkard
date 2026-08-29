@@ -20,7 +20,11 @@
         <content>
             <Table id="recipientsTable" class="sapUiSmallMarginTop"
                 autoPopinMode="true" popinLayout="Block"
-                items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+                items="{
+                    path: 'odata>/Recipients',
+                    parameters: {$orderby: 'Id desc'},
+                    boundFilters: {path: 'Name', operator: 'Contains', value1: '{view>/searchTerm}'}
+                }"
                 noDataText="{i18n>noData}">
                         <columns>
                             <Column importance="High"><Text text="{i18n>recipientNumber}" /></Column>

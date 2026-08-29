@@ -1,110 +1,90 @@
-import Input from "sap/m/Input";
-import TextArea from "sap/m/TextArea";
-import Filter from "sap/ui/model/Filter";
-import FilterOperator from "sap/ui/model/FilterOperator";
+import type { Button$PressEvent } from "sap/m/Button";
+import Dialog from "sap/m/Dialog";
+import type { SearchField$SearchEvent } from "sap/m/SearchField";
+import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import Context from "sap/ui/model/odata/v4/Context";
-import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
-import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import * as api from "../model/api";
+import type { RecipientDraft, RecipientsView } from "../model/state";
 import BaseController from "./Base.controller";
 
 export default class Recipients extends BaseController {
   public onInit(): void {
-    // routed views run onInit before they are added to the App, so the
-    // odata model is not visible via view.getModel() yet
-    const view = this.getView()!;
-    const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
-    view.setBindingContext(model.createBindingContext("/") as Context, "odata");
+    this.bindODataRoot();
+    this.setState<RecipientsView>("view", { searchTerm: null });
   }
 
-  public onSearch(event: any): void {
-    const term = event.getParameter("query") as string;
-    const binding = (this.byId("recipientsTable") as any).getBinding(
-      "items",
-    ) as ODataListBinding;
-    if (!term) {
-      binding.filter([]);
-      return;
-    }
-
-    binding.filter(new Filter("Name", FilterOperator.Contains, term));
+  public onSearch(event: SearchField$SearchEvent): void {
+    // the table's filter is bound to this term; null makes it neutral, which
+    // drops it, so an empty search needs no special case
+    const term = event.getParameter("query") ?? "";
+    this.state<RecipientsView>("view").setProperty("/searchTerm", term || null);
   }
 
   public async onCreateRecipient(): Promise<void> {
     await this.openRecipientDialog(null);
   }
 
-  public async onEditRecipient(event: any): Promise<void> {
+  public async onEditRecipient(event: Button$PressEvent): Promise<void> {
     const context = event.getSource().getBindingContext("odata") as Context;
     await this.openRecipientDialog(context);
   }
 
   private async openRecipientDialog(context: Context | null): Promise<void> {
     if (!this._dialog) {
-      // loadFragment passes this controller and the view ID prefix so that
-      // this.byId(...) finds the dialog controls and IDs stay unique; the
-      // fragment must be reused on later opens or the view-prefixed child
-      // IDs collide with the first instance
+      // loadFragment passes the view ID prefix, so the fragment has to be
+      // reused on later opens or its prefixed child IDs collide with the
+      // first instance
       this._dialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.RecipientDialog",
-      })) as any;
+      })) as Dialog;
     }
 
-    if (context) {
-      (this.byId("recipientNumber") as Input).setValue(
-        context.getProperty("Number") as string,
-      );
-      (this.byId("recipientName") as Input).setValue(
-        context.getProperty("Name") as string,
-      );
-      (this.byId("recipientAddress") as TextArea).setValue(
-        context.getProperty("Address") as string,
-      );
-      this._editId = context.getProperty("Id") as number;
-    } else {
-      (this.byId("recipientNumber") as Input).setValue("");
-      (this.byId("recipientName") as Input).setValue("");
-      (this.byId("recipientAddress") as TextArea).setValue("");
-      this._editId = null;
-    }
-    this._dialog.setTitle(
-      this.i18nText(context ? "editRecipient" : "createRecipient"),
+    this._dialog.setModel(
+      new TypedJSONModel<RecipientDraft>(
+        context
+          ? {
+              id: context.getProperty("Id") as number,
+              number: context.getProperty("Number") as string,
+              name: context.getProperty("Name") as string,
+              address: context.getProperty("Address") as string,
+            }
+          : { id: null, number: "", name: "", address: "" },
+      ),
+      "recipientDraft",
     );
     this._dialog.open();
   }
 
-  public async onDialogSave(event: any): Promise<void> {
-    const dialog = event.getSource().getParent() as any;
-    const number = (this.byId("recipientNumber") as Input).getValue().trim();
-    const fields = {
-      Name: (this.byId("recipientName") as Input).getValue(),
-      Address: (this.byId("recipientAddress") as TextArea).getValue(),
-    };
+  public async onDialogSave(): Promise<void> {
+    const draft = this.draft().getData();
+    const number = draft.number.trim();
+    const fields = { Name: draft.name, Address: draft.address };
     try {
-      if (this._editId != null) {
-        await api.updateRecipient(this._editId, { ...fields, Number: number });
+      if (draft.id != null) {
+        await api.updateRecipient(draft.id, { ...fields, Number: number });
       } else {
         // an empty number means "assign the next free one"
         await api.createRecipient(
           number ? { ...fields, Number: number } : fields,
         );
       }
-      dialog.close();
-      this._editId = null;
-      (
-        (this.byId("recipientsTable") as any).getBinding(
-          "items",
-        ) as ODataListBinding
-      ).refresh();
+      this._dialog.close();
+      this.odata().refresh();
     } catch (error) {
       api.showError(this, error);
     }
   }
 
-  public onDialogCancel(event: any): void {
-    (event.getSource().getParent() as any).close();
+  public onDialogCancel(): void {
+    this._dialog.close();
   }
 
-  private _editId: number | null = null;
-  private _dialog: any;
+  /** The draft lives on the dialog rather than the view, so it is read there. */
+  private draft(): TypedJSONModel<RecipientDraft> {
+    return this._dialog.getModel(
+      "recipientDraft",
+    ) as TypedJSONModel<RecipientDraft>;
+  }
+
+  private _dialog!: Dialog;
 }
