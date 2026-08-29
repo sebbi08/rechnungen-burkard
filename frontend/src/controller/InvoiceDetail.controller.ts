@@ -24,7 +24,7 @@ export default class InvoiceDetail extends InvoiceEdit {
         "detail",
       );
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

@@ -111,7 +111,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     const rows = (model.getProperty("/Recipients") as any[]) ?? [];
     const recipientId = select.getSelectedKey();
     if (rows.some((row) => row.recipientId === recipientId)) {
-      await api.showError(this, new Error("GraveRecipientLinkExists"));
+      api.showError(this, new Error("GraveRecipientLinkExists"));
       return;
     }
 
@@ -141,7 +141,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     const draft = model.getData() as any;
     const items = draft.Items as any[];
     if (items.some((row) => !row.itemId)) {
-      await api.showError(this, new Error("ItemRequired"));
+      api.showError(this, new Error("ItemRequired"));
       return;
     }
 
@@ -164,7 +164,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       this._graveDialog.close();
       await this.refreshAfterSave();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -197,7 +197,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       select.setSelectedKey(String(id));
       dialog.close();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -215,7 +215,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     try {
       group = await api.fetchGraveInvoiceGroup(invoiceId);
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
       return;
     }
 
@@ -306,7 +306,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     const draft = model.getData() as any;
     const rows = draft.lines as any[];
     if (rows.some((row) => !row.itemId)) {
-      await api.showError(this, new Error("ItemRequired"));
+      api.showError(this, new Error("ItemRequired"));
       return;
     }
 
@@ -337,7 +337,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     }
 
     if (failure) {
-      await api.showError(this, failure);
+      api.showError(this, failure);
     }
   }
 

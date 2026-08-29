@@ -21,8 +21,10 @@ export default class GraveDetail extends GraveEdit {
     try {
       const [details, runs, invoices] = await Promise.all([
         api.fetchGraveDetails(this._graveId),
-        this.readList("/GraveInvoiceRuns", { $filter: `GraveId eq ${this._graveId}` }),
-        this.readList("/Invoices", {
+        this.readList<api.GraveInvoiceRunRow>("/GraveInvoiceRuns", {
+          $filter: `GraveId eq ${this._graveId}`,
+        }),
+        this.readList<api.InvoiceRow>("/Invoices", {
           $filter: `GraveId eq ${this._graveId} and IsLatestRevision eq true`,
           $orderby: "PeriodYear desc,PeriodHalf desc,RecipientName",
           $expand: "Lines",
@@ -91,7 +93,7 @@ export default class GraveDetail extends GraveEdit {
         "grave",
       );
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

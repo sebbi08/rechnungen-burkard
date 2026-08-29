@@ -19,7 +19,7 @@ export default abstract class InvoiceRevisions extends BaseController {
       $expand: "Lines,Documents($select=Id,FileName,Kind)",
     };
 
-    const rows = await this.readList("/Invoices", {
+    const rows = await this.readList<api.InvoiceRow>("/Invoices", {
       ...parameters,
       $filter: `RootId eq ${rootId}`,
     });
@@ -27,12 +27,14 @@ export default abstract class InvoiceRevisions extends BaseController {
       return rows;
     }
 
-    const single = await this.readList("/Invoices", { $filter: `Id eq ${rootId}` });
+    const single = await this.readList<api.InvoiceRow>("/Invoices", {
+      $filter: `Id eq ${rootId}`,
+    });
     if (!single.length) {
       return [];
     }
 
-    return this.readList("/Invoices", {
+    return this.readList<api.InvoiceRow>("/Invoices", {
       ...parameters,
       $filter: `RootId eq ${Number(single[0].RootId)}`,
     });

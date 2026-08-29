@@ -54,7 +54,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
         description: line.Description,
       }));
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
       return [InvoiceEdit.emptyLine()];
     }
   }
@@ -119,7 +119,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     const draft = model.getData() as any;
     const rows = draft.lines as any[];
     if (rows.some((row) => !row.itemId)) {
-      await api.showError(this, new Error("ItemRequired"));
+      api.showError(this, new Error("ItemRequired"));
       return;
     }
 
@@ -162,7 +162,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     }
 
     if (failure) {
-      await api.showError(this, failure);
+      api.showError(this, failure);
     }
   }
 
@@ -198,7 +198,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       );
       dialog.close();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

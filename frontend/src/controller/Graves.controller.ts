@@ -57,7 +57,7 @@ export default class Graves extends GraveEdit {
         const matches = await api.searchGraves(term);
         this._searchIds = new Set(matches.map((match) => Number(match.Id)));
       } catch (error) {
-        await api.showError(this, error);
+        api.showError(this, error);
         return;
       }
     }
@@ -74,7 +74,7 @@ export default class Graves extends GraveEdit {
       this._rows = await api.fetchGraveStatus(year, half);
       this.applyRows();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -118,7 +118,7 @@ export default class Graves extends GraveEdit {
     try {
       await api.bulkDownload("Normal", "rechnungen.zip", year, half);
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -174,7 +174,7 @@ export default class Graves extends GraveEdit {
     }
 
     if (failure) {
-      await api.showError(this, failure);
+      api.showError(this, failure);
       return;
     }
 

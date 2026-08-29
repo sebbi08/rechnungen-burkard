@@ -97,7 +97,7 @@ export default class Recipients extends BaseController {
         ) as ODataListBinding
       ).refresh();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

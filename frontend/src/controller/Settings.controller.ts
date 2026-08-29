@@ -32,7 +32,7 @@ export default class Settings extends BaseController {
           .getText("saved"),
       );
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -40,7 +40,7 @@ export default class Settings extends BaseController {
     const input = this.byId("newVatRate") as Input;
     const rate = Number(input.getValue());
     if (!rate || rate <= 0) {
-      await api.showError(this, new Error("InvalidVatRate"));
+      api.showError(this, new Error("InvalidVatRate"));
       return;
     }
 
@@ -49,7 +49,7 @@ export default class Settings extends BaseController {
       input.setValue("");
       this.refreshVatRates();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -60,7 +60,7 @@ export default class Settings extends BaseController {
       await api.deleteVatRate(id);
       this.refreshVatRates();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

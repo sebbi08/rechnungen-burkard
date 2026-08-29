@@ -47,7 +47,7 @@ export default class GraveInvoiceDetail extends GraveEdit {
       );
       this.getView()!.setModel(model, "detail");
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

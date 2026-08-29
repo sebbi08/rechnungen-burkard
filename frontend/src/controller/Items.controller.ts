@@ -115,7 +115,7 @@ export default class Items extends BaseController {
         (this.byId("itemsTable") as any).getBinding("items") as ODataListBinding
       ).refresh();
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 

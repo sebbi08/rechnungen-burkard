@@ -20,7 +20,7 @@ export default class ImportExport extends BaseController {
     try {
       await api.downloadImportTemplate("import-vorlage.zip");
     } catch (error) {
-      await api.showError(this, error);
+      api.showError(this, error);
     }
   }
 
@@ -36,7 +36,7 @@ export default class ImportExport extends BaseController {
     }
 
     if (!this._file) {
-      await api.showError(this, new Error("ArchiveRequired"));
+      api.showError(this, new Error("ArchiveRequired"));
       return;
     }
 
@@ -73,7 +73,7 @@ export default class ImportExport extends BaseController {
       return;
     }
 
-    await api.showError(this, failure);
+    api.showError(this, failure);
   }
 
   private formatSummary(summary: api.ImportSummary): string {
