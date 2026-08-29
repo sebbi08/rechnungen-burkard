@@ -607,3 +607,36 @@ test("the grave list colours its status and offers the invoice mass download", a
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("rechnungen.zip");
 });
+
+test("a grave invoice's detail page shows its revisions and its siblings", async ({
+  page,
+}) => {
+  const marker = `GI-${Date.now()}`;
+  const names = [`Anna ${marker}`, `Bernd ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names);
+
+  // its own period, so the rows below belong to this test alone
+  await generateFor(page, 2037, 2);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await invoicesTable
+    .locator("tbody tr", { hasText: names[0] })
+    .getByRole("button", { name: "Details", exact: true })
+    .click();
+
+  // sap.m.NavContainer keeps the grave detail page parked in the DOM behind
+  // this one, so an unscoped assertion could match text on either page
+  const detailPage = page.locator("[id$='graveInvoiceDetailPage']");
+  await expect(detailPage.getByText("Original", { exact: true })).toBeVisible();
+  await expect(detailPage.getByText(marker, { exact: true })).toBeVisible();
+  await expect(detailPage.getByText("H2 2037")).toBeVisible();
+  // the other recipient of the same half-year is listed
+  await expect(detailPage.getByText(names[1])).toBeVisible();
+
+  // back navigation returns to the grave, not to the home screen — via the
+  // page's own nav-back button, not a positional lookup (the header also
+  // carries an edit button)
+  await page.locator("[id$='graveInvoiceDetailPage-navButton']").click();
+  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
+});

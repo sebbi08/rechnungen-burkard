@@ -205,6 +205,32 @@ for (const screen of LIST_SCREENS) {
   });
 }
 
+// The detail pages are built from panels rather than a toolbar and a table,
+// so they get their own, narrower check. The grave-invoice detail page is not
+// swept here: reaching it needs a generated grave invoice, and generation
+// belongs to graves.spec.ts alone. It shares its markup with the invoice
+// detail page, which is covered below.
+test("detail pages fit the viewport", async ({ page }) => {
+  await seed(page);
+
+  const invoices = await (
+    await page.request.get(
+      "/odata/Invoices?$filter=GraveId eq null&$select=Id,RootId&$top=1",
+    )
+  ).json();
+  const graves = await (
+    await page.request.get("/odata/Graves?$select=Id&$top=1")
+  ).json();
+
+  await page.goto(`/index.html#/invoices/${invoices.value[0].RootId}`);
+  await expect(page.locator("[id$='invoiceDetailPage']")).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+
+  await page.goto(`/index.html#/graves/${graves.value[0].Id}`);
+  await expect(page.locator("[id$='graveDetailPage']")).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+});
+
 test("settings: the form and the VAT rate row fit the viewport", async ({
   page,
 }) => {

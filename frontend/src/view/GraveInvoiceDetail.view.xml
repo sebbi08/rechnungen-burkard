@@ -1,0 +1,80 @@
+<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
+    controllerName="burkard.invoicing.controller.GraveInvoiceDetail" displayBlock="true">
+    <Page id="graveInvoiceDetailPage" title="{i18n>graveInvoiceDetailTitle}" titleLevel="H1"
+        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+        <headerContent>
+            <Button icon="sap-icon://edit" tooltip="{i18n>actionEdit}" press=".onEditGraveInvoice" />
+        </headerContent>
+        <content>
+            <VBox class="sapUiSmallMarginTop">
+                <Title text="{detail>/invoiceNumber}" level="H2" />
+                <Text text="{detail>/recipientName}" class="sapUiTinyMarginTop" />
+                <!-- the address is stored with line breaks, as it is printed -->
+                <Text text="{detail>/recipientAddress}" renderWhitespace="true" />
+                <HBox wrap="Wrap" class="sapUiSmallMarginTop">
+                    <ObjectStatus title="{i18n>graveNumber}" class="sapUiSmallMarginEnd"
+                        text="{detail>/graveNumber}" />
+                    <ObjectStatus title="{i18n>halfYear}" class="sapUiSmallMarginEnd"
+                        text="{detail>/halfYear}" />
+                    <ObjectStatus title="{i18n>sharePercent}" text="{detail>/shareText}" />
+                </HBox>
+            </VBox>
+
+            <Panel headerText="{i18n>otherRecipients}" class="sapUiSmallMarginTop"
+                visible="{= ${detail>/others}.length > 0 }">
+                <List items="{detail>/others}" noDataText="{i18n>noData}">
+                    <StandardListItem title="{detail>Name}" type="Navigation"
+                        press=".onOpenSibling" />
+                </List>
+            </Panel>
+
+            <!-- one panel per revision, newest first; the history stays collapsed -->
+            <VBox items="{detail>/revisions}">
+                <Panel headerText="{detail>Title}" expandable="true" expanded="{detail>Expanded}"
+                    class="sapUiSmallMarginTop">
+                    <content>
+                        <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginBottom">
+                            <Text text="{detail>InvoiceNumber}" class="sapUiSmallMarginEnd" />
+                            <Text text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
+                                class="sapUiSmallMarginEnd" />
+                            <Button icon="sap-icon://pdf-attachment" type="Transparent"
+                                tooltip="{i18n>actionDownloadNormal}" press=".onDownloadRevisionNormal" />
+                            <Button icon="sap-icon://copy" type="Transparent"
+                                tooltip="{i18n>actionDownloadCopy}" press=".onDownloadRevisionCopy" />
+                        </HBox>
+                        <Table items="{detail>Lines}" autoPopinMode="true" popinLayout="Block">
+                            <columns>
+                                <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                                <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>lineTotal}" /></Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem>
+                                    <cells>
+                                        <Text text="{detail>ItemNumber}" />
+                                        <Text text="{detail>Description}" wrapping="true" />
+                                        <Text text="{detail>Count}" />
+                                        <Text text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}" />
+                                        <Text text="{detail>VatRate}" />
+                                        <Text text="{path: 'detail>LineTotal', formatter: '.formatAmount'}" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                        <HBox wrap="Wrap" justifyContent="End" class="sapUiSmallMarginTop">
+                            <ObjectStatus title="{i18n>netTotal}" class="sapUiSmallMarginEnd"
+                                text="{path: 'detail>NetTotal', formatter: '.formatAmount'}" />
+                            <ObjectStatus title="{i18n>vatTotal}" class="sapUiSmallMarginEnd"
+                                text="{path: 'detail>VatTotal', formatter: '.formatAmount'}" />
+                            <ObjectStatus title="{i18n>grossTotal}" state="Information"
+                                text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}" />
+                        </HBox>
+                    </content>
+                </Panel>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>

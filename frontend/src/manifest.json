@@ -117,6 +117,13 @@
           ]
         },
         {
+          "name": "graveInvoiceDetail",
+          "pattern": "graves/{graveId}/invoices/{rootId}",
+          "target": [
+            "graveInvoiceDetail"
+          ]
+        },
+        {
           "name": "importExport",
           "pattern": "import-export",
           "target": [
@@ -163,6 +170,11 @@
         "graveDetail": {
           "name": "GraveDetail",
           "level": 1,
+          "type": "View"
+        },
+        "graveInvoiceDetail": {
+          "name": "GraveInvoiceDetail",
+          "level": 2,
           "type": "View"
         },
         "importExport": {
