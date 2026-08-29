@@ -74,7 +74,14 @@ public class GraveInvoiceGroupController : ODataController
         var graveNumber = await _db.Graves.AsNoTracking()
             .Where(g => g.Id == invoice.GraveId)
             .Select(g => g.GraveNumber)
-            .FirstAsync(HttpContext.RequestAborted);
+            .FirstOrDefaultAsync(HttpContext.RequestAborted);
+        if (graveNumber is null)
+        {
+            return NotFound(new
+            {
+                error = new { code = "GraveNotFound", message = "The grave does not exist." }
+            });
+        }
 
         var value = new
         {
