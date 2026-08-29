@@ -16,6 +16,17 @@ public class GraveRecipientsController : ODataController
     [EnableQuery]
     public IQueryable<GraveRecipient> Get() => _db.GraveRecipients.AsNoTracking();
 
+    /// <summary>Once a grave has been invoiced, its recipient set is frozen: the
+    /// even split across them is baked into the invoices already generated. Links
+    /// on a grave that was never invoiced stay writable.</summary>
+    private bool WasInvoiced(long graveId) => _db.GraveInvoiceRuns.Any(r => r.GraveId == graveId);
+
+    private static ObjectResult Immutable() => new(new
+    {
+        error = new { code = "GraveRecipientsImmutable", message = "A grave's recipients cannot be changed." }
+    })
+    { StatusCode = StatusCodes.Status400BadRequest };
+
     public IActionResult Post([FromBody] GraveRecipient? link)
     {
         if (link is null)
@@ -50,6 +61,11 @@ public class GraveRecipientsController : ODataController
             });
         }
 
+        if (WasInvoiced(link.GraveId))
+        {
+            return Immutable();
+        }
+
         _db.GraveRecipients.Add(link);
         _db.SaveChanges();
         return Created(link);
@@ -59,6 +75,11 @@ public class GraveRecipientsController : ODataController
     {
         var link = _db.GraveRecipients.Find(key);
         if (link is null) return NotFound();
+        if (WasInvoiced(link.GraveId))
+        {
+            return Immutable();
+        }
+
         _db.GraveRecipients.Remove(link);
         _db.SaveChanges();
         return NoContent();

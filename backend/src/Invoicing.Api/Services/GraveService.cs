@@ -25,6 +25,22 @@ public sealed class GraveService
     {
         await ValidateAsync(graveNumber, items, recipientIds, ct);
 
+        // A grave's recipients are fixed at creation: the even split across them is
+        // baked into every invoice already generated, and changing the set would
+        // make a later revision disagree with what was sent out.
+        if (graveId is { } existingId)
+        {
+            var stored = await _db.GraveRecipients
+                .Where(r => r.GraveId == existingId)
+                .Select(r => r.RecipientId)
+                .ToListAsync(ct);
+            if (!stored.OrderBy(id => id).SequenceEqual(recipientIds.OrderBy(id => id)))
+            {
+                throw new ValidationException("GraveRecipientsImmutable",
+                    "A grave's recipients cannot be changed.");
+            }
+        }
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var grave = graveId is { } id ? await LoadForReplaceAsync(id, ct) : NewGrave();
         grave.GraveNumber = graveNumber;

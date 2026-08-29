@@ -87,11 +87,11 @@ public class SaveGraveTests
     }
 
     [Fact]
-    public async Task Save_replaces_the_links_of_an_existing_grave()
+    public async Task Save_replaces_the_items_of_an_existing_grave()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        var (pricedItem, unpricedItem, recipient, other) = await SeedAsync(client);
+        var (pricedItem, unpricedItem, recipient, _) = await SeedAsync(client);
 
         var created = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
         {
@@ -105,7 +105,8 @@ public class SaveGraveTests
         var graveId = createdJson.RootElement.GetProperty("Id").GetInt64();
 
         // the same item stays (so the unique (GraveId, ItemId) index sees a re-add),
-        // the second one is new, and the recipient is swapped out
+        // the second one is new; the recipient set is unchanged, since a grave's
+        // recipients are fixed once it exists (see GraveRecipientImmutabilityTests)
         var updated = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
         {
             graveId,
@@ -117,7 +118,7 @@ public class SaveGraveTests
                 new { itemId = pricedItem, count = 3, unitPrice = (decimal?)null },
                 new { itemId = unpricedItem, count = 1, unitPrice = (decimal?)45.50m },
             },
-            recipientIds = new[] { other },
+            recipientIds = new[] { recipient },
         }));
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
 
@@ -131,8 +132,8 @@ public class SaveGraveTests
         Assert.Equal(2, grave.Items.Count);
         Assert.Equal(3, grave.Items.Single(i => i.ItemId == pricedItem).Count);
         Assert.Equal(45.50m, grave.Items.Single(i => i.ItemId == unpricedItem).UnitPrice);
-        Assert.Equal(other, Assert.Single(grave.Recipients).RecipientId);
-        // the replaced links are gone, not orphaned
+        Assert.Equal(recipient, Assert.Single(grave.Recipients).RecipientId);
+        // the replaced item links are gone, not orphaned
         Assert.Equal(2, await db.GraveItems.CountAsync());
         Assert.Equal(1, await db.GraveRecipients.CountAsync());
     }
