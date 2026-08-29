@@ -16,7 +16,12 @@ builder.Services.AddControllers().AddOData(o =>
     // and OData's own query-option parser then 400s on an empty "search=" before our
     // action code ever runs.
     o.EnableNoDollarQueryOptions = false;
-    o.Select().Filter().OrderBy().Count().SetMaxTop(200)
+    // Expand() was missing until the invoice detail page's readList became the
+    // first caller to pass $expand (Lines, Documents): without it every
+    // navigation property — collection or single-valued — is rejected with
+    // "The property 'X' cannot be used in the $expand query option.", which is
+    // not what D-002 promises for reads through the OData v4 model.
+    o.Select().Filter().OrderBy().Count().Expand().SetMaxTop(200)
      .AddRouteComponents("odata", EdmModelBuilder.Build());
 });
 

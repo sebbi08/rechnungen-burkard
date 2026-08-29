@@ -38,6 +38,10 @@ export default abstract class BaseController extends Controller {
     path: string,
     parameters: Record<string, unknown>,
   ): Promise<any[]> {
+    // The OData controller caps $top at 200 (Program.cs, SetMaxTop). A single
+    // requestContexts(0, N) with N above that is rejected outright, so page
+    // through in that size rather than assuming everything fits in one shot.
+    const PAGE_SIZE = 200;
     const binding = this.odata().bindList(
       path,
       undefined,
@@ -45,8 +49,14 @@ export default abstract class BaseController extends Controller {
       undefined,
       parameters as any,
     );
-    const contexts = await binding.requestContexts(0, 500);
-    const rows = contexts.map((context) => context.getObject());
+    const rows: any[] = [];
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const contexts = await binding.requestContexts(offset, PAGE_SIZE);
+      rows.push(...contexts.map((context) => context.getObject()));
+      if (contexts.length < PAGE_SIZE) {
+        break;
+      }
+    }
     binding.destroy();
     return rows;
   }

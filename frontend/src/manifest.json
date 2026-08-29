@@ -96,6 +96,13 @@
           ]
         },
         {
+          "name": "invoiceDetail",
+          "pattern": "invoices/{rootId}",
+          "target": [
+            "invoiceDetail"
+          ]
+        },
+        {
           "name": "graves",
           "pattern": "graves",
           "target": [
@@ -134,6 +141,11 @@
         "invoices": {
           "name": "Invoices",
           "level": 0,
+          "type": "View"
+        },
+        "invoiceDetail": {
+          "name": "InvoiceDetail",
+          "level": 1,
           "type": "View"
         },
         "graves": {
