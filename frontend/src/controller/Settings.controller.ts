@@ -1,44 +1,69 @@
-import Input from "sap/m/Input";
-import Select from "sap/m/Select";
+import type { Button$PressEvent } from "sap/m/Button";
 import MessageBox from "sap/m/MessageBox";
-import TextArea from "sap/m/TextArea";
 import Context from "sap/ui/model/odata/v4/Context";
-import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
-import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import * as api from "../model/api";
+import type { SettingsDraft, SettingsView } from "../model/state";
 import BaseController from "./Base.controller";
+
+/** The /Settings singleton, as the EDM serialises it. */
+interface SettingsRow {
+  StampWord: string;
+  EndingText: string;
+  Language: string;
+}
 
 export default class Settings extends BaseController {
   public onInit(): void {
-    const view = this.getView()!;
-    // routed views run onInit before they are added to the App, so the
-    // odata model is not visible via view.getModel() yet
-    const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
-    // bind the view to the /Settings singleton; tables use absolute paths
-    const context = model.createBindingContext("/Settings") as Context;
-    view.setBindingContext(context, "odata");
+    // bind the view to the /Settings singleton; the VAT table uses an
+    // absolute path of its own
+    this.getView()!.setBindingContext(
+      this.odata().createBindingContext("/Settings"),
+      "odata",
+    );
+    this.setState<SettingsView>("view", { newVatRate: "" });
+    this.setState<SettingsDraft>("settingsDraft", {
+      stampWord: "",
+      endingText: "",
+      language: "",
+    });
+    void this.loadSettings();
+  }
+
+  /**
+   * Fills the form. The read goes through the OData model like every other
+   * read (D-002); only the write in onSave goes out through fetch.
+   */
+  private async loadSettings(): Promise<void> {
+    try {
+      const context = this.odata().bindContext("/Settings").getBoundContext();
+      const settings = (await context.requestObject()) as SettingsRow;
+      this.state<SettingsDraft>("settingsDraft").setData({
+        stampWord: settings.StampWord ?? "",
+        endingText: settings.EndingText ?? "",
+        language: settings.Language ?? "",
+      });
+    } catch (error) {
+      api.showError(this, error);
+    }
   }
 
   public async onSave(): Promise<void> {
+    const draft = this.state<SettingsDraft>("settingsDraft").getData();
     try {
       await api.patchSettings({
-        StampWord: (this.byId("stampWord") as Input).getValue(),
-        EndingText: (this.byId("endingText") as TextArea).getValue(),
-        Language: (this.byId("documentLanguage") as Select).getSelectedKey(),
+        StampWord: draft.stampWord,
+        EndingText: draft.endingText,
+        Language: draft.language,
       });
-      await MessageBox.information(
-        (this.getView()!.getModel("i18n") as any)
-          .getResourceBundle()
-          .getText("saved"),
-      );
+      MessageBox.information(this.i18nText("saved"));
     } catch (error) {
       api.showError(this, error);
     }
   }
 
   public async onAddVatRate(): Promise<void> {
-    const input = this.byId("newVatRate") as Input;
-    const rate = Number(input.getValue());
+    const view = this.state<SettingsView>("view");
+    const rate = Number(view.getProperty("/newVatRate"));
     if (!rate || rate <= 0) {
       api.showError(this, new Error("InvalidVatRate"));
       return;
@@ -46,27 +71,21 @@ export default class Settings extends BaseController {
 
     try {
       await api.createVatRate(rate);
-      input.setValue("");
-      this.refreshVatRates();
+      view.setProperty("/newVatRate", "");
+      this.odata().refresh();
     } catch (error) {
       api.showError(this, error);
     }
   }
 
-  public async onDeleteVatRate(event: any): Promise<void> {
+  public async onDeleteVatRate(event: Button$PressEvent): Promise<void> {
     const context = event.getSource().getBindingContext("odata") as Context;
     const id = context.getProperty("Id") as number;
     try {
       await api.deleteVatRate(id);
-      this.refreshVatRates();
+      this.odata().refresh();
     } catch (error) {
       api.showError(this, error);
     }
-  }
-
-  private refreshVatRates(): void {
-    const table = this.byId("vatRates");
-    const binding = (table as any).getBinding("items") as ODataListBinding;
-    binding.refresh();
   }
 }
