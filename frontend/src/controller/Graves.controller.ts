@@ -88,6 +88,30 @@ export default class Graves extends GraveEdit {
     await this.openGraveDialog(Number(context.getProperty("Id")));
   }
 
+  public onShowGraveDetails(event: any): void {
+    const context = event.getSource().getBindingContext("status");
+    this.router().navTo("graveDetail", {
+      graveId: String(context.getProperty("Id")),
+    });
+  }
+
+  /**
+   * The normal documents of the half-year the toolbar shows, across all graves.
+   * Copies are downloaded one at a time from the detail pages; a bulk of copies
+   * is the one thing that could be mistaken for a bulk of originals.
+   */
+  public async onBulkGraveInvoices(): Promise<void> {
+    const [year, half] = (this.byId("halfYearSelect") as Select)
+      .getSelectedKey()
+      .split("-")
+      .map(Number);
+    try {
+      await api.bulkDownload("Normal", "rechnungen.zip", year, half);
+    } catch (error) {
+      await api.showError(this, error);
+    }
+  }
+
   protected async refreshAfterSave(): Promise<void> {
     await this.refreshStatus();
   }

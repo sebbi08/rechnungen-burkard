@@ -105,6 +105,9 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
 
   // status column now shows graves as invoiced
   await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
+  await expect(
+    gravesTable.locator(".sapMObjStatus.sapMObjStatusSuccess").first(),
+  ).toBeVisible();
 
   // dismiss the success message, then run the second generation
   await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
@@ -571,4 +574,36 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   await expect(
     invoicesTable.locator("tbody tr", { hasText: "107,00 €" }),
   ).toHaveCount(2);
+});
+
+test("the grave list colours its status and offers the invoice mass download", async ({
+  page,
+}) => {
+  const marker = `GL-${Date.now()}`;
+  await seedGrave(page, marker, [`Liste ${marker}`]);
+
+  await page.goto("/index.html#/graves");
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  const row = gravesTable.locator("tbody tr", { hasText: marker });
+  await expect(row).toBeVisible();
+
+  // created after the generation tests above, so this grave is still open —
+  // and an open half-year reads red
+  await expect(row.locator(".sapMObjStatus.sapMObjStatusError")).toBeVisible();
+
+  // the details action reaches the grave's own page. sap.m.NavContainer keeps
+  // the graves list page parked in the DOM behind the detail page, so its row
+  // still carries the same marker text — scope to the detail page itself
+  // rather than the whole document, or the marker would match twice.
+  await row.getByRole("button", { name: "Details", exact: true }).click();
+  const detailPage = page.locator("[id$='graveDetailPage']");
+  await expect(detailPage.getByText(marker, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
+
+  // the mass download hands back a ZIP of the half-year the toolbar shows
+  await page.goto("/index.html#/graves");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("rechnungen.zip");
 });

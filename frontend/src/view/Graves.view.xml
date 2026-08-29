@@ -22,6 +22,11 @@
                     </layoutData>
                 </Select>
                 <ToolbarSpacer />
+                <Button text="{i18n>bulkGraveInvoices}" press=".onBulkGraveInvoices">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" />
+                    </layoutData>
+                </Button>
                 <Button text="{i18n>createGrave}" press=".onCreateGrave">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
@@ -46,7 +51,7 @@
                             <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>startDate}" /></Column>
                             <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>endDate}" /></Column>
                             <Column importance="High" popinDisplay="Inline"><Text text="{i18n>invoicingStatus}" /></Column>
-                            <Column importance="Low" popinDisplay="WithoutHeader" />
+                            <Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
@@ -54,8 +59,15 @@
                                     <Text text="{status>GraveNumber}" />
                                     <Text text="{path: 'status>StartDate', formatter: '.formatDate'}" />
                                     <Text text="{path: 'status>EndDate', formatter: '.formatDate'}" />
-                                    <Text text="{path: 'status>Invoiced', formatter: '.statusFormatter'}" />
-                                    <Button text="{i18n>edit}" press=".onEditGrave" type="Transparent" />
+                                    <ObjectStatus text="{path: 'status>Invoiced', formatter: '.statusFormatter'}"
+                                        state="{= ${status>Invoiced} ? 'Success' : 'Error' }"
+                                        icon="{= ${status>Invoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
+                                    <HBox wrap="Wrap">
+                                        <Button icon="sap-icon://detail-view" type="Transparent"
+                                            tooltip="{i18n>actionDetails}" press=".onShowGraveDetails" />
+                                        <Button icon="sap-icon://edit" type="Transparent"
+                                            tooltip="{i18n>actionEdit}" press=".onEditGrave" />
+                                    </HBox>
                                 </cells>
                             </ColumnListItem>
                         </items>
