@@ -3,25 +3,14 @@
     <Page title="{i18n>menuInvoices}" titleLevel="H1" showNavButton="true"
         navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
         <subHeader>
-            <!-- the bulk downloads are the first to move into the "..." menu; the
-                 create action stays on the toolbar as long as it fits -->
             <OverflowToolbar id="invoicesToolbar">
-                <Select id="halfYearFilter" width="12rem" change=".onHalfYearChange">
+                <SearchField id="invoiceSearch" width="18rem" search=".onSearchInvoices"
+                    placeholder="{i18n>searchInvoice}">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
-                </Select>
+                </SearchField>
                 <ToolbarSpacer />
-                <Button text="{i18n>bulkNormal}" press=".onBulkNormal">
-                    <layoutData>
-                        <OverflowToolbarLayoutData priority="Low" />
-                    </layoutData>
-                </Button>
-                <Button text="{i18n>bulkCopy}" press=".onBulkCopy">
-                    <layoutData>
-                        <OverflowToolbarLayoutData priority="Low" />
-                    </layoutData>
-                </Button>
                 <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="High" />
@@ -32,14 +21,14 @@
         <content>
             <Table id="invoicesTable" class="sapUiSmallMarginTop" growing="true" growingThreshold="50"
                 autoPopinMode="true" popinLayout="Block"
-                items="{path: 'odata>/Invoices', parameters: {$orderby: 'Id desc'}}"
+                items="{path: 'odata>/Invoices', parameters: {$filter: 'GraveId eq null and IsLatestRevision eq true', $orderby: 'Id desc'}}"
                 noDataText="{i18n>noData}">
                         <columns>
                             <Column importance="High"><Text text="{i18n>invoiceNumber}" /></Column>
                             <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
                             <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>invoiceDate}" /></Column>
                             <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>revision}" /></Column>
-                            <!-- wide enough for the three actions to stay on one line -->
+                            <!-- wide enough for the four actions to stay on one line -->
                             <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
@@ -54,12 +43,17 @@
                                         <Text text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
                                             visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
                                     </HBox>
-                                    <!-- wraps in the pop-in, where the three actions sit
+                                    <!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
                                     <HBox wrap="Wrap">
-                                        <Button text="{i18n>downloadNormal}" press=".onDownloadNormal" type="Transparent" />
-                                        <Button text="{i18n>downloadCopy}" press=".onDownloadCopy" type="Transparent" />
-                                        <Button text="{i18n>editInvoice}" press=".onEditInvoice" type="Transparent" />
+                                        <Button icon="sap-icon://detail-view" type="Transparent"
+                                            tooltip="{i18n>actionDetails}" press=".onShowDetails" />
+                                        <Button icon="sap-icon://pdf-attachment" type="Transparent"
+                                            tooltip="{i18n>actionDownloadNormal}" press=".onDownloadNormal" />
+                                        <Button icon="sap-icon://copy" type="Transparent"
+                                            tooltip="{i18n>actionDownloadCopy}" press=".onDownloadCopy" />
+                                        <Button icon="sap-icon://edit" type="Transparent"
+                                            tooltip="{i18n>actionEdit}" press=".onEditInvoice" />
                                     </HBox>
                                 </cells>
                             </ColumnListItem>

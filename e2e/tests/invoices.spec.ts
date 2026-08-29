@@ -92,7 +92,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
     );
   await invoicesTable
     .locator("tbody tr", { hasText: RECIPIENT_NAME })
-    .getByRole("button", { name: "Rechnung", exact: true })
+    .getByRole("button", { name: "Rechnung herunterladen", exact: true })
     .first()
     .click();
   const tab = await tabPromise;
@@ -370,4 +370,77 @@ test("a double click on save creates one invoice, not two", async ({
   ).toBeVisible();
   expect(created).toBe(1);
   await expect.poll(() => countInvoices(page, recipientId)).toBe(1);
+});
+
+test("the list shows non-grave invoices only and searches them (Story 9)", async ({
+  page,
+}) => {
+  const marker = `Suche ${Date.now()}`;
+  const { itemNumber, recipientName } = await seedOwnMasterData(page, marker);
+  const item = await (
+    await page.request.get(`/odata/InvoiceItems?$filter=Number eq '${itemNumber}'`)
+  ).json();
+  const recipients = await (
+    await page.request.get(`/odata/Recipients?$filter=Name eq '${recipientName}'`)
+  ).json();
+  await page.request.post("/odata/CreateInvoice", {
+    data: {
+      recipientId: recipients.value[0].Id,
+      lines: [{ itemId: item.value[0].Id, count: 1, unitPrice: 120 }],
+    },
+  });
+
+  // The list asks the server for non-grave invoices, latest revision only.
+  // Asserting the request rather than counting rows keeps this independent of
+  // the graves other specs invoice in parallel.
+  const listRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/odata/Invoices") &&
+      decodeURIComponent(request.url()).includes(
+        "GraveId eq null and IsLatestRevision eq true",
+      ),
+  );
+  await page.goto("/index.html#/invoices");
+  await listRequest;
+
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+  await expect(
+    invoicesTable.locator("tbody tr", { hasText: recipientName }),
+  ).toBeVisible();
+
+  // the search reaches the backend as the custom query option
+  const search = page.locator("[id$='invoiceSearch'] input");
+  const searchRequest = page.waitForRequest((request) =>
+    request.url().includes("/odata/Invoices") && request.url().includes("search="),
+  );
+  await search.fill(recipientName);
+  await search.press("Enter");
+  await searchRequest;
+
+  await expect(
+    invoicesTable.locator("tbody tr", { hasText: recipientName }),
+  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
+
+  // clearing the field restores the list
+  await search.fill("");
+  await search.press("Enter");
+  await expect(
+    invoicesTable.locator("tbody tr", { hasText: recipientName }),
+  ).toBeVisible();
+
+  // narrow it again for the row assertions below
+  await search.fill(recipientName);
+  await search.press("Enter");
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
+
+  // the four row actions are icon-only, named by their tooltips
+  const row = invoicesTable.locator("tbody tr", { hasText: recipientName });
+  for (const name of ["Details", "Rechnung herunterladen", "Kopie herunterladen", "Bearbeiten"]) {
+    await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+
+  // details opens the revision page for that invoice
+  await row.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(page.getByText("Original", { exact: true })).toBeVisible();
 });
