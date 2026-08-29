@@ -1,0 +1,50 @@
+<core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
+    <!-- one panel per revision, newest first; the history stays collapsed.
+         Used as the aggregation-binding template for the "{detail>/revisions}"
+         VBox on both InvoiceDetail and GraveInvoiceDetail, so it clones and
+         binds once per revision the same way inline markup would. -->
+    <Panel headerText="{detail>Title}" expandable="true" expanded="{detail>Expanded}"
+        class="sapUiSmallMarginTop">
+        <content>
+            <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginBottom">
+                <Text text="{detail>InvoiceNumber}" class="sapUiSmallMarginEnd" />
+                <Text text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
+                    class="sapUiSmallMarginEnd" />
+                <Button icon="sap-icon://pdf-attachment" type="Transparent"
+                    tooltip="{i18n>actionDownloadNormal}" press=".onDownloadRevisionNormal" />
+                <Button icon="sap-icon://copy" type="Transparent"
+                    tooltip="{i18n>actionDownloadCopy}" press=".onDownloadRevisionCopy" />
+            </HBox>
+            <Table items="{detail>Lines}" autoPopinMode="true" popinLayout="Block">
+                <columns>
+                    <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
+                    <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
+                    <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
+                    <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                    <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
+                    <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>lineTotal}" /></Column>
+                </columns>
+                <items>
+                    <ColumnListItem>
+                        <cells>
+                            <Text text="{detail>ItemNumber}" />
+                            <Text text="{detail>Description}" wrapping="true" />
+                            <Text text="{detail>Count}" />
+                            <Text text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}" />
+                            <Text text="{detail>VatRate}" />
+                            <Text text="{path: 'detail>LineTotal', formatter: '.formatAmount'}" />
+                        </cells>
+                    </ColumnListItem>
+                </items>
+            </Table>
+            <HBox wrap="Wrap" justifyContent="End" class="sapUiSmallMarginTop">
+                <ObjectStatus title="{i18n>netTotal}" class="sapUiSmallMarginEnd"
+                    text="{path: 'detail>NetTotal', formatter: '.formatAmount'}" />
+                <ObjectStatus title="{i18n>vatTotal}" class="sapUiSmallMarginEnd"
+                    text="{path: 'detail>VatTotal', formatter: '.formatAmount'}" />
+                <ObjectStatus title="{i18n>grossTotal}" state="Information"
+                    text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}" />
+            </HBox>
+        </content>
+    </Panel>
+</core:FragmentDefinition>
