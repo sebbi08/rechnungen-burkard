@@ -46,6 +46,7 @@ public class GravesController : ODataController
             grave.GraveNumber,
             grave.StartDate,
             grave.EndDate,
+            grave.CreatedAt,
             Items = grave.Items.Select(i => new
             {
                 i.Id,

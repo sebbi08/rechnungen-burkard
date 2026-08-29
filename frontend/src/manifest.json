@@ -110,6 +110,13 @@
           ]
         },
         {
+          "name": "graveDetail",
+          "pattern": "graves/{graveId}",
+          "target": [
+            "graveDetail"
+          ]
+        },
+        {
           "name": "importExport",
           "pattern": "import-export",
           "target": [
@@ -151,6 +158,11 @@
         "graves": {
           "name": "Graves",
           "level": 0,
+          "type": "View"
+        },
+        "graveDetail": {
+          "name": "GraveDetail",
+          "level": 1,
           "type": "View"
         },
         "importExport": {

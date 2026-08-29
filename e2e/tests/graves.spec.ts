@@ -434,3 +434,103 @@ test("editing a grave warns about future invoices and freezes its recipients", a
   await expect(recipientsLink.getByRole("button", { name: "Hinzufügen" })).toBeHidden();
   await expect(recipientsTable.getByRole("button", { name: "Löschen" })).toBeHidden();
 });
+
+/**
+ * Generates the grave invoices of one half-year and waits for the job. Each
+ * caller uses a period no other test touches, so a run never collides with the
+ * generation tests above or with another test's expectations.
+ */
+async function generateFor(
+  page: import("@playwright/test").Page,
+  year: number,
+  half: number,
+): Promise<void> {
+  const response = await page.request.post("/odata/GenerateGraveInvoices", {
+    data: { year, half },
+  });
+  expect(response.status()).toBe(202);
+  const job = await response.json();
+  await expect
+    .poll(
+      async () =>
+        (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status,
+      { timeout: 90000 },
+    )
+    .toBe("Succeeded");
+}
+
+/** A grave with one item at 100.00 and the given recipients, unique per run. */
+async function seedGrave(
+  page: import("@playwright/test").Page,
+  marker: string,
+  recipientNames: string[],
+): Promise<{ graveId: number; recipientNames: string[] }> {
+  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
+  const item = await (
+    await page.request.post("/odata/InvoiceItems", {
+      data: {
+        Number: `${marker}-item`,
+        Description: "Grabpflege",
+        VatRate: 7,
+        DefaultPrice: 100,
+      },
+    })
+  ).json();
+  const grave = await (
+    await page.request.post("/odata/Graves", {
+      data: {
+        GraveNumber: marker,
+        StartDate: "2026-01-01",
+        EndDate: "2040-12-31",
+      },
+    })
+  ).json();
+  await page.request.post("/odata/GraveItems", {
+    data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
+  });
+  for (const name of recipientNames) {
+    const recipient = await (
+      await page.request.post("/odata/Recipients", {
+        data: { Name: name, Address: "Musterweg 1" },
+      })
+    ).json();
+    await page.request.post("/odata/GraveRecipients", {
+      data: { GraveId: grave.Id, RecipientId: recipient.Id },
+    });
+  }
+  return { graveId: grave.Id, recipientNames };
+}
+
+test("the grave detail page shows the grave, its status and its invoices", async ({
+  page,
+}) => {
+  const marker = `GD-${Date.now()}`;
+  const names = [`Anna ${marker}`, `Bernd ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+
+  await expect(page.getByText(marker, { exact: true })).toBeVisible();
+  // this grave was created after the generation tests above ran, so nothing has
+  // invoiced it for the current half-year
+  await expect(page.getByText("offen").first()).toBeVisible();
+  for (const name of names) {
+    await expect(page.getByText(name)).toBeVisible();
+  }
+  await expect(page.getByText("Für dieses Grab wurden noch keine")).toBeVisible();
+
+  // a period no other test uses, so the rows below are exactly this generation
+  await generateFor(page, 2039, 2);
+  await page.reload();
+
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(2);
+  await expect(invoicesTable).toContainText("H2 2039");
+  // each recipient pays half of 1 × 100.00 + 7% = 53,50
+  await expect(invoicesTable).toContainText("53,50 €");
+
+  // both documents are reachable per row
+  const row = invoicesTable.locator("tbody tr", { hasText: names[0] });
+  await expect(row.getByRole("button", { name: "Rechnung herunterladen" })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Kopie herunterladen" })).toBeVisible();
+});
