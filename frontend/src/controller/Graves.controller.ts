@@ -6,9 +6,7 @@ import Select from "sap/m/Select";
 import TextArea from "sap/m/TextArea";
 import Item from "sap/ui/core/Item";
 import JSONModel from "sap/ui/model/json/JSONModel";
-import Context from "sap/ui/model/odata/v4/Context";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
-import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import * as api from "../model/api";
 import BaseController from "./Base.controller";
 
@@ -17,10 +15,7 @@ export default class Graves extends BaseController {
 
   public onInit(): void {
     const view = this.getView()!;
-    // routed views run onInit before they are added to the App, so the
-    // odata model is not visible via view.getModel() yet
-    const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
-    view.setBindingContext(model.createBindingContext("/") as Context, "odata");
+    this.bindODataRoot();
     // The overview lists graves that are still open for the selected half-year
     // first (FR-028). That order depends on the half-year, so the rows come from
     // the status endpoint rather than from a plain Graves list binding.
@@ -40,14 +35,6 @@ export default class Graves extends BaseController {
 
   public statusFormatter(invoiced: boolean | null | undefined): string {
     return this.i18nText(invoiced ? "statusInvoiced" : "statusOpen");
-  }
-
-  public formatDate(value: Date | string | null | undefined): string {
-    if (value == null) {
-      return "";
-    }
-    const date = value instanceof Date ? value : new Date(value);
-    return date.toLocaleDateString("de-DE");
   }
 
   public onHalfYearChange(): void {

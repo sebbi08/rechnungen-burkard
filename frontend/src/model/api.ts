@@ -61,6 +61,10 @@ const CODE_TO_I18N: Record<string, string> = {
   NoLines: "errorNoLines",
   LanguageNotSupported: "errorLanguageNotSupported",
   ArchiveRequired: "errorArchiveRequired",
+  GraveRecipientsImmutable: "errorGraveRecipientsImmutable",
+  NotAGraveInvoice: "errorNotAGraveInvoice",
+  GraveInvoiceGroupInconsistent: "errorGraveInvoiceGroupInconsistent",
+  GraveInvoiceRevisionRequired: "errorGraveInvoiceRevisionRequired",
 };
 
 export async function showError(
@@ -398,4 +402,83 @@ export async function importArchive(file: File): Promise<ImportSummary> {
   }
 
   throw new Error(payload?.error?.code ?? `HTTP ${response.status}`);
+}
+
+export interface InvoiceLineAmounts {
+  Count: number;
+  UnitPrice: number;
+  VatRate: number;
+}
+
+export interface InvoiceTotals {
+  net: number;
+  vat: number;
+  gross: number;
+}
+
+/** A line's net total, rounded to the cent the way the document rounds it. */
+export function lineTotal(line: InvoiceLineAmounts): number {
+  return Math.round(line.Count * line.UnitPrice * 100) / 100;
+}
+
+/** Net, VAT and gross of an invoice. Each line is rounded on its own, exactly
+ *  as DocumentDataBuilder does it, so a detail page never disagrees with the
+ *  PDF it links to. */
+export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
+  let netCents = 0;
+  let vatCents = 0;
+  for (const line of lines) {
+    const lineCents = Math.round(line.Count * line.UnitPrice * 100);
+    netCents += lineCents;
+    vatCents += Math.round((lineCents * line.VatRate) / 100);
+  }
+  return {
+    net: netCents / 100,
+    vat: vatCents / 100,
+    gross: (netCents + vatCents) / 100,
+  };
+}
+
+/** "H1 2026" — the label the half-year selects already use. */
+export function halfYearText(year: number, half: number): string {
+  return `H${half} ${year}`;
+}
+
+export interface GraveInvoiceGroupLine {
+  ItemId: number;
+  ItemNumber: string;
+  Description: string;
+  Count: number;
+  UnitPrice: number;
+  VatRate: number;
+}
+
+export interface GraveInvoiceGroup {
+  GraveId: number;
+  GraveNumber: string;
+  PeriodYear: number;
+  PeriodHalf: number;
+  Recipients: { Id: number; Name: string; InvoiceId: number }[];
+  Lines: GraveInvoiceGroupLine[];
+}
+
+/** The grave, half-year and recipients a grave invoice belongs to, with the
+ *  grave's lines as they were invoiced — not as the grave looks today. */
+export async function fetchGraveInvoiceGroup(
+  invoiceId: number,
+): Promise<GraveInvoiceGroup> {
+  const response = await fetch(`/odata/GraveInvoiceGroup?invoiceId=${invoiceId}`);
+  await ensureOk(response);
+  return (await response.json()) as GraveInvoiceGroup;
+}
+
+/** Revises every recipient invoice of the grave and half-year the given invoice
+ *  belongs to. `lines` are grave-level: the full count at the full price. */
+export async function createGraveInvoiceRevision(
+  invoiceId: number,
+  lines: InvoiceLineDto[],
+): Promise<void> {
+  await ensureOk(
+    await post("/odata/CreateGraveInvoiceRevision", { invoiceId, lines }),
+  );
 }

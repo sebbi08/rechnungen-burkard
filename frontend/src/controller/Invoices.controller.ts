@@ -10,18 +10,13 @@ import FilterOperator from "sap/ui/model/FilterOperator";
 import JSONModel from "sap/ui/model/json/JSONModel";
 import Context from "sap/ui/model/odata/v4/Context";
 import ODataListBinding from "sap/ui/model/odata/v4/ODataListBinding";
-import ODataModel from "sap/ui/model/odata/v4/ODataModel";
 import ResourceModel from "sap/ui/model/resource/ResourceModel";
 import * as api from "../model/api";
 import BaseController from "./Base.controller";
 
 export default class Invoices extends BaseController {
   public onInit(): void {
-    // routed views run onInit before they are added to the App, so the
-    // odata model is not visible via view.getModel() yet
-    const view = this.getView()!;
-    const model = this.getOwnerComponent()!.getModel("odata") as ODataModel;
-    view.setBindingContext(model.createBindingContext("/") as Context, "odata");
+    this.bindODataRoot();
 
     // half-year filter options are generated at runtime
     const select = this.byId("halfYearFilter") as Select;
@@ -274,44 +269,13 @@ export default class Invoices extends BaseController {
   }
 
   public async onDownloadNormal(event: any): Promise<void> {
-    await this.openDocument(
-      event.getSource().getBindingContext("odata") as Context,
-      false,
-    );
+    const context = event.getSource().getBindingContext("odata") as Context;
+    await this.openDocument(context.getProperty("Id") as number, false);
   }
 
   public async onDownloadCopy(event: any): Promise<void> {
-    await this.openDocument(
-      event.getSource().getBindingContext("odata") as Context,
-      true,
-    );
-  }
-
-  /** Opens the invoice's PDF in a new tab, where the browser displays it. */
-  private async openDocument(context: Context, isCopy: boolean): Promise<void> {
-    // The tab is opened before the documents are fetched: one opened after the
-    // await no longer belongs to the click, and browsers block it as a popup.
-    const tab = window.open("", "_blank");
-    try {
-      const invoiceId = context.getProperty("Id") as number;
-      const documents = await api.fetchDocuments(invoiceId);
-      const wanted = isCopy ? "Copy" : "Normal";
-      const match = documents.find((d) => d.Kind === wanted);
-      if (!match) {
-        tab?.close();
-        return;
-      }
-
-      if (tab) {
-        tab.location.href = api.documentUrl(match.Id);
-      } else {
-        // a browser that refused the empty tab may still allow a real URL
-        window.open(api.documentUrl(match.Id), "_blank");
-      }
-    } catch (error) {
-      tab?.close();
-      await api.showError(this, error);
-    }
+    const context = event.getSource().getBindingContext("odata") as Context;
+    await this.openDocument(context.getProperty("Id") as number, true);
   }
 
   private async onBulk(
@@ -341,26 +305,6 @@ export default class Invoices extends BaseController {
 
   public async onBulkCopy(): Promise<void> {
     await this.onBulk("Copy", "kopien.zip");
-  }
-
-  public formatDate(value: Date | string | null | undefined): string {
-    if (value == null) {
-      return "";
-    }
-    const date = value instanceof Date ? value : new Date(value);
-    return date.toLocaleDateString("de-DE");
-  }
-
-  public formatInvoiceNumber(value: string | null | undefined): string {
-    if (value == null) {
-      return "";
-    }
-    const index = value.lastIndexOf("-R");
-    return index >= 0 ? value.slice(0, index) : value;
-  }
-
-  public formatRevisionBadge(value: number | null | undefined): string {
-    return value != null && value > 0 ? `R${value}` : "";
   }
 
   private _saving = false;
