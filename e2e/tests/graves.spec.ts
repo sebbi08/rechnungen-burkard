@@ -563,8 +563,12 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   await dialog.getByLabel("Preis").fill("200");
   await dialog.getByRole("button", { name: "Speichern" }).click();
 
-  // both recipients moved to R1, each at half of 1 × 200.00 + 7% = 107,00
+  // both recipients moved to R1, each at half of 1 × 200.00 + 7% = 107,00 —
+  // asserted per row, not just "at least one", so a revision that reached
+  // only one recipient would fail this
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(2);
   await expect(invoicesTable.locator("tbody tr", { hasText: "R1" })).toHaveCount(2);
-  await expect(invoicesTable.getByText("107,00 €").first()).toBeVisible();
+  await expect(
+    invoicesTable.locator("tbody tr", { hasText: "107,00 €" }),
+  ).toHaveCount(2);
 });

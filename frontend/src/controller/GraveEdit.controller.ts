@@ -239,10 +239,11 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           itemNumber: line.ItemNumber,
           description: line.Description,
           count: Number(line.Count),
-          // the backend's decimal can carry more precision than the Input
-          // should show (e.g. a trailing .000); round to the currency's own
-          // 2 decimals so the field genuinely reads as the grave's price
-          unitPrice: Math.round(Number(line.UnitPrice) * 100) / 100,
+          // no rounding: a pre-GraveUnitPrice-migration line is reconstructed
+          // by GraveInvoiceSplitter.Combine at 3-decimal precision on purpose,
+          // to reproduce its historical net cents exactly. Rounding here would
+          // resubmit a different price for every line the user never touched.
+          unitPrice: Number(line.UnitPrice),
           defaultPrice: null,
         })),
       }),
