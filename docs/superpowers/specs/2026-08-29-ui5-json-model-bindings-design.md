@@ -223,11 +223,24 @@ template literal does: `` `/lines/${index}/itemNumber` `` has type
 four negative controls — a misspelt path, a misspelt row property, a wrong
 value type and a wrong read type all fail to compile.
 
-**`ODataModel.refresh()` returns `void`.** It cannot be awaited, so the
-quick-create flow — refresh the recipient list, then select the new recipient —
-depends on the `Select` re-applying its bound `selectedKey` when the refreshed
-items arrive. `invoices.spec.ts` Story 3.2 covers exactly this path; if it
-fails, that spot reverts to the list binding's own awaitable `refresh()`.
+**`ODataModel.refresh()` returns `void` — resolved.** The quick-create flow
+(refresh the recipient list, then select the new recipient) works: the `Select`
+re-applies its bound `selectedKey` when the refreshed items arrive.
+`invoices.spec.ts` Story 3.2 passes.
+
+**What the two-way binding did not fix, and how it was.** Binding the recipient
+`selectedKey` two-way was necessary but not sufficient. A reopened dialog starts
+on an empty draft, and the select's `forceSelection` then picks its first item —
+a control-side fallback UI5 deliberately does not write into the bound model, so
+the save still sent recipient 0. "The second invoice goes to the recipient the
+reopened dialog shows" caught this.
+
+The fix is not to read the control again. It is to make the default explicit:
+`BaseController.newestRecipientId()` chooses it, newest first, which is the
+order the selects list recipients in. The application now decides what is
+preselected instead of inheriting a control's fallback, which is the same
+principle as the rest of this change — the model is what says what is on screen.
+The grave dialog's recipient-link select uses the same helper.
 
 **Settings changes binding direction.** Moving from `OneWay` OData bindings to a
 JSON draft changes when the form is populated. `masterdata.spec.ts` covers save

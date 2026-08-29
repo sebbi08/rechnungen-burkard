@@ -28,7 +28,10 @@ first and commit before it: `scripts/reset-dev-db.sh`.
 - **Dev stack**: `env "UID=$(id -u)" "GID=$(id -g)" docker compose up -d`
   (frontend on 8080, proxying `/odata` to the backend container).
 - **Backend tests**: `scripts/dotnet.sh test Invoicing.sln`.
-- **Frontend types**: `cd frontend && npm run typecheck`.
+- **Frontend checks**: `cd frontend && npm run typecheck`, then `npm run lint`
+  (ESLint with type-aware rules) and `npm run ui5lint` (deprecated APIs,
+  accessibility, manifest). All three must be clean; both linters are scoped to
+  `src`, since `dist/` holds the whole OpenUI5 runtime.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
   tablet projects only run `tests/layout.spec.ts`.
 
