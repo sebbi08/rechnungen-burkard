@@ -76,3 +76,44 @@ jobs:
         with:
           name: playwright-report
           path: e2e/playwright-report
+
+  # The commit-msg hook is what normally catches these, but it only runs on a
+  # machine where `npm install` has been run at the repository root, and
+  # `--no-verify` skips it. The release version is derived from these messages,
+  # so it is worth checking them again here.
+  commit-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Lint the new commit messages
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FROM="${{ github.event.pull_request.base.sha }}"
+            TO="${{ github.event.pull_request.head.sha }}"
+          else
+            FROM="${{ github.event.before }}"
+            TO="${{ github.sha }}"
+          fi
+          # A branch's first push reports an all-zero "before"; there is no
+          # range to check then, so look at the tip commit only.
+          if [ -z "$FROM" ] || [ "$FROM" = "0000000000000000000000000000000000000000" ]; then
+            npx commitlint --last --verbose
+          else
+            npx commitlint --from "$FROM" --to "$TO" --verbose
+          fi
+
+  release-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: scripts/test-release-scripts.sh
