@@ -198,6 +198,9 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await itemInput.click();
   await itemInput.fill(itemNumber);
   await page.locator(SUGGESTION, { hasText: itemNumber }).click();
+  // selecting the item pre-fills its default price, as the invoice dialog does;
+  // typing another one overrides it for this grave
+  await expect(graveDialog.getByLabel("Preis")).toHaveValue("50");
   await graveDialog.getByLabel("Anzahl").fill("2");
   await graveDialog.getByLabel("Preis").fill("55");
 
