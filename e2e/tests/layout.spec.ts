@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
@@ -13,8 +13,10 @@ import { createRow, ensureRow } from "../seed";
 // carries the worker index as well — two workers starting in the same
 // millisecond would otherwise collide on the unique numbers below.
 const RUN = `${Date.now()}-${process.env.TEST_PARALLEL_INDEX ?? "0"}`;
-const ITEM_NUMBER = `L${RUN}`;
-const RECIPIENT_NAME = `Layout ${RUN}`;
+// long on purpose: a number and a name that fit a narrow column anyway would
+// not notice a column too narrow to hold them
+const ITEM_NUMBER = `L${RUN}-GRABPFLEGE`;
+const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
 const GRAVE_NUMBER = `L-${RUN}`;
 
 interface ListScreen {
@@ -176,6 +178,132 @@ for (const screen of LIST_SCREENS) {
     await expect(dialog).toHaveCount(0);
   });
 }
+
+const widthOf = (locator: Locator): Promise<number> =>
+  locator.evaluate((el) => el.getBoundingClientRect().width);
+
+/**
+ * Two dialogs collect invoice lines — the grave dialog and the invoice dialog —
+ * and both put a table into a stretched dialog. On a small screen those rows
+ * have the least room in the app, and it has to go to the fields rather than to
+ * gutters and to columns that split the row evenly however short their content
+ * is. Both used to leave the item's number field some ten characters, which
+ * showed "L17565..." and hid the rest of the number.
+ *
+ * A number long enough outruns any column, so what is asserted is the room the
+ * field gets, not that this run's number happens to fit.
+ */
+async function expectFieldsGetTheWidth(
+  page: Page,
+  parts: { dialog: string; table: string; picker: string; item: string },
+): Promise<void> {
+  // by id, not by .sapMDialog: on a phone a ComboBox's picker is a dialog of
+  // its own and stays in the DOM once it has been opened
+  const dialog = page.locator(`[id$='${parts.dialog}']`);
+  const rem = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.documentElement).fontSize),
+  );
+
+  // a field's width, bar the room the drop-down arrow takes. Both fields are
+  // ComboBoxes, and in the invoice dialog the recipient is the first of them,
+  // so each is addressed by its own id rather than by position
+  const itemField = dialog
+    .locator(`.sapMComboBox[id*='${parts.item}'] input[id$='-inner']`)
+    .first();
+  await expect(itemField).toHaveValue(ITEM_NUMBER);
+  expect(await widthOf(itemField), "the item number field is squeezed").toBeGreaterThan(12 * rem);
+
+  // the table must not sit in a gutter: the dialog's own margin, and in the
+  // grave dialog each panel's content padding on top, ate a quarter of a phone
+  const dialogWidth = await widthOf(dialog);
+  const table = page.locator(`[id$='${parts.table}-listUl']`);
+  expect(await widthOf(table), `${parts.table} is squeezed`).toBeGreaterThan(dialogWidth * 0.85);
+
+  // and the recipient picker, measured the same way: at a fixed 12rem it showed
+  // "Layout 17565..." and left the recipient of the next click a guess
+  const picker = dialog.locator(`.sapMComboBox[id$='${parts.picker}']`);
+  await expect(picker.locator("input[id$='-inner']")).toHaveValue(new RegExp(RECIPIENT_NAME));
+  expect(await widthOf(picker), "the recipient picker is squeezed").toBeGreaterThan(20 * rem);
+}
+
+test("graves: the create dialog spends its width on the fields", async ({ page }) => {
+  await seed(page);
+  await page.goto("/index.html#/graves");
+  await expect(page.locator("[id$='gravesTable-listUl'] tr.sapMListTblRow").first()).toBeVisible();
+
+  await pressToolbarAction(page, "gravesToolbar", "Grab anlegen");
+  await waitForDialogOpen(page);
+  const dialog = page.locator("[id$='graveDialog']");
+
+  await dialog.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  // on a phone both pickers open as a full-screen dialog rather than a popover,
+  // so the option is addressed by its role instead of by the popover's markup
+  await dialog
+    .locator(".sapMComboBox[id*='graveItem'] .sapMInputBaseIconContainer")
+    .first()
+    .click();
+  await page.getByRole("option", { name: ITEM_NUMBER, exact: false }).click();
+
+  await dialog.locator(".sapMComboBox[id$='linkRecipient'] .sapMInputBaseIconContainer").click();
+  await page.getByRole("option", { name: RECIPIENT_NAME, exact: false }).click();
+  // the pick lands after the click returns; "Hinzufügen" reads the draft
+  await expect(dialog.locator("input[id$='linkRecipient-inner']")).toHaveValue(RECIPIENT_NAME);
+  await dialog.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+
+  await expectFieldsGetTheWidth(page, {
+    dialog: "graveDialog",
+    table: "graveItemsTable",
+    picker: "linkRecipient",
+    item: "graveItem",
+  });
+
+  // this dialog carries a second table, and its own gutter check
+  const dialogWidth = await widthOf(dialog);
+  const recipients = page.locator("[id$='graveRecipientsTable-listUl']");
+  expect(await widthOf(recipients)).toBeGreaterThan(dialogWidth * 0.85);
+
+  if (onPhone()) {
+    // the delete button belongs in the pop-in here; sharing the row evenly with
+    // the name leaves the name half a phone to wrap in
+    const nameCell = recipients.locator("tr.sapMListTblRow td.sapMListTblCell").first();
+    expect(await widthOf(nameCell)).toBeGreaterThan((await widthOf(recipients)) * 0.7);
+  }
+
+  await dialog.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("invoices: the create dialog spends its width on the fields", async ({ page }) => {
+  await seed(page);
+  await page.goto("/index.html#/invoices");
+  await expect(
+    page.locator("[id$='invoicesTable-listUl'] tr.sapMListTblRow").first(),
+  ).toBeVisible();
+
+  await pressToolbarAction(page, "invoicesToolbar", "Rechnung erstellen");
+  await waitForDialogOpen(page);
+  const dialog = page.locator("[id$='invoiceDialog']");
+
+  await dialog.locator(".sapMComboBox[id$='recipient'] .sapMInputBaseIconContainer").click();
+  await page.getByRole("option", { name: RECIPIENT_NAME, exact: false }).click();
+  // the pick closes the picker and hands focus back afterwards; opening the
+  // item field into that would close its picker again
+  await expect(dialog.locator("input[id$='--recipient-inner']")).toHaveValue(RECIPIENT_NAME);
+
+  // unlike the grave dialog this one opens with an empty line already in place
+  await dialog.locator(".sapMComboBox[id*='lineItem'] .sapMInputBaseIconContainer").first().click();
+  await page.getByRole("option", { name: ITEM_NUMBER, exact: false }).click();
+
+  await expectFieldsGetTheWidth(page, {
+    dialog: "invoiceDialog",
+    table: "lineTable",
+    picker: "recipient",
+    item: "lineItem",
+  });
+
+  await dialog.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(dialog).toHaveCount(0);
+});
 
 // The detail pages are built from panels rather than a toolbar and a table,
 // so they get their own, narrower check. The grave-invoice detail page is not

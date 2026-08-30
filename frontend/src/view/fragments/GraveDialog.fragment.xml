@@ -5,7 +5,10 @@
         title="{= ${graveDraft>/Id} === null ? ${i18n>createGrave} : ${i18n>editGrave} }"
     >
         <content>
-            <VBox class="sapUiMediumMargin">
+            <!-- one gutter, not three: the dialog is stretched, so a 2rem margin
+                 around a panel that pads its own content again spent 48 of a
+                 phone's 393 pixels on each side before a field started -->
+            <VBox class="sapUiSmallMargin">
                 <!-- an edit changes the grave, never an invoice already issued
                      from it; the invoices are snapshots -->
                 <MessageStrip
@@ -33,7 +36,9 @@
                     valueFormat="yyyy-MM-dd"
                     value="{graveDraft>/EndDate}"
                 />
-                <Panel headerText="{i18n>graveItems}">
+                <!-- the panel drops its own side padding on a phone, so the table
+                     lines up with the fields above instead of behind them -->
+                <Panel headerText="{i18n>graveItems}" class="sapUiResponsiveContentPadding">
                     <Table
                         id="graveItemsTable"
                         items="{graveDraft>/Items}"
@@ -41,16 +46,25 @@
                         popinLayout="Block"
                     >
                         <columns>
-                            <Column importance="High">
+                            <!-- a field's width, like the ones above. Columns without one
+                                 share the row evenly however long their content is, which
+                                 left the number about ten characters on a small screen -->
+                            <Column width="16rem" importance="High">
                                 <Text text="{i18n>itemNumber}" />
                             </Column>
-                            <Column importance="Medium" popinDisplay="Inline">
+                            <!-- as wide as the number, or in the pop-in: a description
+                                 squeezed into a third of a tablet wraps over three
+                                 lines and takes the number's room with it -->
+                            <Column importance="Medium" popinDisplay="Inline" autoPopinWidth="16">
                                 <Text text="{i18n>itemDescription}" />
                             </Column>
-                            <Column importance="High" popinDisplay="Inline">
+                            <!-- both hold a short number, so they take a fixed slice
+                                 instead of an equal share; the rest goes to the two
+                                 columns whose content is as long as the data is -->
+                            <Column width="6rem" importance="High" popinDisplay="Inline">
                                 <Text text="{i18n>itemCount}" />
                             </Column>
-                            <Column importance="High" popinDisplay="Inline">
+                            <Column width="8rem" importance="High" popinDisplay="Inline">
                                 <Text text="{i18n>itemPrice}" />
                             </Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
@@ -60,7 +74,7 @@
                                 <cells>
                                     <ComboBox
                                         id="graveItem"
-                                        width="10rem"
+                                        width="100%"
                                         selectedKey="{graveDraft>itemId}"
                                         showSecondaryValues="true"
                                         items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
@@ -104,7 +118,7 @@
                         class="sapUiSmallMarginTop"
                     />
                 </Panel>
-                <Panel headerText="{i18n>graveRecipients}">
+                <Panel headerText="{i18n>graveRecipients}" class="sapUiResponsiveContentPadding">
                     <!-- the even split across them is baked into every invoice the
                          grave has generated, so the set is fixed at creation -->
                     <MessageStrip
@@ -121,7 +135,9 @@
                         popinLayout="Block"
                     >
                         <columns>
-                            <Column importance="High">
+                            <!-- names run long; splitting a phone row evenly with the
+                                 delete button wrapped them over three lines -->
+                            <Column importance="High" autoPopinWidth="16">
                                 <Text text="{i18n>recipientName}" />
                             </Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
@@ -153,12 +169,18 @@
                              what the draft holds -->
                         <ComboBox
                             id="linkRecipient"
-                            width="12rem"
+                            width="100%"
                             showSecondaryValues="true"
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                             selectedKey="{graveDraft>/linkRecipientId}"
                             selectionChange=".onLinkRecipientSelected"
                         >
+                            <!-- names are long, so the field takes what the buttons
+                                 leave of the line rather than a fixed slice of it; on a
+                                 phone the buttons wrap away and it gets the whole row -->
+                            <layoutData>
+                                <FlexItemData growFactor="1" baseSize="20rem" maxWidth="30rem" />
+                            </layoutData>
                             <core:ListItem
                                 key="{odata>Id}"
                                 text="{odata>Name}"
