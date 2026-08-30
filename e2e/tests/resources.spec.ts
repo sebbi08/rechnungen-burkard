@@ -26,9 +26,7 @@ const resourceTypes = [
   "/resources/sap/ui/core/themes/sap_horizon/.theming",
 ];
 
-test("the deployment serves every resource type the UI5 build ships", async ({
-  request,
-}) => {
+test("the deployment serves every resource type the UI5 build ships", async ({ request }) => {
   for (const path of resourceTypes) {
     const response = await request.get(path);
     expect(response.status(), path).toBe(200);

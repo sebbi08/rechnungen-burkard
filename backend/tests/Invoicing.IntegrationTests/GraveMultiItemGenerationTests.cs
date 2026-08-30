@@ -43,12 +43,14 @@ public class GraveMultiItemGenerationTests
         db.InvoiceItems.AddRange(expensive, cheap);
         for (var i = 1; i <= recipientCount; i++)
         {
-            db.Recipients.Add(new Recipient
-            {
-                Number = $"E-{i:D4}",
-                Name = $"Empfänger {i}",
-                Address = $"Weg {i}",
-            });
+            db.Recipients.Add(
+                new Recipient
+                {
+                    Number = $"E-{i:D4}",
+                    Name = $"Empfänger {i}",
+                    Address = $"Weg {i}",
+                }
+            );
         }
 
         var grave = new Grave
@@ -62,11 +64,24 @@ public class GraveMultiItemGenerationTests
         await db.SaveChangesAsync();
 
         db.GraveItems.AddRange(
-            new GraveItem { GraveId = grave.Id, ItemId = expensive.Id, Count = 1 },
-            new GraveItem { GraveId = grave.Id, ItemId = cheap.Id, Count = 1 });
+            new GraveItem
+            {
+                GraveId = grave.Id,
+                ItemId = expensive.Id,
+                Count = 1,
+            },
+            new GraveItem
+            {
+                GraveId = grave.Id,
+                ItemId = cheap.Id,
+                Count = 1,
+            }
+        );
         foreach (var recipient in await db.Recipients.ToListAsync())
         {
-            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = recipient.Id });
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = recipient.Id }
+            );
         }
 
         await db.SaveChangesAsync();
@@ -75,8 +90,10 @@ public class GraveMultiItemGenerationTests
 
     private static async Task GenerateAsync(HttpClient client, int year, int half)
     {
-        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
-            ODataJson.Body(new { year, half }));
+        var start = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year, half })
+        );
         Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
         using var startJson = await ODataJson.ReadAsync(start);
         var jobId = startJson.RootElement.GetProperty("Id").GetInt64();
@@ -88,7 +105,8 @@ public class GraveMultiItemGenerationTests
             response.EnsureSuccessStatusCode();
             using var json = await ODataJson.ReadAsync(response);
             var status = json.RootElement.GetProperty("Status").GetString();
-            if (status == "Succeeded") return;
+            if (status == "Succeeded")
+                return;
             Assert.NotEqual("Failed", status);
             await Task.Delay(100);
         }
@@ -131,8 +149,14 @@ public class GraveMultiItemGenerationTests
         foreach (var invoice in invoices)
         {
             Assert.Equal(50m, invoice.SharePercent);
-            Assert.Equal(ExpensivePrice / 2, invoice.Lines.Single(l => l.ItemNumber == "M-100").UnitPrice);
-            Assert.Equal(CheapPrice / 2, invoice.Lines.Single(l => l.ItemNumber == "M-010").UnitPrice);
+            Assert.Equal(
+                ExpensivePrice / 2,
+                invoice.Lines.Single(l => l.ItemNumber == "M-100").UnitPrice
+            );
+            Assert.Equal(
+                CheapPrice / 2,
+                invoice.Lines.Single(l => l.ItemNumber == "M-010").UnitPrice
+            );
         }
 
         // the shares still add up to the grave's full gross: (100 + 10) * 1.07
@@ -175,11 +199,19 @@ public class GraveMultiItemGenerationTests
     /// <summary>What the invoice's persisted lines actually bill, net — the same
     /// rounding DocumentDataBuilder applies.</summary>
     private static long NetCents(Invoice invoice) =>
-        invoice.Lines.Sum(l => (long)Math.Round(
-            l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero));
+        invoice.Lines.Sum(l =>
+            (long)Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)
+        );
 
     private static long GrossCents(Invoice invoice) =>
-        invoice.Lines.Sum(l => (long)Math.Round(
-            Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)
-            * (100m + l.VatRate) / 100m, 0, MidpointRounding.AwayFromZero));
+        invoice.Lines.Sum(l =>
+            (long)
+                Math.Round(
+                    Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)
+                        * (100m + l.VatRate)
+                        / 100m,
+                    0,
+                    MidpointRounding.AwayFromZero
+                )
+        );
 }

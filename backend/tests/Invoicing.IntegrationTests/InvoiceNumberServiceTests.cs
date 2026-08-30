@@ -10,6 +10,7 @@ public class InvoiceNumberServiceTests
     private sealed class FixedClock : IClock
     {
         public DateTime GetLocalNow() => new(2026, 1, 1, 0, 15, 0, DateTimeKind.Local);
+
         public DateTime GetUtcNow() => new(2025, 12, 31, 23, 15, 0, DateTimeKind.Utc);
     }
 
@@ -37,7 +38,8 @@ public class InvoiceNumberServiceTests
         }
         finally
         {
-            if (File.Exists(dbFile)) File.Delete(dbFile);
+            if (File.Exists(dbFile))
+                File.Delete(dbFile);
         }
     }
 }

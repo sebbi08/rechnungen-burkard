@@ -60,9 +60,7 @@ export default class ImportExport extends BaseController {
     if (summary) {
       this.showProblems([]);
       this.reset();
-      MessageBox.information(
-        `${this.i18nText("importDone")}\n${this.formatSummary(summary)}`,
-      );
+      MessageBox.information(`${this.i18nText("importDone")}\n${this.formatSummary(summary)}`);
       return;
     }
 

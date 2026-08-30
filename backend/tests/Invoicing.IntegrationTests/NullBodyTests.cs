@@ -20,7 +20,10 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         var response = await client.PostAsync(url, content);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidRequest", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidRequest",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -58,7 +61,10 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         var response = await client.PostAsync("/odata/CreateInvoice", NullBody());
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidRequest", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidRequest",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -68,18 +74,26 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         var response = await client.PostAsync("/odata/CreateRevision", NullBody());
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidRequest", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidRequest",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
     public async Task Create_revision_without_lines_is_rejected_with_NoLines()
     {
         using var client = _host.CreateClient();
-        var response = await client.PostAsync("/odata/CreateRevision",
-            ODataJson.Body(new { invoiceId = 1, recipientId = 1 }));
+        var response = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(new { invoiceId = 1, recipientId = 1 })
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("NoLines", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "NoLines",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -89,7 +103,10 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         var response = await client.PostAsync("/odata/GenerateGraveInvoices", NullBody());
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidRequest", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidRequest",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -99,16 +116,25 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         var response = await client.PatchAsync("/odata/Settings", NullBody());
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidRequest", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidRequest",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
     public async Task Create_invoice_without_lines_is_rejected_with_NoLines()
     {
         using var client = _host.CreateClient();
-        var response = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new { recipientId = 1 }));
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(new { recipientId = 1 })
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("NoLines", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "NoLines",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 }

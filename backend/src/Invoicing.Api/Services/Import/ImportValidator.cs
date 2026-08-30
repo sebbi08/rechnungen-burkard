@@ -26,8 +26,14 @@ public sealed class ImportValidator
         }
         catch (InvalidDataException)
         {
-            problems.Add(new ImportProblem("", null, "ArchiveUnreadable",
-                "The file is not a readable ZIP archive."));
+            problems.Add(
+                new ImportProblem(
+                    "",
+                    null,
+                    "ArchiveUnreadable",
+                    "The file is not a readable ZIP archive."
+                )
+            );
             return new ImportValidationResult(problems, null);
         }
 
@@ -36,7 +42,14 @@ public sealed class ImportValidator
         {
             if (!files.ContainsKey(name))
             {
-                problems.Add(new ImportProblem(name, null, "FileMissing", "The file is missing from the archive."));
+                problems.Add(
+                    new ImportProblem(
+                        name,
+                        null,
+                        "FileMissing",
+                        "The file is missing from the archive."
+                    )
+                );
             }
         }
 
@@ -52,8 +65,14 @@ public sealed class ImportValidator
             var rows = Csv.Parse(files[name]);
             if (rows.Count == 0 || !HeaderMatches(rows[0], expectedHeader))
             {
-                problems.Add(new ImportProblem(name, 1, "HeaderInvalid",
-                    $"The header row must be: {string.Join(", ", expectedHeader)}."));
+                problems.Add(
+                    new ImportProblem(
+                        name,
+                        1,
+                        "HeaderInvalid",
+                        $"The header row must be: {string.Join(", ", expectedHeader)}."
+                    )
+                );
                 continue;
             }
 
@@ -98,18 +117,33 @@ public sealed class ImportValidator
             }
 
             using var stream = entry.Open();
-            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: true
+            );
             files[name] = reader.ReadToEnd();
         }
 
         return files;
     }
 
-    private static bool HeaderMatches(IReadOnlyList<string> actual, IReadOnlyList<string> expected) =>
+    private static bool HeaderMatches(
+        IReadOnlyList<string> actual,
+        IReadOnlyList<string> expected
+    ) =>
         actual.Count == expected.Count
-        && actual.Select((value, i) => value.Trim().Equals(expected[i], StringComparison.OrdinalIgnoreCase)).All(m => m);
+        && actual
+            .Select(
+                (value, i) => value.Trim().Equals(expected[i], StringComparison.OrdinalIgnoreCase)
+            )
+            .All(m => m);
 
-    private static void ReadRecipients(List<List<string>> rows, ImportData data, List<ImportProblem> problems)
+    private static void ReadRecipients(
+        List<List<string>> rows,
+        ImportData data,
+        List<ImportProblem> problems
+    )
     {
         const string file = ImportArchiveLayout.RecipientsFile;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -117,23 +151,33 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 3, file, line, problems)) continue;
+            if (!HasColumns(row, 3, file, line, problems))
+                continue;
 
             var number = row[0].Trim();
             var name = row[1].Trim();
             var address = row[2].Trim();
-            if (number.Length > 0) data.DeclaredRecipients.Add(number);
-            if (Missing(number, file, line, "RecipientNumber", problems)
+            if (number.Length > 0)
+                data.DeclaredRecipients.Add(number);
+            if (
+                Missing(number, file, line, "RecipientNumber", problems)
                 | Missing(name, file, line, "Name", problems)
-                | Missing(address, file, line, "Address", problems))
+                | Missing(address, file, line, "Address", problems)
+            )
             {
                 continue;
             }
 
             if (seen.TryGetValue(number, out var first))
             {
-                problems.Add(new ImportProblem(file, line, "DuplicateNumber",
-                    $"The recipient number '{number}' is already used in row {first}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DuplicateNumber",
+                        $"The recipient number '{number}' is already used in row {first}."
+                    )
+                );
                 continue;
             }
 
@@ -142,7 +186,11 @@ public sealed class ImportValidator
         }
     }
 
-    private static void ReadItems(List<List<string>> rows, ImportData data, List<ImportProblem> problems)
+    private static void ReadItems(
+        List<List<string>> rows,
+        ImportData data,
+        List<ImportProblem> problems
+    )
     {
         const string file = ImportArchiveLayout.ItemsFile;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -150,24 +198,34 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 4, file, line, problems)) continue;
+            if (!HasColumns(row, 4, file, line, problems))
+                continue;
 
             var number = row[0].Trim();
             var description = row[1].Trim();
             var rawVat = row[2].Trim();
             var rawPrice = row[3].Trim();
-            if (number.Length > 0) data.DeclaredItems.Add(number);
-            if (Missing(number, file, line, "ItemNumber", problems)
+            if (number.Length > 0)
+                data.DeclaredItems.Add(number);
+            if (
+                Missing(number, file, line, "ItemNumber", problems)
                 | Missing(description, file, line, "Description", problems)
-                | Missing(rawVat, file, line, "VatRate", problems))
+                | Missing(rawVat, file, line, "VatRate", problems)
+            )
             {
                 continue;
             }
 
             if (!TryParseDecimal(rawVat, out var vatRate) || vatRate < 0)
             {
-                problems.Add(new ImportProblem(file, line, "VatRateInvalid",
-                    $"'{rawVat}' is not a valid VAT rate."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "VatRateInvalid",
+                        $"'{rawVat}' is not a valid VAT rate."
+                    )
+                );
                 continue;
             }
 
@@ -176,8 +234,14 @@ public sealed class ImportValidator
             {
                 if (!TryParseDecimal(rawPrice, out var parsedPrice) || parsedPrice < 0)
                 {
-                    problems.Add(new ImportProblem(file, line, "PriceInvalid",
-                        $"'{rawPrice}' is not a valid price."));
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "PriceInvalid",
+                            $"'{rawPrice}' is not a valid price."
+                        )
+                    );
                     continue;
                 }
 
@@ -186,17 +250,29 @@ public sealed class ImportValidator
 
             if (seen.TryGetValue(number, out var first))
             {
-                problems.Add(new ImportProblem(file, line, "DuplicateNumber",
-                    $"The item number '{number}' is already used in row {first}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DuplicateNumber",
+                        $"The item number '{number}' is already used in row {first}."
+                    )
+                );
                 continue;
             }
 
             seen[number] = line;
-            data.Items.Add(new ItemRow(line, number, description, VatRateNormalizer.Normalize(vatRate), price));
+            data.Items.Add(
+                new ItemRow(line, number, description, VatRateNormalizer.Normalize(vatRate), price)
+            );
         }
     }
 
-    private static void ReadGraves(List<List<string>> rows, ImportData data, List<ImportProblem> problems)
+    private static void ReadGraves(
+        List<List<string>> rows,
+        ImportData data,
+        List<ImportProblem> problems
+    )
     {
         const string file = ImportArchiveLayout.GravesFile;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -204,44 +280,72 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 3, file, line, problems)) continue;
+            if (!HasColumns(row, 3, file, line, problems))
+                continue;
 
             var number = row[0].Trim();
             var rawStart = row[1].Trim();
             var rawEnd = row[2].Trim();
-            if (number.Length > 0) data.DeclaredGraves.Add(number);
-            if (Missing(number, file, line, "GraveNumber", problems)
+            if (number.Length > 0)
+                data.DeclaredGraves.Add(number);
+            if (
+                Missing(number, file, line, "GraveNumber", problems)
                 | Missing(rawStart, file, line, "StartDate", problems)
-                | Missing(rawEnd, file, line, "EndDate", problems))
+                | Missing(rawEnd, file, line, "EndDate", problems)
+            )
             {
                 continue;
             }
 
             if (!TryParseDate(rawStart, out var start))
             {
-                problems.Add(new ImportProblem(file, line, "DateInvalid",
-                    $"'{rawStart}' is not a valid date (expected YYYY-MM-DD)."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DateInvalid",
+                        $"'{rawStart}' is not a valid date (expected YYYY-MM-DD)."
+                    )
+                );
                 continue;
             }
 
             if (!TryParseDate(rawEnd, out var end))
             {
-                problems.Add(new ImportProblem(file, line, "DateInvalid",
-                    $"'{rawEnd}' is not a valid date (expected YYYY-MM-DD)."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DateInvalid",
+                        $"'{rawEnd}' is not a valid date (expected YYYY-MM-DD)."
+                    )
+                );
                 continue;
             }
 
             if (end < start)
             {
-                problems.Add(new ImportProblem(file, line, "DateRangeInvalid",
-                    "The end date must not be before the start date."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DateRangeInvalid",
+                        "The end date must not be before the start date."
+                    )
+                );
                 continue;
             }
 
             if (seen.TryGetValue(number, out var first))
             {
-                problems.Add(new ImportProblem(file, line, "DuplicateNumber",
-                    $"The grave number '{number}' is already used in row {first}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "DuplicateNumber",
+                        $"The grave number '{number}' is already used in row {first}."
+                    )
+                );
                 continue;
             }
 
@@ -250,7 +354,11 @@ public sealed class ImportValidator
         }
     }
 
-    private static void ReadMapping(List<List<string>> rows, ImportData data, List<ImportProblem> problems)
+    private static void ReadMapping(
+        List<List<string>> rows,
+        ImportData data,
+        List<ImportProblem> problems
+    )
     {
         const string file = ImportArchiveLayout.MappingFile;
         var itemLinks = new Dictionary<(string, string), int>();
@@ -260,47 +368,80 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 4, file, line, problems)) continue;
+            if (!HasColumns(row, 4, file, line, problems))
+                continue;
 
             var type = row[0].Trim();
             var graveNumber = row[1].Trim();
             var reference = row[2].Trim();
             var rawCount = row[3].Trim();
-            if (Missing(type, file, line, "Type", problems)
+            if (
+                Missing(type, file, line, "Type", problems)
                 | Missing(graveNumber, file, line, "GraveNumber", problems)
-                | Missing(reference, file, line, "Reference", problems))
+                | Missing(reference, file, line, "Reference", problems)
+            )
             {
                 continue;
             }
 
             if (type.Equals(ImportArchiveLayout.ItemLinkType, StringComparison.OrdinalIgnoreCase))
             {
-                if (!int.TryParse(rawCount, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
-                    || count <= 0)
+                if (
+                    !int.TryParse(
+                        rawCount,
+                        NumberStyles.Integer,
+                        CultureInfo.InvariantCulture,
+                        out var count
+                    )
+                    || count <= 0
+                )
                 {
-                    problems.Add(new ImportProblem(file, line, "CountInvalid",
-                        $"'{rawCount}' is not a valid count; an item link needs a positive number."));
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "CountInvalid",
+                            $"'{rawCount}' is not a valid count; an item link needs a positive number."
+                        )
+                    );
                     continue;
                 }
 
                 var key = (graveNumber.ToUpperInvariant(), reference.ToUpperInvariant());
                 if (itemLinks.TryGetValue(key, out var firstItemRow))
                 {
-                    problems.Add(new ImportProblem(file, line, "DuplicateLink",
-                        $"Grave '{graveNumber}' is already linked to item '{reference}' in row {firstItemRow}."));
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "DuplicateLink",
+                            $"Grave '{graveNumber}' is already linked to item '{reference}' in row {firstItemRow}."
+                        )
+                    );
                     continue;
                 }
 
                 itemLinks[key] = line;
                 data.ItemLinks.Add(new ItemLinkRow(line, graveNumber, reference, count));
             }
-            else if (type.Equals(ImportArchiveLayout.RecipientLinkType, StringComparison.OrdinalIgnoreCase))
+            else if (
+                type.Equals(
+                    ImportArchiveLayout.RecipientLinkType,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
                 var key = (graveNumber.ToUpperInvariant(), reference.ToUpperInvariant());
                 if (recipientLinks.TryGetValue(key, out var firstRecipientRow))
                 {
-                    problems.Add(new ImportProblem(file, line, "DuplicateLink",
-                        $"Grave '{graveNumber}' is already linked to recipient '{reference}' in row {firstRecipientRow}."));
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "DuplicateLink",
+                            $"Grave '{graveNumber}' is already linked to recipient '{reference}' in row {firstRecipientRow}."
+                        )
+                    );
                     continue;
                 }
 
@@ -309,9 +450,15 @@ public sealed class ImportValidator
             }
             else
             {
-                problems.Add(new ImportProblem(file, line, "TypeInvalid",
-                    $"'{type}' is not a link type; use '{ImportArchiveLayout.ItemLinkType}' or "
-                    + $"'{ImportArchiveLayout.RecipientLinkType}'."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "TypeInvalid",
+                        $"'{type}' is not a link type; use '{ImportArchiveLayout.ItemLinkType}' or "
+                            + $"'{ImportArchiveLayout.RecipientLinkType}'."
+                    )
+                );
             }
         }
     }
@@ -329,14 +476,26 @@ public sealed class ImportValidator
         {
             if (!graves.Contains(link.GraveNumber))
             {
-                problems.Add(new ImportProblem(file, link.Row, "GraveNotDefined",
-                    $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        link.Row,
+                        "GraveNotDefined",
+                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."
+                    )
+                );
             }
 
             if (!items.Contains(link.ItemNumber))
             {
-                problems.Add(new ImportProblem(file, link.Row, "ItemNotDefined",
-                    $"The item '{link.ItemNumber}' is not defined in {ImportArchiveLayout.ItemsFile}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        link.Row,
+                        "ItemNotDefined",
+                        $"The item '{link.ItemNumber}' is not defined in {ImportArchiveLayout.ItemsFile}."
+                    )
+                );
             }
         }
 
@@ -344,15 +503,27 @@ public sealed class ImportValidator
         {
             if (!graves.Contains(link.GraveNumber))
             {
-                problems.Add(new ImportProblem(file, link.Row, "GraveNotDefined",
-                    $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        link.Row,
+                        "GraveNotDefined",
+                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."
+                    )
+                );
             }
 
             if (!recipients.Contains(link.RecipientNumber))
             {
-                problems.Add(new ImportProblem(file, link.Row, "RecipientNotDefined",
-                    $"The recipient '{link.RecipientNumber}' is not defined in "
-                    + $"{ImportArchiveLayout.RecipientsFile}."));
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        link.Row,
+                        "RecipientNotDefined",
+                        $"The recipient '{link.RecipientNumber}' is not defined in "
+                            + $"{ImportArchiveLayout.RecipientsFile}."
+                    )
+                );
             }
         }
     }
@@ -361,61 +532,113 @@ public sealed class ImportValidator
     /// already stored is a validation error rather than an update. An item's VAT
     /// rate must also be one of the configured ones, exactly as it must be when
     /// the item is created through the item section (FR-006).</summary>
-    private async Task CheckAgainstStoredDataAsync(ImportData data, List<ImportProblem> problems, CancellationToken ct)
+    private async Task CheckAgainstStoredDataAsync(
+        ImportData data,
+        List<ImportProblem> problems,
+        CancellationToken ct
+    )
     {
         var configuredRates = await _db.VatRates.Select(v => v.Rate).ToListAsync(ct);
         foreach (var item in data.Items.Where(i => !configuredRates.Contains(i.VatRate)))
         {
-            problems.Add(new ImportProblem(ImportArchiveLayout.ItemsFile, item.Row, "VatRateNotConfigured",
-                $"The VAT rate '{item.VatRate}' is not configured in the settings."));
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.ItemsFile,
+                    item.Row,
+                    "VatRateNotConfigured",
+                    $"The VAT rate '{item.VatRate}' is not configured in the settings."
+                )
+            );
         }
 
         var recipientNumbers = await _db.Recipients.Select(r => r.Number).ToListAsync(ct);
         var existingRecipients = recipientNumbers.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var recipient in data.Recipients.Where(r => existingRecipients.Contains(r.Number)))
         {
-            problems.Add(new ImportProblem(ImportArchiveLayout.RecipientsFile, recipient.Row, "AlreadyExists",
-                $"A recipient with the number '{recipient.Number}' already exists."));
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.RecipientsFile,
+                    recipient.Row,
+                    "AlreadyExists",
+                    $"A recipient with the number '{recipient.Number}' already exists."
+                )
+            );
         }
 
         var itemNumbers = await _db.InvoiceItems.Select(i => i.Number).ToListAsync(ct);
         var existingItems = itemNumbers.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var item in data.Items.Where(i => existingItems.Contains(i.Number)))
         {
-            problems.Add(new ImportProblem(ImportArchiveLayout.ItemsFile, item.Row, "AlreadyExists",
-                $"An item with the number '{item.Number}' already exists."));
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.ItemsFile,
+                    item.Row,
+                    "AlreadyExists",
+                    $"An item with the number '{item.Number}' already exists."
+                )
+            );
         }
 
         var graveNumbers = await _db.Graves.Select(g => g.GraveNumber).ToListAsync(ct);
         var existingGraves = graveNumbers.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var grave in data.Graves.Where(g => existingGraves.Contains(g.Number)))
         {
-            problems.Add(new ImportProblem(ImportArchiveLayout.GravesFile, grave.Row, "AlreadyExists",
-                $"A grave with the number '{grave.Number}' already exists."));
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.GravesFile,
+                    grave.Row,
+                    "AlreadyExists",
+                    $"A grave with the number '{grave.Number}' already exists."
+                )
+            );
         }
     }
 
-    private static bool HasColumns(IReadOnlyList<string> row, int expected, string file, int line,
-        List<ImportProblem> problems)
+    private static bool HasColumns(
+        IReadOnlyList<string> row,
+        int expected,
+        string file,
+        int line,
+        List<ImportProblem> problems
+    )
     {
         if (row.Count == expected)
         {
             return true;
         }
 
-        problems.Add(new ImportProblem(file, line, "ColumnCount",
-            $"The row has {row.Count} columns; {expected} are expected."));
+        problems.Add(
+            new ImportProblem(
+                file,
+                line,
+                "ColumnCount",
+                $"The row has {row.Count} columns; {expected} are expected."
+            )
+        );
         return false;
     }
 
-    private static bool Missing(string value, string file, int line, string column, List<ImportProblem> problems)
+    private static bool Missing(
+        string value,
+        string file,
+        int line,
+        string column,
+        List<ImportProblem> problems
+    )
     {
         if (value.Length > 0)
         {
             return false;
         }
 
-        problems.Add(new ImportProblem(file, line, "FieldRequired", $"The column '{column}' must not be empty."));
+        problems.Add(
+            new ImportProblem(
+                file,
+                line,
+                "FieldRequired",
+                $"The column '{column}' must not be empty."
+            )
+        );
         return true;
     }
 
@@ -423,9 +646,19 @@ public sealed class ImportValidator
     // German "12,5" have to be understood.
     private static bool TryParseDecimal(string raw, out decimal value) =>
         decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out value)
-        || decimal.TryParse(raw.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out value);
+        || decimal.TryParse(
+            raw.Replace(',', '.'),
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out value
+        );
 
     private static bool TryParseDate(string raw, out DateOnly value) =>
-        DateOnly.TryParseExact(raw, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out value)
-        || DateOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
+        DateOnly.TryParseExact(
+            raw,
+            "yyyy-MM-dd",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out value
+        ) || DateOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
 }

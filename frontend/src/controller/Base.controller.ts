@@ -27,10 +27,7 @@ export default abstract class BaseController extends Controller {
    * they are added to the App, so view.getModel("odata") is not visible yet.
    */
   protected bindODataRoot(): void {
-    this.getView()!.setBindingContext(
-      this.odata().createBindingContext("/"),
-      "odata",
-    );
+    this.getView()!.setBindingContext(this.odata().createBindingContext("/"), "odata");
   }
 
   /**
@@ -54,21 +51,12 @@ export default abstract class BaseController extends Controller {
    * (D-002) — and hands back plain objects for a JSONModel. The detail pages
    * compute totals per revision, which a list binding cannot express.
    */
-  protected async readList<T>(
-    path: string,
-    parameters: Record<string, unknown>,
-  ): Promise<T[]> {
+  protected async readList<T>(path: string, parameters: Record<string, unknown>): Promise<T[]> {
     // The OData controller caps $top at 200 (Program.cs, SetMaxTop). A single
     // requestContexts(0, N) with N above that is rejected outright, so page
     // through in that size rather than assuming everything fits in one shot.
     const PAGE_SIZE = 200;
-    const binding = this.odata().bindList(
-      path,
-      undefined,
-      undefined,
-      undefined,
-      parameters,
-    );
+    const binding = this.odata().bindList(path, undefined, undefined, undefined, parameters);
     const rows: T[] = [];
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const contexts = await binding.requestContexts(offset, PAGE_SIZE);
@@ -97,12 +85,9 @@ export default abstract class BaseController extends Controller {
    * binding rather than view state, so it takes a control id: no binding syntax
    * expresses "reload now, and tell me when".
    */
-  protected async refreshRecipients(
-    selectId: string,
-  ): Promise<number | undefined> {
+  protected async refreshRecipients(selectId: string): Promise<number | undefined> {
     const binding = (this.byId(selectId) as Select).getBinding("items") as
-      | ODataListBinding
-      | undefined;
+      ODataListBinding | undefined;
     if (!binding) {
       return undefined;
     }
@@ -151,10 +136,7 @@ export default abstract class BaseController extends Controller {
   }
 
   /** Opens an invoice's PDF in a new tab, where the browser displays it. */
-  protected async openDocument(
-    invoiceId: number,
-    isCopy: boolean,
-  ): Promise<void> {
+  protected async openDocument(invoiceId: number, isCopy: boolean): Promise<void> {
     // The tab is opened before the documents are fetched: one opened after the
     // await no longer belongs to the click, and browsers block it as a popup.
     const tab = window.open("", "_blank");

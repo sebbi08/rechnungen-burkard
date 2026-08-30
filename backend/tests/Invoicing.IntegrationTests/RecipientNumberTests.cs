@@ -12,10 +12,14 @@ public class RecipientNumberTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        var first = await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Name = "Anna", Address = "Hauptstraße 1" }));
-        var second = await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Name = "Bert", Address = "Nebenweg 2" }));
+        var first = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(new { Name = "Anna", Address = "Hauptstraße 1" })
+        );
+        var second = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(new { Name = "Bert", Address = "Nebenweg 2" })
+        );
 
         using var firstJson = await ODataJson.ReadAsync(first);
         using var secondJson = await ODataJson.ReadAsync(second);
@@ -29,18 +33,38 @@ public class RecipientNumberTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        var created = await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Number = "K-77", Name = "Anna", Address = "Hauptstraße 1" }));
+        var created = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(
+                new
+                {
+                    Number = "K-77",
+                    Name = "Anna",
+                    Address = "Hauptstraße 1",
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         using var createdJson = await ODataJson.ReadAsync(created);
         Assert.Equal("K-77", createdJson.RootElement.GetProperty("Number").GetString());
 
-        var duplicate = await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Number = "K-77", Name = "Bert", Address = "Nebenweg 2" }));
+        var duplicate = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(
+                new
+                {
+                    Number = "K-77",
+                    Name = "Bert",
+                    Address = "Nebenweg 2",
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
         using var duplicateJson = await ODataJson.ReadAsync(duplicate);
-        Assert.Equal("RecipientNumberExists",
-            duplicateJson.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "RecipientNumberExists",
+            duplicateJson.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -49,10 +73,21 @@ public class RecipientNumberTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Number = "E-0042", Name = "Anna", Address = "Hauptstraße 1" }));
-        var next = await client.PostAsync("/odata/Recipients",
-            ODataJson.Body(new { Name = "Bert", Address = "Nebenweg 2" }));
+        await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(
+                new
+                {
+                    Number = "E-0042",
+                    Name = "Anna",
+                    Address = "Hauptstraße 1",
+                }
+            )
+        );
+        var next = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(new { Name = "Bert", Address = "Nebenweg 2" })
+        );
 
         using var json = await ODataJson.ReadAsync(next);
         Assert.Equal("E-0043", json.RootElement.GetProperty("Number").GetString());

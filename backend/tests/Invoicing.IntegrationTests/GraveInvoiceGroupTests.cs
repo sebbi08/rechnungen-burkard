@@ -14,16 +14,35 @@ public class GraveInvoiceGroupTests
 {
     /// <summary>A grave with one item at 100.00 and two recipients, invoiced for
     /// 2029 H1. Returns the grave id and one of its invoice ids.</summary>
-    private static async Task<(long GraveId, long InvoiceId, long ItemId)> SeedInvoicedGraveAsync(ApiTestHost host)
+    private static async Task<(long GraveId, long InvoiceId, long ItemId)> SeedInvoicedGraveAsync(
+        ApiTestHost host
+    )
     {
-        long graveId, itemId;
+        long graveId,
+            itemId;
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.VatRates.Add(new VatRate { Rate = 7m });
-            var item = new InvoiceItem { Number = "3001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-            var anna = new Recipient { Number = "E-0001", Name = "Anna Beispiel", Address = "A 1" };
-            var bernd = new Recipient { Number = "E-0002", Name = "Bernd Beispiel", Address = "B 2" };
+            var item = new InvoiceItem
+            {
+                Number = "3001",
+                Description = "Grabpflege",
+                VatRate = 7m,
+                DefaultPrice = 100m,
+            };
+            var anna = new Recipient
+            {
+                Number = "E-0001",
+                Name = "Anna Beispiel",
+                Address = "A 1",
+            };
+            var bernd = new Recipient
+            {
+                Number = "E-0002",
+                Name = "Bernd Beispiel",
+                Address = "B 2",
+            };
             db.InvoiceItems.Add(item);
             db.Recipients.AddRange(anna, bernd);
             var grave = new Grave
@@ -35,9 +54,20 @@ public class GraveInvoiceGroupTests
             };
             db.Graves.Add(grave);
             await db.SaveChangesAsync();
-            db.GraveItems.Add(new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 2 });
-            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = anna.Id });
-            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = bernd.Id });
+            db.GraveItems.Add(
+                new GraveItem
+                {
+                    GraveId = grave.Id,
+                    ItemId = item.Id,
+                    Count = 2,
+                }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = anna.Id }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = bernd.Id }
+            );
             await db.SaveChangesAsync();
             (graveId, itemId) = (grave.Id, item.Id);
         }
@@ -68,8 +98,10 @@ public class GraveInvoiceGroupTests
         Assert.Equal(2029, root.GetProperty("PeriodYear").GetInt32());
         Assert.Equal(1, root.GetProperty("PeriodHalf").GetInt32());
 
-        var names = root.GetProperty("Recipients").EnumerateArray()
-            .Select(r => r.GetProperty("Name").GetString()).ToList();
+        var names = root.GetProperty("Recipients")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("Name").GetString())
+            .ToList();
         Assert.Equal(new[] { "Anna Beispiel", "Bernd Beispiel" }, names);
 
         var line = Assert.Single(root.GetProperty("Lines").EnumerateArray().ToList());
@@ -111,18 +143,42 @@ public class GraveInvoiceGroupTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "3002", Description = "X", VatRate = 7m, DefaultPrice = 10m };
-        var recipient = new Recipient { Number = "E-0009", Name = "Solo", Address = "S 1" };
+        var item = new InvoiceItem
+        {
+            Number = "3002",
+            Description = "X",
+            VatRate = 7m,
+            DefaultPrice = 10m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0009",
+            Name = "Solo",
+            Address = "S 1",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         created.EnsureSuccessStatusCode();
         using var createdJson = await ODataJson.ReadAsync(created);
         var invoiceId = createdJson.RootElement.GetProperty("Id").GetInt64();
@@ -130,7 +186,10 @@ public class GraveInvoiceGroupTests
         var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceId}");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("NotAGraveInvoice", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "NotAGraveInvoice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -142,7 +201,10 @@ public class GraveInvoiceGroupTests
         var response = await client.GetAsync("/odata/GraveInvoiceGroup?invoiceId=987654");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvoiceNotFound", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvoiceNotFound",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -156,22 +218,24 @@ public class GraveInvoiceGroupTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var siblingInvoiceId = await db.Invoices
-                .Where(i => i.GraveId == graveId && i.Id != invoiceId)
+            var siblingInvoiceId = await db
+                .Invoices.Where(i => i.GraveId == graveId && i.Id != invoiceId)
                 .Select(i => i.Id)
                 .FirstAsync();
             var template = await db.InvoiceLines.FirstAsync(l => l.InvoiceId == siblingInvoiceId);
-            db.InvoiceLines.Add(new InvoiceLine
-            {
-                InvoiceId = siblingInvoiceId,
-                ItemId = template.ItemId,
-                ItemNumber = template.ItemNumber,
-                Description = template.Description,
-                Count = 1,
-                UnitPrice = 5m,
-                VatRate = template.VatRate,
-                LineNumber = template.LineNumber + 1,
-            });
+            db.InvoiceLines.Add(
+                new InvoiceLine
+                {
+                    InvoiceId = siblingInvoiceId,
+                    ItemId = template.ItemId,
+                    ItemNumber = template.ItemNumber,
+                    Description = template.Description,
+                    Count = 1,
+                    UnitPrice = 5m,
+                    VatRate = template.VatRate,
+                    LineNumber = template.LineNumber + 1,
+                }
+            );
             await db.SaveChangesAsync();
         }
 
@@ -179,7 +243,10 @@ public class GraveInvoiceGroupTests
         var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceId}");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("GraveInvoiceGroupInconsistent", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "GraveInvoiceGroupInconsistent",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -195,8 +262,8 @@ public class GraveInvoiceGroupTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var siblingInvoiceId = await db.Invoices
-                .Where(i => i.GraveId == graveId && i.Id != invoiceId)
+            var siblingInvoiceId = await db
+                .Invoices.Where(i => i.GraveId == graveId && i.Id != invoiceId)
                 .Select(i => i.Id)
                 .FirstAsync();
             var line = await db.InvoiceLines.SingleAsync(l => l.InvoiceId == siblingInvoiceId);
@@ -221,7 +288,9 @@ public class GraveInvoiceGroupTests
         var (graveId, _, _) = await SeedInvoicedGraveAsync(host);
 
         using var client = host.CreateClient();
-        var response = await client.GetAsync($"/odata/GraveInvoiceRuns?$filter=GraveId eq {graveId}");
+        var response = await client.GetAsync(
+            $"/odata/GraveInvoiceRuns?$filter=GraveId eq {graveId}"
+        );
         response.EnsureSuccessStatusCode();
         using var json = await ODataJson.ReadAsync(response);
 

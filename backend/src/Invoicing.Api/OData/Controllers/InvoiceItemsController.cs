@@ -27,23 +27,36 @@ public class InvoiceItemsController : ODataController
     {
         if (item is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         item.VatRate = VatRateNormalizer.Normalize(item.VatRate);
 
         var error = Validate(item);
-        if (error is not null) return BadRequest(error);
+        if (error is not null)
+            return BadRequest(error);
 
         if (_db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
         {
-            return BadRequest(new
-            {
-                error = new { code = "ItemNumberExists", message = "This item number already exists." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "ItemNumberExists",
+                        message = "This item number already exists.",
+                    },
+                }
+            );
         }
 
         _db.InvoiceItems.Add(item);
@@ -51,31 +64,48 @@ public class InvoiceItemsController : ODataController
         return Created(item);
     }
 
-    public IActionResult Patch([FromRoute] long key, [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<InvoiceItem>? delta)
+    public IActionResult Patch(
+        [FromRoute] long key,
+        [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<InvoiceItem>? delta
+    )
     {
         if (delta is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         var item = _db.InvoiceItems.Find(key);
-        if (item is null) return NotFound();
+        if (item is null)
+            return NotFound();
 
         delta.Patch(item);
         item.VatRate = VatRateNormalizer.Normalize(item.VatRate);
 
         var error = Validate(item);
-        if (error is not null) return BadRequest(error);
+        if (error is not null)
+            return BadRequest(error);
 
         if (_db.InvoiceItems.Any(i => i.Number == item.Number && i.Id != item.Id))
         {
-            return BadRequest(new
-            {
-                error = new { code = "ItemNumberExists", message = "This item number already exists." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "ItemNumberExists",
+                        message = "This item number already exists.",
+                    },
+                }
+            );
         }
 
         _db.SaveChanges();
@@ -85,7 +115,8 @@ public class InvoiceItemsController : ODataController
     public IActionResult Delete([FromRoute] long key)
     {
         var item = _db.InvoiceItems.Find(key);
-        if (item is null) return NotFound();
+        if (item is null)
+            return NotFound();
         _db.InvoiceItems.Remove(item);
         try
         {
@@ -94,10 +125,16 @@ public class InvoiceItemsController : ODataController
         catch (DbUpdateException)
         {
             // Restrict FK: the item is still linked to a grave
-            return BadRequest(new
-            {
-                error = new { code = "ItemInUse", message = "This item is linked to a grave and cannot be deleted." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "ItemInUse",
+                        message = "This item is linked to a grave and cannot be deleted.",
+                    },
+                }
+            );
         }
 
         return NoContent();
@@ -107,17 +144,38 @@ public class InvoiceItemsController : ODataController
     {
         if (string.IsNullOrWhiteSpace(item.Number))
         {
-            return new { error = new { code = "ItemNumberRequired", message = "The item number is required." } };
+            return new
+            {
+                error = new
+                {
+                    code = "ItemNumberRequired",
+                    message = "The item number is required.",
+                },
+            };
         }
 
         if (string.IsNullOrWhiteSpace(item.Description))
         {
-            return new { error = new { code = "ItemDescriptionRequired", message = "The description is required." } };
+            return new
+            {
+                error = new
+                {
+                    code = "ItemDescriptionRequired",
+                    message = "The description is required.",
+                },
+            };
         }
 
         if (!_db.VatRates.Any(v => v.Rate == item.VatRate))
         {
-            return new { error = new { code = "VatRateNotConfigured", message = "The VAT rate is not configured." } };
+            return new
+            {
+                error = new
+                {
+                    code = "VatRateNotConfigured",
+                    message = "The VAT rate is not configured.",
+                },
+            };
         }
 
         return null;

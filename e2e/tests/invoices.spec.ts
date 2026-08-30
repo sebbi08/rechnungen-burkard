@@ -17,9 +17,7 @@ const RECIPIENT_NAME = `E2E 9001 ${Date.now()}`;
  */
 const SUGGESTION = "div.sapMPopover li.sapMSLI";
 
-async function seedMasterData(
-  page: import("@playwright/test").Page,
-): Promise<void> {
+async function seedMasterData(page: import("@playwright/test").Page): Promise<void> {
   // Direct API calls keep the test focused on the UI flow. VatRate 7 and
   // item 9001 may already exist from previous runs; the API then answers
   // 409, which is harmless because the existing rows are reused.
@@ -69,9 +67,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
     })
     .click();
   // the item field is a typeahead input: type the number, then pick the suggestion
-  const lineInput = page.locator(
-    ".sapMDialog input[id*='lineItem'][id$='-inner']",
-  );
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill("9001");
   await page.locator(SUGGESTION, { hasText: "9001" }).click();
@@ -82,9 +78,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   // saving shows a row for this run's unique recipient. This fails if
   // CreateInvoice breaks, and is unaffected by parallel grave generation
   // (which creates rows for other recipients) or by an empty fresh DB.
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: RECIPIENT_NAME }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: RECIPIENT_NAME })).toBeVisible();
 
   // open the normal document from the row of this run's invoice, not from the
   // first row (which a parallel grave run may replace): it opens in a new tab
@@ -115,9 +109,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   expect(disposition).not.toContain("Kopie");
 });
 
-test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
-  page,
-}) => {
+test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
   await seedMasterData(page);
   await page.goto("/index.html#/invoices");
 
@@ -128,9 +120,7 @@ test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
       hasText: RECIPIENT_NAME,
     })
     .click();
-  const lineInput = page.locator(
-    ".sapMDialog input[id*='lineItem'][id$='-inner']",
-  );
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill("9001");
   await page.locator(SUGGESTION, { hasText: "9001" }).click();
@@ -146,9 +136,7 @@ test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
   );
 });
 
-test("create invoice with an on-the-fly recipient (Story 3.2)", async ({
-  page,
-}) => {
+test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page }) => {
   const ts = Date.now();
   const quickName = `Schnell ${ts}`;
   const itemNumber = `9004-${ts}`;
@@ -179,13 +167,9 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({
   // the quick dialog closes without leaving the invoice dialog, which now
   // shows the newly created recipient as selected
   await expect(quickDialog).toBeHidden();
-  await expect(page.locator(".sapMDialog .sapMSlt").first()).toContainText(
-    quickName,
-  );
+  await expect(page.locator(".sapMDialog .sapMSlt").first()).toContainText(quickName);
 
-  const lineInput = page.locator(
-    ".sapMDialog input[id*='lineItem'][id$='-inner']",
-  );
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill(itemNumber);
   await page.locator(SUGGESTION, { hasText: itemNumber }).click();
@@ -193,9 +177,7 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
 
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: quickName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: quickName })).toBeVisible();
 });
 
 test("editing an invoice creates a revision with -R1 number and badge (Story 9)", async ({
@@ -208,16 +190,19 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
     data: { Rate: 7 },
   });
   const item = await createRow(page, "/odata/InvoiceItems", {
-        Number: itemNumber,
-        Description: "E2E Revision",
-        VatRate: 7,
-        DefaultPrice: null,
-      });
-  const recipient = await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Revisionsweg 1" });
+    Number: itemNumber,
+    Description: "E2E Revision",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Revisionsweg 1",
+  });
   const invoice = await createRow(page, "/odata/CreateInvoice", {
-        recipientId: recipient.Id,
-        lines: [{ itemId: item.Id, count: 1, unitPrice: 100 }],
-      });
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.Id, count: 1, unitPrice: 100 }],
+  });
   const number = invoice.InvoiceNumber as string;
   expect(number).toMatch(/^\d{4}-\d{4}$/); // freshly created: no -R suffix
 
@@ -266,12 +251,8 @@ async function countInvoicesFor(
   page: import("@playwright/test").Page,
   recipientName: string,
 ): Promise<number> {
-  const filter = encodeURIComponent(
-    `RecipientName eq '${recipientName.replace(/'/g, "''")}'`,
-  );
-  const response = await page.request.get(
-    `/odata/Invoices?$filter=${filter}&$select=Id`,
-  );
+  const filter = encodeURIComponent(`RecipientName eq '${recipientName.replace(/'/g, "''")}'`);
+  const response = await page.request.get(`/odata/Invoices?$filter=${filter}&$select=Id`);
   return ((await response.json()).value as unknown[]).length;
 }
 
@@ -285,26 +266,16 @@ async function countInvoices(
   return ((await response.json()).value as unknown[]).length;
 }
 
-async function fillLine(
-  page: import("@playwright/test").Page,
-  itemNumber: string,
-): Promise<void> {
-  const lineInput = page.locator(
-    ".sapMDialog input[id*='lineItem'][id$='-inner']",
-  );
+async function fillLine(page: import("@playwright/test").Page, itemNumber: string): Promise<void> {
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill(itemNumber);
   await page.locator(SUGGESTION, { hasText: itemNumber }).click();
   await page.getByLabel("Preis").fill("120");
 }
 
-test("the second invoice goes to the recipient the reopened dialog shows", async ({
-  page,
-}) => {
-  const { itemNumber, recipientName } = await seedOwnMasterData(
-    page,
-    `Wieder ${Date.now()}`,
-  );
+test("the second invoice goes to the recipient the reopened dialog shows", async ({ page }) => {
+  const { itemNumber, recipientName } = await seedOwnMasterData(page, `Wieder ${Date.now()}`);
   await page.goto("/index.html#/invoices");
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
@@ -318,9 +289,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
     .click();
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // second invoice: the dialog is reopened and saved without touching the
   // select. *Which* recipient it shows is not this test's business — a reopened
@@ -329,9 +298,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // What must hold is that the save invoices exactly the recipient on screen.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
   // the visible label; the select also renders a hidden native one
-  const shown = (
-    await page.locator(".sapMDialog .sapMSltLabel").first().innerText()
-  ).trim();
+  const shown = (await page.locator(".sapMDialog .sapMSltLabel").first().innerText()).trim();
   expect(shown).not.toBe("");
   const before = await countInvoicesFor(page, shown);
 
@@ -344,9 +311,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   await expect.poll(() => countInvoicesFor(page, shown)).toBe(before + 1);
 });
 
-test("a double click on save creates one invoice, not two", async ({
-  page,
-}) => {
+test("a double click on save creates one invoice, not two", async ({ page }) => {
   const { itemNumber, recipientName, recipientId } = await seedOwnMasterData(
     page,
     `Doppel ${Date.now()}`,
@@ -377,16 +342,12 @@ test("a double click on save creates one invoice, not two", async ({
   // click must not produce a second invoice (constitution VIII)
   await page.getByRole("button", { name: "Speichern" }).dblclick();
 
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
   expect(created).toBe(1);
   await expect.poll(() => countInvoices(page, recipientId)).toBe(1);
 });
 
-test("the list shows non-grave invoices only and searches them (Story 9)", async ({
-  page,
-}) => {
+test("the list shows non-grave invoices only and searches them (Story 9)", async ({ page }) => {
   const marker = `Suche ${Date.now()}`;
   const { itemNumber, recipientName } = await seedOwnMasterData(page, marker);
   const item = await (
@@ -408,38 +369,30 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   const listRequest = page.waitForRequest(
     (request) =>
       request.url().includes("/odata/Invoices") &&
-      decodeURIComponent(request.url()).includes(
-        "GraveId eq null and IsLatestRevision eq true",
-      ),
+      decodeURIComponent(request.url()).includes("GraveId eq null and IsLatestRevision eq true"),
   );
   await page.goto("/index.html#/invoices");
   await listRequest;
 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // the search reaches the backend as the custom query option
   const search = page.locator("[id$='invoiceSearch'] input");
-  const searchRequest = page.waitForRequest((request) =>
-    request.url().includes("/odata/Invoices") && request.url().includes("search="),
+  const searchRequest = page.waitForRequest(
+    (request) => request.url().includes("/odata/Invoices") && request.url().includes("search="),
   );
   await search.fill(recipientName);
   await search.press("Enter");
   await searchRequest;
 
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
   // clearing the field restores the list
   await search.fill("");
   await search.press("Enter");
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // narrow it again for the row assertions below
   await search.fill(recipientName);

@@ -16,8 +16,21 @@ public sealed class InvoiceDocumentData
     public decimal TotalVat { get; set; }
     public decimal GrossTotal { get; set; }
 
-    public sealed record LineData(int Position, string ItemNumber, string Description,
-        int Count, decimal UnitPrice, decimal VatRate, decimal LineTotal, decimal VatAmount);
+    public sealed record LineData(
+        int Position,
+        string ItemNumber,
+        string Description,
+        int Count,
+        decimal UnitPrice,
+        decimal VatRate,
+        decimal LineTotal,
+        decimal VatAmount
+    );
 
-    public sealed record VatSummary(decimal Rate, decimal NetTotal, decimal VatAmount, decimal GrossTotal);
+    public sealed record VatSummary(
+        decimal Rate,
+        decimal NetTotal,
+        decimal VatAmount,
+        decimal GrossTotal
+    );
 }

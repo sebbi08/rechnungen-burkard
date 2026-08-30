@@ -1,12 +1,21 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog id="quickRecipientDialog" title="{i18n>newRecipient}"
-        stretch="{device>/system/phone}" contentWidth="20rem">
+    <Dialog
+        id="quickRecipientDialog"
+        title="{i18n>newRecipient}"
+        stretch="{device>/system/phone}"
+        contentWidth="20rem"
+    >
         <content>
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="quickName" />
                 <Input id="quickName" width="100%" value="{quickRecipientDraft>/name}" />
                 <Label text="{i18n>recipientAddress}" labelFor="quickAddress" />
-                <TextArea id="quickAddress" rows="4" width="100%" value="{quickRecipientDraft>/address}" />
+                <TextArea
+                    id="quickAddress"
+                    rows="4"
+                    width="100%"
+                    value="{quickRecipientDraft>/address}"
+                />
             </VBox>
         </content>
         <beginButton>

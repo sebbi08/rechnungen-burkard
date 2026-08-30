@@ -78,8 +78,7 @@ export default class Items extends BaseController {
       Description: draft.description,
       VatRate: Number(draft.vatRate),
       // an empty input means "no default price"; a price of 0 is a real value
-      DefaultPrice:
-        draft.defaultPrice === "" ? null : Number(draft.defaultPrice),
+      DefaultPrice: draft.defaultPrice === "" ? null : Number(draft.defaultPrice),
     };
     try {
       if (draft.id != null) {

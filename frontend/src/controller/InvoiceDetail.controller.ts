@@ -51,22 +51,15 @@ export default class InvoiceDetail extends InvoiceEdit {
     await this.refresh();
   }
 
-  public async onDownloadRevisionNormal(
-    event: Button$PressEvent,
-  ): Promise<void> {
+  public async onDownloadRevisionNormal(event: Button$PressEvent): Promise<void> {
     await this.downloadRevision(event, false);
   }
 
-  public async onDownloadRevisionCopy(
-    event: Button$PressEvent,
-  ): Promise<void> {
+  public async onDownloadRevisionCopy(event: Button$PressEvent): Promise<void> {
     await this.downloadRevision(event, true);
   }
 
-  private async downloadRevision(
-    event: Button$PressEvent,
-    isCopy: boolean,
-  ): Promise<void> {
+  private async downloadRevision(event: Button$PressEvent, isCopy: boolean): Promise<void> {
     const context = event.getSource().getBindingContext("detail")!;
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }

@@ -26,8 +26,7 @@ public class GraveInvoiceSplitterTests
     [Fact]
     public void Every_line_is_split_on_its_own_so_proportions_survive()
     {
-        var split = GraveInvoiceSplitter.Split(
-            new[] { Line(2, 120m, 7m), Line(1, 50m, 19m) }, 2);
+        var split = GraveInvoiceSplitter.Split(new[] { Line(2, 120m, 7m), Line(1, 50m, 19m) }, 2);
 
         Assert.Equal(2, split.Count);
         Assert.All(split, lines => Assert.Equal(2, lines.Count));
@@ -77,7 +76,9 @@ public class GraveInvoiceSplitterTests
     {
         var lines = new[] { Line(1, 2.60m, 19m) };
 
-        var combined = Assert.Single(GraveInvoiceSplitter.Combine(GraveInvoiceSplitter.Split(lines, 3)));
+        var combined = Assert.Single(
+            GraveInvoiceSplitter.Combine(GraveInvoiceSplitter.Split(lines, 3))
+        );
 
         Assert.Equal(2.60m, combined.UnitPrice);
     }
@@ -102,14 +103,18 @@ public class GraveInvoiceSplitterTests
     [Fact]
     public void Zero_recipients_throws()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => GraveInvoiceSplitter.Split(new[] { Line(1, 100m, 7m) }, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GraveInvoiceSplitter.Split(new[] { Line(1, 100m, 7m) }, 0)
+        );
     }
 
     [Fact]
     public void Combining_nothing_throws()
     {
-        Assert.Throws<ArgumentException>(
-            () => GraveInvoiceSplitter.Combine(Array.Empty<System.Collections.Generic.IReadOnlyList<Domain.Entities.InvoiceLine>>()));
+        Assert.Throws<ArgumentException>(() =>
+            GraveInvoiceSplitter.Combine(
+                Array.Empty<System.Collections.Generic.IReadOnlyList<Domain.Entities.InvoiceLine>>()
+            )
+        );
     }
 }

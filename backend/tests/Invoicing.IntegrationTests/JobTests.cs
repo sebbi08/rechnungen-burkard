@@ -56,7 +56,8 @@ public class JobTests : IClassFixture<ApiTestHost>
     {
         using var scope = _host.Services.CreateScope();
         var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
-        var handler = (TestJobHandler)_host.Services.GetServices<IJobHandler>().Single(h => h is TestJobHandler);
+        var handler = (TestJobHandler)
+            _host.Services.GetServices<IJobHandler>().Single(h => h is TestJobHandler);
         var callsBefore = handler.Calls;
         var job = await jobs.EnqueueAsync("Test", null, 10, CancellationToken.None);
 
@@ -90,13 +91,25 @@ public class JobTests : IClassFixture<ApiTestHost>
         try
         {
             // seed a stuck job directly before first app start
-            using (var setup = new ServiceCollection()
-                       .AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={recoveryHost.DbFilePath}"))
-                       .BuildServiceProvider())
+            using (
+                var setup = new ServiceCollection()
+                    .AddDbContext<AppDbContext>(o =>
+                        o.UseSqlite($"Data Source={recoveryHost.DbFilePath}")
+                    )
+                    .BuildServiceProvider()
+            )
             {
                 var db = setup.GetRequiredService<AppDbContext>();
                 db.Database.Migrate();
-                db.Jobs.Add(new Job { Type = "Test", Status = JobStatus.Running, TotalCount = 10, CreatedAt = DateTime.UtcNow });
+                db.Jobs.Add(
+                    new Job
+                    {
+                        Type = "Test",
+                        Status = JobStatus.Running,
+                        TotalCount = 10,
+                        CreatedAt = DateTime.UtcNow,
+                    }
+                );
                 await db.SaveChangesAsync();
             }
 
@@ -109,7 +122,8 @@ public class JobTests : IClassFixture<ApiTestHost>
                     using var scope = recoveryHost.Services.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     finished = await db.Jobs.OrderByDescending(j => j.Id).FirstAsync();
-                    if (finished.Status is JobStatus.Succeeded or JobStatus.Failed) break;
+                    if (finished.Status is JobStatus.Succeeded or JobStatus.Failed)
+                        break;
                     await Task.Delay(50);
                 }
 

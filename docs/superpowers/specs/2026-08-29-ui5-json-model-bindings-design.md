@@ -64,17 +64,17 @@ OpenUI5.
 
 Interfaces live in a new `src/model/state.ts`. Two kinds of model:
 
-| Kind | Name | Holds |
-|---|---|---|
-| Page state | `view` | Search terms, toolbar selections — one per page |
-| Dialog state | `<thing>Draft` | Everything a dialog collects until it is saved |
+| Kind         | Name           | Holds                                           |
+| ------------ | -------------- | ----------------------------------------------- |
+| Page state   | `view`         | Search terms, toolbar selections — one per page |
+| Dialog state | `<thing>Draft` | Everything a dialog collects until it is saved  |
 
 Both are `TypedJSONModel<T>`, available since UI5 1.140 and present in the
 pinned 1.151.0. It checks path literals against the interface, so
 `setProperty("/lines/0/unitPrce", …)` fails to compile rather than silently
 writing a new property.
 
-**Control `id` attributes stay.** This refactor removes `byId` *calls*, not
+**Control `id` attributes stay.** This refactor removes `byId` _calls_, not
 element IDs. `graves.spec.ts:210` matches `.sapMSlt[id$='linkRecipient']`, and
 roughly thirty-six `getByLabel(...)` locators across the suite resolve through
 `labelFor`. Removing an ID breaks tests that have nothing to do with this work.
@@ -85,7 +85,7 @@ roughly thirty-six `getByLabel(...)` locators across the suite resolve through
 
 - `view` model `{ searchTerm: string | null }`. The table declares
   `boundFilters` over `Number` and `Description` with `and: false`;
-  `onSearch` writes `term || null`. A `null` value makes the filter *neutral*
+  `onSearch` writes `term || null`. A `null` value makes the filter _neutral_
   (`Filter.isNeutral`), so clearing the field drops the filter with no
   `if (!term)` branch.
 - `itemDraft` model `{ id, number, description, vatRate, defaultPrice }`,
@@ -120,7 +120,7 @@ a `recipientDraft` model, an expression-bound title, `odata().refresh()`.
 ### InvoiceEdit
 
 - The recipient `Select` binds `selectedKey` **two-way** to
-  `invoiceDraft>/recipientId`. This deletes the `byId` read *and* the
+  `invoiceDraft>/recipientId`. This deletes the `byId` read _and_ the
   reused-dialog workaround described under Problem. The draft holds the key as
   a string, matching the existing `itemId` convention, and converts on save.
 - `quickRecipientDraft` model `{ name, address }` for the shared quick-create
@@ -148,14 +148,14 @@ a `recipientDraft` model, an expression-bound title, `odata().refresh()`.
 
 Two sites, each with a comment saying why:
 
-| Site | Why |
-|---|---|
-| `Invoices` — `invoicesTable` `.changeParameters({ search })` | A custom OData query option on a list binding. Not view state; no binding syntax expresses it. |
-| `ImportExport` — `archiveUpload.clear()` | `FileUploader.clear()` resets the native file input. The `value` property is bindable but does not do this. |
-| `Base` — `refreshRecipients(selectId)` | Reloads a recipient select's list and waits for it. No binding syntax expresses "reload now, and tell me when". Added during implementation; see below. |
+| Site                                                         | Why                                                                                                                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Invoices` — `invoicesTable` `.changeParameters({ search })` | A custom OData query option on a list binding. Not view state; no binding syntax expresses it.                                                          |
+| `ImportExport` — `archiveUpload.clear()`                     | `FileUploader.clear()` resets the native file input. The `value` property is bindable but does not do this.                                             |
+| `Base` — `refreshRecipients(selectId)`                       | Reloads a recipient select's list and waits for it. No binding syntax expresses "reload now, and tell me when". Added during implementation; see below. |
 
 Reaching a list binding through its control is ordinary UI5. The anti-pattern is
-storing *state* in controls, and after this change none is.
+storing _state_ in controls, and after this change none is.
 
 ## Typing
 
@@ -233,19 +233,19 @@ re-applies its bound `selectedKey` when the refreshed items arrive.
 regression test caught every one of them. Worth recording, because each failure
 was a different lesson.
 
-*First:* binding `selectedKey` two-way was necessary but not sufficient. A
+_First:_ binding `selectedKey` two-way was necessary but not sufficient. A
 reopened dialog starts on an empty draft, and the select's `forceSelection` then
 picks its first item — a control-side fallback UI5 deliberately does not write
 into the bound model, so the save still sent recipient 0.
 
-*Second:* making the default explicit (an own read of the newest recipient, and
+_Second:_ making the default explicit (an own read of the newest recipient, and
 `forceSelection="false"`) fixed the saved value but not what was displayed. The
 dialog is reused, so its recipient list was the one loaded on the first open; a
 recipient created since was missing from it, the bound key matched no loaded
 item, and the select went on showing the previous label. The draft was right and
 the screen was wrong — the same divergence, inverted.
 
-*Third:* refreshing that list was still not enough while the refresh and the
+_Third:_ refreshing that list was still not enough while the refresh and the
 "which is newest" read were two separate requests. Under the parallel suite a
 recipient created between them made them disagree again.
 

@@ -279,12 +279,12 @@ controllers.
 - Each row carries four icon-only buttons, each with a tooltip that doubles as
   its accessible name:
 
-  | Action | Icon | Behaviour |
-  |---|---|---|
-  | Details | `sap-icon://detail-view` | navigates to `invoices/{RootId}` |
-  | Rechnung | `sap-icon://pdf-attachment` | opens the normal document |
-  | Kopie | `sap-icon://copy` | opens the copy |
-  | Bearbeiten | `sap-icon://edit` | opens the invoice dialog on this invoice |
+  | Action     | Icon                        | Behaviour                                |
+  | ---------- | --------------------------- | ---------------------------------------- |
+  | Details    | `sap-icon://detail-view`    | navigates to `invoices/{RootId}`         |
+  | Rechnung   | `sap-icon://pdf-attachment` | opens the normal document                |
+  | Kopie      | `sap-icon://copy`           | opens the copy                           |
+  | Bearbeiten | `sap-icon://edit`           | opens the invoice dialog on this invoice |
 
   The buttons sit in the same wrapping `HBox` as today, so they drop below the
   row in the phone pop-in.
@@ -338,7 +338,7 @@ Three panels:
   recipients are fixed.
 - **Rechnungen** — every latest-revision invoice of the grave, across all
   half-years and recipients, ordered by `PeriodYear desc, PeriodHalf desc,
-  RecipientName`. Columns: half-year ("H1 2026"), recipient, invoice number,
+RecipientName`. Columns: half-year ("H1 2026"), recipient, invoice number,
   date, revision badge, gross total, and the same four icon actions as the
   invoice list — details navigating to `graves/{graveId}/invoices/{RootId}`,
   the two downloads, and edit opening the grave-invoice dialog.

@@ -17,8 +17,19 @@ public class BulkDownloadTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "7001", Description = "X", VatRate = 7m, DefaultPrice = 10m };
-        var recipient = new Recipient { Number = "E-0001", Name = "X", Address = "Y" };
+        var item = new InvoiceItem
+        {
+            Number = "7001",
+            Description = "X",
+            VatRate = 7m,
+            DefaultPrice = 10m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0001",
+            Name = "X",
+            Address = "Y",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
@@ -26,11 +37,24 @@ public class BulkDownloadTests
         using var client = host.CreateClient();
         for (var i = 0; i < 2; i++)
         {
-            var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-            {
-                recipientId = recipient.Id,
-                lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-            }));
+            var created = await client.PostAsync(
+                "/odata/CreateInvoice",
+                ODataJson.Body(
+                    new
+                    {
+                        recipientId = recipient.Id,
+                        lines = new[]
+                        {
+                            new
+                            {
+                                itemId = item.Id,
+                                count = 1,
+                                unitPrice = (decimal?)null,
+                            },
+                        },
+                    }
+                )
+            );
             created.EnsureSuccessStatusCode();
         }
     }
@@ -42,12 +66,17 @@ public class BulkDownloadTests
         await SeedTwoInvoicesAsync(host);
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/BulkDownloadDocuments",
-            ODataJson.Body(new { kind = "Normal" }));
+        var response = await client.PostAsync(
+            "/odata/BulkDownloadDocuments",
+            ODataJson.Body(new { kind = "Normal" })
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
 
-        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var zip = new ZipArchive(
+            await response.Content.ReadAsStreamAsync(),
+            ZipArchiveMode.Read
+        );
         var names = zip.Entries.Select(e => e.Name).ToList();
         Assert.Equal(2, names.Count);
         Assert.All(names, n => Assert.False(n.Contains("Kopie")));
@@ -60,11 +89,16 @@ public class BulkDownloadTests
         await SeedTwoInvoicesAsync(host);
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/BulkDownloadDocuments",
-            ODataJson.Body(new { kind = "Copy" }));
+        var response = await client.PostAsync(
+            "/odata/BulkDownloadDocuments",
+            ODataJson.Body(new { kind = "Copy" })
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var zip = new ZipArchive(
+            await response.Content.ReadAsStreamAsync(),
+            ZipArchiveMode.Read
+        );
         var names = zip.Entries.Select(e => e.Name).ToList();
         Assert.Equal(2, names.Count);
         Assert.All(names, n => Assert.Contains("Kopie", n));

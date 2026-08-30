@@ -43,10 +43,7 @@
         "type": "sap.ui.model.resource.ResourceModel",
         "settings": {
           "bundleName": "burkard.invoicing.i18n.i18n",
-          "supportedLocales": [
-            "",
-            "en"
-          ],
+          "supportedLocales": ["", "en"],
           "fallbackLocale": ""
         }
       }
@@ -63,72 +60,52 @@
         {
           "name": "home",
           "pattern": "",
-          "target": [
-            "home"
-          ]
+          "target": ["home"]
         },
         {
           "name": "settings",
           "pattern": "settings",
-          "target": [
-            "settings"
-          ]
+          "target": ["settings"]
         },
         {
           "name": "items",
           "pattern": "items",
-          "target": [
-            "items"
-          ]
+          "target": ["items"]
         },
         {
           "name": "recipients",
           "pattern": "recipients",
-          "target": [
-            "recipients"
-          ]
+          "target": ["recipients"]
         },
         {
           "name": "invoices",
           "pattern": "invoices",
-          "target": [
-            "invoices"
-          ]
+          "target": ["invoices"]
         },
         {
           "name": "invoiceDetail",
           "pattern": "invoices/{rootId}",
-          "target": [
-            "invoiceDetail"
-          ]
+          "target": ["invoiceDetail"]
         },
         {
           "name": "graves",
           "pattern": "graves",
-          "target": [
-            "graves"
-          ]
+          "target": ["graves"]
         },
         {
           "name": "graveDetail",
           "pattern": "graves/{graveId}",
-          "target": [
-            "graveDetail"
-          ]
+          "target": ["graveDetail"]
         },
         {
           "name": "graveInvoiceDetail",
           "pattern": "graves/{graveId}/invoices/{rootId}",
-          "target": [
-            "graveInvoiceDetail"
-          ]
+          "target": ["graveInvoiceDetail"]
         },
         {
           "name": "importExport",
           "pattern": "import-export",
-          "target": [
-            "importExport"
-          ]
+          "target": ["importExport"]
         }
       ],
       "targets": {

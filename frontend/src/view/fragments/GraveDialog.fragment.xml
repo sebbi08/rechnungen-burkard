@@ -1,89 +1,170 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
-    <Dialog id="graveDialog" stretch="true"
-        title="{= ${graveDraft>/Id} === null ? ${i18n>createGrave} : ${i18n>editGrave} }">
+    <Dialog
+        id="graveDialog"
+        stretch="true"
+        title="{= ${graveDraft>/Id} === null ? ${i18n>createGrave} : ${i18n>editGrave} }"
+    >
         <content>
             <VBox class="sapUiMediumMargin">
                 <!-- an edit changes the grave, never an invoice already issued
                      from it; the invoices are snapshots -->
-                <MessageStrip type="Warning" showIcon="true" class="sapUiSmallMarginBottom"
-                    text="{i18n>graveEditWarning}" visible="{= ${graveDraft>/Id} !== null }" />
+                <MessageStrip
+                    type="Warning"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"
+                    text="{i18n>graveEditWarning}"
+                    visible="{= ${graveDraft>/Id} !== null }"
+                />
                 <Label text="{i18n>graveNumber}" labelFor="graveNumber" />
                 <Input id="graveNumber" width="16rem" value="{graveDraft>/GraveNumber}" />
                 <Label text="{i18n>startDate}" labelFor="graveStart" />
-                <DatePicker id="graveStart" width="16rem" displayFormat="yyyy-MM-dd"
-                    valueFormat="yyyy-MM-dd" value="{graveDraft>/StartDate}" />
+                <DatePicker
+                    id="graveStart"
+                    width="16rem"
+                    displayFormat="yyyy-MM-dd"
+                    valueFormat="yyyy-MM-dd"
+                    value="{graveDraft>/StartDate}"
+                />
                 <Label text="{i18n>endDate}" labelFor="graveEnd" />
-                <DatePicker id="graveEnd" width="16rem" displayFormat="yyyy-MM-dd"
-                    valueFormat="yyyy-MM-dd" value="{graveDraft>/EndDate}" />
+                <DatePicker
+                    id="graveEnd"
+                    width="16rem"
+                    displayFormat="yyyy-MM-dd"
+                    valueFormat="yyyy-MM-dd"
+                    value="{graveDraft>/EndDate}"
+                />
                 <Panel headerText="{i18n>graveItems}">
-                    <Table id="graveItemsTable" items="{graveDraft>/Items}"
-                        autoPopinMode="true" popinLayout="Block">
+                    <Table
+                        id="graveItemsTable"
+                        items="{graveDraft>/Items}"
+                        autoPopinMode="true"
+                        popinLayout="Block"
+                    >
                         <columns>
-                            <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                            <Column importance="High">
+                                <Text text="{i18n>itemNumber}" />
+                            </Column>
+                            <Column importance="Medium" popinDisplay="Inline">
+                                <Text text="{i18n>itemDescription}" />
+                            </Column>
+                            <Column importance="High" popinDisplay="Inline">
+                                <Text text="{i18n>itemCount}" />
+                            </Column>
+                            <Column importance="High" popinDisplay="Inline">
+                                <Text text="{i18n>itemPrice}" />
+                            </Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
-                                    <ComboBox id="graveItem" width="10rem"
+                                    <ComboBox
+                                        id="graveItem"
+                                        width="10rem"
                                         selectedKey="{graveDraft>itemId}"
                                         showSecondaryValues="true"
                                         items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
-                                        selectionChange=".onGraveItemSelected">
-                                        <core:ListItem key="{odata>Id}"
-                                            text="{odata>Number}" additionalText="{odata>Description}" />
+                                        selectionChange=".onGraveItemSelected"
+                                    >
+                                        <core:ListItem
+                                            key="{odata>Id}"
+                                            text="{odata>Number}"
+                                            additionalText="{odata>Description}"
+                                        />
                                     </ComboBox>
                                     <Text text="{graveDraft>description}" wrapping="true" />
-                                    <Input value="{graveDraft>count}" type="Number" width="5rem"
-                                        ariaLabel="{i18n>itemCount}" />
+                                    <Input
+                                        value="{graveDraft>count}"
+                                        type="Number"
+                                        width="5rem"
+                                        ariaLabel="{i18n>itemCount}"
+                                    />
                                     <!-- empty means "use the item's default price", which the
                                          placeholder shows; a typed price overrides it -->
-                                    <Input value="{graveDraft>unitPrice}" type="Number" width="7rem"
-                                        placeholder="{graveDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
-                                    <Button text="{i18n>delete}" press=".onDeleteItemLink" type="Transparent" />
+                                    <Input
+                                        value="{graveDraft>unitPrice}"
+                                        type="Number"
+                                        width="7rem"
+                                        placeholder="{graveDraft>defaultPrice}"
+                                        ariaLabel="{i18n>itemPrice}"
+                                    />
+                                    <Button
+                                        text="{i18n>delete}"
+                                        press=".onDeleteItemLink"
+                                        type="Transparent"
+                                    />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <Button text="{i18n>addLine}" press=".onAddItemLink" class="sapUiSmallMarginTop" />
+                    <Button
+                        text="{i18n>addLine}"
+                        press=".onAddItemLink"
+                        class="sapUiSmallMarginTop"
+                    />
                 </Panel>
                 <Panel headerText="{i18n>graveRecipients}">
                     <!-- the even split across them is baked into every invoice the
                          grave has generated, so the set is fixed at creation -->
-                    <MessageStrip type="Information" showIcon="true" class="sapUiSmallMarginBottom"
-                        text="{i18n>graveRecipientsFixed}" visible="{= ${graveDraft>/Id} !== null }" />
-                    <Table id="graveRecipientsTable" items="{graveDraft>/Recipients}"
-                        autoPopinMode="true" popinLayout="Block">
+                    <MessageStrip
+                        type="Information"
+                        showIcon="true"
+                        class="sapUiSmallMarginBottom"
+                        text="{i18n>graveRecipientsFixed}"
+                        visible="{= ${graveDraft>/Id} !== null }"
+                    />
+                    <Table
+                        id="graveRecipientsTable"
+                        items="{graveDraft>/Recipients}"
+                        autoPopinMode="true"
+                        popinLayout="Block"
+                    >
                         <columns>
-                            <Column importance="High"><Text text="{i18n>recipientName}" /></Column>
+                            <Column importance="High">
+                                <Text text="{i18n>recipientName}" />
+                            </Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{graveDraft>name}" />
-                                    <Button text="{i18n>delete}" press=".onDeleteRecipientLink"
-                                        type="Transparent" visible="{= ${graveDraft>/Id} === null }" />
+                                    <Button
+                                        text="{i18n>delete}"
+                                        press=".onDeleteRecipientLink"
+                                        type="Transparent"
+                                        visible="{= ${graveDraft>/Id} === null }"
+                                    />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
                     <!-- wraps so the select and both buttons stay usable on a phone -->
-                    <HBox id="graveRecipientsLink" wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop"
-                        visible="{= ${graveDraft>/Id} === null }">
+                    <HBox
+                        id="graveRecipientsLink"
+                        wrap="Wrap"
+                        alignItems="Center"
+                        class="sapUiSmallMarginTop"
+                        visible="{= ${graveDraft>/Id} === null }"
+                    >
                         <!-- forceSelection off for the same reason as the invoice
                              dialog's: what is shown is what the draft holds -->
-                        <Select id="linkRecipient" width="12rem" forceSelection="false"
+                        <Select
+                            id="linkRecipient"
+                            width="12rem"
+                            forceSelection="false"
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                             selectedKey="{graveDraft>/linkRecipientId}"
-                            change=".onLinkRecipientChange">
+                            change=".onLinkRecipientChange"
+                        >
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
                         </Select>
                         <Button text="{i18n>add}" press=".onAddRecipientLink" />
-                        <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent" />
+                        <Button
+                            text="{i18n>newRecipient}"
+                            press=".onNewRecipient"
+                            type="Transparent"
+                        />
                     </HBox>
                 </Panel>
             </VBox>

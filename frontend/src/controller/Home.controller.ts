@@ -10,9 +10,7 @@ export default class Home extends BaseController {
       .getCustomData()
       .find((data) => data.getKey() === "route");
     if (route) {
-      (UIComponent.getRouterFor(this) as Router).navTo(
-        route.getValue() as string,
-      );
+      (UIComponent.getRouterFor(this) as Router).navTo(route.getValue() as string);
     }
   }
 }

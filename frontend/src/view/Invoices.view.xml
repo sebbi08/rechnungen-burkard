@@ -1,11 +1,24 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.Invoices" displayBlock="true">
-    <Page title="{i18n>menuInvoices}" titleLevel="H1" showNavButton="true"
-        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    controllerName="burkard.invoicing.controller.Invoices"
+    displayBlock="true"
+>
+    <Page
+        title="{i18n>menuInvoices}"
+        titleLevel="H1"
+        showNavButton="true"
+        navButtonPress=".onNavBack"
+        class="sapUiResponsiveContentPadding"
+    >
         <subHeader>
             <OverflowToolbar id="invoicesToolbar">
-                <SearchField id="invoiceSearch" width="18rem" search=".onSearchInvoices"
-                    placeholder="{i18n>searchInvoice}">
+                <SearchField
+                    id="invoiceSearch"
+                    width="18rem"
+                    search=".onSearchInvoices"
+                    placeholder="{i18n>searchInvoice}"
+                >
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
@@ -19,45 +32,80 @@
             </OverflowToolbar>
         </subHeader>
         <content>
-            <Table id="invoicesTable" class="sapUiSmallMarginTop" growing="true" growingThreshold="50"
-                autoPopinMode="true" popinLayout="Block"
+            <Table
+                id="invoicesTable"
+                class="sapUiSmallMarginTop"
+                growing="true"
+                growingThreshold="50"
+                autoPopinMode="true"
+                popinLayout="Block"
                 items="{path: 'odata>/Invoices', parameters: {$filter: 'GraveId eq null and IsLatestRevision eq true', $orderby: 'Id desc'}}"
-                noDataText="{i18n>noData}">
-                        <columns>
-                            <Column importance="High"><Text text="{i18n>invoiceNumber}" /></Column>
-                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
-                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>invoiceDate}" /></Column>
-                            <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>revision}" /></Column>
-                            <!-- wide enough for the four actions to stay on one line -->
-                            <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
-                        </columns>
-                        <items>
-                            <ColumnListItem>
-                                <cells>
-                                    <Text text="{odata>InvoiceNumber}" />
-                                    <Text text="{odata>RecipientName}" />
-                                    <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
-                                    <HBox>
-                                        <Text text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}"
-                                            visible="{= ${odata>RevisionNumber} > 0}" />
-                                        <Text text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
-                                            visible="{= ${odata>RevisionNumber} > 0}" class="sapUiTinyMarginBegin" />
-                                    </HBox>
-                                    <!-- wraps in the pop-in, where the actions sit
+                noDataText="{i18n>noData}"
+            >
+                <columns>
+                    <Column importance="High">
+                        <Text text="{i18n>invoiceNumber}" />
+                    </Column>
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>recipientName}" />
+                    </Column>
+                    <Column importance="Medium" popinDisplay="Inline">
+                        <Text text="{i18n>invoiceDate}" />
+                    </Column>
+                    <Column importance="Medium" popinDisplay="Inline">
+                        <Text text="{i18n>revision}" />
+                    </Column>
+                    <!-- wide enough for the four actions to stay on one line -->
+                    <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
+                </columns>
+                <items>
+                    <ColumnListItem>
+                        <cells>
+                            <Text text="{odata>InvoiceNumber}" />
+                            <Text text="{odata>RecipientName}" />
+                            <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
+                            <HBox>
+                                <Text
+                                    text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}"
+                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                />
+                                <Text
+                                    text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
+                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                    class="sapUiTinyMarginBegin"
+                                />
+                            </HBox>
+                            <!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
-                                    <HBox wrap="Wrap">
-                                        <Button icon="sap-icon://detail-view" type="Transparent"
-                                            tooltip="{i18n>actionDetails}" press=".onShowDetails" />
-                                        <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                            tooltip="{i18n>actionDownloadNormal}" press=".onDownloadNormal" />
-                                        <Button icon="sap-icon://copy" type="Transparent"
-                                            tooltip="{i18n>actionDownloadCopy}" press=".onDownloadCopy" />
-                                        <Button icon="sap-icon://edit" type="Transparent"
-                                            tooltip="{i18n>actionEdit}" press=".onEditInvoice" />
-                                    </HBox>
-                                </cells>
-                            </ColumnListItem>
-                        </items>
+                            <HBox wrap="Wrap">
+                                <Button
+                                    icon="sap-icon://detail-view"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionDetails}"
+                                    press=".onShowDetails"
+                                />
+                                <Button
+                                    icon="sap-icon://pdf-attachment"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionDownloadNormal}"
+                                    press=".onDownloadNormal"
+                                />
+                                <Button
+                                    icon="sap-icon://copy"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionDownloadCopy}"
+                                    press=".onDownloadCopy"
+                                />
+                                <Button
+                                    icon="sap-icon://edit"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionEdit}"
+                                    press=".onEditInvoice"
+                                />
+                            </HBox>
+                        </cells>
+                    </ColumnListItem>
+                </items>
             </Table>
         </content>
     </Page>

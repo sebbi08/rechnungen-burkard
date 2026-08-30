@@ -7,8 +7,5 @@ namespace Burkard.Invoicing.Api.OData;
 /// property names the entity payloads use, so the client sees one casing.</summary>
 public static class ODataJsonDefaults
 {
-    public static readonly JsonSerializerOptions PascalCase = new()
-    {
-        PropertyNamingPolicy = null,
-    };
+    public static readonly JsonSerializerOptions PascalCase = new() { PropertyNamingPolicy = null };
 }

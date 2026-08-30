@@ -100,9 +100,7 @@ async function expectNoSidewaysScrolling(page: Page): Promise<void> {
   await expect
     .poll(() =>
       page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       ),
     )
     .toBeLessThanOrEqual(1);
@@ -132,11 +130,7 @@ async function expectToolbarFits(page: Page, toolbar: string): Promise<void> {
  * Clicks a toolbar action, opening the overflow menu first when the toolbar
  * moved the action in there.
  */
-async function pressToolbarAction(
-  page: Page,
-  toolbar: string,
-  name: string,
-): Promise<void> {
+async function pressToolbarAction(page: Page, toolbar: string, name: string): Promise<void> {
   const button = page.getByRole("button", { name, exact: true });
   if (!(await button.isVisible())) {
     await page.locator(`[id$='${toolbar}-overflowButton']`).click();
@@ -147,9 +141,7 @@ async function pressToolbarAction(
 const onPhone = () => test.info().project.name === "phone";
 
 for (const screen of LIST_SCREENS) {
-  test(`${screen.route}: fits the viewport and keeps its actions reachable`, async ({
-    page,
-  }) => {
+  test(`${screen.route}: fits the viewport and keeps its actions reachable`, async ({ page }) => {
     await seed(page);
     await page.goto(`/index.html#/${screen.route}`);
 
@@ -194,13 +186,9 @@ test("detail pages fit the viewport", async ({ page }) => {
   await seed(page);
 
   const invoices = await (
-    await page.request.get(
-      "/odata/Invoices?$filter=GraveId eq null&$select=Id,RootId&$top=1",
-    )
+    await page.request.get("/odata/Invoices?$filter=GraveId eq null&$select=Id,RootId&$top=1")
   ).json();
-  const graves = await (
-    await page.request.get("/odata/Graves?$select=Id&$top=1")
-  ).json();
+  const graves = await (await page.request.get("/odata/Graves?$select=Id&$top=1")).json();
 
   await page.goto(`/index.html#/invoices/${invoices.value[0].RootId}`);
   await expect(page.locator("[id$='invoiceDetailPage']")).toBeVisible();
@@ -211,9 +199,7 @@ test("detail pages fit the viewport", async ({ page }) => {
   await expectNoSidewaysScrolling(page);
 });
 
-test("settings: the form and the VAT rate row fit the viewport", async ({
-  page,
-}) => {
+test("settings: the form and the VAT rate row fit the viewport", async ({ page }) => {
   await seed(page);
   await page.goto("/index.html#/settings");
 
@@ -225,8 +211,6 @@ test("settings: the form and the VAT rate row fit the viewport", async ({
 test("import/export: the page fits the viewport", async ({ page }) => {
   await page.goto("/index.html#/import-export");
 
-  await expect(
-    page.getByRole("button", { name: "Vorlage herunterladen" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vorlage herunterladen" })).toBeVisible();
   await expectNoSidewaysScrolling(page);
 });

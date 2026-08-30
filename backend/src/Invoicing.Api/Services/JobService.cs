@@ -16,7 +16,12 @@ public sealed class JobService
         _queue = queue;
     }
 
-    public async Task<Job> EnqueueAsync(string type, string? payloadJson, int totalCount, CancellationToken ct)
+    public async Task<Job> EnqueueAsync(
+        string type,
+        string? payloadJson,
+        int totalCount,
+        CancellationToken ct
+    )
     {
         var job = new Job
         {
@@ -33,5 +38,7 @@ public sealed class JobService
     }
 
     public bool HasActive(string type) =>
-        _db.Jobs.Any(j => j.Type == type && (j.Status == JobStatus.Queued || j.Status == JobStatus.Running));
+        _db.Jobs.Any(j =>
+            j.Type == type && (j.Status == JobStatus.Queued || j.Status == JobStatus.Running)
+        );
 }

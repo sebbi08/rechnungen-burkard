@@ -46,10 +46,16 @@ public class ImportExportController : ODataController
 
         if (file is null || file.Length == 0)
         {
-            return BadRequest(new
-            {
-                error = new { code = "ArchiveRequired", message = "An archive file is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "ArchiveRequired",
+                        message = "An archive file is required.",
+                    },
+                }
+            );
         }
 
         try
@@ -66,11 +72,17 @@ public class ImportExportController : ODataController
             var result = await _import.ImportAsync(buffer, HttpContext.RequestAborted);
             if (result.Summary is null)
             {
-                return BadRequest(new
-                {
-                    error = new { code = "ImportInvalid", message = "The archive was rejected." },
-                    problems = result.Problems,
-                });
+                return BadRequest(
+                    new
+                    {
+                        error = new
+                        {
+                            code = "ImportInvalid",
+                            message = "The archive was rejected.",
+                        },
+                        problems = result.Problems,
+                    }
+                );
             }
 
             return Ok(new { summary = result.Summary });
@@ -80,8 +92,13 @@ public class ImportExportController : ODataController
             // Letting the exception escape would cause the test host to rethrow it on
             // the client instead of producing a 500 response; mirror production behavior.
             _logger.LogError(ex, "ImportArchive failed");
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
         }
     }
 }

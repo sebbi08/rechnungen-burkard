@@ -7,8 +7,8 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
-using Burkard.Invoicing.Domain.Entities;
 using Burkard.Invoicing.Documents;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -48,14 +48,24 @@ public class CreateInvoiceTests
         var (itemId, recipientId) = await SeedAsync(host);
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId,
-            lines = new[]
-            {
-                new { itemId, count = 2, unitPrice = (decimal?)null },
-            },
-        }));
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         using var json = await ODataJson.ReadAsync(response);
@@ -65,8 +75,9 @@ public class CreateInvoiceTests
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var invoice = await db.Invoices
-            .Include(i => i.Lines).Include(i => i.Documents)
+        var invoice = await db
+            .Invoices.Include(i => i.Lines)
+            .Include(i => i.Documents)
             .SingleAsync(i => i.Id == id);
 
         Assert.Equal("Familie Mahr", invoice.RecipientName);
@@ -89,21 +100,48 @@ public class CreateInvoiceTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 19m });
-        var item = new InvoiceItem { Number = "4002", Description = "No price", VatRate = 19m, DefaultPrice = null };
-        var recipient = new Recipient { Number = "E-0001", Name = "X", Address = "Y" };
+        var item = new InvoiceItem
+        {
+            Number = "4002",
+            Description = "No price",
+            VatRate = 19m,
+            DefaultPrice = null,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0001",
+            Name = "X",
+            Address = "Y",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var response = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("PriceRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "PriceRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -113,21 +151,48 @@ public class CreateInvoiceTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 19m });
-        var item = new InvoiceItem { Number = "4003", Description = "X", VatRate = 19m, DefaultPrice = 1m };
-        var recipient = new Recipient { Number = "E-0002", Name = "No address", Address = "" };
+        var item = new InvoiceItem
+        {
+            Number = "4003",
+            Description = "X",
+            VatRate = 19m,
+            DefaultPrice = 1m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0002",
+            Name = "No address",
+            Address = "",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var response = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)1m } },
-        }));
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)1m,
+                        },
+                    },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("RecipientAddressRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "RecipientAddressRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -137,18 +202,31 @@ public class CreateInvoiceTests
         var (itemId, recipientId) = await SeedAsync(host);
         using var client = host.CreateClient();
 
-        var tasks = Enumerable.Range(0, 5)
-            .Select(_ => Task.Run(async () =>
-            {
-                // each request gets its own body — reusing one StringContent across
-                // parallel requests races on its underlying stream
-                var own = ODataJson.Body(new
+        var tasks = Enumerable
+            .Range(0, 5)
+            .Select(_ =>
+                Task.Run(async () =>
                 {
-                    recipientId,
-                    lines = new[] { new { itemId, count = 1, unitPrice = (decimal?)10m } },
-                });
-                return await client.PostAsync("/odata/CreateInvoice", own);
-            }));
+                    // each request gets its own body — reusing one StringContent across
+                    // parallel requests races on its underlying stream
+                    var own = ODataJson.Body(
+                        new
+                        {
+                            recipientId,
+                            lines = new[]
+                            {
+                                new
+                                {
+                                    itemId,
+                                    count = 1,
+                                    unitPrice = (decimal?)10m,
+                                },
+                            },
+                        }
+                    );
+                    return await client.PostAsync("/odata/CreateInvoice", own);
+                })
+            );
         var responses = await Task.WhenAll(tasks);
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.Created, r.StatusCode));
 
@@ -174,8 +252,19 @@ public class CreateInvoiceTests
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.VatRates.Add(new VatRate { Rate = 7m });
-                var item = new InvoiceItem { Number = "4004", Description = "X", VatRate = 7m, DefaultPrice = 1m };
-                var recipient = new Recipient { Number = "E-0003", Name = "X", Address = "Y" };
+                var item = new InvoiceItem
+                {
+                    Number = "4004",
+                    Description = "X",
+                    VatRate = 7m,
+                    DefaultPrice = 1m,
+                };
+                var recipient = new Recipient
+                {
+                    Number = "E-0003",
+                    Name = "X",
+                    Address = "Y",
+                };
                 db.InvoiceItems.Add(item);
                 db.Recipients.Add(recipient);
                 await db.SaveChangesAsync();
@@ -184,11 +273,24 @@ public class CreateInvoiceTests
             }
 
             using var client = host.CreateClient();
-            var response = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-            {
-                recipientId,
-                lines = new[] { new { itemId, count = 1, unitPrice = (decimal?)1m } },
-            }));
+            var response = await client.PostAsync(
+                "/odata/CreateInvoice",
+                ODataJson.Body(
+                    new
+                    {
+                        recipientId,
+                        lines = new[]
+                        {
+                            new
+                            {
+                                itemId,
+                                count = 1,
+                                unitPrice = (decimal?)1m,
+                            },
+                        },
+                    }
+                )
+            );
             Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
 
             using var verifyScope = host.Services.CreateScope();
@@ -217,7 +319,9 @@ public class CreateInvoiceTests
 
     private sealed class FailingDocsHost : ApiTestHost
     {
-        protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
+        protected override void ConfigureWebHost(
+            Microsoft.AspNetCore.Hosting.IWebHostBuilder builder
+        )
         {
             base.ConfigureWebHost(builder);
             builder.ConfigureServices(services =>

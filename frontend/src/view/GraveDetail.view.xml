@@ -1,7 +1,17 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.GraveDetail" displayBlock="true">
-    <Page id="graveDetailPage" title="{i18n>graveDetailTitle}" titleLevel="H1"
-        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    controllerName="burkard.invoicing.controller.GraveDetail"
+    displayBlock="true"
+>
+    <Page
+        id="graveDetailPage"
+        title="{i18n>graveDetailTitle}"
+        titleLevel="H1"
+        showNavButton="true"
+        navButtonPress=".onNavBack"
+        class="sapUiResponsiveContentPadding"
+    >
         <headerContent>
             <Button icon="sap-icon://edit" tooltip="{i18n>editGrave}" press=".onEditGrave" />
         </headerContent>
@@ -9,30 +19,56 @@
             <VBox class="sapUiSmallMarginTop">
                 <Title text="{grave>/GraveNumber}" level="H2" />
                 <HBox wrap="Wrap" class="sapUiTinyMarginTop">
-                    <ObjectStatus title="{i18n>startDate}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/StartDate', formatter: '.formatDate'}" />
-                    <ObjectStatus title="{i18n>endDate}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/EndDate', formatter: '.formatDate'}" />
-                    <ObjectStatus title="{i18n>graveCreatedAt}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/CreatedAt', formatter: '.formatDate'}" />
+                    <ObjectStatus
+                        title="{i18n>startDate}"
+                        class="sapUiSmallMarginEnd"
+                        text="{path: 'grave>/StartDate', formatter: '.formatDate'}"
+                    />
+                    <ObjectStatus
+                        title="{i18n>endDate}"
+                        class="sapUiSmallMarginEnd"
+                        text="{path: 'grave>/EndDate', formatter: '.formatDate'}"
+                    />
+                    <ObjectStatus
+                        title="{i18n>graveCreatedAt}"
+                        class="sapUiSmallMarginEnd"
+                        text="{path: 'grave>/CreatedAt', formatter: '.formatDate'}"
+                    />
                     <!-- green when this half-year is done, red while it still needs
                          invoices — the same reading as the grave list -->
-                    <ObjectStatus title="{grave>/currentHalfYearLabel}" text="{grave>/currentStatusText}"
+                    <ObjectStatus
+                        title="{grave>/currentHalfYearLabel}"
+                        text="{grave>/currentStatusText}"
                         stateAnnouncementText="{grave>/currentStatusAnnouncement}"
                         state="{= ${grave>/currentInvoiced} ? 'Success' : 'Error' }"
-                        icon="{= ${grave>/currentInvoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
+                        icon="{= ${grave>/currentInvoiced} ? 'sap-icon://accept' : 'sap-icon://error' }"
+                    />
                 </HBox>
             </VBox>
 
             <Panel headerText="{i18n>graveItems}" class="sapUiSmallMarginTop">
-                <Table items="{grave>/Items}" autoPopinMode="true" popinLayout="Block"
-                    noDataText="{i18n>noData}">
+                <Table
+                    items="{grave>/Items}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                    noDataText="{i18n>noData}"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
-                        <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>itemNumber}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>itemDescription}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemCount}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemPrice}" />
+                        </Column>
+                        <Column importance="Low" popinDisplay="Inline">
+                            <Text text="{i18n>vatRate}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -51,11 +87,19 @@
             <Panel headerText="{i18n>graveRecipients}" class="sapUiSmallMarginTop">
                 <!-- read-only always: the split across them is baked into every
                      invoice the grave has generated -->
-                <Table items="{grave>/Recipients}" autoPopinMode="true" popinLayout="Block"
-                    noDataText="{i18n>noData}">
+                <Table
+                    items="{grave>/Recipients}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                    noDataText="{i18n>noData}"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>recipientName}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>recipientAddress}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>recipientName}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>recipientAddress}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -69,14 +113,29 @@
             </Panel>
 
             <Panel headerText="{i18n>graveInvoices}" class="sapUiSmallMarginTop">
-                <Table id="graveInvoicesTable" items="{grave>/Invoices}"
-                    autoPopinMode="true" popinLayout="Block" noDataText="{i18n>noGraveInvoices}">
+                <Table
+                    id="graveInvoicesTable"
+                    items="{grave>/Invoices}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                    noDataText="{i18n>noGraveInvoices}"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>halfYear}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>invoiceNumber}" /></Column>
-                        <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>invoiceDate}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>grossTotal}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>halfYear}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>recipientName}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>invoiceNumber}" />
+                        </Column>
+                        <Column importance="Low" popinDisplay="Inline">
+                            <Text text="{i18n>invoiceDate}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>grossTotal}" />
+                        </Column>
                         <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
@@ -86,20 +145,42 @@
                                 <Text text="{grave>RecipientName}" />
                                 <HBox>
                                     <Text text="{grave>InvoiceNumber}" />
-                                    <Text text="{path: 'grave>RevisionNumber', formatter: '.formatRevisionBadge'}"
-                                        class="sapUiTinyMarginBegin" />
+                                    <Text
+                                        text="{path: 'grave>RevisionNumber', formatter: '.formatRevisionBadge'}"
+                                        class="sapUiTinyMarginBegin"
+                                    />
                                 </HBox>
-                                <Text text="{path: 'grave>GeneratedAt', formatter: '.formatDate'}" />
-                                <Text text="{path: 'grave>GrossTotal', formatter: '.formatAmount'}" />
+                                <Text
+                                    text="{path: 'grave>GeneratedAt', formatter: '.formatDate'}"
+                                />
+                                <Text
+                                    text="{path: 'grave>GrossTotal', formatter: '.formatAmount'}"
+                                />
                                 <HBox wrap="Wrap">
-                                    <Button icon="sap-icon://detail-view" type="Transparent"
-                                        tooltip="{i18n>actionDetails}" press=".onShowInvoiceDetails" />
-                                    <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                        tooltip="{i18n>actionDownloadNormal}" press=".onDownloadInvoiceNormal" />
-                                    <Button icon="sap-icon://copy" type="Transparent"
-                                        tooltip="{i18n>actionDownloadCopy}" press=".onDownloadInvoiceCopy" />
-                                    <Button icon="sap-icon://edit" type="Transparent"
-                                        tooltip="{i18n>actionEdit}" press=".onEditGraveInvoice" />
+                                    <Button
+                                        icon="sap-icon://detail-view"
+                                        type="Transparent"
+                                        tooltip="{i18n>actionDetails}"
+                                        press=".onShowInvoiceDetails"
+                                    />
+                                    <Button
+                                        icon="sap-icon://pdf-attachment"
+                                        type="Transparent"
+                                        tooltip="{i18n>actionDownloadNormal}"
+                                        press=".onDownloadInvoiceNormal"
+                                    />
+                                    <Button
+                                        icon="sap-icon://copy"
+                                        type="Transparent"
+                                        tooltip="{i18n>actionDownloadCopy}"
+                                        press=".onDownloadInvoiceCopy"
+                                    />
+                                    <Button
+                                        icon="sap-icon://edit"
+                                        type="Transparent"
+                                        tooltip="{i18n>actionEdit}"
+                                        press=".onEditGraveInvoice"
+                                    />
                                 </HBox>
                             </cells>
                         </ColumnListItem>

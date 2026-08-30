@@ -1,15 +1,29 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Home" displayBlock="true">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    controllerName="burkard.invoicing.controller.Home"
+    displayBlock="true"
+>
     <Page showHeader="false" class="sapUiResponsiveContentPadding">
         <content>
             <VBox alignItems="Center" class="sapUiMediumMarginTop sapUiMediumMarginBottom">
                 <Title text="{i18n>homeWelcome}" level="H1" textAlign="Center" />
                 <Text text="{i18n>homeSubtitle}" textAlign="Center" class="sapUiTinyMarginTop" />
             </VBox>
-            <FlexBox id="homeTiles" justifyContent="Center" alignItems="Start" wrap="Wrap"
-                class="sapUiMediumMarginBottom">
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuSettings}"
-                    press=".onTilePress">
+            <FlexBox
+                id="homeTiles"
+                justifyContent="Center"
+                alignItems="Start"
+                wrap="Wrap"
+                class="sapUiMediumMarginBottom"
+            >
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuSettings}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="settings" />
                     </customData>
@@ -19,8 +33,12 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuItems}"
-                    press=".onTilePress">
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuItems}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="items" />
                     </customData>
@@ -30,8 +48,12 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuRecipients}"
-                    press=".onTilePress">
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuRecipients}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="recipients" />
                     </customData>
@@ -41,8 +63,12 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuInvoices}"
-                    press=".onTilePress">
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuInvoices}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="invoices" />
                     </customData>
@@ -52,8 +78,12 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuGraves}"
-                    press=".onTilePress">
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuGraves}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="graves" />
                     </customData>
@@ -63,8 +93,12 @@
                         </TileContent>
                     </tileContent>
                 </GenericTile>
-                <GenericTile class="sapUiTinyMargin" width="11rem" header="{i18n>menuImportExport}"
-                    press=".onTilePress">
+                <GenericTile
+                    class="sapUiTinyMargin"
+                    width="11rem"
+                    header="{i18n>menuImportExport}"
+                    press=".onTilePress"
+                >
                     <customData>
                         <core:CustomData key="route" value="importExport" />
                     </customData>

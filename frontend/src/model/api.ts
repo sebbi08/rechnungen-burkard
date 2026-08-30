@@ -107,9 +107,7 @@ export function showError(controller: Controller, error: unknown): void {
   MessageBox.error(`${generic} (${raw})`);
 }
 
-export async function patchSettings(
-  payload: Record<string, unknown>,
-): Promise<void> {
+export async function patchSettings(payload: Record<string, unknown>): Promise<void> {
   const response = await fetch("/odata/Settings", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -187,10 +185,7 @@ export interface DocumentDto {
   Kind: "Normal" | "Copy";
 }
 
-export async function createInvoice(
-  recipientId: number,
-  lines: InvoiceLineDto[],
-): Promise<void> {
+export async function createInvoice(recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
   await ensureOk(await post("/odata/CreateInvoice", { recipientId, lines }));
 }
 
@@ -199,19 +194,13 @@ export async function createRevision(
   recipientId: number,
   lines: InvoiceLineDto[],
 ): Promise<void> {
-  await ensureOk(
-    await post("/odata/CreateRevision", { invoiceId, recipientId, lines }),
-  );
+  await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
 }
 
-export async function fetchDocuments(
-  invoiceId: number,
-): Promise<DocumentDto[]> {
+export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
   // only the id and file name are needed for the download links; keep the
   // PDF blobs out of the response
-  const response = await fetch(
-    `/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName,Kind`,
-  );
+  const response = await fetch(`/odata/Invoices(${invoiceId})/Documents?$select=Id,FileName,Kind`);
   await ensureOk(response);
   const body = await toJson<ODataCollection<DocumentDto>>(response);
   return body.value;
@@ -246,17 +235,10 @@ export interface YearHalfOption {
 }
 
 // Half-year keys ("2026-1", "2026-2") for the given year range, newest first.
-export function halfYearOptions(
-  yearsBack: number,
-  yearsAhead: number,
-): YearHalfOption[] {
+export function halfYearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
   const currentYear = new Date().getFullYear();
   const options: YearHalfOption[] = [];
-  for (
-    let year = currentYear + yearsAhead;
-    year >= currentYear - yearsBack;
-    year--
-  ) {
+  for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
     options.push({ key: `${year}-2`, text: `H2 ${year}` });
     options.push({ key: `${year}-1`, text: `H1 ${year}` });
   }
@@ -264,17 +246,10 @@ export function halfYearOptions(
 }
 
 // Year-only keys ("2026") for the given year range, newest first.
-export function yearOptions(
-  yearsBack: number,
-  yearsAhead: number,
-): YearHalfOption[] {
+export function yearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
   const currentYear = new Date().getFullYear();
   const options: YearHalfOption[] = [];
-  for (
-    let year = currentYear + yearsAhead;
-    year >= currentYear - yearsBack;
-    year--
-  ) {
+  for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
     options.push({ key: String(year), text: String(year) });
   }
   return options;
@@ -307,10 +282,7 @@ export interface GenerationResult {
   SkippedGraves?: SkippedGrave[];
 }
 
-export async function generateGraveInvoices(
-  year: number,
-  half: number,
-): Promise<JobDto> {
+export async function generateGraveInvoices(year: number, half: number): Promise<JobDto> {
   const response = await post("/odata/GenerateGraveInvoices", { year, half });
   await ensureOk(response);
   return (await response.json()) as JobDto;
@@ -324,13 +296,8 @@ export interface GraveStatusRow {
   Invoiced: boolean;
 }
 
-export async function fetchGraveStatus(
-  year: number,
-  half: number,
-): Promise<GraveStatusRow[]> {
-  const response = await fetch(
-    `/odata/GraveInvoicingStatus?year=${year}&half=${half}`,
-  );
+export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
+  const response = await fetch(`/odata/GraveInvoicingStatus?year=${year}&half=${half}`);
   await ensureOk(response);
   const body = await toJson<ODataCollection<GraveStatusRow>>(response);
   return body.value;
@@ -343,9 +310,7 @@ export interface GraveSearchResult {
 }
 
 export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
-  const response = await fetch(
-    `/odata/SearchGraves?term=${encodeURIComponent(term)}`,
-  );
+  const response = await fetch(`/odata/SearchGraves?term=${encodeURIComponent(term)}`);
   await ensureOk(response);
   const body = await toJson<ODataCollection<GraveSearchResult>>(response);
   return body.value;
@@ -407,9 +372,7 @@ export interface GraveDetails {
   Recipients: GraveRecipientLink[];
 }
 
-export async function fetchGraveDetails(
-  graveId: number,
-): Promise<GraveDetails> {
+export async function fetchGraveDetails(graveId: number): Promise<GraveDetails> {
   const response = await fetch(
     `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`,
   );
@@ -572,9 +535,7 @@ export interface GraveInvoiceRecipient {
 
 /** The grave, half-year and recipients a grave invoice belongs to, with the
  *  grave's lines as they were invoiced — not as the grave looks today. */
-export async function fetchGraveInvoiceGroup(
-  invoiceId: number,
-): Promise<GraveInvoiceGroup> {
+export async function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveInvoiceGroup> {
   const response = await fetch(`/odata/GraveInvoiceGroup?invoiceId=${invoiceId}`);
   await ensureOk(response);
   return (await response.json()) as GraveInvoiceGroup;
@@ -586,7 +547,5 @@ export async function createGraveInvoiceRevision(
   invoiceId: number,
   lines: InvoiceLineDto[],
 ): Promise<void> {
-  await ensureOk(
-    await post("/odata/CreateGraveInvoiceRevision", { invoiceId, lines }),
-  );
+  await ensureOk(await post("/odata/CreateGraveInvoiceRevision", { invoiceId, lines }));
 }

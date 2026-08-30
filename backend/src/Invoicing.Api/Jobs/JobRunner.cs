@@ -66,7 +66,8 @@ public sealed class JobRunner : BackgroundService
             return;
         }
 
-        var handler = scope.ServiceProvider.GetServices<IJobHandler>()
+        var handler = scope
+            .ServiceProvider.GetServices<IJobHandler>()
             .FirstOrDefault(h => h.Type == job.Type);
         if (handler is null)
         {

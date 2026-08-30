@@ -17,8 +17,13 @@ public class InvoiceActionsController : ODataController
     private readonly AppDbContext _db;
     private readonly ILogger<InvoiceActionsController> _logger;
 
-    public InvoiceActionsController(InvoiceService service, GraveInvoiceRevisionService graveRevisions,
-        JobService jobs, AppDbContext db, ILogger<InvoiceActionsController> logger)
+    public InvoiceActionsController(
+        InvoiceService service,
+        GraveInvoiceRevisionService graveRevisions,
+        JobService jobs,
+        AppDbContext db,
+        ILogger<InvoiceActionsController> logger
+    )
     {
         _service = service;
         _graveRevisions = graveRevisions;
@@ -32,23 +37,32 @@ public class InvoiceActionsController : ODataController
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (request.Lines is null || request.Lines.Count == 0)
         {
-            return BadRequest(new
-            {
-                error = new { code = "NoLines", message = "At least one line is required." }
-            });
+            return BadRequest(
+                new { error = new { code = "NoLines", message = "At least one line is required." } }
+            );
         }
 
         try
         {
-            var invoice = await _service.CreateAsync(request.RecipientId, request.Lines, HttpContext.RequestAborted);
+            var invoice = await _service.CreateAsync(
+                request.RecipientId,
+                request.Lines,
+                HttpContext.RequestAborted
+            );
             return Created($"odata/Invoices({invoice.Id})", invoice);
         }
         catch (ValidationException ex)
@@ -60,8 +74,13 @@ public class InvoiceActionsController : ODataController
             // Letting the exception escape would cause the test host to rethrow it on the
             // client instead of producing a 500 response; mirror production behavior.
             _logger.LogError(ex, "CreateInvoice failed");
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
         }
     }
 
@@ -70,24 +89,33 @@ public class InvoiceActionsController : ODataController
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (request.Lines is null || request.Lines.Count == 0)
         {
-            return BadRequest(new
-            {
-                error = new { code = "NoLines", message = "At least one line is required." }
-            });
+            return BadRequest(
+                new { error = new { code = "NoLines", message = "At least one line is required." } }
+            );
         }
 
         try
         {
             var invoice = await _service.CreateRevisionAsync(
-                request.InvoiceId, request.RecipientId, request.Lines, HttpContext.RequestAborted);
+                request.InvoiceId,
+                request.RecipientId,
+                request.Lines,
+                HttpContext.RequestAborted
+            );
             return Created($"odata/Invoices({invoice.Id})", invoice);
         }
         catch (ValidationException ex)
@@ -97,34 +125,49 @@ public class InvoiceActionsController : ODataController
         catch (Exception ex)
         {
             _logger.LogError(ex, "CreateRevision failed");
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
         }
     }
 
     [HttpPost("CreateGraveInvoiceRevision")]
-    public async Task<IActionResult> CreateGraveInvoiceRevision([FromBody] CreateGraveInvoiceRevisionRequest? request)
+    public async Task<IActionResult> CreateGraveInvoiceRevision(
+        [FromBody] CreateGraveInvoiceRevisionRequest? request
+    )
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (request.Lines is null || request.Lines.Count == 0)
         {
-            return BadRequest(new
-            {
-                error = new { code = "NoLines", message = "At least one line is required." }
-            });
+            return BadRequest(
+                new { error = new { code = "NoLines", message = "At least one line is required." } }
+            );
         }
 
         try
         {
             var revisions = await _graveRevisions.CreateAsync(
-                request.InvoiceId, request.Lines, HttpContext.RequestAborted);
+                request.InvoiceId,
+                request.Lines,
+                HttpContext.RequestAborted
+            );
             return Ok(revisions);
         }
         catch (ValidationException ex)
@@ -134,55 +177,85 @@ public class InvoiceActionsController : ODataController
         catch (Exception ex)
         {
             _logger.LogError(ex, "CreateGraveInvoiceRevision failed");
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
         }
     }
 
     [HttpPost("GenerateGraveInvoices")]
-    public async Task<IActionResult> GenerateGraveInvoices([FromBody] GenerateGraveInvoicesRequest? request)
+    public async Task<IActionResult> GenerateGraveInvoices(
+        [FromBody] GenerateGraveInvoicesRequest? request
+    )
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (request.Year < 2000 || request.Year > 2100 || request.Half is not (1 or 2))
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidHalfYear", message = "The half-year is invalid." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new { code = "InvalidHalfYear", message = "The half-year is invalid." },
+                }
+            );
         }
 
-        var alreadyInvoicedCount = _db.GraveInvoiceRuns
-            .Where(r => r.Year == request.Year && r.Half == request.Half)
+        var alreadyInvoicedCount = _db
+            .GraveInvoiceRuns.Where(r => r.Year == request.Year && r.Half == request.Half)
             .Select(r => r.GraveId)
             .Distinct()
             .Count();
         if (alreadyInvoicedCount > 0 && alreadyInvoicedCount >= _db.Graves.Count())
         {
-            return Conflict(new
-            {
-                error = new { code = "GravesAlreadyInvoiced", message = "Invoices for this half-year were already generated." }
-            });
+            return Conflict(
+                new
+                {
+                    error = new
+                    {
+                        code = "GravesAlreadyInvoiced",
+                        message = "Invoices for this half-year were already generated.",
+                    },
+                }
+            );
         }
 
         if (_jobs.HasActive("GraveInvoices"))
         {
-            return Conflict(new
-            {
-                error = new { code = "JobAlreadyRunning", message = "A generation is already running." }
-            });
+            return Conflict(
+                new
+                {
+                    error = new
+                    {
+                        code = "JobAlreadyRunning",
+                        message = "A generation is already running.",
+                    },
+                }
+            );
         }
 
         var total = _db.Graves.Count();
-        var job = await _jobs.EnqueueAsync("GraveInvoices",
+        var job = await _jobs.EnqueueAsync(
+            "GraveInvoices",
             JsonSerializer.Serialize(new GraveInvoicesPayload(request.Year, request.Half)),
-            total, HttpContext.RequestAborted);
+            total,
+            HttpContext.RequestAborted
+        );
         return Accepted(job);
     }
 
@@ -208,6 +281,7 @@ public class InvoiceActionsController : ODataController
     public sealed class CreateGraveInvoiceRevisionRequest
     {
         public long InvoiceId { get; set; }
+
         /// <summary>Grave-level lines: the grave's count at the grave's price,
         /// before the even split across its recipients.</summary>
         public List<InvoiceLineInput> Lines { get; set; } = new();

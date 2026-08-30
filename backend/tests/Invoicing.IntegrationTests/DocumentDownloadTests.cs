@@ -22,18 +22,42 @@ public class DocumentDownloadTests : IClassFixture<ApiTestHost>
         using var scope = _host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "5002", Description = "X", VatRate = 7m, DefaultPrice = 5m };
-        var recipient = new Recipient { Number = "E-0001", Name = "X", Address = "Y" };
+        var item = new InvoiceItem
+        {
+            Number = "5002",
+            Description = "X",
+            VatRate = 7m,
+            DefaultPrice = 5m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0001",
+            Name = "X",
+            Address = "Y",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = _host.CreateClient();
-        var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         created.EnsureSuccessStatusCode();
 
         var stored = await db.Documents.SingleAsync(d => d.Kind == DocumentKind.Normal);
@@ -59,27 +83,55 @@ public class DocumentDownloadTests : IClassFixture<ApiTestHost>
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "5003", Description = "X", VatRate = 7m, DefaultPrice = 5m };
-        var recipient = new Recipient { Number = "E-0002", Name = "X", Address = "Y" };
+        var item = new InvoiceItem
+        {
+            Number = "5003",
+            Description = "X",
+            VatRate = 7m,
+            DefaultPrice = 5m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0002",
+            Name = "X",
+            Address = "Y",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         created.EnsureSuccessStatusCode();
         using var createdJson = await ODataJson.ReadAsync(created);
         var invoiceId = createdJson.RootElement.GetProperty("Id").GetInt64();
 
-        var response = await client.GetAsync($"/odata/Invoices({invoiceId})/Documents?$select=Id,FileName,Kind");
+        var response = await client.GetAsync(
+            $"/odata/Invoices({invoiceId})/Documents?$select=Id,FileName,Kind"
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var json = await ODataJson.ReadAsync(response);
-        var kinds = json.RootElement.GetProperty("value").EnumerateArray()
+        var kinds = json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
             .Select(d => d.GetProperty("Kind").GetString())
             .OrderBy(k => k)
             .ToArray();

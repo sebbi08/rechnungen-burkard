@@ -81,59 +81,54 @@ export default class GraveDetail extends GraveEdit {
       const year = now.getFullYear();
       // a half-year is Jan–Jun or Jul–Dec
       const half = now.getMonth() < 6 ? 1 : 2;
-      const invoiced = runs.some(
-        (run) => Number(run.Year) === year && Number(run.Half) === half,
-      );
+      const invoiced = runs.some((run) => Number(run.Year) === year && Number(run.Half) === half);
 
       this.setState<GraveDetailView>("grave", {
-          Id: details.Id,
-          GraveNumber: details.GraveNumber,
-          StartDate: details.StartDate,
-          EndDate: details.EndDate,
-          CreatedAt: details.CreatedAt,
-          currentHalfYearLabel: this.i18nText("currentHalfYearStatus").replace(
-            "{0}",
-            api.halfYearText(year, half),
-          ),
-          currentStatusText: this.i18nText(invoiced ? "statusInvoiced" : "statusOpen"),
-          // without this the red state is announced as a validation error
-          currentStatusAnnouncement: this.i18nText(
-            invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
-          ),
-          currentInvoiced: invoiced,
-          Items: details.Items.map((link) => ({
-            Number: link.Item.Number,
-            Description: link.Item.Description,
-            Count: link.Count,
-            // the link's own price wins; without one the item's default is billed
-            Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
-            VatRate: link.Item.VatRate,
-          })),
-          Recipients: details.Recipients.map((link) => ({
-            Name: link.Recipient.Name,
-            Address: link.Recipient.Address,
-          })),
-          Invoices: invoices.map((invoice) => {
-            const lines = (invoice.Lines ?? []).map((line) => ({
-              // the OData V4 model serialises Edm.Decimal as a string
-              Count: Number(line.Count),
-              UnitPrice: Number(line.UnitPrice),
-              VatRate: Number(line.VatRate),
-            }));
-            return {
-              Id: Number(invoice.Id),
-              RootId: Number(invoice.RootId),
-              HalfYear: api.halfYearText(
-                Number(invoice.PeriodYear),
-                Number(invoice.PeriodHalf),
-              ),
-              RecipientName: invoice.RecipientName,
-              InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
-              RevisionNumber: Number(invoice.RevisionNumber),
-              GeneratedAt: invoice.GeneratedAt,
-              GrossTotal: api.invoiceTotals(lines).gross,
-            };
-          }),
+        Id: details.Id,
+        GraveNumber: details.GraveNumber,
+        StartDate: details.StartDate,
+        EndDate: details.EndDate,
+        CreatedAt: details.CreatedAt,
+        currentHalfYearLabel: this.i18nText("currentHalfYearStatus").replace(
+          "{0}",
+          api.halfYearText(year, half),
+        ),
+        currentStatusText: this.i18nText(invoiced ? "statusInvoiced" : "statusOpen"),
+        // without this the red state is announced as a validation error
+        currentStatusAnnouncement: this.i18nText(
+          invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
+        ),
+        currentInvoiced: invoiced,
+        Items: details.Items.map((link) => ({
+          Number: link.Item.Number,
+          Description: link.Item.Description,
+          Count: link.Count,
+          // the link's own price wins; without one the item's default is billed
+          Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+          VatRate: link.Item.VatRate,
+        })),
+        Recipients: details.Recipients.map((link) => ({
+          Name: link.Recipient.Name,
+          Address: link.Recipient.Address,
+        })),
+        Invoices: invoices.map((invoice) => {
+          const lines = (invoice.Lines ?? []).map((line) => ({
+            // the OData V4 model serialises Edm.Decimal as a string
+            Count: Number(line.Count),
+            UnitPrice: Number(line.UnitPrice),
+            VatRate: Number(line.VatRate),
+          }));
+          return {
+            Id: Number(invoice.Id),
+            RootId: Number(invoice.RootId),
+            HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
+            RecipientName: invoice.RecipientName,
+            InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
+            RevisionNumber: Number(invoice.RevisionNumber),
+            GeneratedAt: invoice.GeneratedAt,
+            GrossTotal: api.invoiceTotals(lines).gross,
+          };
+        }),
       });
     } catch (error) {
       api.showError(this, error);
@@ -169,10 +164,7 @@ export default class GraveDetail extends GraveEdit {
     await this.downloadRow(event, true);
   }
 
-  private async downloadRow(
-    event: Button$PressEvent,
-    isCopy: boolean,
-  ): Promise<void> {
+  private async downloadRow(event: Button$PressEvent, isCopy: boolean): Promise<void> {
     const context = event.getSource().getBindingContext("grave")!;
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }

@@ -33,7 +33,10 @@ public sealed class ImportService
                 var entry = zip.CreateEntry(name);
                 using var stream = entry.Open();
                 // UTF-8 with a BOM so spreadsheet tools open the umlauts correctly
-                using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+                using var writer = new StreamWriter(
+                    stream,
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: true)
+                );
                 writer.Write(Csv.Write(header, Array.Empty<string[]>()));
             }
         }
@@ -54,8 +57,14 @@ public sealed class ImportService
 
         var recipients = data.Recipients.ToDictionary(
             row => row.Number,
-            row => new Recipient { Number = row.Number, Name = row.Name, Address = row.Address },
-            StringComparer.OrdinalIgnoreCase);
+            row => new Recipient
+            {
+                Number = row.Number,
+                Name = row.Name,
+                Address = row.Address,
+            },
+            StringComparer.OrdinalIgnoreCase
+        );
         _db.Recipients.AddRange(recipients.Values);
 
         var items = data.Items.ToDictionary(
@@ -67,7 +76,8 @@ public sealed class ImportService
                 VatRate = row.VatRate,
                 DefaultPrice = row.Price,
             },
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.OrdinalIgnoreCase
+        );
         _db.InvoiceItems.AddRange(items.Values);
 
         var createdAt = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -80,7 +90,8 @@ public sealed class ImportService
                 EndDate = row.EndDate,
                 CreatedAt = createdAt,
             },
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.OrdinalIgnoreCase
+        );
         _db.Graves.AddRange(graves.Values);
 
         // the links need the generated keys, so the parents go in first
@@ -88,28 +99,37 @@ public sealed class ImportService
 
         foreach (var link in data.ItemLinks)
         {
-            _db.GraveItems.Add(new GraveItem
-            {
-                GraveId = graves[link.GraveNumber].Id,
-                ItemId = items[link.ItemNumber].Id,
-                Count = link.Count,
-            });
+            _db.GraveItems.Add(
+                new GraveItem
+                {
+                    GraveId = graves[link.GraveNumber].Id,
+                    ItemId = items[link.ItemNumber].Id,
+                    Count = link.Count,
+                }
+            );
         }
 
         foreach (var link in data.RecipientLinks)
         {
-            _db.GraveRecipients.Add(new GraveRecipient
-            {
-                GraveId = graves[link.GraveNumber].Id,
-                RecipientId = recipients[link.RecipientNumber].Id,
-            });
+            _db.GraveRecipients.Add(
+                new GraveRecipient
+                {
+                    GraveId = graves[link.GraveNumber].Id,
+                    RecipientId = recipients[link.RecipientNumber].Id,
+                }
+            );
         }
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        var summary = new ImportSummary(recipients.Count, items.Count, graves.Count,
-            data.ItemLinks.Count, data.RecipientLinks.Count);
+        var summary = new ImportSummary(
+            recipients.Count,
+            items.Count,
+            graves.Count,
+            data.ItemLinks.Count,
+            data.RecipientLinks.Count
+        );
         return new ImportResult(Array.Empty<ImportProblem>(), summary);
     }
 }

@@ -18,17 +18,25 @@ public sealed class InvoiceService
     private readonly InvoiceNumberService _numbers;
     private readonly InvoiceDocumentFactory _documentFactory;
 
-    public InvoiceService(AppDbContext db, InvoiceNumberService numbers,
-        InvoiceDocumentFactory documentFactory)
+    public InvoiceService(
+        AppDbContext db,
+        InvoiceNumberService numbers,
+        InvoiceDocumentFactory documentFactory
+    )
     {
         _db = db;
         _numbers = numbers;
         _documentFactory = documentFactory;
     }
 
-    public async Task<Invoice> CreateAsync(long recipientId, IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
+    public async Task<Invoice> CreateAsync(
+        long recipientId,
+        IReadOnlyList<InvoiceLineInput> lineInputs,
+        CancellationToken ct
+    )
     {
-        var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
+        var recipient =
+            await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
         var lines = await BuildLinesAsync(lineInputs, ct);
@@ -50,11 +58,15 @@ public sealed class InvoiceService
         }
     }
 
-    public async Task<Invoice> CreateRevisionAsync(long invoiceId, long recipientId,
-        IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
+    public async Task<Invoice> CreateRevisionAsync(
+        long invoiceId,
+        long recipientId,
+        IReadOnlyList<InvoiceLineInput> lineInputs,
+        CancellationToken ct
+    )
     {
-        var edited = await _db.Invoices
-            .SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
+        var edited =
+            await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
         // A grave invoice is one recipient's share of one grave bill: revising it
@@ -63,11 +75,14 @@ public sealed class InvoiceService
         // recipient of the grave and half-year at once.
         if (edited.GraveId is not null)
         {
-            throw new ValidationException("GraveInvoiceRevisionRequired",
-                "A grave invoice must be revised for all of its recipients at once.");
+            throw new ValidationException(
+                "GraveInvoiceRevisionRequired",
+                "A grave invoice must be revised for all of its recipients at once."
+            );
         }
 
-        var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
+        var recipient =
+            await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
         var lines = await BuildLinesAsync(lineInputs, ct);
@@ -75,16 +90,21 @@ public sealed class InvoiceService
 
         if (string.IsNullOrWhiteSpace(recipient.Address))
         {
-            throw new ValidationException("RecipientAddressRequired", "The recipient address is required.");
+            throw new ValidationException(
+                "RecipientAddressRequired",
+                "The recipient address is required."
+            );
         }
 
         // The revision number continues the whole chain, not just the row that was
         // edited: editing an older revision (or the same one twice) must still
         // produce the next free number instead of colliding on (Year, Sequence,
         // RevisionNumber).
-        var lastRevision = await _db.Invoices
-            .Where(i => i.RootId == edited.RootId)
-            .MaxAsync(i => (int?)i.RevisionNumber, ct) ?? edited.RevisionNumber;
+        var lastRevision =
+            await _db
+                .Invoices.Where(i => i.RootId == edited.RootId)
+                .MaxAsync(i => (int?)i.RevisionNumber, ct)
+            ?? edited.RevisionNumber;
         var revisionNumber = lastRevision + 1;
 
         var now = DateTime.UtcNow;
@@ -114,8 +134,8 @@ public sealed class InvoiceService
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         // the chain has exactly one latest revision, and it is now this one
-        var superseded = await _db.Invoices
-            .Where(i => i.RootId == edited.RootId && i.IsLatestRevision)
+        var superseded = await _db
+            .Invoices.Where(i => i.RootId == edited.RootId && i.IsLatestRevision)
             .ToListAsync(ct);
         foreach (var invoice in superseded)
         {
@@ -132,7 +152,10 @@ public sealed class InvoiceService
         return revision;
     }
 
-    private async Task<List<InvoiceLine>> BuildLinesAsync(IReadOnlyList<InvoiceLineInput> inputs, CancellationToken ct)
+    private async Task<List<InvoiceLine>> BuildLinesAsync(
+        IReadOnlyList<InvoiceLineInput> inputs,
+        CancellationToken ct
+    )
     {
         if (inputs.Count == 0)
         {
@@ -140,8 +163,8 @@ public sealed class InvoiceService
         }
 
         var itemIds = inputs.Select(l => l.ItemId).ToArray();
-        var items = await _db.InvoiceItems
-            .Where(i => itemIds.Contains(i.Id))
+        var items = await _db
+            .InvoiceItems.Where(i => itemIds.Contains(i.Id))
             .ToDictionaryAsync(i => i.Id, ct);
 
         var result = new List<InvoiceLine>(inputs.Count);
@@ -149,7 +172,10 @@ public sealed class InvoiceService
         {
             if (!items.TryGetValue(input.ItemId, out var item))
             {
-                throw new ValidationException($"ItemNotFound:{input.ItemId}", $"The item {input.ItemId} does not exist.");
+                throw new ValidationException(
+                    $"ItemNotFound:{input.ItemId}",
+                    $"The item {input.ItemId} does not exist."
+                );
             }
 
             if (input.Count <= 0)
@@ -160,30 +186,42 @@ public sealed class InvoiceService
             var unitPrice = input.UnitPrice ?? item.DefaultPrice;
             if (unitPrice is null)
             {
-                throw new ValidationException("PriceRequired", $"A price is required for item '{item.Number}'.");
+                throw new ValidationException(
+                    "PriceRequired",
+                    $"A price is required for item '{item.Number}'."
+                );
             }
 
-            result.Add(new InvoiceLine
-            {
-                ItemId = item.Id,
-                ItemNumber = item.Number,
-                Description = item.Description,
-                Count = input.Count,
-                UnitPrice = unitPrice.Value,
-                VatRate = item.VatRate,
-                LineNumber = index + 1,
-            });
+            result.Add(
+                new InvoiceLine
+                {
+                    ItemId = item.Id,
+                    ItemNumber = item.Number,
+                    Description = item.Description,
+                    Count = input.Count,
+                    UnitPrice = unitPrice.Value,
+                    VatRate = item.VatRate,
+                    LineNumber = index + 1,
+                }
+            );
         }
 
         return result;
     }
 
-    private async Task<Invoice> PersistAsync(Recipient recipient, GlobalSettings settings,
-        List<InvoiceLine> lines, CancellationToken ct)
+    private async Task<Invoice> PersistAsync(
+        Recipient recipient,
+        GlobalSettings settings,
+        List<InvoiceLine> lines,
+        CancellationToken ct
+    )
     {
         if (string.IsNullOrWhiteSpace(recipient.Address))
         {
-            throw new ValidationException("RecipientAddressRequired", "The recipient address is required.");
+            throw new ValidationException(
+                "RecipientAddressRequired",
+                "The recipient address is required."
+            );
         }
 
         var (number, year, sequence) = await _numbers.AllocateAsync(ct);

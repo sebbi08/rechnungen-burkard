@@ -32,9 +32,6 @@ export async function waitForDialogOpen(page: Page): Promise<void> {
     const open = Object.values(registry.all()).filter(
       (control: any) => control.isA?.("sap.m.Dialog") && control.isOpen?.(),
     );
-    return (
-      open.length > 0 &&
-      open.every((d: any) => d.oPopup?.getOpenState() === "OPEN")
-    );
+    return open.length > 0 && open.every((d: any) => d.oPopup?.getOpenState() === "OPEN");
   });
 }

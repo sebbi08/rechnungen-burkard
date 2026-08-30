@@ -54,37 +54,57 @@ public class ImportTests
 
     /// <summary>A consistent archive: two recipients, two items, one grave with
     /// both link kinds.</summary>
-    private static byte[] ValidArchive() => Zip(
-        ("recipients.csv", RecipientsHeader
-            + "E-1000,Anna Beispiel,\"Hauptstraße 1\n99999 Musterdorf\"\r\n"
-            + "E-1001,Bert Beispiel,\"Nebenweg 2\n99999 Musterdorf\"\r\n"),
-        ("items.csv", ItemsHeader
-            + "9001,Grabpflege,7,120.00\r\n"
-            + "9002,Sonderleistung,7,\r\n"),
-        ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-        ("mapping.csv", MappingHeader
-            + "Item,IMP-1,9001,2\r\n"
-            + "Item,IMP-1,9002,1\r\n"
-            + "Recipient,IMP-1,E-1000,\r\n"
-            + "Recipient,IMP-1,E-1001,\r\n"));
+    private static byte[] ValidArchive() =>
+        Zip(
+            (
+                "recipients.csv",
+                RecipientsHeader
+                    + "E-1000,Anna Beispiel,\"Hauptstraße 1\n99999 Musterdorf\"\r\n"
+                    + "E-1001,Bert Beispiel,\"Nebenweg 2\n99999 Musterdorf\"\r\n"
+            ),
+            (
+                "items.csv",
+                ItemsHeader + "9001,Grabpflege,7,120.00\r\n" + "9002,Sonderleistung,7,\r\n"
+            ),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9001,2\r\n"
+                    + "Item,IMP-1,9002,1\r\n"
+                    + "Recipient,IMP-1,E-1000,\r\n"
+                    + "Recipient,IMP-1,E-1001,\r\n"
+            )
+        );
 
     private static MultipartFormDataContent Upload(byte[] archive)
     {
         var content = new MultipartFormDataContent();
         var file = new ByteArrayContent(archive);
-        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/zip"
+        );
         content.Add(file, "file", "import.zip");
         return content;
     }
 
-    private static async Task<List<(string File, int? Row, string Code)>> ProblemsAsync(HttpResponseMessage response)
+    private static async Task<List<(string File, int? Row, string Code)>> ProblemsAsync(
+        HttpResponseMessage response
+    )
     {
         using var json = await ODataJson.ReadAsync(response);
-        return json.RootElement.GetProperty("problems").EnumerateArray()
-            .Select(p => (
-                p.GetProperty("file").GetString()!,
-                p.GetProperty("row").ValueKind == JsonValueKind.Null ? (int?)null : p.GetProperty("row").GetInt32(),
-                p.GetProperty("code").GetString()!))
+        return json
+            .RootElement.GetProperty("problems")
+            .EnumerateArray()
+            .Select(p =>
+                (
+                    p.GetProperty("file").GetString()!,
+                    p.GetProperty("row").ValueKind == JsonValueKind.Null
+                        ? (int?)null
+                        : p.GetProperty("row").GetInt32(),
+                    p.GetProperty("code").GetString()!
+                )
+            )
             .ToList();
     }
 
@@ -107,20 +127,28 @@ public class ImportTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
 
-        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var zip = new ZipArchive(
+            await response.Content.ReadAsStreamAsync(),
+            ZipArchiveMode.Read
+        );
         var names = zip.Entries.Select(e => e.FullName).OrderBy(n => n).ToArray();
         Assert.Equal(new[] { "graves.csv", "items.csv", "mapping.csv", "recipients.csv" }, names);
 
-        foreach (var (name, header) in new[]
-                 {
-                     ("recipients.csv", RecipientsHeader),
-                     ("items.csv", ItemsHeader),
-                     ("graves.csv", GravesHeader),
-                     ("mapping.csv", MappingHeader),
-                 })
+        foreach (
+            var (name, header) in new[]
+            {
+                ("recipients.csv", RecipientsHeader),
+                ("items.csv", ItemsHeader),
+                ("graves.csv", GravesHeader),
+                ("mapping.csv", MappingHeader),
+            }
+        )
         {
             using var reader = new StreamReader(zip.GetEntry(name)!.Open(), Encoding.UTF8, true);
-            Assert.Equal(header.TrimEnd('\r', '\n'), reader.ReadToEnd().Trim('﻿').TrimEnd('\r', '\n'));
+            Assert.Equal(
+                header.TrimEnd('\r', '\n'),
+                reader.ReadToEnd().Trim('﻿').TrimEnd('\r', '\n')
+            );
         }
     }
 
@@ -130,7 +158,9 @@ public class ImportTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        var template = await (await client.GetAsync("/odata/ImportTemplate")).Content.ReadAsByteArrayAsync();
+        var template = await (
+            await client.GetAsync("/odata/ImportTemplate")
+        ).Content.ReadAsByteArrayAsync();
         var response = await client.PostAsync("/odata/ImportArchive", Upload(template));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -160,9 +190,11 @@ public class ImportTests
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var grave = await db.Graves
-            .Include(g => g.Items).ThenInclude(i => i.Item)
-            .Include(g => g.Recipients).ThenInclude(r => r.Recipient)
+        var grave = await db
+            .Graves.Include(g => g.Items)
+                .ThenInclude(i => i.Item)
+            .Include(g => g.Recipients)
+                .ThenInclude(r => r.Recipient)
             .SingleAsync();
 
         Assert.Equal("IMP-1", grave.GraveNumber);
@@ -192,7 +224,8 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader),
-            ("graves.csv", GravesHeader));
+            ("graves.csv", GravesHeader)
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -212,12 +245,16 @@ public class ImportTests
             ("recipients.csv", "Nummer,Name,Adresse\r\n"),
             ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", MappingHeader));
+            ("mapping.csv", MappingHeader)
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "recipients.csv" && p.Row == 1 && p.Code == "HeaderInvalid");
+        Assert.Contains(
+            problems,
+            p => p.File == "recipients.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
+        );
         await AssertNothingImportedAsync(host);
     }
 
@@ -232,14 +269,24 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,nicht-ein-datum,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader));
+            ("mapping.csv", MappingHeader)
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired");
-        Assert.Contains(problems, p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateInvalid");
-        Assert.Contains(problems, p => p.File == "graves.csv" && p.Row == 2 && p.Code == "DateInvalid");
+        Assert.Contains(
+            problems,
+            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateInvalid"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "DateInvalid"
+        );
         await AssertNothingImportedAsync(host);
     }
 
@@ -256,13 +303,20 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,GIBTSNICHT,1\r\n"));
+            ("mapping.csv", MappingHeader + "Item,IMP-1,GIBTSNICHT,1\r\n")
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired");
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined");
+        Assert.Contains(
+            problems,
+            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
+        );
     }
 
     [Fact]
@@ -278,7 +332,8 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader + "Recipient,IMP-1,E-1000,\r\n"));
+            ("mapping.csv", MappingHeader + "Recipient,IMP-1,E-1000,\r\n")
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         var problems = await ProblemsAsync(response);
@@ -297,17 +352,30 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader
-                + "Item,IMP-1,9999,1\r\n"
-                + "Recipient,IMP-1,E-9999,\r\n"
-                + "Recipient,IMP-9,E-1000,\r\n"));
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9999,1\r\n"
+                    + "Recipient,IMP-1,E-9999,\r\n"
+                    + "Recipient,IMP-9,E-1000,\r\n"
+            )
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined");
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "RecipientNotDefined");
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 4 && p.Code == "GraveNotDefined");
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "RecipientNotDefined"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 4 && p.Code == "GraveNotDefined"
+        );
         await AssertNothingImportedAsync(host);
     }
 
@@ -319,26 +387,37 @@ public class ImportTests
         using var client = host.CreateClient();
 
         var archive = Zip(
-            ("recipients.csv", RecipientsHeader
-                + "E-1000,Anna,Hauptstraße 1\r\n"
-                + "E-1000,Bert,Nebenweg 2\r\n"),
-            ("items.csv", ItemsHeader
-                + "9001,Grabpflege,7,120\r\n"
-                + "9001,Doppelt,7,10\r\n"),
-            ("graves.csv", GravesHeader
-                + "IMP-1,2026-01-01,2040-12-31\r\n"
-                + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader
-                + "Item,IMP-1,9001,1\r\n"
-                + "Item,IMP-1,9001,2\r\n"));
+            (
+                "recipients.csv",
+                RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n" + "E-1000,Bert,Nebenweg 2\r\n"
+            ),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n" + "9001,Doppelt,7,10\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n" + "IMP-1,2026-01-01,2040-12-31\r\n"
+            ),
+            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1\r\n" + "Item,IMP-1,9001,2\r\n")
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "recipients.csv" && p.Row == 3 && p.Code == "DuplicateNumber");
-        Assert.Contains(problems, p => p.File == "items.csv" && p.Row == 3 && p.Code == "DuplicateNumber");
-        Assert.Contains(problems, p => p.File == "graves.csv" && p.Row == 3 && p.Code == "DuplicateNumber");
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "DuplicateLink");
+        Assert.Contains(
+            problems,
+            p => p.File == "recipients.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "graves.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        );
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "DuplicateLink"
+        );
         await AssertNothingImportedAsync(host);
     }
 
@@ -350,8 +429,10 @@ public class ImportTests
         using var client = host.CreateClient();
 
         // the same archive twice: the second run collides with everything
-        Assert.Equal(HttpStatusCode.OK,
-            (await client.PostAsync("/odata/ImportArchive", Upload(ValidArchive()))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PostAsync("/odata/ImportArchive", Upload(ValidArchive()))).StatusCode
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(ValidArchive()));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -377,12 +458,16 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader + "9001,Grabpflege,19,120\r\n"),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", MappingHeader));
+            ("mapping.csv", MappingHeader)
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateNotConfigured");
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateNotConfigured"
+        );
     }
 
     [Fact]
@@ -398,12 +483,16 @@ public class ImportTests
             ("graves.csv", GravesHeader),
             ("mapping.csv", MappingHeader),
             ("liesmich.txt", "nur eine Notiz"),
-            ("bilder/grab.csv", "irrelevant"));
+            ("bilder/grab.csv", "irrelevant")
+        );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal(1, json.RootElement.GetProperty("summary").GetProperty("recipients").GetInt32());
+        Assert.Equal(
+            1,
+            json.RootElement.GetProperty("summary").GetProperty("recipients").GetInt32()
+        );
     }
 
     [Fact]
@@ -412,8 +501,10 @@ public class ImportTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/ImportArchive",
-            Upload(Encoding.UTF8.GetBytes("das ist kein ZIP")));
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(Encoding.UTF8.GetBytes("das ist kein ZIP"))
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
@@ -426,10 +517,16 @@ public class ImportTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/ImportArchive", new MultipartFormDataContent());
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            new MultipartFormDataContent()
+        );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("ArchiveRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "ArchiveRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 }

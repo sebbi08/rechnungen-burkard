@@ -9,23 +9,49 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class LatestRevisionTests
 {
-    private static async Task<(long InvoiceId, long ItemId, long RecipientId)> SeedAsync(ApiTestHost host)
+    private static async Task<(long InvoiceId, long ItemId, long RecipientId)> SeedAsync(
+        ApiTestHost host
+    )
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "6001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-        var recipient = new Recipient { Number = "E-0001", Name = "Familie Beispiel", Address = "Hauptstraße 1" };
+        var item = new InvoiceItem
+        {
+            Number = "6001",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 100m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0001",
+            Name = "Familie Beispiel",
+            Address = "Hauptstraße 1",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         created.EnsureSuccessStatusCode();
         using var json = await ODataJson.ReadAsync(created);
         return (json.RootElement.GetProperty("Id").GetInt64(), item.Id, recipient.Id);
@@ -49,18 +75,33 @@ public class LatestRevisionTests
         var (invoiceId, itemId, recipientId) = await SeedAsync(host);
 
         using var client = host.CreateClient();
-        var response = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
-        {
-            invoiceId,
-            recipientId,
-            lines = new[] { new { itemId, count = 3, unitPrice = (decimal?)null } },
-        }));
+        var response = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         response.EnsureSuccessStatusCode();
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var chain = await db.Invoices.Where(i => i.RootId == invoiceId)
-            .OrderBy(i => i.RevisionNumber).ToListAsync();
+        var chain = await db
+            .Invoices.Where(i => i.RootId == invoiceId)
+            .OrderBy(i => i.RevisionNumber)
+            .ToListAsync();
         Assert.Equal(2, chain.Count);
         Assert.False(chain[0].IsLatestRevision);
         Assert.True(chain[1].IsLatestRevision);
@@ -75,18 +116,33 @@ public class LatestRevisionTests
 
         for (var attempt = 1; attempt <= 2; attempt++)
         {
-            var response = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
-            {
-                invoiceId,
-                recipientId,
-                lines = new[] { new { itemId, count = attempt, unitPrice = (decimal?)null } },
-            }));
+            var response = await client.PostAsync(
+                "/odata/CreateRevision",
+                ODataJson.Body(
+                    new
+                    {
+                        invoiceId,
+                        recipientId,
+                        lines = new[]
+                        {
+                            new
+                            {
+                                itemId,
+                                count = attempt,
+                                unitPrice = (decimal?)null,
+                            },
+                        },
+                    }
+                )
+            );
             response.EnsureSuccessStatusCode();
         }
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var latest = await db.Invoices.Where(i => i.RootId == invoiceId && i.IsLatestRevision).ToListAsync();
+        var latest = await db
+            .Invoices.Where(i => i.RootId == invoiceId && i.IsLatestRevision)
+            .ToListAsync();
         Assert.Equal(2, Assert.Single(latest).RevisionNumber);
     }
 
@@ -100,27 +156,44 @@ public class LatestRevisionTests
         var (invoiceId, itemId, recipientId) = await SeedAsync(host);
 
         using var client = host.CreateClient();
-        var revised = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
-        {
-            invoiceId,
-            recipientId,
-            lines = new[] { new { itemId, count = 2, unitPrice = (decimal?)null } },
-        }));
+        var revised = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         revised.EnsureSuccessStatusCode();
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.ExecuteSqlRawAsync("UPDATE Invoices SET IsLatestRevision = 1;");
 
-        await db.Database.ExecuteSqlRawAsync(@"
+        await db.Database.ExecuteSqlRawAsync(
+            @"
             UPDATE Invoices SET IsLatestRevision = 0
             WHERE EXISTS (
                 SELECT 1 FROM Invoices later
                 WHERE later.RootId = Invoices.RootId
-                  AND later.RevisionNumber > Invoices.RevisionNumber);");
+                  AND later.RevisionNumber > Invoices.RevisionNumber);"
+        );
 
-        var chain = await db.Invoices.Where(i => i.RootId == invoiceId)
-            .OrderBy(i => i.RevisionNumber).ToListAsync();
+        var chain = await db
+            .Invoices.Where(i => i.RootId == invoiceId)
+            .OrderBy(i => i.RevisionNumber)
+            .ToListAsync();
         Assert.Equal(new[] { false, true }, chain.Select(i => i.IsLatestRevision));
     }
 
@@ -131,19 +204,37 @@ public class LatestRevisionTests
         var (invoiceId, itemId, recipientId) = await SeedAsync(host);
         using var client = host.CreateClient();
 
-        var revised = await client.PostAsync("/odata/CreateRevision", ODataJson.Body(new
-        {
-            invoiceId,
-            recipientId,
-            lines = new[] { new { itemId, count = 2, unitPrice = (decimal?)null } },
-        }));
+        var revised = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         revised.EnsureSuccessStatusCode();
 
-        var response = await client.PostAsync("/odata/BulkDownloadDocuments",
-            ODataJson.Body(new { kind = "Normal" }));
+        var response = await client.PostAsync(
+            "/odata/BulkDownloadDocuments",
+            ODataJson.Body(new { kind = "Normal" })
+        );
         response.EnsureSuccessStatusCode();
 
-        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(), ZipArchiveMode.Read);
+        using var zip = new ZipArchive(
+            await response.Content.ReadAsStreamAsync(),
+            ZipArchiveMode.Read
+        );
         var name = Assert.Single(zip.Entries).Name;
         Assert.Contains("-R1", name);
     }
@@ -157,9 +248,25 @@ public class LatestRevisionTests
             using var scope = host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             db.VatRates.Add(new VatRate { Rate = 7m });
-            var item = new InvoiceItem { Number = "6002", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-            var first = new Recipient { Number = "E-0002", Name = "Anna", Address = "A 1" };
-            var second = new Recipient { Number = "E-0003", Name = "Bernd", Address = "B 2" };
+            var item = new InvoiceItem
+            {
+                Number = "6002",
+                Description = "Grabpflege",
+                VatRate = 7m,
+                DefaultPrice = 100m,
+            };
+            var first = new Recipient
+            {
+                Number = "E-0002",
+                Name = "Anna",
+                Address = "A 1",
+            };
+            var second = new Recipient
+            {
+                Number = "E-0003",
+                Name = "Bernd",
+                Address = "B 2",
+            };
             db.InvoiceItems.Add(item);
             db.Recipients.AddRange(first, second);
             var grave = new Grave
@@ -171,9 +278,20 @@ public class LatestRevisionTests
             };
             db.Graves.Add(grave);
             await db.SaveChangesAsync();
-            db.GraveItems.Add(new GraveItem { GraveId = grave.Id, ItemId = item.Id, Count = 1 });
-            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = first.Id });
-            db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = second.Id });
+            db.GraveItems.Add(
+                new GraveItem
+                {
+                    GraveId = grave.Id,
+                    ItemId = item.Id,
+                    Count = 1,
+                }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = first.Id }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = second.Id }
+            );
             await db.SaveChangesAsync();
             graveId = grave.Id;
         }
@@ -183,8 +301,10 @@ public class LatestRevisionTests
 
         using var verify = host.Services.CreateScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
-        var lines = await verifyDb.InvoiceLines
-            .Where(l => verifyDb.Invoices.Any(i => i.Id == l.InvoiceId && i.GraveId == graveId))
+        var lines = await verifyDb
+            .InvoiceLines.Where(l =>
+                verifyDb.Invoices.Any(i => i.Id == l.InvoiceId && i.GraveId == graveId)
+            )
             .ToListAsync();
         Assert.Equal(2, lines.Count);
         // each recipient pays half, but the line remembers the grave's price

@@ -24,7 +24,8 @@ public sealed class DocumentTexts
         vatTotal: "MwSt. gesamt: {0}",
         grossTotal: "Gesamtbetrag: {0}",
         page: "Seite",
-        of: " von ");
+        of: " von "
+    );
 
     private static readonly DocumentTexts EnglishTexts = new(
         CultureInfo.GetCultureInfo("en-GB"),
@@ -41,7 +42,8 @@ public sealed class DocumentTexts
         vatTotal: "VAT total: {0}",
         grossTotal: "Amount due: {0}",
         page: "Page",
-        of: " of ");
+        of: " of "
+    );
 
     private readonly string _share;
     private readonly string _title;
@@ -51,9 +53,23 @@ public sealed class DocumentTexts
     private readonly string _vatTotal;
     private readonly string _grossTotal;
 
-    private DocumentTexts(CultureInfo culture, string share, string title, string description,
-        string count, string unitPrice, string vat, string total, string netForRate,
-        string vatForRate, string netTotal, string vatTotal, string grossTotal, string page, string of)
+    private DocumentTexts(
+        CultureInfo culture,
+        string share,
+        string title,
+        string description,
+        string count,
+        string unitPrice,
+        string vat,
+        string total,
+        string netForRate,
+        string vatForRate,
+        string netTotal,
+        string vatTotal,
+        string grossTotal,
+        string page,
+        string of
+    )
     {
         Culture = culture;
         _share = share;
@@ -81,7 +97,9 @@ public sealed class DocumentTexts
     /// <summary>Falls back to the default language for anything unknown, so an
     /// old row with an unexpected value still renders.</summary>
     public static DocumentTexts For(string? language) =>
-        string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? EnglishTexts : GermanTexts;
+        string.Equals(language, "en", StringComparison.OrdinalIgnoreCase)
+            ? EnglishTexts
+            : GermanTexts;
 
     public CultureInfo Culture { get; }
     public string ColumnDescription { get; }
@@ -100,10 +118,20 @@ public sealed class DocumentTexts
         string.Format(Culture, _title, invoiceNumber);
 
     public string NetForRate(decimal rate, decimal amount) =>
-        string.Format(Culture, _netForRate, rate.ToString("0.#", Culture), amount.ToString("N2", Culture));
+        string.Format(
+            Culture,
+            _netForRate,
+            rate.ToString("0.#", Culture),
+            amount.ToString("N2", Culture)
+        );
 
     public string VatForRate(decimal rate, decimal amount) =>
-        string.Format(Culture, _vatForRate, rate.ToString("0.#", Culture), amount.ToString("N2", Culture));
+        string.Format(
+            Culture,
+            _vatForRate,
+            rate.ToString("0.#", Culture),
+            amount.ToString("N2", Culture)
+        );
 
     public string NetTotal(decimal amount) =>
         string.Format(Culture, _netTotal, amount.ToString("N2", Culture));

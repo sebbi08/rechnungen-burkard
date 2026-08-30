@@ -18,12 +18,7 @@ services:
     volumes:
       - ./frontend:/app/frontend
       - frontend-node-modules:/app/frontend/node_modules
-    command:
-      [
-        "sh",
-        "-c",
-        "npm install && npx ui5 serve --port 8080 --accept-remote-connections",
-      ]
+    command: ["sh", "-c", "npm install && npx ui5 serve --port 8080 --accept-remote-connections"]
     ports:
       - "8080:8080"
 volumes:

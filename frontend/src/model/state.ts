@@ -1,9 +1,4 @@
-import type {
-  GraveInvoiceRecipient,
-  GraveStatusRow,
-  ImportProblem,
-  YearHalfOption,
-} from "./api";
+import type { GraveInvoiceRecipient, GraveStatusRow, ImportProblem, YearHalfOption } from "./api";
 
 /**
  * What a view or a dialog holds while the user works in it.

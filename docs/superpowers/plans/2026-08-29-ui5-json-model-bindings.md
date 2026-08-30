@@ -18,7 +18,7 @@
 - **English source, i18n UI** (Constitution VII). No user-visible string moves out of `src/i18n/*.properties`. Any new key goes into **both** `i18n.properties` and `i18n_en.properties`.
 - **Reads stay on the OData model** (deviation D-002). Settings is filled via `bindContext("/Settings").requestObject()`, never `fetch`.
 - **Never run E2E against the dev stack.** `cd e2e && npm test` only. `E2E_BASE_URL=http://localhost:8080` is forbidden — the dev database holds the user's data.
-- **Control `id` attributes must not be removed.** `graves.spec.ts:210` matches `.sapMSlt[id$='linkRecipient']`; ~36 `getByLabel(...)` locators resolve through `labelFor`. Only `byId` *calls* go.
+- **Control `id` attributes must not be removed.** `graves.spec.ts:210` matches `.sapMSlt[id$='linkRecipient']`; ~36 `getByLabel(...)` locators resolve through `labelFor`. Only `byId` _calls_ go.
 - **Every commit must pass `npm run typecheck`.** ESLint goes from 633 errors to 0 across the branch; only the final task gates on zero.
 - Model names already in use and not to be renamed: `odata`, `i18n`, `device`, `status`, `import`, `invoiceDraft`, `graveDraft`, `graveInvoiceDraft`.
 
@@ -42,40 +42,40 @@ So the usual red-green TDD loop does not apply here. This is a behaviour-preserv
 
 `npx eslint src` — **633 errors**:
 
-| Rule | Count |
-|---|---|
-| `no-unsafe-member-access` | 262 |
-| `no-unsafe-call` | 131 |
-| `no-explicit-any` | 112 |
-| `no-unsafe-assignment` | 81 |
-| `no-unnecessary-type-assertion` | 21 |
-| `no-unsafe-argument` | 8 |
-| `await-thenable` | 8 |
-| `no-misused-promises` | 3 |
-| `unbound-method` | 3 |
-| `no-unsafe-return` | 2 |
-| `no-floating-promises` | 1 |
-| `require-await` | 1 |
+| Rule                            | Count |
+| ------------------------------- | ----- |
+| `no-unsafe-member-access`       | 262   |
+| `no-unsafe-call`                | 131   |
+| `no-explicit-any`               | 112   |
+| `no-unsafe-assignment`          | 81    |
+| `no-unnecessary-type-assertion` | 21    |
+| `no-unsafe-argument`            | 8     |
+| `await-thenable`                | 8     |
+| `no-misused-promises`           | 3     |
+| `unbound-method`                | 3     |
+| `no-unsafe-return`              | 2     |
+| `no-floating-promises`          | 1     |
+| `require-await`                 | 1     |
 
 Per file — this is each task's target:
 
-| File | Errors | Task |
-|---|---|---|
-| `controller/GraveEdit.controller.ts` | 172 | 9 |
-| `controller/GraveDetail.controller.ts` | 79 | 11 |
-| `controller/InvoiceEdit.controller.ts` | 71 | 8 |
-| `controller/Graves.controller.ts` | 59 | 7 |
-| `controller/InvoiceRevisions.controller.ts` | 41 | 12 |
-| `controller/Items.controller.ts` | 41 | 4 |
-| `controller/Recipients.controller.ts` | 41 | 5 |
-| `controller/Invoices.controller.ts` | 29 | 10 |
-| `controller/GraveInvoiceDetail.controller.ts` | 26 | 11 |
-| `model/api.ts` | 26 | 3 |
-| `controller/InvoiceDetail.controller.ts` | 16 | 12 |
-| `controller/Settings.controller.ts` | 15 | 6 |
-| `controller/Base.controller.ts` | 14 | 2 |
-| `controller/ImportExport.controller.ts` | 2 | 10 |
-| `Component.ts` | 1 | 12 |
+| File                                          | Errors | Task |
+| --------------------------------------------- | ------ | ---- |
+| `controller/GraveEdit.controller.ts`          | 172    | 9    |
+| `controller/GraveDetail.controller.ts`        | 79     | 11   |
+| `controller/InvoiceEdit.controller.ts`        | 71     | 8    |
+| `controller/Graves.controller.ts`             | 59     | 7    |
+| `controller/InvoiceRevisions.controller.ts`   | 41     | 12   |
+| `controller/Items.controller.ts`              | 41     | 4    |
+| `controller/Recipients.controller.ts`         | 41     | 5    |
+| `controller/Invoices.controller.ts`           | 29     | 10   |
+| `controller/GraveInvoiceDetail.controller.ts` | 26     | 11   |
+| `model/api.ts`                                | 26     | 3    |
+| `controller/InvoiceDetail.controller.ts`      | 16     | 12   |
+| `controller/Settings.controller.ts`           | 15     | 6    |
+| `controller/Base.controller.ts`               | 14     | 2    |
+| `controller/ImportExport.controller.ts`       | 2      | 10   |
+| `Component.ts`                                | 1      | 12   |
 
 ## File structure
 
@@ -114,10 +114,12 @@ Verified with four negative controls: a misspelt absolute path, a misspelt row p
 ### Task 1: Lint tooling
 
 **Files:**
+
 - Create: `frontend/eslint.config.mjs`
 - Modify: `frontend/package.json`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `npm run lint` and `npm run ui5lint` in `frontend/`. Every later task uses both.
 
@@ -181,10 +183,12 @@ git commit -m "build: add eslint and the ui5 linter to the frontend"
 ### Task 2: State interfaces and the typed-model helper
 
 **Files:**
+
 - Create: `frontend/src/model/state.ts`
 - Modify: `frontend/src/controller/Base.controller.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: every interface below, plus two `BaseController` members used by Tasks 4–10:
   - `protected setState<T extends object>(name: string, data: T): TypedJSONModel<T>` — creates the model, sets it on the view, returns it.
@@ -322,9 +326,11 @@ git commit -m "refactor: describe view state as types and add typed-model helper
 ### Task 3: Type `model/api.ts`
 
 **Files:**
+
 - Modify: `frontend/src/model/api.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: types Tasks 7–11 depend on:
   - `GraveDetails`, `GraveItemLink`, `GraveRecipientLink` — the shape `fetchGraveDetails` returns.
@@ -373,10 +379,12 @@ git commit -m "refactor: give the api module real types instead of any"
 This is the pattern every later screen follows. Do it first and do it carefully.
 
 **Files:**
+
 - Modify: `frontend/src/controller/Items.controller.ts`, `frontend/src/view/Items.view.xml`, `frontend/src/view/fragments/ItemDialog.fragment.xml`
 - Test: `e2e/tests/masterdata.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `setState`, `state`, `ItemsView`, `ItemDraft`.
 - Produces: the pattern — nothing later imports from here.
 
@@ -518,10 +526,12 @@ git commit -m "refactor: hold the item dialog's state in a model, not in its con
 ### Task 5: Recipients
 
 **Files:**
+
 - Modify: `frontend/src/controller/Recipients.controller.ts`, `frontend/src/view/Recipients.view.xml`, `frontend/src/view/fragments/RecipientDialog.fragment.xml`
 - Test: `e2e/tests/masterdata.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `setState`, `state`, `RecipientsView`, `RecipientDraft`.
 - Produces: nothing.
 
@@ -585,13 +595,15 @@ git commit -m "refactor: hold the recipient dialog's state in a model"
 
 ### Task 6: Settings
 
-The one screen that changes *where its data comes from*, so read the D-002 constraint before starting: the form must be filled from the OData model, not `fetch`.
+The one screen that changes _where its data comes from_, so read the D-002 constraint before starting: the form must be filled from the OData model, not `fetch`.
 
 **Files:**
+
 - Modify: `frontend/src/controller/Settings.controller.ts`, `frontend/src/view/Settings.view.xml`
 - Test: `e2e/tests/masterdata.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `setState`, `state`, `SettingsDraft`, `SettingsView`.
 - Produces: nothing.
 
@@ -668,10 +680,12 @@ git commit -m "refactor: edit settings through a draft model"
 ### Task 7: Graves toolbar and generate dialog
 
 **Files:**
+
 - Modify: `frontend/src/controller/Graves.controller.ts`, `frontend/src/view/Graves.view.xml`, `frontend/src/view/fragments/GenerateDialog.fragment.xml`
 - Test: `e2e/tests/graves.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `setState`, `state`, `GravesView`, `GenerateDraft`, `api.GenerationResult`.
 - Produces: nothing.
 
@@ -680,8 +694,13 @@ git commit -m "refactor: edit settings through a draft model"
 This deletes the `removeAllItems()` / `addItem(new Item(...))` loop in `onInit`. Keep `id="halfYearSelect"` and the `OverflowToolbarLayoutData`:
 
 ```xml
-<Select id="halfYearSelect" width="10rem" change=".onHalfYearChange"
-    items="{view>/halfYearOptions}" selectedKey="{view>/halfYear}">
+<Select
+  id="halfYearSelect"
+  width="10rem"
+  change=".onHalfYearChange"
+  items="{view>/halfYearOptions}"
+  selectedKey="{view>/halfYear}"
+>
     <core:Item key="{view>key}" text="{view>text}" />
 </Select>
 ```
@@ -765,10 +784,12 @@ git commit -m "refactor: bind the half-year and generate selects to a model"
 This task deletes a real bug workaround. Read the spec's Problem section first.
 
 **Files:**
+
 - Modify: `frontend/src/controller/InvoiceEdit.controller.ts`, `frontend/src/view/fragments/InvoiceDialog.fragment.xml`, `frontend/src/view/fragments/RecipientQuickCreate.fragment.xml`
 - Test: `e2e/tests/invoices.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `InvoiceDraft`, `DraftLine`, `QuickRecipientDraft`.
 - Produces: `QuickRecipientDraft` wiring on the shared fragment. **Task 9 reuses this fragment and must use the same model name `quickRecipientDraft`.**
 
@@ -777,9 +798,12 @@ This task deletes a real bug workaround. Read the spec's Problem section first.
 In `InvoiceDialog.fragment.xml`, drop `mode: 'OneWay'` and the comment above it:
 
 ```xml
-<Select id="recipient" width="20rem"
-    items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
-    selectedKey="{invoiceDraft>/recipientId}">
+<Select
+  id="recipient"
+  width="20rem"
+  items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+  selectedKey="{invoiceDraft>/recipientId}"
+>
     <core:Item key="{odata>Id}" text="{odata>Name}" />
 </Select>
 ```
@@ -820,8 +844,10 @@ const id = await api.createRecipient({ Name: draft.name, Address: draft.address 
 // refresh the recipient list so the new row is included, then select it in
 // the parent invoice dialog, which stays open
 this.odata().refresh();
-(this._invoiceDialog.getModel("invoiceDraft") as TypedJSONModel<InvoiceDraft>)
-  .setProperty("/recipientId", String(id));
+(this._invoiceDialog.getModel("invoiceDraft") as TypedJSONModel<InvoiceDraft>).setProperty(
+  "/recipientId",
+  String(id),
+);
 ```
 
 Type `_invoiceDialog` and `_quickDialog` as `Dialog`.
@@ -834,7 +860,7 @@ Expected: typecheck passes; **0** errors (down from 71).
 - [ ] **Step 5: Run the E2E spec, unedited**
 
 Run: `cd e2e && npm test -- --project=desktop invoices.spec.ts`
-Expected: PASS. Two tests matter most here: *"create invoice with an on-the-fly recipient (Story 3.2)"* covers the refresh-then-select flow, and *"the second invoice goes to the recipient the reopened dialog shows"* is the regression test for the workaround being deleted. If the latter fails, the two-way binding is not holding the selection — do not paper over it by restoring `getSelectedKey()`; find out why.
+Expected: PASS. Two tests matter most here: _"create invoice with an on-the-fly recipient (Story 3.2)"_ covers the refresh-then-select flow, and _"the second invoice goes to the recipient the reopened dialog shows"_ is the regression test for the workaround being deleted. If the latter fails, the two-way binding is not holding the selection — do not paper over it by restoring `getSelectedKey()`; find out why.
 
 - [ ] **Step 6: Commit**
 
@@ -850,10 +876,12 @@ git commit -m "fix: bind the invoice dialog's recipient two-way instead of readi
 The largest file (172 errors) and the last dialog. It shares `RecipientQuickCreate.fragment.xml` with Task 8, so the `quickRecipientDraft` model name is fixed.
 
 **Files:**
+
 - Modify: `frontend/src/controller/GraveEdit.controller.ts`, `frontend/src/view/fragments/GraveDialog.fragment.xml`, `frontend/src/view/fragments/GraveInvoiceDialog.fragment.xml`
 - Test: `e2e/tests/graves.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `GraveDraft`, `GraveInvoiceDraft`, `DraftLine`, `GraveRecipientRow`, `QuickRecipientDraft`, `api.GraveDetails`.
 - Produces: nothing.
 
@@ -862,9 +890,13 @@ The largest file (172 errors) and the last dialog. It shares `RecipientQuickCrea
 Keep `id="linkRecipient"` — `graves.spec.ts:210` matches on it. Capture the display name from the `change` event rather than a control lookup:
 
 ```xml
-<Select id="linkRecipient" width="12rem"
-    items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
-    selectedKey="{graveDraft>/linkRecipientId}" change=".onLinkRecipientChange">
+<Select
+  id="linkRecipient"
+  width="12rem"
+  items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+  selectedKey="{graveDraft>/linkRecipientId}"
+  change=".onLinkRecipientChange"
+>
     <core:Item key="{odata>Id}" text="{odata>Name}" />
 </Select>
 ```
@@ -918,10 +950,12 @@ git commit -m "refactor: hold the grave dialogs' state in typed models"
 The two screens that keep a `byId` call. Both keepers get a comment.
 
 **Files:**
+
 - Modify: `frontend/src/controller/ImportExport.controller.ts`, `frontend/src/view/ImportExport.view.xml`, `frontend/src/controller/Invoices.controller.ts`
 - Test: `e2e/tests/import-export.spec.ts`, `e2e/tests/invoices.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `setState`, `state`.
 - Produces: nothing.
 
@@ -945,8 +979,9 @@ The two screens that keep a `byId` call. Both keepers get a comment.
 ```ts
 // `search` is a custom OData query option on the list binding, not view
 // state — no binding syntax expresses it, so reach the binding directly.
-((this.byId("invoicesTable") as Table).getBinding("items") as ODataListBinding)
-  .changeParameters({ search: term });
+((this.byId("invoicesTable") as Table).getBinding("items") as ODataListBinding).changeParameters({
+  search: term,
+});
 ```
 
 Note `as Table`, not `as any` — `no-explicit-any` forbids the old cast.
@@ -979,10 +1014,12 @@ git commit -m "refactor: bind the import problems panel and type the invoice lis
 Pure typing — neither controller has a `byId` call. 105 errors between them.
 
 **Files:**
+
 - Modify: `frontend/src/controller/GraveDetail.controller.ts`, `frontend/src/controller/GraveInvoiceDetail.controller.ts`
 - Test: `e2e/tests/graves.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: `api.GraveDetails`, generic `readList<T>`.
 - Produces: nothing.
 
@@ -1014,10 +1051,12 @@ git commit -m "refactor: type the grave detail pages"
 The last 58 errors.
 
 **Files:**
+
 - Modify: `frontend/src/controller/InvoiceRevisions.controller.ts`, `frontend/src/controller/InvoiceDetail.controller.ts`, `frontend/src/Component.ts`
 - Test: `e2e/tests/invoice-detail.spec.ts` (do not edit)
 
 **Interfaces:**
+
 - Consumes: generic `readList<T>`.
 - Produces: nothing.
 
@@ -1047,9 +1086,11 @@ git commit -m "refactor: type the invoice detail and revision pages"
 ### Task 13: Full gate and documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: everything.
 - Produces: a branch ready to merge.
 

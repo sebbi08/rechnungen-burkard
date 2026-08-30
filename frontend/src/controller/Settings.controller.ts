@@ -16,10 +16,7 @@ export default class Settings extends BaseController {
   public onInit(): void {
     // bind the view to the /Settings singleton; the VAT table uses an
     // absolute path of its own
-    this.getView()!.setBindingContext(
-      this.odata().createBindingContext("/Settings"),
-      "odata",
-    );
+    this.getView()!.setBindingContext(this.odata().createBindingContext("/Settings"), "odata");
     this.setState<SettingsView>("view", { newVatRate: "" });
     this.setState<SettingsDraft>("settingsDraft", {
       stampWord: "",

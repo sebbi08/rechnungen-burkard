@@ -94,10 +94,7 @@ function tryCreate(path: string): boolean {
  * Throws when the wait runs out, naming the file so it can be removed by hand
  * if a run really did leave it behind.
  */
-export function acquireStackLock(
-  path: string,
-  options: AcquireOptions = {},
-): StackLock {
+export function acquireStackLock(path: string, options: AcquireOptions = {}): StackLock {
   const waitMs = options.waitMs ?? 0;
   const deadline = Date.now() + waitMs;
   let announced = false;
@@ -114,9 +111,7 @@ export function acquireStackLock(
 
     if (!announced) {
       announced = true;
-      options.onWait?.(
-        `waiting for another E2E run to release the stack lock ${path}`,
-      );
+      options.onWait?.(`waiting for another E2E run to release the stack lock ${path}`);
     }
 
     if (Date.now() >= deadline) {
