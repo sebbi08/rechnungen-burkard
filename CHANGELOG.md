@@ -5,6 +5,12 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v1.0.2 — 2026-08-30
+
+### Fixes
+- open the generate dialog on the half-year today falls in (9cd89dc)
+- update half-year default to current date (a30176a)
+
 ## v1.0.1 — 2026-08-30
 
 ### Fixes
