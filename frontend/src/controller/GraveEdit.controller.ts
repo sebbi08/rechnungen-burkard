@@ -91,10 +91,14 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/Items/${row}/description`,
       itemContext.getProperty("Description") as string,
     );
-    // an empty price falls back to this, which the input shows as its placeholder
+    // as in the invoice dialog: the item's default price is pre-filled and stays
+    // overridable; an item without one leaves the field empty, where it falls
+    // back to the item's price at invoicing time
+    const defaultPrice = itemContext.getProperty("DefaultPrice") as number | null;
+    model.setProperty(`/Items/${row}/defaultPrice`, defaultPrice);
     model.setProperty(
-      `/Items/${row}/defaultPrice`,
-      itemContext.getProperty("DefaultPrice") as number | null,
+      `/Items/${row}/unitPrice`,
+      defaultPrice != null ? Number(defaultPrice) : null,
     );
   }
 
