@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "ui5 serve",
-    "build": "ui5 build --all --clean-dest",
+    "build": "ui5 build --all --clean-dest --include-task=generateVersionInfo",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "ui5lint": "ui5lint"

@@ -4,7 +4,10 @@ using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Api.Services.Import;
 using Microsoft.AspNetCore.OData;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.FileProviders.Physical;
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
@@ -54,9 +57,35 @@ using (var scope = app.Services.CreateScope())
     DatabaseSeeder.Seed(db);
 }
 
-// Serve the UI5 build from wwwroot (combined release image).
+// Serve the UI5 build from wwwroot (combined release image). Two of the static
+// file middleware's defaults do not fit that build, and both fail silently: a
+// resource it will not serve comes back as a bare 404, and UI5 carries on
+// without it. A missing message bundle costs the framework every text it
+// renders itself, so buttons and value states show the raw message key.
+var ui5ContentTypes = new FileExtensionContentTypeProvider();
+foreach (var extension in new[] { ".properties", ".library", ".supportrc", ".theme", ".theming", ".hpb" })
+{
+    // The middleware answers only for extensions it can name a content type
+    // for, and knows none of the runtime's own. application/octet-stream is what
+    // `ui5 serve` returns for them in the dev stack; UI5 reads each one as text
+    // or as bytes and never looks at the type.
+    ui5ContentTypes.Mappings[extension] = "application/octet-stream";
+}
+
+if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
+{
+    // The library and theme metadata is named ".library", ".theming" and so on,
+    // and the default file provider hides dot-prefixed names. None is the only
+    // filter that lets them through: on Unix a leading dot is what makes a file
+    // hidden, so excluding hidden files excludes exactly these again. wwwroot
+    // holds nothing but the UI5 build, and every dot-prefixed name in it is
+    // OpenUI5 metadata.
+    app.Environment.WebRootFileProvider =
+        new PhysicalFileProvider(app.Environment.WebRootPath, ExclusionFilters.None);
+}
+
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = ui5ContentTypes });
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
