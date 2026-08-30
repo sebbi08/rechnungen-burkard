@@ -7,6 +7,11 @@ namespace Burkard.Invoicing.Documents;
 
 internal sealed class InvoiceDocument : IDocument
 {
+    private const float SideMarginMillimetre = 20;
+
+    // The lower edge of a DIN lang envelope's window, measured from the sheet's top.
+    private const float WindowBottomMillimetre = 90;
+
     private readonly InvoiceDocumentData _data;
     private readonly bool _isCopy;
     private readonly DocumentTexts _texts;
@@ -36,8 +41,16 @@ internal sealed class InvoiceDocument : IDocument
         container.Page(page =>
         {
             page.Size(PageSizes.A4);
-            page.Margin(2, Unit.Centimetre);
+            // The letterhead prints its own logo block and bank details, so the
+            // margins that clear them are asymmetric rather than a flat 2 cm.
+            page.MarginTop(Letterhead.HeaderHeightMillimetres, Unit.Millimetre);
+            page.MarginBottom(Letterhead.FooterHeightMillimetres, Unit.Millimetre);
+            page.MarginHorizontal(2, Unit.Centimetre);
             page.DefaultTextStyle(x => x.FontSize(10));
+
+            // Background is drawn per page, so every page of a multi-page invoice
+            // gets the stationery.
+            page.Background().Element(Letterhead.Compose);
 
             if (_isCopy)
             {
@@ -62,14 +75,8 @@ internal sealed class InvoiceDocument : IDocument
             page.Header()
                 .Column(column =>
                 {
-                    column
-                        .Item()
-                        .Text(_texts.InvoiceTitle(_data.InvoiceNumber))
-                        .FontSize(18)
-                        .SemiBold();
-                    column.Item().Text(_data.GeneratedAt.ToString("d", _culture));
-                    column.Item().PaddingTop(10).Text(_data.RecipientName).SemiBold();
-                    column.Item().Text(_data.RecipientAddress);
+                    column.Item().ShowOnce().Element(AddressBlock);
+                    column.Item().SkipOnce().Element(ContinuationLine);
                 });
 
             page.Content()
@@ -175,6 +182,68 @@ internal sealed class InvoiceDocument : IDocument
                 });
         });
     }
+
+    /// <summary>
+    /// The first page's head: the recipient in the envelope's window, the invoice
+    /// number below it.
+    /// </summary>
+    private void AddressBlock(IContainer container) =>
+        container.Column(column =>
+        {
+            // The letterhead prints the sender line immediately above this, so the
+            // recipient goes directly under it: folded for a DIN lang envelope, both
+            // addresses then show through the window, which reveals the sheet from
+            // 45 mm to 90 mm below its top edge.
+            //
+            // The address gets that whole zone whether it fills it or not, so the
+            // invoice number always starts clear of the window instead of being sliced
+            // by its edge on short addresses. A longer address pushes the number down
+            // rather than being clipped.
+            column
+                .Item()
+                .PaddingLeft(
+                    Letterhead.AddressFieldLeftMillimetres - SideMarginMillimetre,
+                    Unit.Millimetre
+                )
+                .MinHeight(
+                    Letterhead.AddressFieldBottomMillimetres - Letterhead.HeaderHeightMillimetres,
+                    Unit.Millimetre
+                )
+                .Column(recipient =>
+                {
+                    recipient.Item().Text(_data.RecipientName).SemiBold();
+                    recipient.Item().Text(_data.RecipientAddress);
+                });
+
+            // just past the window's lower edge, so the number is never framed by it
+            column
+                .Item()
+                .PaddingTop(
+                    WindowBottomMillimetre + 2 - Letterhead.AddressFieldBottomMillimetres,
+                    Unit.Millimetre
+                )
+                .Text(_texts.InvoiceTitle(_data.InvoiceNumber))
+                .FontSize(18)
+                .SemiBold();
+            column
+                .Item()
+                .PaddingBottom(8, Unit.Millimetre)
+                .Text(_data.GeneratedAt.ToString("d", _culture));
+        });
+
+    /// <summary>
+    /// Every page after the first. Only the sheet that goes in the envelope needs the
+    /// address block; the rest just have to say which invoice they belong to.
+    /// </summary>
+    private void ContinuationLine(IContainer container) =>
+        container
+            .PaddingBottom(6, Unit.Millimetre)
+            .Text(text =>
+            {
+                text.Span(_texts.InvoiceTitle(_data.InvoiceNumber)).SemiBold();
+                text.Span(" · ");
+                text.Span(_data.GeneratedAt.ToString("d", _culture));
+            });
 
     private string Money(decimal value) => value.ToString("N2", _culture);
 

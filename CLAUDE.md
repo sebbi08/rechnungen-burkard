@@ -51,6 +51,26 @@ the specs wait for the value to be set and the popover to be gone, rather than
 assuming the click was the last thing to happen. CI is roughly four times slower
 than a dev machine and fails this where a local run does not.
 
+## An overflowing page background paginates instead of repeating
+
+The letterhead is drawn in `page.Background()`, which QuestPDF renders again on
+every page — but only while its content fits. Ask for one millimetre more than
+the page holds and it is treated as flowing content instead: page one gets the
+top of it, and every later page gets nothing at all.
+
+The symptom does not point at the cause. Nothing complains about heights; what
+you see is continuation pages losing the whole letterhead, and the tests that go
+red are the ones about images or footer text. `Letterhead.Compose` therefore
+splits the page into three bands whose heights add up to exactly 297 mm, and
+each band's content has to fit inside its own band. Two ways to break it, both
+of which happened while it was being written: giving a band more content than it
+reserves (moving the sender line down 4 mm was enough), and setting text in rows
+shorter than the font's default line height — the footer's 3.4 mm rows need an
+explicit `LineHeight` to fit 8.5 pt type.
+
+Whatever you change there, check page two of a multi-page invoice, not just
+page one.
+
 ## Running the parts
 
 - **Dev stack**: `env "UID=$(id -u)" "GID=$(id -g)" docker compose up -d`

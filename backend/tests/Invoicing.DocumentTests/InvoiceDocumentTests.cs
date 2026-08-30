@@ -71,9 +71,11 @@ public class InvoiceDocumentTests
         var text = ExtractText(pdf);
 
         Assert.Contains("Diese Rechnung enthält 50 % des Gesamtbetrags.", text);
+        // "Grabpflege" is also one of the services the letterhead lists at the top of
+        // the page, so anchor on the line's own total rather than its description.
         Assert.True(
             text.IndexOf("50 % des Gesamtbetrags", StringComparison.Ordinal)
-                < text.IndexOf("Grabpflege", StringComparison.Ordinal)
+                < text.IndexOf("240,00", StringComparison.Ordinal)
         );
     }
 }
