@@ -212,6 +212,10 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await recipientInput.click();
   await recipientInput.fill(recipientName);
   await suggestions(page, "linkRecipient").filter({ hasText: recipientName }).click();
+  // the pick lands after the click returns: the popover closes and focus goes
+  // back to the field. "Hinzufügen" reads the draft, so wait for it to settle
+  await expect(recipientInput).toHaveValue(recipientName);
+  await expect(page.locator("[id*='linkRecipient'][id$='-popup-list']")).toBeHidden();
   // "Hinzufügen" alone also matches the item table's "Zeile hinzufügen"
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   await expect(page.locator("[id$='graveRecipientsTable-listUl']")).toContainText(recipientName);

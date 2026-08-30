@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per run: the parallel grave generation (graves.spec.ts) inserts
@@ -28,12 +29,24 @@ function recipientField(page: Page): Locator {
   return page.locator(".sapMDialog input[id$='--recipient-inner']");
 }
 
-/** Picks a recipient the way the item field is driven: type, then click. */
+/**
+ * Picks a recipient the way the item field is driven: type, then click.
+ *
+ * The pick is not finished when the click returns: the ComboBox closes its
+ * popover and hands focus back to its own input, and both land afterwards.
+ * Touching the item field before that happens opens its popover into the
+ * pending focus change, which closes it again — the entry then sits in the DOM
+ * but invisible, which is the failure `dialog.ts` describes. Waiting for the
+ * settled state instead of assuming the click was the last thing to happen
+ * keeps the two fields from overlapping.
+ */
 async function pickRecipient(page: Page, name: string): Promise<void> {
   const input = recipientField(page);
   await input.click();
   await input.fill(name);
   await suggestions(page, "recipient").filter({ hasText: name }).click();
+  await expect(input).toHaveValue(name);
+  await expect(page.locator("[id*='recipient'][id$='-popup-list']")).toBeHidden();
 }
 
 async function seedMasterData(page: Page): Promise<void> {
@@ -75,6 +88,7 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   // this run's recipient name is unique: picking it cannot collide with
   // rows created by other tests, parallel workers or previous runs
   await pickRecipient(page, RECIPIENT_NAME);
@@ -126,6 +140,7 @@ test("a recipient suggestion shows the first line of the address (Story 3)", asy
   await page.goto("/index.html#/invoices");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   const input = recipientField(page);
   await input.click();
   await input.fill(RECIPIENT_NAME);
@@ -143,6 +158,7 @@ test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ pag
   await page.goto("/index.html#/invoices");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   await pickRecipient(page, RECIPIENT_NAME);
   const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
@@ -180,6 +196,7 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page })
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   await page.getByRole("button", { name: "Neuer Empfänger" }).click();
 
   // the quick-create dialog is a second dialog on top of the invoice dialog
@@ -236,6 +253,7 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await expect(row).toBeVisible();
 
   await row.getByRole("button", { name: "Bearbeiten" }).click();
+  await waitForDialogOpen(page);
   await page.getByLabel("Anzahl").fill("3");
   await page.getByLabel("Preis").fill("150");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -299,6 +317,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
 
   // first invoice: the recipient is picked from the list, as a user would
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   await pickRecipient(page, recipientName);
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -311,6 +330,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // since. What must hold is that the save invoices exactly the recipient on
   // screen.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   const shown = (await recipientField(page).inputValue()).trim();
   expect(shown).not.toBe("");
   const before = await countInvoicesFor(page, shown);
@@ -333,6 +353,7 @@ test("a double click on save creates one invoice, not two", async ({ page }) => 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   await pickRecipient(page, recipientName);
   await fillLine(page, itemNumber);
 
