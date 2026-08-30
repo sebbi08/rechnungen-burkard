@@ -77,6 +77,30 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report
 
+  # Same reasoning as commit-lint below: the pre-commit hook formats staged
+  # files, but it only exists where `npm install` has been run at the repository
+  # root, and `--no-verify` skips it. CSharpier runs through the SDK directly
+  # here rather than through scripts/csharpier.sh, which exists because the dev
+  # machine has no .NET SDK — the runner does.
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: npm ci
+      - name: Prettier
+        run: npx prettier --check .
+      - name: CSharpier
+        working-directory: backend
+        run: |
+          dotnet tool restore
+          dotnet csharpier check .
+
   # The commit-msg hook is what normally catches these, but it only runs on a
   # machine where `npm install` has been run at the repository root, and
   # `--no-verify` skips it. The release version is derived from these messages,
