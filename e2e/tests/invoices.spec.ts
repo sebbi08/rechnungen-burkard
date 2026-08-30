@@ -1,23 +1,55 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
+import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per run: the parallel grave generation (graves.spec.ts) inserts
 // invoices in bursts, and against the dev stack rows from earlier runs are
 // still there, so row-count and first-row assertions are invalid. A unique
 // recipient makes this spec's assertions independent of both.
-// Deliberately contains the item number seeded below. The recipient select's
-// popover stays in the DOM — and briefly visible — after a recipient is picked,
-// so an unscoped suggestion locator would match its options too. This name keeps
-// that collision permanent instead of leaving it to whether the clock happens to
-// produce a timestamp containing the item number, which is how it first showed up.
+// Deliberately contains the item number seeded below. Recipient and item are
+// both ComboBoxes, both leave their suggestion list in the DOM after a pick,
+// and both render sapMSLI rows, so a suggestion locator that named neither
+// field would match the other's rows. This name keeps that collision permanent
+// instead of leaving it to whether the clock happens to produce a timestamp
+// containing the item number, which is how it first showed up.
 const RECIPIENT_NAME = `E2E 9001 ${Date.now()}`;
 
-/** The item field's suggestion list: a StandardListItem inside a popover. The
- *  recipient select's options are sapMSelectListItem, so this excludes them.
+/**
+ * One field's suggestion rows. A ComboBox renders its list as
+ * `<control id>-popup-list`, so naming the field keeps the two lists apart.
+ * The item field sits in a table template and its id therefore carries a clone
+ * suffix, which is why the field name is matched anywhere in the id.
  */
-const SUGGESTION = "div.sapMPopover li.sapMSLI";
+function suggestions(page: Page, field: string): Locator {
+  return page.locator(`[id*='${field}'][id$='-popup-list'] li.sapMSLI`);
+}
 
-async function seedMasterData(page: import("@playwright/test").Page): Promise<void> {
+/** The invoice dialog's recipient input. */
+function recipientField(page: Page): Locator {
+  return page.locator(".sapMDialog input[id$='--recipient-inner']");
+}
+
+/**
+ * Picks a recipient the way the item field is driven: type, then click.
+ *
+ * The pick is not finished when the click returns: the ComboBox closes its
+ * popover and hands focus back to its own input, and both land afterwards.
+ * Touching the item field before that happens opens its popover into the
+ * pending focus change, which closes it again — the entry then sits in the DOM
+ * but invisible, which is the failure `dialog.ts` describes. Waiting for the
+ * settled state instead of assuming the click was the last thing to happen
+ * keeps the two fields from overlapping.
+ */
+async function pickRecipient(page: Page, name: string): Promise<void> {
+  const input = recipientField(page);
+  await input.click();
+  await input.fill(name);
+  await suggestions(page, "recipient").filter({ hasText: name }).click();
+  await expect(input).toHaveValue(name);
+  await expect(page.locator("[id*='recipient'][id$='-popup-list']")).toBeHidden();
+}
+
+async function seedMasterData(page: Page): Promise<void> {
   // Direct API calls keep the test focused on the UI flow. VatRate 7 and
   // item 9001 may already exist from previous runs; the API then answers
   // 409, which is harmless because the existing rows are reused.
@@ -30,7 +62,7 @@ async function seedMasterData(page: import("@playwright/test").Page): Promise<vo
   });
   // Recipient names are not unique in the backend and both tests in this
   // file share the seeded recipient, so seed only when it does not exist
-  // yet — otherwise the select list would hold duplicates and the strict
+  // yet — otherwise the suggestion list would hold duplicates and the strict
   // locator would fail.
   const recipients = await (
     await page.request.get(
@@ -56,21 +88,15 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  // fragment controls are prefixed with the view id; the visual select root
-  // is the first .sapMSlt inside the dialog (the hidden native select is not)
-  await page.locator(".sapMDialog .sapMSlt").first().click(); // recipient Select opens popover
-  // this run's recipient name is unique: selecting it cannot collide with
+  await waitForDialogOpen(page);
+  // this run's recipient name is unique: picking it cannot collide with
   // rows created by other tests, parallel workers or previous runs
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: RECIPIENT_NAME,
-    })
-    .click();
-  // the item field is a typeahead input: type the number, then pick the suggestion
+  await pickRecipient(page, RECIPIENT_NAME);
+  // the item field is a typeahead too: type the number, then pick the suggestion
   const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill("9001");
-  await page.locator(SUGGESTION, { hasText: "9001" }).click();
+  await suggestions(page, "lineItem").filter({ hasText: "9001" }).click();
   await page.getByLabel("Anzahl").fill("2");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -109,21 +135,35 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   expect(disposition).not.toContain("Kopie");
 });
 
+test("a recipient suggestion shows the first line of the address (Story 3)", async ({ page }) => {
+  await seedMasterData(page);
+  await page.goto("/index.html#/invoices");
+
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
+  const input = recipientField(page);
+  await input.click();
+  await input.fill(RECIPIENT_NAME);
+
+  // the recipient is seeded with "Musterstraße 1\n12345 Musterstadt", so this
+  // also pins that the secondary value is the first line and not the whole
+  // address — an address runs over as many lines as the user typed
+  const row = suggestions(page, "recipient").filter({ hasText: RECIPIENT_NAME });
+  await expect(row).toContainText("Musterstraße 1");
+  await expect(row).not.toContainText("12345 Musterstadt");
+});
+
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
   await seedMasterData(page);
   await page.goto("/index.html#/invoices");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  await page.locator(".sapMDialog .sapMSlt").first().click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: RECIPIENT_NAME,
-    })
-    .click();
+  await waitForDialogOpen(page);
+  await pickRecipient(page, RECIPIENT_NAME);
   const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill("9001");
-  await page.locator(SUGGESTION, { hasText: "9001" }).click();
+  await suggestions(page, "lineItem").filter({ hasText: "9001" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   // the create dialog renders "Preis" as a column header and stays in the DOM
@@ -156,6 +196,7 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page })
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
   await page.getByRole("button", { name: "Neuer Empfänger" }).click();
 
   // the quick-create dialog is a second dialog on top of the invoice dialog
@@ -167,12 +208,12 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page })
   // the quick dialog closes without leaving the invoice dialog, which now
   // shows the newly created recipient as selected
   await expect(quickDialog).toBeHidden();
-  await expect(page.locator(".sapMDialog .sapMSlt").first()).toContainText(quickName);
+  await expect(recipientField(page)).toHaveValue(quickName);
 
   const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill(itemNumber);
-  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
+  await suggestions(page, "lineItem").filter({ hasText: itemNumber }).click();
   await page.getByLabel("Anzahl").fill("1");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -212,6 +253,7 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await expect(row).toBeVisible();
 
   await row.getByRole("button", { name: "Bearbeiten" }).click();
+  await waitForDialogOpen(page);
   await page.getByLabel("Anzahl").fill("3");
   await page.getByLabel("Preis").fill("150");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -226,7 +268,7 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
 
 /** Seeds a VAT rate, one item and one recipient, all unique to this test. */
 async function seedOwnMasterData(
-  page: import("@playwright/test").Page,
+  page: Page,
   marker: string,
 ): Promise<{ itemNumber: string; recipientName: string; recipientId: number }> {
   const itemNumber = `${marker}-item`;
@@ -247,30 +289,24 @@ async function seedOwnMasterData(
 
 /** Invoices whose snapshotted recipient name matches, by name rather than id:
  *  the caller knows what the dialog displayed, not which row it came from. */
-async function countInvoicesFor(
-  page: import("@playwright/test").Page,
-  recipientName: string,
-): Promise<number> {
+async function countInvoicesFor(page: Page, recipientName: string): Promise<number> {
   const filter = encodeURIComponent(`RecipientName eq '${recipientName.replace(/'/g, "''")}'`);
   const response = await page.request.get(`/odata/Invoices?$filter=${filter}&$select=Id`);
   return ((await response.json()).value as unknown[]).length;
 }
 
-async function countInvoices(
-  page: import("@playwright/test").Page,
-  recipientId: number,
-): Promise<number> {
+async function countInvoices(page: Page, recipientId: number): Promise<number> {
   const response = await page.request.get(
     `/odata/Invoices?$filter=RecipientId eq ${recipientId}&$select=Id`,
   );
   return ((await response.json()).value as unknown[]).length;
 }
 
-async function fillLine(page: import("@playwright/test").Page, itemNumber: string): Promise<void> {
+async function fillLine(page: Page, itemNumber: string): Promise<void> {
   const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
   await lineInput.click();
   await lineInput.fill(itemNumber);
-  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
+  await suggestions(page, "lineItem").filter({ hasText: itemNumber }).click();
   await page.getByLabel("Preis").fill("120");
 }
 
@@ -281,24 +317,21 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
 
   // first invoice: the recipient is picked from the list, as a user would
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  await page.locator(".sapMDialog .sapMSlt").first().click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: recipientName,
-    })
-    .click();
+  await waitForDialogOpen(page);
+  await pickRecipient(page, recipientName);
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // second invoice: the dialog is reopened and saved without touching the
-  // select. *Which* recipient it shows is not this test's business — a reopened
-  // dialog carries no draft selection, so the select falls back to the newest
-  // recipient, and a spec running beside this one may have created one since.
-  // What must hold is that the save invoices exactly the recipient on screen.
+  // recipient field. *Which* recipient it shows is not this test's business — a
+  // reopened dialog carries no draft selection, so the dialog starts on the
+  // newest recipient, and a spec running beside this one may have created one
+  // since. What must hold is that the save invoices exactly the recipient on
+  // screen.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  // the visible label; the select also renders a hidden native one
-  const shown = (await page.locator(".sapMDialog .sapMSltLabel").first().innerText()).trim();
+  await waitForDialogOpen(page);
+  const shown = (await recipientField(page).inputValue()).trim();
   expect(shown).not.toBe("");
   const before = await countInvoicesFor(page, shown);
 
@@ -320,12 +353,8 @@ test("a double click on save creates one invoice, not two", async ({ page }) => 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
-  await page.locator(".sapMDialog .sapMSlt").first().click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: recipientName,
-    })
-    .click();
+  await waitForDialogOpen(page);
+  await pickRecipient(page, recipientName);
   await fillLine(page, itemNumber);
 
   // Counting the requests, not only the rows: the second request is sent

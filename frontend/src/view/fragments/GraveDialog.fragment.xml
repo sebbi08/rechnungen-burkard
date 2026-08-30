@@ -156,7 +156,7 @@
                             </ColumnListItem>
                         </items>
                     </Table>
-                    <!-- wraps so the select and both buttons stay usable on a phone -->
+                    <!-- wraps so the field and both buttons stay usable on a phone -->
                     <HBox
                         id="graveRecipientsLink"
                         wrap="Wrap"
@@ -164,24 +164,29 @@
                         class="sapUiSmallMarginTop"
                         visible="{= ${graveDraft>/Id} === null }"
                     >
-                        <!-- forceSelection off for the same reason as the invoice
-                             dialog's: what is shown is what the draft holds -->
-                        <Select
+                        <!-- typeahead over the recipients, like the invoice dialog's
+                             and like the item field above: what is on screen is
+                             what the draft holds -->
+                        <ComboBox
                             id="linkRecipient"
                             width="100%"
-                            forceSelection="false"
+                            showSecondaryValues="true"
                             items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                             selectedKey="{graveDraft>/linkRecipientId}"
-                            change=".onLinkRecipientChange"
+                            selectionChange=".onLinkRecipientSelected"
                         >
-                            <!-- names are long, so the select takes what the buttons
+                            <!-- names are long, so the field takes what the buttons
                                  leave of the line rather than a fixed slice of it; on a
                                  phone the buttons wrap away and it gets the whole row -->
                             <layoutData>
                                 <FlexItemData growFactor="1" baseSize="20rem" maxWidth="30rem" />
                             </layoutData>
-                            <core:Item key="{odata>Id}" text="{odata>Name}" />
-                        </Select>
+                            <core:ListItem
+                                key="{odata>Id}"
+                                text="{odata>Name}"
+                                additionalText="{path: 'odata>Address', formatter: '.formatAddressLine'}"
+                            />
+                        </ComboBox>
                         <Button text="{i18n>add}" press=".onAddRecipientLink" />
                         <Button
                             text="{i18n>newRecipient}"

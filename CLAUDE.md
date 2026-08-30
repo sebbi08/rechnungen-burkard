@@ -34,12 +34,22 @@ ComboBox suggestion popover) closes underneath it.
 So a spec that opens a dialog calls `waitForDialogOpen(page)` from
 `e2e/dialog.ts` before touching it. The helper explains the mechanism.
 
-One deliberate exception: `invoices.spec.ts` does not use it. The wait moves
-when that spec reads the recipient select's label, and "the second invoice goes
-to the recipient the reopened dialog shows" then fails about four runs in five
-— including with the recipient handling reverted to what it was before the
-model refactor, so the spec is sensitive to the timing rather than to the
-control. Leave it as it is.
+`invoices.spec.ts` used to be a deliberate exception: the wait moved when that
+spec read the recipient select's rendered label, and "the second invoice goes to
+the recipient the reopened dialog shows" then failed about four runs in five.
+That exception is gone. The recipient is a ComboBox now and the spec reads its
+input value rather than a Select's label, so the read no longer moves with the
+wait — 15 consecutive runs of that test pass with it. The spec waits like every
+other one.
+
+The same mechanism bites a second time, between two fields of one dialog. A
+ComboBox pick is not finished when the click returns: the popover closes and
+focus goes back to the field afterwards. A spec that moves straight to the next
+field opens that field's popover into the pending focus change and it closes
+again, leaving the entry in the DOM but invisible. So after picking a recipient
+the specs wait for the value to be set and the popover to be gone, rather than
+assuming the click was the last thing to happen. CI is roughly four times slower
+than a dev machine and fails this where a local run does not.
 
 ## Running the parts
 

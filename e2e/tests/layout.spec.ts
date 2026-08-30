@@ -195,17 +195,21 @@ const widthOf = (locator: Locator): Promise<number> =>
  */
 async function expectFieldsGetTheWidth(
   page: Page,
-  parts: { dialog: string; table: string; picker: string },
+  parts: { dialog: string; table: string; picker: string; item: string },
 ): Promise<void> {
-  // by id, not by .sapMDialog: on a phone a Select's picker is a dialog of its
-  // own and stays in the DOM once it has been opened
+  // by id, not by .sapMDialog: on a phone a ComboBox's picker is a dialog of
+  // its own and stays in the DOM once it has been opened
   const dialog = page.locator(`[id$='${parts.dialog}']`);
   const rem = await page.evaluate(() =>
     parseFloat(getComputedStyle(document.documentElement).fontSize),
   );
 
-  // a field's width, bar the room the drop-down arrow takes
-  const itemField = dialog.locator(".sapMComboBox input").first();
+  // a field's width, bar the room the drop-down arrow takes. Both fields are
+  // ComboBoxes, and in the invoice dialog the recipient is the first of them,
+  // so each is addressed by its own id rather than by position
+  const itemField = dialog
+    .locator(`.sapMComboBox[id*='${parts.item}'] input[id$='-inner']`)
+    .first();
   await expect(itemField).toHaveValue(ITEM_NUMBER);
   expect(await widthOf(itemField), "the item number field is squeezed").toBeGreaterThan(12 * rem);
 
@@ -217,8 +221,8 @@ async function expectFieldsGetTheWidth(
 
   // and the recipient picker, measured the same way: at a fixed 12rem it showed
   // "Layout 17565..." and left the recipient of the next click a guess
-  const picker = dialog.locator(`.sapMSlt[id$='${parts.picker}']`);
-  await expect(picker).toHaveText(new RegExp(RECIPIENT_NAME));
+  const picker = dialog.locator(`.sapMComboBox[id$='${parts.picker}']`);
+  await expect(picker.locator("input[id$='-inner']")).toHaveValue(new RegExp(RECIPIENT_NAME));
   expect(await widthOf(picker), "the recipient picker is squeezed").toBeGreaterThan(20 * rem);
 }
 
@@ -234,17 +238,23 @@ test("graves: the create dialog spends its width on the fields", async ({ page }
   await dialog.getByRole("button", { name: "Zeile hinzufügen" }).click();
   // on a phone both pickers open as a full-screen dialog rather than a popover,
   // so the option is addressed by its role instead of by the popover's markup
-  await dialog.locator(".sapMComboBox .sapMInputBaseIconContainer").first().click();
+  await dialog
+    .locator(".sapMComboBox[id*='graveItem'] .sapMInputBaseIconContainer")
+    .first()
+    .click();
   await page.getByRole("option", { name: ITEM_NUMBER, exact: false }).click();
 
-  await dialog.locator(".sapMSlt[id$='linkRecipient']").click();
+  await dialog.locator(".sapMComboBox[id$='linkRecipient'] .sapMInputBaseIconContainer").click();
   await page.getByRole("option", { name: RECIPIENT_NAME, exact: false }).click();
+  // the pick lands after the click returns; "Hinzufügen" reads the draft
+  await expect(dialog.locator("input[id$='linkRecipient-inner']")).toHaveValue(RECIPIENT_NAME);
   await dialog.getByRole("button", { name: "Hinzufügen", exact: true }).click();
 
   await expectFieldsGetTheWidth(page, {
     dialog: "graveDialog",
     table: "graveItemsTable",
     picker: "linkRecipient",
+    item: "graveItem",
   });
 
   // this dialog carries a second table, and its own gutter check
@@ -274,17 +284,21 @@ test("invoices: the create dialog spends its width on the fields", async ({ page
   await waitForDialogOpen(page);
   const dialog = page.locator("[id$='invoiceDialog']");
 
-  await dialog.locator(".sapMSlt[id$='recipient']").click();
+  await dialog.locator(".sapMComboBox[id$='recipient'] .sapMInputBaseIconContainer").click();
   await page.getByRole("option", { name: RECIPIENT_NAME, exact: false }).click();
+  // the pick closes the picker and hands focus back afterwards; opening the
+  // item field into that would close its picker again
+  await expect(dialog.locator("input[id$='--recipient-inner']")).toHaveValue(RECIPIENT_NAME);
 
   // unlike the grave dialog this one opens with an empty line already in place
-  await dialog.locator(".sapMComboBox .sapMInputBaseIconContainer").first().click();
+  await dialog.locator(".sapMComboBox[id*='lineItem'] .sapMInputBaseIconContainer").first().click();
   await page.getByRole("option", { name: ITEM_NUMBER, exact: false }).click();
 
   await expectFieldsGetTheWidth(page, {
     dialog: "invoiceDialog",
     table: "lineTable",
     picker: "recipient",
+    item: "lineItem",
   });
 
   await dialog.getByRole("button", { name: "Abbrechen" }).click();

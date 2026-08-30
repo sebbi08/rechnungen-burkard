@@ -30,7 +30,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     const lines = invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
     this._invoiceDialog.setModel(
       new TypedJSONModel<InvoiceDraft>({
-        // the select matches its keys as strings
+        // the ComboBox matches its keys as strings
         recipientId: String(recipientId ?? newest ?? ""),
         invoiceId,
         lines,
@@ -135,7 +135,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       unitPrice: line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
     }));
 
-    // The select is bound two-way, so the draft holds the recipient the dialog
+    // The ComboBox is bound two-way, so the draft holds the recipient the dialog
     // is showing even though the dialog itself is built once and reused.
     const recipientId = Number(draft.recipientId);
 
@@ -194,7 +194,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
         Name: quick.name,
         Address: quick.address,
       });
-      // refresh the recipient select's list so the new row is included, then
+      // refresh the recipient ComboBox's list so the new row is included, then
       // select it in the parent invoice dialog, which stays open
       await this.refreshRecipients("recipient");
       this.draft().setProperty("/recipientId", String(id));
