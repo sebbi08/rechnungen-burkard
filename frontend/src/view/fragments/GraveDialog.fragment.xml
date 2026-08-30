@@ -79,8 +79,9 @@
                                         width="5rem"
                                         ariaLabel="{i18n>itemCount}"
                                     />
-                                    <!-- empty means "use the item's default price", which the
-                                         placeholder shows; a typed price overrides it -->
+                                    <!-- pre-filled with the item's default price, as in the
+                                         invoice dialog; clearing it means "use the item's
+                                         default price", which the placeholder shows -->
                                     <Input
                                         value="{graveDraft>unitPrice}"
                                         type="Number"
