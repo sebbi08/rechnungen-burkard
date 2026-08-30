@@ -9,4 +9,8 @@
     <ProjectReference Include="../Invoicing.Domain/Invoicing.Domain.csproj" />
     <PackageReference Include="QuestPDF" Version="2025.*" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/logo.png" />
+    <EmbeddedResource Include="Assets/rose.png" />
+  </ItemGroup>
 </Project>
