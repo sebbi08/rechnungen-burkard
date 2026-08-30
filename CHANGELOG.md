@@ -5,6 +5,11 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v1.0.1 — 2026-08-30
+
+### Fixes
+- serve every resource the UI5 build ships from the release image (cc69d42)
+
 ## v1.0.0 — 2026-08-29
 
 ### Features
