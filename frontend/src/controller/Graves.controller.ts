@@ -1,15 +1,11 @@
-import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
+import type { Button$PressEvent } from "sap/m/Button";
 import Dialog from "sap/m/Dialog";
 import MessageBox from "sap/m/MessageBox";
 import type { SearchField$SearchEvent } from "sap/m/SearchField";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
-import type {
-  GenerateDraft,
-  GravesStatus,
-  GravesView,
-} from "../model/state";
+import type { GenerateDraft, GravesStatus, GravesView } from "../model/state";
 import GraveEdit from "./GraveEdit.controller";
 
 export default class Graves extends GraveEdit {
@@ -22,11 +18,12 @@ export default class Graves extends GraveEdit {
     // the status endpoint rather than from a plain Graves list binding.
     this.setState<GravesStatus>("status", { graves: [] });
 
+    const currentHalfYear = `${new Date().getFullYear()}-${new Date().getMonth() < 6 ? 1 : 2}`;
     // half-year options are generated at runtime; default to the current
     // year's first half, matching the generate dialog's default half
     this.setState<GravesView>("view", {
       halfYearOptions: api.halfYearOptions(2, 1),
-      halfYear: `${new Date().getFullYear()}-1`,
+      halfYear: currentHalfYear,
     });
 
     void this.refreshStatus();
@@ -154,7 +151,9 @@ export default class Graves extends GraveEdit {
 
   public async onGenerateDialogSave(): Promise<void> {
     const draft = (
-      this._generateDialog.getModel("generateDraft") as TypedJSONModel<GenerateDraft>
+      this._generateDialog.getModel(
+        "generateDraft",
+      ) as TypedJSONModel<GenerateDraft>
     ).getData();
     const year = Number(draft.year);
     const half = Number(draft.half);
