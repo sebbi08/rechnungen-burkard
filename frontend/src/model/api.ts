@@ -245,6 +245,14 @@ export interface YearHalfOption {
   text: string;
 }
 
+/** The half-year today falls in: Jan-Jun is 1, Jul-Dec is 2. The graves
+ *  overview, the grave detail page and the generation dialog all open on it, so
+ *  they agree on which graves are still to be invoiced. */
+export function currentHalfYear(): [number, number] {
+  const now = new Date();
+  return [now.getFullYear(), now.getMonth() < 6 ? 1 : 2];
+}
+
 // Half-year keys ("2026-1", "2026-2") for the given year range, newest first.
 export function halfYearOptions(
   yearsBack: number,

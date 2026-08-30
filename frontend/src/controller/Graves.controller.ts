@@ -18,12 +18,13 @@ export default class Graves extends GraveEdit {
     // the status endpoint rather than from a plain Graves list binding.
     this.setState<GravesStatus>("status", { graves: [] });
 
-    const currentHalfYear = `${new Date().getFullYear()}-${new Date().getMonth() < 6 ? 1 : 2}`;
-    // half-year options are generated at runtime; default to the current
-    // year's first half, matching the generate dialog's default half
+    // half-year options are generated at runtime; default to the half-year today
+    // falls in, the one the generate dialog and the grave detail page also open
+    // on, so all three agree on which graves are still to be invoiced
+    const [year, half] = api.currentHalfYear();
     this.setState<GravesView>("view", {
       halfYearOptions: api.halfYearOptions(2, 1),
-      halfYear: currentHalfYear,
+      halfYear: `${year}-${half}`,
     });
 
     void this.refreshStatus();
@@ -137,12 +138,15 @@ export default class Graves extends GraveEdit {
       })) as Dialog;
     }
 
+    // year options are generated at runtime; the dialog opens on the half-year
+    // the toolbar shows, so a run without further input fills in the period the
+    // status column is reporting on
+    const [year, half] = api.currentHalfYear();
     this._generateDialog.setModel(
       new TypedJSONModel<GenerateDraft>({
-        // year options are generated at runtime; default to the current year
         yearOptions: api.yearOptions(1, 1),
-        year: String(new Date().getFullYear()),
-        half: "1",
+        year: String(year),
+        half: String(half),
       }),
       "generateDraft",
     );
