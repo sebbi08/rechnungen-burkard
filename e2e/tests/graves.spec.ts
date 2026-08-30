@@ -7,6 +7,13 @@ import { createRow, ensureRow } from "../seed";
 // collide with pre-existing rows or make assertions vacuous.
 const RUN = Date.now();
 
+// The overview toolbar and the generate dialog both open on the half-year today
+// falls in, so a generation started without further input lands here. Derived
+// from the same clock the app reads, not hardcoded, or every January would turn
+// this file red.
+const CURRENT_YEAR = new Date().getFullYear();
+const CURRENT_HALF = new Date().getMonth() < 6 ? 1 : 2;
+
 /** The item field's suggestion list: a StandardListItem inside a popover. The
  *  grave dialog's recipient select leaves its own options in the DOM, and those
  *  are sapMSelectListItem, so scoping here keeps the two apart.
@@ -135,14 +142,14 @@ interface PeriodInvoice {
   RecipientId: number;
 }
 
-/** Every grave invoice of the 2026 first half-year, paged past the service's
- *  200-row limit so the duplicate check sees all of them. */
+/** Every grave invoice of the half-year the generation above ran for, paged
+ *  past the service's 200-row limit so the duplicate check sees all of them. */
 async function periodInvoices(page: import("@playwright/test").Page): Promise<PeriodInvoice[]> {
   const pageSize = 200;
   const all: PeriodInvoice[] = [];
   for (let skip = 0; ; skip += pageSize) {
     const response = await page.request.get(
-      "/odata/Invoices?$filter=PeriodYear eq 2026 and PeriodHalf eq 1" +
+      `/odata/Invoices?$filter=PeriodYear eq ${CURRENT_YEAR} and PeriodHalf eq ${CURRENT_HALF}` +
         `&$select=GraveId,RecipientId&$orderby=Id&$top=${pageSize}&$skip=${skip}`,
     );
     const batch = (await response.json()).value as PeriodInvoice[];
@@ -597,4 +604,26 @@ test("the half-year status announces its meaning, not a validation error", async
   // in a hidden span, so this reads the markup rather than the visible text.
   const markup = await status.innerHTML();
   expect(markup).toContain("Rechnungen offen");
+});
+
+test("overview and generate dialog open on the half-year today falls in", async ({ page }) => {
+  await page.goto("/index.html#/graves");
+
+  await expect(page.locator(".sapMSlt[id$='halfYearSelect'] .sapMSltLabel")).toHaveText(
+    `H${CURRENT_HALF} ${CURRENT_YEAR}`,
+  );
+
+  // the two are asserted together on purpose: a dialog defaulting to another
+  // half-year still generates successfully, but leaves the status column the
+  // toolbar is showing red, which reads as a failed run
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForDialogOpen(page);
+  const dialog = page.locator(".sapMDialog");
+  await expect(dialog.locator(".sapMSlt[id$='genYear'] .sapMSltLabel")).toHaveText(
+    String(CURRENT_YEAR),
+  );
+  await expect(dialog.locator(".sapMSlt[id$='genHalf'] .sapMSltLabel")).toHaveText(
+    `H${CURRENT_HALF}`,
+  );
+  await page.getByRole("button", { name: "Abbrechen" }).click();
 });

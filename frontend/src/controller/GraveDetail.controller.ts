@@ -77,10 +77,7 @@ export default class GraveDetail extends GraveEdit {
         }),
       ]);
 
-      const now = new Date();
-      const year = now.getFullYear();
-      // a half-year is Jan–Jun or Jul–Dec
-      const half = now.getMonth() < 6 ? 1 : 2;
+      const [year, half] = api.currentHalfYear();
       const invoiced = runs.some((run) => Number(run.Year) === year && Number(run.Half) === half);
 
       this.setState<GraveDetailView>("grave", {
