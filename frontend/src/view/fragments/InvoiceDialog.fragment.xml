@@ -1,7 +1,9 @@
 <core:FragmentDefinition xmlns:core="sap.ui.core" xmlns="sap.m">
     <Dialog id="invoiceDialog" title="{i18n>createInvoice}" stretch="true">
         <content>
-            <VBox class="sapUiMediumMargin">
+            <!-- a 2rem margin around a stretched dialog spent 32 of a phone's 393
+                 pixels on each side before a field started -->
+            <VBox class="sapUiSmallMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
                 <HBox wrap="Wrap" alignItems="Center">
                     <!-- two-way, and forceSelection off: the draft is what the save
@@ -9,11 +11,17 @@
                          fallback would show a recipient the draft does not hold. -->
                     <Select
                         id="recipient"
-                        width="20rem"
+                        width="100%"
                         forceSelection="false"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                         selectedKey="{invoiceDraft>/recipientId}"
                     >
+                        <!-- names are long, so the select takes what the button leaves
+                             of the line rather than a fixed slice of it; on a phone the
+                             button wraps away and it gets the whole row -->
+                        <layoutData>
+                            <FlexItemData growFactor="1" baseSize="20rem" maxWidth="30rem" />
+                        </layoutData>
                         <core:Item key="{odata>Id}" text="{odata>Name}" />
                     </Select>
                     <Button
@@ -30,16 +38,24 @@
                     popinLayout="Block"
                 >
                     <columns>
-                        <Column importance="High">
+                        <!-- a field's width. Columns without one share the row evenly
+                             however long their content is, which left the number about
+                             ten characters — on every screen, not only a phone -->
+                        <Column width="16rem" importance="High">
                             <Text text="{i18n>itemNumber}" />
                         </Column>
-                        <Column importance="Medium" popinDisplay="Inline">
+                        <!-- as wide as the number, or in the pop-in: a description
+                             squeezed into a quarter of a tablet wraps over three lines
+                             and takes the number's room with it -->
+                        <Column importance="Medium" popinDisplay="Inline" autoPopinWidth="16">
                             <Text text="{i18n>itemDescription}" />
                         </Column>
-                        <Column importance="High" popinDisplay="Inline">
+                        <!-- both hold a short number, so they take a fixed slice
+                             instead of an equal share -->
+                        <Column width="6rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemCount}" />
                         </Column>
-                        <Column importance="High" popinDisplay="Inline">
+                        <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
                     </columns>
@@ -48,7 +64,7 @@
                             <cells>
                                 <ComboBox
                                     id="lineItem"
-                                    width="10rem"
+                                    width="100%"
                                     selectedKey="{invoiceDraft>itemId}"
                                     showSecondaryValues="true"
                                     items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
@@ -61,9 +77,12 @@
                                     />
                                 </ComboBox>
                                 <Text text="{invoiceDraft>description}" wrapping="true" />
+                                <!-- a width of their own, or the pop-in gives a count
+                                     the whole row to hold one digit -->
                                 <Input
                                     value="{invoiceDraft>count}"
                                     type="Number"
+                                    width="5rem"
                                     ariaLabel="{i18n>itemCount}"
                                 />
                                 <!-- pre-filled with the item's default price; clearing it or
@@ -71,6 +90,7 @@
                                 <Input
                                     value="{invoiceDraft>unitPrice}"
                                     type="Number"
+                                    width="7rem"
                                     placeholder="{invoiceDraft>defaultPrice}"
                                     ariaLabel="{i18n>itemPrice}"
                                 />

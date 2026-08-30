@@ -15,7 +15,9 @@
         initialFocus="graveInvoiceDialog"
     >
         <content>
-            <VBox class="sapUiMediumMargin">
+            <!-- a 2rem margin around a stretched dialog spent 32 of a phone's 393
+                 pixels on each side before a field started -->
+            <VBox class="sapUiSmallMargin">
                 <!-- an invoice per recipient is one grave bill split evenly, so an
                      edit is an edit to the bill: every recipient is revised -->
                 <MessageStrip
@@ -31,16 +33,24 @@
                     popinLayout="Block"
                 >
                     <columns>
-                        <Column importance="High">
+                        <!-- a field's width. Columns without one share the row evenly
+                             however long their content is, which with five of them left
+                             the number 75 pixels on a tablet — some eight characters -->
+                        <Column width="16rem" importance="High">
                             <Text text="{i18n>itemNumber}" />
                         </Column>
-                        <Column importance="Medium" popinDisplay="Inline">
+                        <!-- as wide as the number, or in the pop-in: a description
+                             squeezed into a fifth of a tablet wraps over three lines
+                             and takes the number's room with it -->
+                        <Column importance="Medium" popinDisplay="Inline" autoPopinWidth="16">
                             <Text text="{i18n>itemDescription}" />
                         </Column>
-                        <Column importance="High" popinDisplay="Inline">
+                        <!-- both hold a short number, so they take a fixed slice
+                             instead of an equal share -->
+                        <Column width="6rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemCount}" />
                         </Column>
-                        <Column importance="High" popinDisplay="Inline">
+                        <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
                         <Column importance="Low" popinDisplay="WithoutHeader" />
@@ -50,7 +60,7 @@
                             <cells>
                                 <ComboBox
                                     id="graveInvoiceItem"
-                                    width="10rem"
+                                    width="100%"
                                     selectedKey="{graveInvoiceDraft>itemId}"
                                     showSecondaryValues="true"
                                     items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"

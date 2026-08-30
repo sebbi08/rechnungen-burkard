@@ -513,6 +513,20 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   // it opens on the grave's price, not on the 50.00 share each recipient pays
   await expect(dialog.getByLabel("Preis")).toHaveValue("100");
 
+  // A layout check, which normally belongs to layout.spec.ts — but reaching this
+  // dialog needs a generated grave invoice, and GenerateGraveInvoices runs over
+  // every grave at once and refuses a second concurrent job, so generation stays
+  // in this file. The item's number field used to be a fixed 10rem inside a
+  // column that shares the row evenly with four others: 75px on a tablet, and
+  // still too narrow to hold a long number here on the desktop this test runs
+  // at. It has to be about as wide as its 16rem column, bar the arrow.
+  const numberField = dialog.locator("input[id*='graveInvoiceItem-'][id$='-inner']").first();
+  const rem = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.documentElement).fontSize),
+  );
+  const numberWidth = await numberField.evaluate((el) => el.getBoundingClientRect().width);
+  expect(numberWidth).toBeGreaterThan(12 * rem);
+
   await dialog.getByLabel("Preis").fill("200");
   await dialog.getByRole("button", { name: "Speichern" }).click();
 
