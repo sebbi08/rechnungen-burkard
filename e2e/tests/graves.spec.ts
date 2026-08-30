@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
@@ -14,16 +14,19 @@ const RUN = Date.now();
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_HALF = new Date().getMonth() < 6 ? 1 : 2;
 
-/** The item field's suggestion list: a StandardListItem inside a popover. The
- *  grave dialog's recipient select leaves its own options in the DOM, and those
- *  are sapMSelectListItem, so scoping here keeps the two apart.
+/**
+ * One field's suggestion rows. The item and recipient fields of the grave
+ * dialog are both ComboBoxes and both leave their list in the DOM after a pick,
+ * so naming the field keeps the two apart — a ComboBox renders its list as
+ * `<control id>-popup-list`. The item field sits in a table template and its id
+ * therefore carries a clone suffix, which is why the field name is matched
+ * anywhere in the id.
  */
-const SUGGESTION = "div.sapMPopover li.sapMSLI";
+function suggestions(page: Page, field: string): Locator {
+  return page.locator(`[id*='${field}'][id$='-popup-list'] li.sapMSLI`);
+}
 
-async function seedGraveGenerationData(
-  page: import("@playwright/test").Page,
-  count: number,
-): Promise<string> {
+async function seedGraveGenerationData(page: Page, count: number): Promise<string> {
   // VatRate 7 may already exist from previous runs; a 409 here is harmless.
   await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
@@ -144,7 +147,7 @@ interface PeriodInvoice {
 
 /** Every grave invoice of the half-year the generation above ran for, paged
  *  past the service's 200-row limit so the duplicate check sees all of them. */
-async function periodInvoices(page: import("@playwright/test").Page): Promise<PeriodInvoice[]> {
+async function periodInvoices(page: Page): Promise<PeriodInvoice[]> {
   const pageSize = 200;
   const all: PeriodInvoice[] = [];
   for (let skip = 0; ; skip += pageSize) {
@@ -197,16 +200,15 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
   await itemInput.click();
   await itemInput.fill(itemNumber);
-  await page.locator(SUGGESTION, { hasText: itemNumber }).click();
+  await suggestions(page, "graveItem").filter({ hasText: itemNumber }).click();
   await graveDialog.getByLabel("Anzahl").fill("2");
   await graveDialog.getByLabel("Preis").fill("55");
 
-  await page.locator(".sapMDialog .sapMSlt[id$='linkRecipient']").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", {
-      hasText: recipientName,
-    })
-    .click();
+  // the recipient field is the same typeahead as the item field above
+  const recipientInput = page.locator(".sapMDialog input[id$='--linkRecipient-inner']");
+  await recipientInput.click();
+  await recipientInput.fill(recipientName);
+  await suggestions(page, "linkRecipient").filter({ hasText: recipientName }).click();
   // "Hinzufügen" alone also matches the item table's "Zeile hinzufügen"
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   await expect(page.locator("[id$='graveRecipientsTable-listUl']")).toContainText(recipientName);
@@ -284,7 +286,7 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
   await itemInput.click();
   await itemInput.fill(noPriceItemNumber);
-  await page.locator(SUGGESTION, { hasText: noPriceItemNumber }).click();
+  await suggestions(page, "graveItem").filter({ hasText: noPriceItemNumber }).click();
 
   // no price anywhere: saving is rejected with the German "missing price" message
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -399,11 +401,7 @@ test("editing a grave warns about future invoices and freezes its recipients", a
  * caller uses a period no other test touches, so a run never collides with the
  * generation tests above or with another test's expectations.
  */
-async function generateFor(
-  page: import("@playwright/test").Page,
-  year: number,
-  half: number,
-): Promise<void> {
+async function generateFor(page: Page, year: number, half: number): Promise<void> {
   const response = await page.request.post("/odata/GenerateGraveInvoices", {
     data: { year, half },
   });
@@ -418,7 +416,7 @@ async function generateFor(
 
 /** A grave with one item at 100.00 and the given recipients, unique per run. */
 async function seedGrave(
-  page: import("@playwright/test").Page,
+  page: Page,
   marker: string,
   recipientNames: string[],
 ): Promise<{ graveId: number; recipientNames: string[] }> {

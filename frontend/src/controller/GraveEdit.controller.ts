@@ -2,7 +2,6 @@ import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
 import type { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Dialog from "sap/m/Dialog";
-import type { Select$ChangeEvent } from "sap/m/Select";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
 import type { DraftLine, GraveDraft, GraveInvoiceDraft, QuickRecipientDraft } from "../model/state";
@@ -24,7 +23,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       })) as Dialog;
     }
 
-    // the link select starts on whichever recipient this refreshed list shows first
+    // the link field starts on whichever recipient this refreshed list shows first
     const newest = await this.refreshRecipients("linkRecipient");
 
     // everything the dialog collects lives in this draft until it is saved, so
@@ -106,8 +105,8 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     model.setProperty("/Items", rows);
   }
 
-  public onLinkRecipientChange(event: Select$ChangeEvent): void {
-    // the select writes its key into the draft; keep the name it shows too, so
+  public onLinkRecipientSelected(event: ComboBox$SelectionChangeEvent): void {
+    // the ComboBox writes its key into the draft; keep the name it shows too, so
     // the added row can be labelled without looking the recipient up again
     const selected = event.getParameter("selectedItem");
     this.graveDraft().setProperty("/linkRecipientName", selected?.getText() ?? "");
@@ -133,7 +132,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     model.setProperty("/Recipients", rows);
   }
 
-  /** The name of a recipient the select shows but no change event named yet. */
+  /** The name of a recipient the field shows but no selection event named yet. */
   private async recipientName(recipientId: string): Promise<string> {
     const context = this.odata().bindContext(`/Recipients(${recipientId})`).getBoundContext();
     const row = (await context.requestObject()) as { Name: string };
@@ -226,7 +225,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         Name: quick.name,
         Address: quick.address,
       });
-      // refresh the link select's list so the new row is included, then select
+      // refresh the link ComboBox's list so the new row is included, then select
       // it; the parent grave dialog stays open
       await this.refreshRecipients("linkRecipient");
       const model = this.graveDraft();

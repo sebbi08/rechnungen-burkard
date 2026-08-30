@@ -4,18 +4,23 @@
             <VBox class="sapUiMediumMargin">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
                 <HBox wrap="Wrap" alignItems="Center">
-                    <!-- two-way, and forceSelection off: the draft is what the save
-                         reads, so the control must never select on its own. Its
-                         fallback would show a recipient the draft does not hold. -->
-                    <Select
+                    <!-- typeahead over the recipients, like the item field below.
+                         Two-way, and a ComboBox selects nothing on its own: the
+                         draft is what the save reads, so what is on screen is
+                         always what the draft holds. -->
+                    <ComboBox
                         id="recipient"
                         width="20rem"
-                        forceSelection="false"
+                        showSecondaryValues="true"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
                         selectedKey="{invoiceDraft>/recipientId}"
                     >
-                        <core:Item key="{odata>Id}" text="{odata>Name}" />
-                    </Select>
+                        <core:ListItem
+                            key="{odata>Id}"
+                            text="{odata>Name}"
+                            additionalText="{path: 'odata>Address', formatter: '.formatAddressLine'}"
+                        />
+                    </ComboBox>
                     <Button
                         text="{i18n>newRecipient}"
                         press=".onNewRecipient"

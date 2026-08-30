@@ -1,6 +1,6 @@
 import type ResourceBundle from "sap/base/i18n/ResourceBundle";
+import ComboBox from "sap/m/ComboBox";
 import Router from "sap/m/routing/Router";
-import Select from "sap/m/Select";
 import Controller from "sap/ui/core/mvc/Controller";
 import UIComponent from "sap/ui/core/UIComponent";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
@@ -70,23 +70,22 @@ export default abstract class BaseController extends Controller {
   }
 
   /**
-   * Re-reads a recipient select's list, waits for it, and answers which
-   * recipient a fresh draft should start on: the first row, which is the one
-   * the select displays because the list is ordered newest first.
+   * Re-reads a recipient ComboBox's list, waits for it, and answers which
+   * recipient a fresh draft should start on: the first row, which is the newest
+   * because the list is ordered that way.
    *
    * Both dialogs are built once and reused, so without the refresh the list is
    * the one loaded on their first open and a recipient created since is missing
    * from it. The default is taken from this same list rather than from a read of
    * its own: two reads can disagree if a recipient is created between them, and
-   * the draft would then name someone the select cannot show.
+   * the draft would then name someone the ComboBox cannot show.
    *
-   * A select's own fallback is no use here — UI5 does not write it into the
-   * bound model — which is why the application picks. This reaches a list
-   * binding rather than view state, so it takes a control id: no binding syntax
-   * expresses "reload now, and tell me when".
+   * A ComboBox selects nothing on its own, so this is the only thing that fills
+   * the field. It reaches a list binding rather than view state, so it takes a
+   * control id: no binding syntax expresses "reload now, and tell me when".
    */
-  protected async refreshRecipients(selectId: string): Promise<number | undefined> {
-    const binding = (this.byId(selectId) as Select).getBinding("items") as
+  protected async refreshRecipients(comboBoxId: string): Promise<number | undefined> {
+    const binding = (this.byId(comboBoxId) as ComboBox).getBinding("items") as
       ODataListBinding | undefined;
     if (!binding) {
       return undefined;
@@ -109,6 +108,15 @@ export default abstract class BaseController extends Controller {
     }
     const date = value instanceof Date ? value : new Date(value);
     return date.toLocaleDateString("de-DE");
+  }
+
+  /**
+   * The first line of a recipient's address, which the recipient ComboBoxes
+   * show as their secondary value. An address is stored as typed, over as many
+   * lines as the user wrote, and one line is all a suggestion row has space for.
+   */
+  public formatAddressLine(value: string | null | undefined): string {
+    return (value ?? "").split("\n")[0].trim();
   }
 
   /** The same locale formatDate uses, so amounts and dates read as one page. */

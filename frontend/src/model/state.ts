@@ -111,7 +111,7 @@ export interface GraveDraft {
   EndDate: string;
   Items: DraftLine[];
   Recipients: GraveRecipientRow[];
-  /** The select above the recipient list, before "add" moves it into Recipients. */
+  /** The ComboBox above the recipient list, before "add" moves it into Recipients. */
   linkRecipientId: string;
   linkRecipientName: string;
 }

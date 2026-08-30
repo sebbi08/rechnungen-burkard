@@ -35,11 +35,12 @@ So a spec that opens a dialog calls `waitForDialogOpen(page)` from
 `e2e/dialog.ts` before touching it. The helper explains the mechanism.
 
 One deliberate exception: `invoices.spec.ts` does not use it. The wait moves
-when that spec reads the recipient select's label, and "the second invoice goes
-to the recipient the reopened dialog shows" then fails about four runs in five
-— including with the recipient handling reverted to what it was before the
+when that spec reads the recipient the dialog shows, and "the second invoice
+goes to the recipient the reopened dialog shows" then fails about four runs in
+five — including with the recipient handling reverted to what it was before the
 model refactor, so the spec is sensitive to the timing rather than to the
-control. Leave it as it is.
+control. It stayed green through the recipient field's change from a Select to
+a ComboBox, so leave it as it is.
 
 ## Running the parts
 
