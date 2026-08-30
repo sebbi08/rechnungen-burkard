@@ -8,21 +8,36 @@ namespace Burkard.Invoicing.DocumentTests;
 public class CopyStampTests
 {
     // reuse a multi-page sample: many lines force > 1 page
-    private static InvoiceDocumentData MultiPageData() => new()
-    {
-        InvoiceNumber = "2026-0002",
-        GeneratedAt = new System.DateTime(2026, 2, 1, 0, 0, 0, System.DateTimeKind.Utc),
-        RecipientName = "Anna Beispiel",
-        RecipientAddress = "Hauptstraße 1\n99999 Musterdorf",
-        EndingText = "",
-        StampWord = "Kopie",
-        Lines = Enumerable.Range(1, 80).Select(i => new InvoiceDocumentData.LineData(
-            i, $"I-{i}", $"Leistung {i}", 1, 10.00m, 19.0m, 10.00m, 1.90m)).ToArray(),
-        VatSummaries = new[] { new InvoiceDocumentData.VatSummary(19.0m, 800.00m, 152.00m, 952.00m) },
-        NetTotal = 800.00m,
-        TotalVat = 152.00m,
-        GrossTotal = 952.00m,
-    };
+    private static InvoiceDocumentData MultiPageData() =>
+        new()
+        {
+            InvoiceNumber = "2026-0002",
+            GeneratedAt = new System.DateTime(2026, 2, 1, 0, 0, 0, System.DateTimeKind.Utc),
+            RecipientName = "Anna Beispiel",
+            RecipientAddress = "Hauptstraße 1\n99999 Musterdorf",
+            EndingText = "",
+            StampWord = "Kopie",
+            Lines = Enumerable
+                .Range(1, 80)
+                .Select(i => new InvoiceDocumentData.LineData(
+                    i,
+                    $"I-{i}",
+                    $"Leistung {i}",
+                    1,
+                    10.00m,
+                    19.0m,
+                    10.00m,
+                    1.90m
+                ))
+                .ToArray(),
+            VatSummaries = new[]
+            {
+                new InvoiceDocumentData.VatSummary(19.0m, 800.00m, 152.00m, 952.00m),
+            },
+            NetTotal = 800.00m,
+            TotalVat = 152.00m,
+            GrossTotal = 952.00m,
+        };
 
     [Fact]
     public void Copy_stamp_word_appears_on_every_page()

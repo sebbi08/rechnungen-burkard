@@ -1,8 +1,8 @@
+using System.Linq;
+using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.Extensions.DependencyInjection;
-using System.Linq;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;

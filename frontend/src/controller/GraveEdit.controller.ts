@@ -5,12 +5,7 @@ import Dialog from "sap/m/Dialog";
 import type { Select$ChangeEvent } from "sap/m/Select";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
-import type {
-  DraftLine,
-  GraveDraft,
-  GraveInvoiceDraft,
-  QuickRecipientDraft,
-} from "../model/state";
+import type { DraftLine, GraveDraft, GraveInvoiceDraft, QuickRecipientDraft } from "../model/state";
 import InvoiceRevisions from "./InvoiceRevisions.controller";
 
 /**
@@ -84,9 +79,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   public onGraveItemSelected(event: ComboBox$SelectionChangeEvent): void {
     // the ComboBox writes the key itself; fill in what the row shows alongside it
-    const itemContext = event
-      .getParameter("selectedItem")
-      ?.getBindingContext("odata");
+    const itemContext = event.getParameter("selectedItem")?.getBindingContext("odata");
     const rowContext = event.getSource().getBindingContext("graveDraft");
     if (!itemContext || !rowContext) {
       return;
@@ -94,10 +87,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
     const model = this.graveDraft();
     const row = Number(rowContext.getPath().split("/").pop());
-    model.setProperty(
-      `/Items/${row}/itemNumber`,
-      itemContext.getProperty("Number") as string,
-    );
+    model.setProperty(`/Items/${row}/itemNumber`, itemContext.getProperty("Number") as string);
     model.setProperty(
       `/Items/${row}/description`,
       itemContext.getProperty("Description") as string,
@@ -120,10 +110,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     // the select writes its key into the draft; keep the name it shows too, so
     // the added row can be labelled without looking the recipient up again
     const selected = event.getParameter("selectedItem");
-    this.graveDraft().setProperty(
-      "/linkRecipientName",
-      selected?.getText() ?? "",
-    );
+    this.graveDraft().setProperty("/linkRecipientName", selected?.getText() ?? "");
   }
 
   public async onAddRecipientLink(): Promise<void> {
@@ -148,9 +135,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   /** The name of a recipient the select shows but no change event named yet. */
   private async recipientName(recipientId: string): Promise<string> {
-    const context = this.odata().bindContext(
-      `/Recipients(${recipientId})`,
-    ).getBoundContext();
+    const context = this.odata().bindContext(`/Recipients(${recipientId})`).getBoundContext();
     const row = (await context.requestObject()) as { Name: string };
     return row.Name;
   }
@@ -203,10 +188,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           itemId: Number(row.itemId),
           count: Number(row.count),
           // a price of 0 is a real value, not a missing one
-          unitPrice:
-            row.unitPrice == null || row.unitPrice === ""
-              ? null
-              : Number(row.unitPrice),
+          unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
         })),
         recipientIds: draft.Recipients.map((row) => Number(row.recipientId)),
       });
@@ -237,9 +219,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   public async onQuickRecipientSave(): Promise<void> {
     const quick = (
-      this._quickDialog.getModel(
-        "quickRecipientDraft",
-      ) as TypedJSONModel<QuickRecipientDraft>
+      this._quickDialog.getModel("quickRecipientDraft") as TypedJSONModel<QuickRecipientDraft>
     ).getData();
     try {
       const id = await api.createRecipient({
@@ -311,9 +291,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
   public onGraveInvoiceItemSelected(event: ComboBox$SelectionChangeEvent): void {
     // the ComboBox writes the key itself; fill in what the row shows alongside it
-    const itemContext = event
-      .getParameter("selectedItem")
-      ?.getBindingContext("odata");
+    const itemContext = event.getParameter("selectedItem")?.getBindingContext("odata");
     const rowContext = event.getSource().getBindingContext("graveInvoiceDraft");
     if (!itemContext || !rowContext) {
       return;
@@ -321,17 +299,12 @@ export default abstract class GraveEdit extends InvoiceRevisions {
 
     const model = this.graveInvoiceDraft();
     const row = Number(rowContext.getPath().split("/").pop());
-    model.setProperty(
-      `/lines/${row}/itemNumber`,
-      itemContext.getProperty("Number") as string,
-    );
+    model.setProperty(`/lines/${row}/itemNumber`, itemContext.getProperty("Number") as string);
     model.setProperty(
       `/lines/${row}/description`,
       itemContext.getProperty("Description") as string,
     );
-    const defaultPrice = itemContext.getProperty("DefaultPrice") as
-      | number
-      | null;
+    const defaultPrice = itemContext.getProperty("DefaultPrice") as number | null;
     model.setProperty(`/lines/${row}/defaultPrice`, defaultPrice);
     model.setProperty(
       `/lines/${row}/unitPrice`,
@@ -370,10 +343,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       itemId: Number(row.itemId),
       count: Number(row.count),
       // a price of 0 is a real value, not a missing one
-      unitPrice:
-        row.unitPrice == null || row.unitPrice === ""
-          ? null
-          : Number(row.unitPrice),
+      unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
     }));
 
     // long-running task: a revision renders both documents for every recipient

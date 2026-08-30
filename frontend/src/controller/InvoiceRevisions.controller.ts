@@ -102,8 +102,7 @@ export default abstract class InvoiceRevisions extends BaseController {
         latest.PeriodYear != null && latest.PeriodHalf != null
           ? api.halfYearText(Number(latest.PeriodYear), Number(latest.PeriodHalf))
           : "",
-      sharePercent:
-        latest.SharePercent != null ? Number(latest.SharePercent) : null,
+      sharePercent: latest.SharePercent != null ? Number(latest.SharePercent) : null,
       revisions,
     };
   }

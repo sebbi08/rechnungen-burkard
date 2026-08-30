@@ -29,36 +29,29 @@ async function seedGraveGenerationData(
     data: { Rate: 7 },
   });
   const item = await createRow(page, "/odata/InvoiceItems", {
-        Number: `8001-${RUN}`,
-        Description: "Grabpflege",
-        VatRate: 7,
-        DefaultPrice: 100,
-      });
-  const recipient = await createRow(page, "/odata/Recipients", { Name: `Anna Beispiel ${RUN}`, Address: "Hauptstraße 1" });
+    Number: `8001-${RUN}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Anna Beispiel ${RUN}`,
+    Address: "Hauptstraße 1",
+  });
 
   // self-heal leftovers from interrupted runs: graves without item/recipient
   // links would be skipped by the generator and keep the duplicate check
   // (409 "bereits") from firing. Only the gaps are filled, so existing
   // grave totals are not inflated.
-  const itemLinks = await (
-    await page.request.get(
-      "/odata/GraveItems?$select=GraveId",
-    )
-  ).json();
+  const itemLinks = await (await page.request.get("/odata/GraveItems?$select=GraveId")).json();
   const recipientLinks = await (
-    await page.request.get(
-      "/odata/GraveRecipients?$select=GraveId",
-    )
+    await page.request.get("/odata/GraveRecipients?$select=GraveId")
   ).json();
-  const withItems = new Set<number>(
-    (itemLinks.value ?? []).map((link: any) => link.GraveId),
-  );
+  const withItems = new Set<number>((itemLinks.value ?? []).map((link: any) => link.GraveId));
   const withRecipients = new Set<number>(
     (recipientLinks.value ?? []).map((link: any) => link.GraveId),
   );
-  const existing = await (
-    await page.request.get("/odata/Graves?$select=Id")
-  ).json();
+  const existing = await (await page.request.get("/odata/Graves?$select=Id")).json();
   for (const grave of existing.value ?? []) {
     if (!withItems.has(grave.Id)) {
       await page.request.post("/odata/GraveItems", {
@@ -75,10 +68,10 @@ async function seedGraveGenerationData(
   const firstGraveNumber = `G-${RUN}-001`;
   for (let i = 1; i <= count; i++) {
     const grave = await createRow(page, "/odata/Graves", {
-          GraveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
-          StartDate: "2026-01-01",
-          EndDate: "2040-12-31",
-        });
+      GraveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
+      StartDate: "2026-01-01",
+      EndDate: "2040-12-31",
+    });
     await page.request.post("/odata/GraveItems", {
       data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
     });
@@ -109,9 +102,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
 
   // status column now shows graves as invoiced
   await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
-  await expect(
-    gravesTable.locator(".sapMObjStatus.sapMObjStatusSuccess").first(),
-  ).toBeVisible();
+  await expect(gravesTable.locator(".sapMObjStatus.sapMObjStatusSuccess").first()).toBeVisible();
 
   // dismiss the success message, then run the second generation
   await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
@@ -134,9 +125,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   const resultBox = page.locator(".sapMDialog.sapMMessageBox");
   await expect(resultBox).toBeVisible();
   const resultText = await resultBox.innerText();
-  expect(
-    resultText.includes("bereits") || resultText.includes("Erstellt"),
-  ).toBeTruthy();
+  expect(resultText.includes("bereits") || resultText.includes("Erstellt")).toBeTruthy();
   await page.locator(".sapMDialog").getByRole("button").first().click();
 
   // FR-027: no grave and recipient may end up with two invoices for the same
@@ -155,9 +144,7 @@ interface PeriodInvoice {
 
 /** Every grave invoice of the half-year the generation above ran for, paged
  *  past the service's 200-row limit so the duplicate check sees all of them. */
-async function periodInvoices(
-  page: import("@playwright/test").Page,
-): Promise<PeriodInvoice[]> {
+async function periodInvoices(page: import("@playwright/test").Page): Promise<PeriodInvoice[]> {
   const pageSize = 200;
   const all: PeriodInvoice[] = [];
   for (let skip = 0; ; skip += pageSize) {
@@ -173,9 +160,7 @@ async function periodInvoices(
   }
 }
 
-test("create a grave with item, price and recipient in one save (Story 5)", async ({
-  page,
-}) => {
+test("create a grave with item, price and recipient in one save (Story 5)", async ({ page }) => {
   const itemNumber = `8002-${RUN}`;
   const recipientName = `Bert Beispiel ${RUN}`;
   const graveNumber = `X-${RUN}`;
@@ -209,9 +194,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
 
   // the grave does not exist yet: item and recipient are collected in the dialog
   await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
-  const itemInput = page.locator(
-    ".sapMDialog input[id*='graveItem-'][id$='-inner']",
-  );
+  const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
   await itemInput.click();
   await itemInput.fill(itemNumber);
   await page.locator(SUGGESTION, { hasText: itemNumber }).click();
@@ -226,32 +209,24 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
     .click();
   // "Hinzufügen" alone also matches the item table's "Zeile hinzufügen"
   await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
-  await expect(
-    page.locator("[id$='graveRecipientsTable-listUl']"),
-  ).toContainText(recipientName);
+  await expect(page.locator("[id$='graveRecipientsTable-listUl']")).toContainText(recipientName);
 
   // nothing has been persisted so far — one save writes the grave and both links
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(gravesTable).toContainText(graveNumber);
 
   const graves = await (
-    await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`,
-    )
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`)
   ).json();
   const graveId = graves.value[0].Id;
   const links = await (
-    await page.request.get(
-      `/odata/GraveItems?$filter=GraveId eq ${graveId}`,
-    )
+    await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${graveId}`)
   ).json();
   expect(links.value).toHaveLength(1);
   expect(Number(links.value[0].Count)).toBe(2);
   expect(Number(links.value[0].UnitPrice)).toBe(55);
   const recipientLinks = await (
-    await page.request.get(
-      `/odata/GraveRecipients?$filter=GraveId eq ${graveId}`,
-    )
+    await page.request.get(`/odata/GraveRecipients?$filter=GraveId eq ${graveId}`)
   ).json();
   expect(recipientLinks.value).toHaveLength(1);
 
@@ -281,9 +256,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await page.getByRole("button", { name: "Abbrechen" }).click();
 });
 
-test("an item without a default price needs an explicit price (Story 6)", async ({
-  page,
-}) => {
+test("an item without a default price needs an explicit price (Story 6)", async ({ page }) => {
   const noPriceItemNumber = `NP-${RUN}`;
   const graveNumber = `NPG-${RUN}`;
   await page.request.post("/odata/VatRates", {
@@ -308,14 +281,10 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   await graveDialog.getByLabel("Beginn").fill("2026-01-01");
   await graveDialog.getByLabel("Ende").fill("2040-12-31");
   await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
-  const itemInput = page.locator(
-    ".sapMDialog input[id*='graveItem-'][id$='-inner']",
-  );
+  const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
   await itemInput.click();
   await itemInput.fill(noPriceItemNumber);
-  await page
-    .locator(SUGGESTION, { hasText: noPriceItemNumber })
-    .click();
+  await page.locator(SUGGESTION, { hasText: noPriceItemNumber }).click();
 
   // no price anywhere: saving is rejected with the German "missing price" message
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -330,34 +299,31 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   await expect(gravesTable).toContainText(graveNumber);
 
   const graves = await (
-    await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`,
-    )
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`)
   ).json();
   const links = await (
-    await page.request.get(
-      `/odata/GraveItems?$filter=GraveId eq ${graves.value[0].Id}`,
-    )
+    await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${graves.value[0].Id}`)
   ).json();
   expect(Number(links.value[0].UnitPrice)).toBe(40);
 });
 
-test("generation result names the skip reason for an unpriced item (Story 6)", async ({
-  page,
-}) => {
+test("generation result names the skip reason for an unpriced item (Story 6)", async ({ page }) => {
   const graveNumber = `SK-${RUN}`;
   const noPriceItem = await createRow(page, "/odata/InvoiceItems", {
-        Number: `SP-${RUN}`,
-        Description: "Ohne Preis",
-        VatRate: 7,
-        DefaultPrice: null,
-      });
-  const recipient = await createRow(page, "/odata/Recipients", { Name: `Skip Beispiel ${RUN}`, Address: "Kiesweg 3" });
+    Number: `SP-${RUN}`,
+    Description: "Ohne Preis",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Skip Beispiel ${RUN}`,
+    Address: "Kiesweg 3",
+  });
   const grave = await createRow(page, "/odata/Graves", {
-        GraveNumber: graveNumber,
-        StartDate: "2026-01-01",
-        EndDate: "2040-12-31",
-      });
+    GraveNumber: graveNumber,
+    StartDate: "2026-01-01",
+    EndDate: "2040-12-31",
+  });
   await page.request.post("/odata/GraveItems", {
     data: { GraveId: grave.Id, ItemId: noPriceItem.Id, Count: 1 },
   });
@@ -366,18 +332,13 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
   });
 
   // 2030 H2 is not used by the other tests, so no duplicate conflicts
-  const start = await page.request.post(
-    "/odata/GenerateGraveInvoices",
-    { data: { year: 2030, half: 2 } },
-  );
+  const start = await page.request.post("/odata/GenerateGraveInvoices", {
+    data: { year: 2030, half: 2 },
+  });
   const jobRef = await start.json();
   let job: any;
   for (let i = 0; i < 80; i++) {
-    job = await (
-      await page.request.get(
-        `/odata/Jobs(${jobRef.Id})`,
-      )
-    ).json();
+    job = await (await page.request.get(`/odata/Jobs(${jobRef.Id})`)).json();
     if (job.Status === "Succeeded" || job.Status === "Failed") {
       break;
     }
@@ -388,14 +349,24 @@ test("generation result names the skip reason for an unpriced item (Story 6)", a
   expect(job.ResultJson).toContain("ItemWithoutPrice");
 });
 
-test("editing a grave warns about future invoices and freezes its recipients", async ({
-  page,
-}) => {
+test("editing a grave warns about future invoices and freezes its recipients", async ({ page }) => {
   const marker = Date.now();
   await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  const item = await createRow(page, "/odata/InvoiceItems", { Number: `7100-${marker}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 });
-  const recipient = await createRow(page, "/odata/Recipients", { Name: `Fest ${marker}`, Address: "Festweg 1" });
-  const grave = await createRow(page, "/odata/Graves", { GraveNumber: `F-${marker}`, StartDate: "2026-01-01", EndDate: "2040-12-31" });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `7100-${marker}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Fest ${marker}`,
+    Address: "Festweg 1",
+  });
+  const grave = await createRow(page, "/odata/Graves", {
+    GraveNumber: `F-${marker}`,
+    StartDate: "2026-01-01",
+    EndDate: "2040-12-31",
+  });
   await page.request.post("/odata/GraveItems", {
     data: { GraveId: grave.Id, ItemId: item.Id, Count: 1 },
   });
@@ -439,11 +410,9 @@ async function generateFor(
   expect(response.status()).toBe(202);
   const job = await response.json();
   await expect
-    .poll(
-      async () =>
-        (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status,
-      { timeout: 90000 },
-    )
+    .poll(async () => (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status, {
+      timeout: 90000,
+    })
     .toBe("Succeeded");
 }
 
@@ -483,9 +452,7 @@ async function seedGrave(
   return { graveId: grave.Id, recipientNames };
 }
 
-test("the grave detail page shows the grave, its status and its invoices", async ({
-  page,
-}) => {
+test("the grave detail page shows the grave, its status and its invoices", async ({ page }) => {
   const marker = `GD-${Date.now()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
   const { graveId } = await seedGrave(page, marker, names);
@@ -551,14 +518,10 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   // only one recipient would fail this
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(2);
   await expect(invoicesTable.locator("tbody tr", { hasText: "R1" })).toHaveCount(2);
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: "107,00 €" }),
-  ).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "107,00 €" })).toHaveCount(2);
 });
 
-test("the grave list colours its status and offers the invoice mass download", async ({
-  page,
-}) => {
+test("the grave list colours its status and offers the invoice mass download", async ({ page }) => {
   const marker = `GL-${Date.now()}`;
   await seedGrave(page, marker, [`Liste ${marker}`]);
 
@@ -588,9 +551,7 @@ test("the grave list colours its status and offers the invoice mass download", a
   expect(download.suggestedFilename()).toBe("rechnungen.zip");
 });
 
-test("a grave invoice's detail page shows its revisions and its siblings", async ({
-  page,
-}) => {
+test("a grave invoice's detail page shows its revisions and its siblings", async ({ page }) => {
   const marker = `GI-${Date.now()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
   const { graveId } = await seedGrave(page, marker, names);
@@ -629,17 +590,13 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
 });
 
-test("the half-year status announces its meaning, not a validation error", async ({
-  page,
-}) => {
+test("the half-year status announces its meaning, not a validation error", async ({ page }) => {
   const marker = `GA-${Date.now()}`;
   await seedGrave(page, marker, [`Ansage ${marker}`]);
 
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
-  const status = gravesTable
-    .locator("tbody tr", { hasText: marker })
-    .locator(".sapMObjStatus");
+  const status = gravesTable.locator("tbody tr", { hasText: marker }).locator(".sapMObjStatus");
   await expect(status).toBeVisible();
 
   // The red state otherwise makes a screen reader call an open half-year an
@@ -649,14 +606,12 @@ test("the half-year status announces its meaning, not a validation error", async
   expect(markup).toContain("Rechnungen offen");
 });
 
-test("overview and generate dialog open on the half-year today falls in", async ({
-  page,
-}) => {
+test("overview and generate dialog open on the half-year today falls in", async ({ page }) => {
   await page.goto("/index.html#/graves");
 
-  await expect(
-    page.locator(".sapMSlt[id$='halfYearSelect'] .sapMSltLabel"),
-  ).toHaveText(`H${CURRENT_HALF} ${CURRENT_YEAR}`);
+  await expect(page.locator(".sapMSlt[id$='halfYearSelect'] .sapMSltLabel")).toHaveText(
+    `H${CURRENT_HALF} ${CURRENT_YEAR}`,
+  );
 
   // the two are asserted together on purpose: a dialog defaulting to another
   // half-year still generates successfully, but leaves the status column the
@@ -664,11 +619,11 @@ test("overview and generate dialog open on the half-year today falls in", async 
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
   await waitForDialogOpen(page);
   const dialog = page.locator(".sapMDialog");
-  await expect(
-    dialog.locator(".sapMSlt[id$='genYear'] .sapMSltLabel"),
-  ).toHaveText(String(CURRENT_YEAR));
-  await expect(
-    dialog.locator(".sapMSlt[id$='genHalf'] .sapMSltLabel"),
-  ).toHaveText(`H${CURRENT_HALF}`);
+  await expect(dialog.locator(".sapMSlt[id$='genYear'] .sapMSltLabel")).toHaveText(
+    String(CURRENT_YEAR),
+  );
+  await expect(dialog.locator(".sapMSlt[id$='genHalf'] .sapMSltLabel")).toHaveText(
+    `H${CURRENT_HALF}`,
+  );
   await page.getByRole("button", { name: "Abbrechen" }).click();
 });

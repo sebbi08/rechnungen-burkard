@@ -22,30 +22,46 @@ public class GraveInvoiceGroupController : ODataController
     [HttpGet("GraveInvoiceGroup")]
     public async Task<IActionResult> Group([FromQuery] long invoiceId)
     {
-        var invoice = await _db.Invoices.AsNoTracking()
+        var invoice = await _db
+            .Invoices.AsNoTracking()
             .FirstOrDefaultAsync(i => i.Id == invoiceId, HttpContext.RequestAborted);
         if (invoice is null)
         {
-            return NotFound(new
-            {
-                error = new { code = "InvoiceNotFound", message = "The invoice does not exist." }
-            });
+            return NotFound(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvoiceNotFound",
+                        message = "The invoice does not exist.",
+                    },
+                }
+            );
         }
 
         if (invoice.GraveId is null || invoice.PeriodYear is null || invoice.PeriodHalf is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "NotAGraveInvoice", message = "The invoice does not belong to a grave." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "NotAGraveInvoice",
+                        message = "The invoice does not belong to a grave.",
+                    },
+                }
+            );
         }
 
-        var siblings = await _db.Invoices.AsNoTracking()
+        var siblings = await _db
+            .Invoices.AsNoTracking()
             .Include(i => i.Lines)
-            .Where(i => i.GraveId == invoice.GraveId
-                        && i.PeriodYear == invoice.PeriodYear
-                        && i.PeriodHalf == invoice.PeriodHalf
-                        && i.IsLatestRevision)
+            .Where(i =>
+                i.GraveId == invoice.GraveId
+                && i.PeriodYear == invoice.PeriodYear
+                && i.PeriodHalf == invoice.PeriodHalf
+                && i.IsLatestRevision
+            )
             .OrderBy(i => i.RecipientName)
             .ThenBy(i => i.Id)
             .ToListAsync(HttpContext.RequestAborted);
@@ -61,26 +77,31 @@ public class GraveInvoiceGroupController : ODataController
         // is reported instead of risking a wrong or crashing reconstruction.
         if (orderedLines.Select(lines => lines.Count).Distinct().Count() > 1)
         {
-            return BadRequest(new
-            {
-                error = new
+            return BadRequest(
+                new
                 {
-                    code = "GraveInvoiceGroupInconsistent",
-                    message = "The invoices of this grave and half-year do not carry the same lines.",
+                    error = new
+                    {
+                        code = "GraveInvoiceGroupInconsistent",
+                        message = "The invoices of this grave and half-year do not carry the same lines.",
+                    },
                 }
-            });
+            );
         }
 
-        var graveNumber = await _db.Graves.AsNoTracking()
+        var graveNumber = await _db
+            .Graves.AsNoTracking()
             .Where(g => g.Id == invoice.GraveId)
             .Select(g => g.GraveNumber)
             .FirstOrDefaultAsync(HttpContext.RequestAborted);
         if (graveNumber is null)
         {
-            return NotFound(new
-            {
-                error = new { code = "GraveNotFound", message = "The grave does not exist." }
-            });
+            return NotFound(
+                new
+                {
+                    error = new { code = "GraveNotFound", message = "The grave does not exist." },
+                }
+            );
         }
 
         var value = new
@@ -94,12 +115,21 @@ public class GraveInvoiceGroupController : ODataController
             // currently-shown invoice out of the list.
             Recipients = siblings.Select(s => new
             {
-                Id = s.RecipientId, Name = s.RecipientName, InvoiceId = s.Id, RootId = s.RootId,
+                Id = s.RecipientId,
+                Name = s.RecipientName,
+                InvoiceId = s.Id,
+                RootId = s.RootId,
             }),
-            Lines = GraveLines(orderedLines).Select(l => new
-            {
-                l.ItemId, l.ItemNumber, l.Description, l.Count, l.UnitPrice, l.VatRate,
-            }),
+            Lines = GraveLines(orderedLines)
+                .Select(l => new
+                {
+                    l.ItemId,
+                    l.ItemNumber,
+                    l.Description,
+                    l.Count,
+                    l.UnitPrice,
+                    l.VatRate,
+                }),
         };
 
         return new JsonResult(value, ODataJsonDefaults.PascalCase);
@@ -112,14 +142,22 @@ public class GraveInvoiceGroupController : ODataController
     /// revised on its own through the ordinary CreateRevision path never sets it.
     /// Any sibling missing it, and pre-migration rows in general, are reconstructed
     /// from the recipients' shares, which is best-effort.</summary>
-    private static IReadOnlyList<GraveLine> GraveLines(IReadOnlyList<IReadOnlyList<InvoiceLine>> orderedLines)
+    private static IReadOnlyList<GraveLine> GraveLines(
+        IReadOnlyList<IReadOnlyList<InvoiceLine>> orderedLines
+    )
     {
         var reference = orderedLines[0];
         if (orderedLines.All(lines => lines.All(l => l.GraveUnitPrice is not null)))
         {
             return reference
-                .Select(l => new GraveLine(l.ItemId ?? 0, l.ItemNumber, l.Description,
-                    l.Count, l.GraveUnitPrice!.Value, l.VatRate))
+                .Select(l => new GraveLine(
+                    l.ItemId ?? 0,
+                    l.ItemNumber,
+                    l.Description,
+                    l.Count,
+                    l.GraveUnitPrice!.Value,
+                    l.VatRate
+                ))
                 .ToList();
         }
 

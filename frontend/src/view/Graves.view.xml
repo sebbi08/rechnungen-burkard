@@ -1,12 +1,26 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Graves" displayBlock="true">
-    <Page title="{i18n>menuGraves}" titleLevel="H1" showNavButton="true"
-        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core"
+    controllerName="burkard.invoicing.controller.Graves"
+    displayBlock="true"
+>
+    <Page
+        title="{i18n>menuGraves}"
+        titleLevel="H1"
+        showNavButton="true"
+        navButtonPress=".onNavBack"
+        class="sapUiResponsiveContentPadding"
+    >
         <subHeader>
             <!-- the half-year label and its select share a group so they always
                  move into the "..." menu together -->
             <OverflowToolbar id="gravesToolbar">
-                <SearchField width="16rem" search=".onSearchGraves" placeholder="{i18n>searchGrave}">
+                <SearchField
+                    width="16rem"
+                    search=".onSearchGraves"
+                    placeholder="{i18n>searchGrave}"
+                >
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
@@ -16,8 +30,13 @@
                         <OverflowToolbarLayoutData priority="Low" group="1" />
                     </layoutData>
                 </Label>
-                <Select id="halfYearSelect" width="10rem" change=".onHalfYearChange"
-                    items="{view>/halfYearOptions}" selectedKey="{view>/halfYear}">
+                <Select
+                    id="halfYearSelect"
+                    width="10rem"
+                    change=".onHalfYearChange"
+                    items="{view>/halfYearOptions}"
+                    selectedKey="{view>/halfYear}"
+                >
                     <core:Item key="{view>key}" text="{view>text}" />
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" group="1" />
@@ -34,7 +53,11 @@
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
                 </Button>
-                <Button text="{i18n>generateInvoices}" press=".onGenerateInvoices" type="Emphasized">
+                <Button
+                    text="{i18n>generateInvoices}"
+                    press=".onGenerateInvoices"
+                    type="Emphasized"
+                >
                     <layoutData>
                         <OverflowToolbarLayoutData priority="High" />
                     </layoutData>
@@ -44,36 +67,58 @@
         <content>
             <!-- rows come from the half-year status endpoint, which lists the graves
                  still open for the selected half-year first (FR-028) -->
-            <Table id="gravesTable" class="sapUiSmallMarginTop"
-                autoPopinMode="true" popinLayout="Block"
+            <Table
+                id="gravesTable"
+                class="sapUiSmallMarginTop"
+                autoPopinMode="true"
+                popinLayout="Block"
                 items="{status>/graves}"
-                noDataText="{i18n>noData}">
-                        <columns>
-                            <Column importance="High"><Text text="{i18n>graveNumber}" /></Column>
-                            <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>startDate}" /></Column>
-                            <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>endDate}" /></Column>
-                            <Column importance="High" popinDisplay="Inline"><Text text="{i18n>invoicingStatus}" /></Column>
-                            <Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
-                        </columns>
-                        <items>
-                            <ColumnListItem>
-                                <cells>
-                                    <Text text="{status>GraveNumber}" />
-                                    <Text text="{path: 'status>StartDate', formatter: '.formatDate'}" />
-                                    <Text text="{path: 'status>EndDate', formatter: '.formatDate'}" />
-                                    <ObjectStatus text="{path: 'status>Invoiced', formatter: '.statusFormatter'}"
-                                        stateAnnouncementText="{path: 'status>Invoiced', formatter: '.statusAnnouncement'}"
-                                        state="{= ${status>Invoiced} ? 'Success' : 'Error' }"
-                                        icon="{= ${status>Invoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
-                                    <HBox wrap="Wrap">
-                                        <Button icon="sap-icon://detail-view" type="Transparent"
-                                            tooltip="{i18n>actionDetails}" press=".onShowGraveDetails" />
-                                        <Button icon="sap-icon://edit" type="Transparent"
-                                            tooltip="{i18n>actionEdit}" press=".onEditGrave" />
-                                    </HBox>
-                                </cells>
-                            </ColumnListItem>
-                        </items>
+                noDataText="{i18n>noData}"
+            >
+                <columns>
+                    <Column importance="High">
+                        <Text text="{i18n>graveNumber}" />
+                    </Column>
+                    <Column importance="Low" popinDisplay="Inline">
+                        <Text text="{i18n>startDate}" />
+                    </Column>
+                    <Column importance="Low" popinDisplay="Inline">
+                        <Text text="{i18n>endDate}" />
+                    </Column>
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>invoicingStatus}" />
+                    </Column>
+                    <Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
+                </columns>
+                <items>
+                    <ColumnListItem>
+                        <cells>
+                            <Text text="{status>GraveNumber}" />
+                            <Text text="{path: 'status>StartDate', formatter: '.formatDate'}" />
+                            <Text text="{path: 'status>EndDate', formatter: '.formatDate'}" />
+                            <ObjectStatus
+                                text="{path: 'status>Invoiced', formatter: '.statusFormatter'}"
+                                stateAnnouncementText="{path: 'status>Invoiced', formatter: '.statusAnnouncement'}"
+                                state="{= ${status>Invoiced} ? 'Success' : 'Error' }"
+                                icon="{= ${status>Invoiced} ? 'sap-icon://accept' : 'sap-icon://error' }"
+                            />
+                            <HBox wrap="Wrap">
+                                <Button
+                                    icon="sap-icon://detail-view"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionDetails}"
+                                    press=".onShowGraveDetails"
+                                />
+                                <Button
+                                    icon="sap-icon://edit"
+                                    type="Transparent"
+                                    tooltip="{i18n>actionEdit}"
+                                    press=".onEditGrave"
+                                />
+                            </HBox>
+                        </cells>
+                    </ColumnListItem>
+                </items>
             </Table>
         </content>
     </Page>

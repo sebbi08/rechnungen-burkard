@@ -7,7 +7,10 @@ namespace Burkard.Invoicing.Api.Services.Import;
 /// several lines, so quoted line breaks must survive a round trip.</summary>
 public static class Csv
 {
-    public static string Write(IReadOnlyList<string> header, IEnumerable<IReadOnlyList<string>> rows)
+    public static string Write(
+        IReadOnlyList<string> header,
+        IEnumerable<IReadOnlyList<string>> rows
+    )
     {
         var builder = new StringBuilder();
         AppendRow(builder, header);
@@ -100,7 +103,8 @@ public static class Csv
     {
         for (var i = 0; i < row.Count; i++)
         {
-            if (i > 0) builder.Append(',');
+            if (i > 0)
+                builder.Append(',');
             builder.Append(Escape(row[i]));
         }
 

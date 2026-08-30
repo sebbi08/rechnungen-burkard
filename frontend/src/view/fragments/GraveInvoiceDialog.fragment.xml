@@ -8,48 +8,89 @@
          breaks getByLabel("Preis") by matching the row as well as the input. Focusing
          the dialog itself (its own documented no-target fallback) keeps focus out of
          the table until the user actually interacts with it. -->
-    <Dialog id="graveInvoiceDialog" title="{i18n>graveInvoiceEditTitle}" stretch="true"
-        initialFocus="graveInvoiceDialog">
+    <Dialog
+        id="graveInvoiceDialog"
+        title="{i18n>graveInvoiceEditTitle}"
+        stretch="true"
+        initialFocus="graveInvoiceDialog"
+    >
         <content>
             <VBox class="sapUiMediumMargin">
                 <!-- an invoice per recipient is one grave bill split evenly, so an
                      edit is an edit to the bill: every recipient is revised -->
-                <MessageStrip type="Warning" showIcon="true" class="sapUiSmallMarginBottom"
-                    text="{graveInvoiceDraft>/warning}" />
-                <Table id="graveInvoiceLineTable" items="{graveInvoiceDraft>/lines}"
-                    autoPopinMode="true" popinLayout="Block">
+                <MessageStrip
+                    type="Warning"
+                    showIcon="true"
+                    class="sapUiSmallMarginBottom"
+                    text="{graveInvoiceDraft>/warning}"
+                />
+                <Table
+                    id="graveInvoiceLineTable"
+                    items="{graveInvoiceDraft>/lines}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>itemNumber}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>itemDescription}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemCount}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemPrice}" />
+                        </Column>
                         <Column importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <ComboBox id="graveInvoiceItem" width="10rem"
+                                <ComboBox
+                                    id="graveInvoiceItem"
+                                    width="10rem"
                                     selectedKey="{graveInvoiceDraft>itemId}"
                                     showSecondaryValues="true"
                                     items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
-                                    selectionChange=".onGraveInvoiceItemSelected">
-                                    <core:ListItem key="{odata>Id}"
-                                        text="{odata>Number}" additionalText="{odata>Description}" />
+                                    selectionChange=".onGraveInvoiceItemSelected"
+                                >
+                                    <core:ListItem
+                                        key="{odata>Id}"
+                                        text="{odata>Number}"
+                                        additionalText="{odata>Description}"
+                                    />
                                 </ComboBox>
                                 <Text text="{graveInvoiceDraft>description}" wrapping="true" />
                                 <!-- the grave's count and price, before the split -->
-                                <Input value="{graveInvoiceDraft>count}" type="Number" width="5rem"
-                                    ariaLabel="{i18n>itemCount}" />
-                                <Input value="{graveInvoiceDraft>unitPrice}" type="Number" width="7rem"
-                                    placeholder="{graveInvoiceDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
-                                <Button text="{i18n>delete}" press=".onDeleteGraveInvoiceLine"
-                                    type="Transparent" />
+                                <Input
+                                    value="{graveInvoiceDraft>count}"
+                                    type="Number"
+                                    width="5rem"
+                                    ariaLabel="{i18n>itemCount}"
+                                />
+                                <Input
+                                    value="{graveInvoiceDraft>unitPrice}"
+                                    type="Number"
+                                    width="7rem"
+                                    placeholder="{graveInvoiceDraft>defaultPrice}"
+                                    ariaLabel="{i18n>itemPrice}"
+                                />
+                                <Button
+                                    text="{i18n>delete}"
+                                    press=".onDeleteGraveInvoiceLine"
+                                    type="Transparent"
+                                />
                             </cells>
                         </ColumnListItem>
                     </items>
                 </Table>
-                <Button text="{i18n>addLine}" press=".onAddGraveInvoiceLine"
-                    class="sapUiSmallMarginTop" />
+                <Button
+                    text="{i18n>addLine}"
+                    press=".onAddGraveInvoiceLine"
+                    class="sapUiSmallMarginTop"
+                />
             </VBox>
         </content>
         <beginButton>

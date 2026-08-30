@@ -7,39 +7,73 @@
                     <!-- two-way, and forceSelection off: the draft is what the save
                          reads, so the control must never select on its own. Its
                          fallback would show a recipient the draft does not hold. -->
-                    <Select id="recipient" width="20rem" forceSelection="false"
+                    <Select
+                        id="recipient"
+                        width="20rem"
+                        forceSelection="false"
                         items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
-                        selectedKey="{invoiceDraft>/recipientId}">
+                        selectedKey="{invoiceDraft>/recipientId}"
+                    >
                         <core:Item key="{odata>Id}" text="{odata>Name}" />
                     </Select>
-                    <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent"
-                        class="sapUiTinyMarginBegin" />
+                    <Button
+                        text="{i18n>newRecipient}"
+                        press=".onNewRecipient"
+                        type="Transparent"
+                        class="sapUiTinyMarginBegin"
+                    />
                 </HBox>
-                <Table id="lineTable" items="{invoiceDraft>/lines}"
-                    autoPopinMode="true" popinLayout="Block">
+                <Table
+                    id="lineTable"
+                    items="{invoiceDraft>/lines}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>itemNumber}" />
+                        </Column>
+                        <Column importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>itemDescription}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemCount}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>itemPrice}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <ComboBox id="lineItem" width="10rem"
+                                <ComboBox
+                                    id="lineItem"
+                                    width="10rem"
                                     selectedKey="{invoiceDraft>itemId}"
                                     showSecondaryValues="true"
                                     items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
-                                    selectionChange=".onLineItemSelected">
-                                        <core:ListItem key="{odata>Id}"
-                                            text="{odata>Number}" additionalText="{odata>Description}"/>
+                                    selectionChange=".onLineItemSelected"
+                                >
+                                    <core:ListItem
+                                        key="{odata>Id}"
+                                        text="{odata>Number}"
+                                        additionalText="{odata>Description}"
+                                    />
                                 </ComboBox>
                                 <Text text="{invoiceDraft>description}" wrapping="true" />
-                                <Input value="{invoiceDraft>count}" type="Number" ariaLabel="{i18n>itemCount}" />
+                                <Input
+                                    value="{invoiceDraft>count}"
+                                    type="Number"
+                                    ariaLabel="{i18n>itemCount}"
+                                />
                                 <!-- pre-filled with the item's default price; clearing it or
                                      typing another one overrides it for this invoice -->
-                                <Input value="{invoiceDraft>unitPrice}" type="Number"
-                                    placeholder="{invoiceDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
+                                <Input
+                                    value="{invoiceDraft>unitPrice}"
+                                    type="Number"
+                                    placeholder="{invoiceDraft>defaultPrice}"
+                                    ariaLabel="{i18n>itemPrice}"
+                                />
                             </cells>
                         </ColumnListItem>
                     </items>

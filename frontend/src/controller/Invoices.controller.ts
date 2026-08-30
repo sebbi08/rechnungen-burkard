@@ -46,9 +46,7 @@ export default class Invoices extends InvoiceEdit {
     const term = event.getParameter("query") ?? "";
     // `search` is a custom query option on the list binding rather than view
     // state, and no binding syntax expresses it, so this reaches the control.
-    const binding = (this.byId("invoicesTable") as Table).getBinding(
-      "items",
-    ) as ODataListBinding;
+    const binding = (this.byId("invoicesTable") as Table).getBinding("items") as ODataListBinding;
     binding.changeParameters({ search: term });
   }
 

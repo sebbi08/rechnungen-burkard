@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using Burkard.Invoicing.Api;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
@@ -5,9 +8,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.IO;
-using System.Linq;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
@@ -27,7 +27,9 @@ public class ApiTestHost : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.Single(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+            var descriptor = services.Single(d =>
+                d.ServiceType == typeof(DbContextOptions<AppDbContext>)
+            );
             services.Remove(descriptor);
             services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
             services.AddSingleton<IJobHandler, TestJobHandler>();
@@ -37,6 +39,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (File.Exists(_dbFile)) File.Delete(_dbFile);
+        if (File.Exists(_dbFile))
+            File.Delete(_dbFile);
     }
 }

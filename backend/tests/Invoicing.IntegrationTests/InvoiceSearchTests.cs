@@ -12,8 +12,12 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class InvoiceSearchTests
 {
-    private static InvoiceSearch.Row Row(string number = "2026-0001", string name = "Familie Müller",
-        string address = "Hauptstraße 1\n12345 Musterstadt", decimal gross = 214.00m) =>
+    private static InvoiceSearch.Row Row(
+        string number = "2026-0001",
+        string name = "Familie Müller",
+        string address = "Hauptstraße 1\n12345 Musterstadt",
+        decimal gross = 214.00m
+    ) =>
         new(1, number, name, address, new DateTime(2026, 3, 14, 10, 0, 0, DateTimeKind.Utc), gross);
 
     [Theory]
@@ -64,9 +68,25 @@ public class InvoiceSearchTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "4001", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-        var mueller = new Recipient { Number = "E-0001", Name = "Familie Müller", Address = "Hauptstraße 1" };
-        var schmidt = new Recipient { Number = "E-0002", Name = "Familie Schmidt", Address = "Nebenweg 2" };
+        var item = new InvoiceItem
+        {
+            Number = "4001",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 100m,
+        };
+        var mueller = new Recipient
+        {
+            Number = "E-0001",
+            Name = "Familie Müller",
+            Address = "Hauptstraße 1",
+        };
+        var schmidt = new Recipient
+        {
+            Number = "E-0002",
+            Name = "Familie Schmidt",
+            Address = "Nebenweg 2",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.AddRange(mueller, schmidt);
         await db.SaveChangesAsync();
@@ -74,19 +94,35 @@ public class InvoiceSearchTests
         using var client = host.CreateClient();
         foreach (var recipient in new[] { mueller, schmidt })
         {
-            var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-            {
-                recipientId = recipient.Id,
-                lines = new[] { new { itemId = item.Id, count = 2, unitPrice = (decimal?)null } },
-            }));
+            var created = await client.PostAsync(
+                "/odata/CreateInvoice",
+                ODataJson.Body(
+                    new
+                    {
+                        recipientId = recipient.Id,
+                        lines = new[]
+                        {
+                            new
+                            {
+                                itemId = item.Id,
+                                count = 2,
+                                unitPrice = (decimal?)null,
+                            },
+                        },
+                    }
+                )
+            );
             created.EnsureSuccessStatusCode();
         }
 
         var response = await client.GetAsync("/odata/Invoices?search=m%C3%BCller");
         response.EnsureSuccessStatusCode();
         using var json = await ODataJson.ReadAsync(response);
-        var names = json.RootElement.GetProperty("value").EnumerateArray()
-            .Select(i => i.GetProperty("RecipientName").GetString()).ToList();
+        var names = json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(i => i.GetProperty("RecipientName").GetString())
+            .ToList();
         Assert.Equal(new[] { "Familie Müller" }, names);
     }
 
@@ -97,8 +133,19 @@ public class InvoiceSearchTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "4002", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-        var recipient = new Recipient { Number = "E-0003", Name = "Familie Beispiel", Address = "Weg 3" };
+        var item = new InvoiceItem
+        {
+            Number = "4002",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 100m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0003",
+            Name = "Familie Beispiel",
+            Address = "Weg 3",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
@@ -106,16 +153,30 @@ public class InvoiceSearchTests
         using var client = host.CreateClient();
         for (var i = 0; i < 3; i++)
         {
-            var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-            {
-                recipientId = recipient.Id,
-                lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-            }));
+            var created = await client.PostAsync(
+                "/odata/CreateInvoice",
+                ODataJson.Body(
+                    new
+                    {
+                        recipientId = recipient.Id,
+                        lines = new[]
+                        {
+                            new
+                            {
+                                itemId = item.Id,
+                                count = 1,
+                                unitPrice = (decimal?)null,
+                            },
+                        },
+                    }
+                )
+            );
             created.EnsureSuccessStatusCode();
         }
 
         var response = await client.GetAsync(
-            "/odata/Invoices?search=Beispiel&$filter=GraveId eq null&$orderby=Id desc&$top=2");
+            "/odata/Invoices?search=Beispiel&$filter=GraveId eq null&$orderby=Id desc&$top=2"
+        );
         response.EnsureSuccessStatusCode();
         using var json = await ODataJson.ReadAsync(response);
         Assert.Equal(2, json.RootElement.GetProperty("value").GetArrayLength());
@@ -128,18 +189,42 @@ public class InvoiceSearchTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.VatRates.Add(new VatRate { Rate = 7m });
-        var item = new InvoiceItem { Number = "4003", Description = "Grabpflege", VatRate = 7m, DefaultPrice = 100m };
-        var recipient = new Recipient { Number = "E-0004", Name = "Familie Beispiel", Address = "Weg 4" };
+        var item = new InvoiceItem
+        {
+            Number = "4003",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 100m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0004",
+            Name = "Familie Beispiel",
+            Address = "Weg 4",
+        };
         db.InvoiceItems.Add(item);
         db.Recipients.Add(recipient);
         await db.SaveChangesAsync();
 
         using var client = host.CreateClient();
-        var created = await client.PostAsync("/odata/CreateInvoice", ODataJson.Body(new
-        {
-            recipientId = recipient.Id,
-            lines = new[] { new { itemId = item.Id, count = 1, unitPrice = (decimal?)null } },
-        }));
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
         created.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync("/odata/Invoices?search=");

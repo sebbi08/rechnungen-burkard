@@ -31,14 +31,15 @@ public class GravesController : ODataController
     // would produce for $expand=Items($expand=Item),Recipients($expand=Recipient).
     public IActionResult Get([FromRoute] long key)
     {
-        var grave = _db.Graves
-            .Include(g => g.Items)
+        var grave = _db
+            .Graves.Include(g => g.Items)
                 .ThenInclude(i => i.Item)
             .Include(g => g.Recipients)
                 .ThenInclude(r => r.Recipient)
             .AsNoTracking()
             .FirstOrDefault(g => g.Id == key);
-        if (grave is null) return NotFound();
+        if (grave is null)
+            return NotFound();
 
         var result = new
         {
@@ -47,18 +48,34 @@ public class GravesController : ODataController
             grave.StartDate,
             grave.EndDate,
             grave.CreatedAt,
-            Items = grave.Items.Select(i => new
-            {
-                i.Id,
-                i.Count,
-                i.UnitPrice,
-                Item = new { i.Item.Id, i.Item.Number, i.Item.Description, i.Item.DefaultPrice, i.Item.VatRate },
-            }).ToList(),
-            Recipients = grave.Recipients.Select(r => new
-            {
-                r.Id,
-                Recipient = new { r.Recipient.Id, r.Recipient.Name, r.Recipient.Address },
-            }).ToList(),
+            Items = grave
+                .Items.Select(i => new
+                {
+                    i.Id,
+                    i.Count,
+                    i.UnitPrice,
+                    Item = new
+                    {
+                        i.Item.Id,
+                        i.Item.Number,
+                        i.Item.Description,
+                        i.Item.DefaultPrice,
+                        i.Item.VatRate,
+                    },
+                })
+                .ToList(),
+            Recipients = grave
+                .Recipients.Select(r => new
+                {
+                    r.Id,
+                    Recipient = new
+                    {
+                        r.Recipient.Id,
+                        r.Recipient.Name,
+                        r.Recipient.Address,
+                    },
+                })
+                .ToList(),
         };
 
         return new JsonResult(result, ODataJsonDefaults.PascalCase);
@@ -68,18 +85,30 @@ public class GravesController : ODataController
     {
         if (grave is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (string.IsNullOrWhiteSpace(grave.GraveNumber))
         {
-            return BadRequest(new
-            {
-                error = new { code = "GraveNumberRequired", message = "The grave number is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "GraveNumberRequired",
+                        message = "The grave number is required.",
+                    },
+                }
+            );
         }
 
         grave.CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -88,25 +117,41 @@ public class GravesController : ODataController
         return Created(grave);
     }
 
-    public IActionResult Patch([FromRoute] long key, [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave>? delta)
+    public IActionResult Patch(
+        [FromRoute] long key,
+        [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave>? delta
+    )
     {
         if (delta is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         var grave = _db.Graves.Find(key);
-        if (grave is null) return NotFound();
+        if (grave is null)
+            return NotFound();
         delta.Patch(grave);
         if (string.IsNullOrWhiteSpace(grave.GraveNumber))
         {
-            return BadRequest(new
-            {
-                error = new { code = "GraveNumberRequired", message = "The grave number is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "GraveNumberRequired",
+                        message = "The grave number is required.",
+                    },
+                }
+            );
         }
 
         _db.SaveChanges();
@@ -116,7 +161,8 @@ public class GravesController : ODataController
     public IActionResult Delete([FromRoute] long key)
     {
         var grave = _db.Graves.Find(key);
-        if (grave is null) return NotFound();
+        if (grave is null)
+            return NotFound();
         _db.Graves.Remove(grave); // cascades to GraveItems/GraveRecipients
         _db.SaveChanges();
         return NoContent();
@@ -128,11 +174,14 @@ public class GravesController : ODataController
     {
         if (string.IsNullOrWhiteSpace(term))
         {
-            return new JsonResult(new { value = Array.Empty<object>() }, ODataJsonDefaults.PascalCase);
+            return new JsonResult(
+                new { value = Array.Empty<object>() },
+                ODataJsonDefaults.PascalCase
+            );
         }
 
-        var graves = await _db.Graves
-            .Select(g => new
+        var graves = await _db
+            .Graves.Select(g => new
             {
                 g.Id,
                 g.GraveNumber,
@@ -143,8 +192,10 @@ public class GravesController : ODataController
         // Match in memory: SQL-side lower() folds ASCII only and would miss
         // non-ASCII case differences (e.g. 'ö' vs 'Ö'), which matters for German names.
         var matches = graves
-            .Where(g => g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
-                        || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            .Where(g =>
+                g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase))
+            )
             .ToList();
 
         return new JsonResult(new { value = matches }, ODataJsonDefaults.PascalCase);
@@ -158,26 +209,46 @@ public class GravesController : ODataController
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
-        if (!DateOnly.TryParse(request.StartDate, out var startDate)
-            || !DateOnly.TryParse(request.EndDate, out var endDate))
+        if (
+            !DateOnly.TryParse(request.StartDate, out var startDate)
+            || !DateOnly.TryParse(request.EndDate, out var endDate)
+        )
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidDate", message = "The start and end dates are required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidDate",
+                        message = "The start and end dates are required.",
+                    },
+                }
+            );
         }
 
         try
         {
-            var grave = await _graves.SaveAsync(request.GraveId, request.GraveNumber ?? "", startDate, endDate,
-                request.Items ?? new List<GraveItemInput>(), request.RecipientIds ?? new List<long>(),
-                HttpContext.RequestAborted);
+            var grave = await _graves.SaveAsync(
+                request.GraveId,
+                request.GraveNumber ?? "",
+                startDate,
+                endDate,
+                request.Items ?? new List<GraveItemInput>(),
+                request.RecipientIds ?? new List<long>(),
+                HttpContext.RequestAborted
+            );
             // PascalCase like every other entity payload; MVC's default camelCase
             // would make this the odd one out
             return new JsonResult(new { grave.Id }, ODataJsonDefaults.PascalCase);
@@ -191,8 +262,13 @@ public class GravesController : ODataController
             // Letting the exception escape would cause the test host to rethrow it on
             // the client instead of producing a 500 response; mirror production behavior.
             _logger.LogError(ex, "SaveGrave failed");
-            return StatusCode(StatusCodes.Status500InternalServerError,
-                new { error = new { code = "InternalError", message = "An internal error occurred." } });
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
         }
     }
 

@@ -17,17 +17,24 @@ public class GraveInvoicingStatusController : ODataController
     [HttpGet("GraveInvoicingStatus")]
     public async Task<IActionResult> Status([FromQuery] int year, [FromQuery] int half)
     {
-        var invoicedIds = _db.GraveInvoiceRuns
-            .Where(r => r.Year == year && r.Half == half)
+        var invoicedIds = _db
+            .GraveInvoiceRuns.Where(r => r.Year == year && r.Half == half)
             .Select(r => r.GraveId)
             .ToHashSet();
 
-        var graves = await _db.Graves
+        var graves = await _db
+            .Graves
             // false sorts before true, so ordering by "is invoiced" puts the
             // graves that are still open at the top
             .OrderBy(g => invoicedIds.Contains(g.Id))
             .ThenBy(g => g.GraveNumber)
-            .Select(g => new { g.Id, g.GraveNumber, g.StartDate, g.EndDate })
+            .Select(g => new
+            {
+                g.Id,
+                g.GraveNumber,
+                g.StartDate,
+                g.EndDate,
+            })
             .ToListAsync();
 
         var value = graves.Select(g => new

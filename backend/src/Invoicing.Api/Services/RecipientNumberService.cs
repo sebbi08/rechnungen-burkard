@@ -15,9 +15,7 @@ public sealed class RecipientNumberService
 
     public string Next()
     {
-        var used = _db.Recipients
-            .Select(r => r.Number)
-            .ToList();
+        var used = _db.Recipients.Select(r => r.Number).ToList();
         return Format(NextSequence(used));
     }
 
@@ -28,9 +26,11 @@ public sealed class RecipientNumberService
         var highest = 0;
         foreach (var number in existing)
         {
-            if (number.StartsWith(Prefix, StringComparison.Ordinal)
+            if (
+                number.StartsWith(Prefix, StringComparison.Ordinal)
                 && int.TryParse(number.AsSpan(Prefix.Length), out var sequence)
-                && sequence > highest)
+                && sequence > highest
+            )
             {
                 highest = sequence;
             }

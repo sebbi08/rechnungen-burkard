@@ -1,16 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-const tileTitles = [
-  "Einstellungen",
-  "Leistungen",
-  "Empfänger",
-  "Rechnungen",
-  "Gräber",
-];
+const tileTitles = ["Einstellungen", "Leistungen", "Empfänger", "Rechnungen", "Gräber"];
 
-test("home shows the launchpad tiles and tiles navigate to the sub-views", async ({
-  page,
-}) => {
+test("home shows the launchpad tiles and tiles navigate to the sub-views", async ({ page }) => {
   await page.goto("/index.html");
 
   // the home route is the default: all five launchpad tiles are visible
@@ -25,9 +17,7 @@ test("home shows the launchpad tiles and tiles navigate to the sub-views", async
   // the page back button returns to the launchpad
   await page.locator("button[id$='-navButton']").click();
   await expect(page).toHaveURL(/#\/?$/);
-  await expect(
-    page.locator(".sapMGT", { hasText: "Rechnungen" }),
-  ).toBeVisible();
+  await expect(page.locator(".sapMGT", { hasText: "Rechnungen" })).toBeVisible();
 
   // a second tile leads to its route
   await page.locator(".sapMGT", { hasText: "Gräber" }).click();

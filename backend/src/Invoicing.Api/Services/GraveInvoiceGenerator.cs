@@ -11,8 +11,11 @@ public sealed class GraveInvoiceGenerator
     private readonly InvoiceNumberService _numbers;
     private readonly InvoiceDocumentFactory _documentFactory;
 
-    public GraveInvoiceGenerator(AppDbContext db, InvoiceNumberService numbers,
-        InvoiceDocumentFactory documentFactory)
+    public GraveInvoiceGenerator(
+        AppDbContext db,
+        InvoiceNumberService numbers,
+        InvoiceDocumentFactory documentFactory
+    )
     {
         _db = db;
         _numbers = numbers;
@@ -23,19 +26,24 @@ public sealed class GraveInvoiceGenerator
     /// transaction. Returns a result with a skip reason when the grave must be
     /// skipped (no recipients, no items, or an item with no price at all),
     /// otherwise the created invoices.</summary>
-    public async Task<GraveGenerationResult> GenerateForGraveAsync(Grave grave, int year, int half, CancellationToken ct)
+    public async Task<GraveGenerationResult> GenerateForGraveAsync(
+        Grave grave,
+        int year,
+        int half,
+        CancellationToken ct
+    )
     {
         // ordered explicitly by link id: GraveInvoiceRevisionService relies on
         // this order matching the order invoice ids were assigned in below, so
         // it can reproduce the same GraveInvoiceSplitter split on revision.
-        var recipients = await _db.GraveRecipients
-            .Where(r => r.GraveId == grave.Id)
+        var recipients = await _db
+            .GraveRecipients.Where(r => r.GraveId == grave.Id)
             .OrderBy(r => r.Id)
             .Select(r => r.Recipient)
             .ToListAsync(ct);
 
-        var graveItems = await _db.GraveItems
-            .Where(i => i.GraveId == grave.Id)
+        var graveItems = await _db
+            .GraveItems.Where(i => i.GraveId == grave.Id)
             .Include(i => i.Item)
             .ToListAsync(ct);
 
@@ -56,8 +64,13 @@ public sealed class GraveInvoiceGenerator
 
         var graveLines = graveItems
             .Select(item => new GraveLine(
-                item.Item.Id, item.Item.Number, item.Item.Description,
-                item.Count, EffectivePrice(item)!.Value, item.Item.VatRate))
+                item.Item.Id,
+                item.Item.Number,
+                item.Item.Description,
+                item.Count,
+                EffectivePrice(item)!.Value,
+                item.Item.VatRate
+            ))
             .ToList();
         var perRecipient = GraveInvoiceSplitter.Split(graveLines, recipients.Count);
 
@@ -99,13 +112,15 @@ public sealed class GraveInvoiceGenerator
             invoices.Add(invoice);
         }
 
-        _db.GraveInvoiceRuns.Add(new GraveInvoiceRun
-        {
-            GraveId = grave.Id,
-            Year = year,
-            Half = half,
-            CreatedAt = now,
-        });
+        _db.GraveInvoiceRuns.Add(
+            new GraveInvoiceRun
+            {
+                GraveId = grave.Id,
+                Year = year,
+                Half = half,
+                CreatedAt = now,
+            }
+        );
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return new GraveGenerationResult(invoices, null);
@@ -113,7 +128,8 @@ public sealed class GraveInvoiceGenerator
 
     /// <summary>The price a grave's line is billed at: the link's own price when
     /// the grave overrides it, otherwise the item's default price.</summary>
-    private static decimal? EffectivePrice(GraveItem item) => item.UnitPrice ?? item.Item.DefaultPrice;
+    private static decimal? EffectivePrice(GraveItem item) =>
+        item.UnitPrice ?? item.Item.DefaultPrice;
 }
 
 /// <summary>Result of generating a grave's invoices: either the created invoices

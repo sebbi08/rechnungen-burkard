@@ -1,35 +1,74 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:unified="sap.ui.unified"
-    controllerName="burkard.invoicing.controller.ImportExport" displayBlock="true">
-    <Page title="{i18n>importExportTitle}" titleLevel="H1" showNavButton="true"
-        navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:unified="sap.ui.unified"
+    controllerName="burkard.invoicing.controller.ImportExport"
+    displayBlock="true"
+>
+    <Page
+        title="{i18n>importExportTitle}"
+        titleLevel="H1"
+        showNavButton="true"
+        navButtonPress=".onNavBack"
+        class="sapUiResponsiveContentPadding"
+    >
         <content>
             <Panel headerText="{i18n>importTemplateHeader}" class="sapUiSmallMarginBottom">
                 <VBox class="sapUiSmallMargin">
                     <Text text="{i18n>importTemplateHint}" />
-                    <Button id="downloadTemplate" text="{i18n>importTemplateDownload}"
-                        press=".onDownloadTemplate" class="sapUiSmallMarginTop" />
+                    <Button
+                        id="downloadTemplate"
+                        text="{i18n>importTemplateDownload}"
+                        press=".onDownloadTemplate"
+                        class="sapUiSmallMarginTop"
+                    />
                 </VBox>
             </Panel>
             <Panel headerText="{i18n>importUploadHeader}" class="sapUiSmallMarginBottom">
                 <VBox class="sapUiSmallMargin">
                     <Text text="{i18n>importUploadHint}" />
-                    <unified:FileUploader id="archiveUpload" name="file" fileType="zip"
-                        placeholder="{i18n>importSelectFile}" width="100%"
-                        change=".onFileSelected" class="sapUiSmallMarginTop" />
-                    <Button id="startImport" text="{i18n>importStart}" type="Emphasized"
-                        press=".onImport" class="sapUiSmallMarginTop" />
+                    <unified:FileUploader
+                        id="archiveUpload"
+                        name="file"
+                        fileType="zip"
+                        placeholder="{i18n>importSelectFile}"
+                        width="100%"
+                        change=".onFileSelected"
+                        class="sapUiSmallMarginTop"
+                    />
+                    <Button
+                        id="startImport"
+                        text="{i18n>importStart}"
+                        type="Emphasized"
+                        press=".onImport"
+                        class="sapUiSmallMarginTop"
+                    />
                 </VBox>
             </Panel>
             <!-- the report is only shown after a rejected archive; every row names
                  the file and line the problem is in -->
-            <Panel id="problemsPanel" headerText="{i18n>importProblemsHeader}"
-                   visible="{= ${import>/problems}.length > 0 }">
-                <Table id="problemsTable" items="{import>/problems}" noDataText="{i18n>noData}"
-                    autoPopinMode="true" popinLayout="Block">
+            <Panel
+                id="problemsPanel"
+                headerText="{i18n>importProblemsHeader}"
+                visible="{= ${import>/problems}.length > 0 }"
+            >
+                <Table
+                    id="problemsTable"
+                    items="{import>/problems}"
+                    noDataText="{i18n>noData}"
+                    autoPopinMode="true"
+                    popinLayout="Block"
+                >
                     <columns>
-                        <Column importance="High"><Text text="{i18n>importProblemFile}" /></Column>
-                        <Column width="6rem" importance="Medium" popinDisplay="Inline"><Text text="{i18n>importProblemRow}" /></Column>
-                        <Column importance="High"><Text text="{i18n>importProblemMessage}" /></Column>
+                        <Column importance="High">
+                            <Text text="{i18n>importProblemFile}" />
+                        </Column>
+                        <Column width="6rem" importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>importProblemRow}" />
+                        </Column>
+                        <Column importance="High">
+                            <Text text="{i18n>importProblemMessage}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>

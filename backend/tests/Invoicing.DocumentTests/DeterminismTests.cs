@@ -17,7 +17,10 @@ public class DeterminismTests
             RecipientAddress = "Testweg 1",
             EndingText = "Danke",
             StampWord = "Kopie",
-            Lines = new[] { new InvoiceDocumentData.LineData(1, "A", "Leistung", 1, 5.00m, 7.0m, 5.00m, 0.35m) },
+            Lines = new[]
+            {
+                new InvoiceDocumentData.LineData(1, "A", "Leistung", 1, 5.00m, 7.0m, 5.00m, 0.35m),
+            },
             VatSummaries = new[] { new InvoiceDocumentData.VatSummary(7.0m, 5.00m, 0.35m, 5.35m) },
             NetTotal = 5.00m,
             TotalVat = 0.35m,

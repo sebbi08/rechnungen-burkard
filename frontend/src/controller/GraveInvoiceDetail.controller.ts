@@ -40,12 +40,9 @@ export default class GraveInvoiceDetail extends GraveEdit {
       const share = detail.sharePercent;
 
       detail.graveNumber = group.GraveNumber;
-      detail.shareText =
-        share != null ? `${share.toFixed(1).replace(".", ",")} %` : "";
+      detail.shareText = share != null ? `${share.toFixed(1).replace(".", ",")} %` : "";
       // the siblings of this half-year, minus the invoice being shown
-      detail.others = group.Recipients.filter(
-        (r) => r.InvoiceId !== latestInvoiceId,
-      );
+      detail.others = group.Recipients.filter((r) => r.InvoiceId !== latestInvoiceId);
       this.setState<RevisionDetailView>("detail", detail);
     } catch (error) {
       api.showError(this, error);
@@ -66,9 +63,7 @@ export default class GraveInvoiceDetail extends GraveEdit {
   }
 
   public async onEditGraveInvoice(): Promise<void> {
-    const invoiceId = this.state<RevisionDetailView>("detail").getProperty(
-      "/latestInvoiceId",
-    );
+    const invoiceId = this.state<RevisionDetailView>("detail").getProperty("/latestInvoiceId");
     if (invoiceId == null) {
       return;
     }
@@ -81,22 +76,15 @@ export default class GraveInvoiceDetail extends GraveEdit {
     await this.refresh();
   }
 
-  public async onDownloadRevisionNormal(
-    event: Button$PressEvent,
-  ): Promise<void> {
+  public async onDownloadRevisionNormal(event: Button$PressEvent): Promise<void> {
     await this.downloadRevision(event, false);
   }
 
-  public async onDownloadRevisionCopy(
-    event: Button$PressEvent,
-  ): Promise<void> {
+  public async onDownloadRevisionCopy(event: Button$PressEvent): Promise<void> {
     await this.downloadRevision(event, true);
   }
 
-  private async downloadRevision(
-    event: Button$PressEvent,
-    isCopy: boolean,
-  ): Promise<void> {
+  private async downloadRevision(event: Button$PressEvent, isCopy: boolean): Promise<void> {
     const context = event.getSource().getBindingContext("detail")!;
     await this.openDocument(Number(context.getProperty("Id")), isCopy);
   }

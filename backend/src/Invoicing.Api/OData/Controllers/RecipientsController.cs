@@ -33,14 +33,21 @@ public class RecipientsController : ODataController
     {
         if (recipient is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         var error = Validate(recipient);
-        if (error is not null) return BadRequest(error);
+        if (error is not null)
+            return BadRequest(error);
 
         // the recipient number identifies the row in the import mapping file; a
         // client that does not care (the quick-create dialog, the UI form) gets
@@ -51,10 +58,16 @@ public class RecipientsController : ODataController
         }
         else if (_db.Recipients.Any(r => r.Number == recipient.Number))
         {
-            return BadRequest(new
-            {
-                error = new { code = "RecipientNumberExists", message = "This recipient number already exists." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "RecipientNumberExists",
+                        message = "This recipient number already exists.",
+                    },
+                }
+            );
         }
 
         _db.Recipients.Add(recipient);
@@ -66,33 +79,53 @@ public class RecipientsController : ODataController
     {
         if (delta is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         var recipient = _db.Recipients.Find(key);
-        if (recipient is null) return NotFound();
+        if (recipient is null)
+            return NotFound();
 
         delta.Patch(recipient);
         var error = Validate(recipient);
-        if (error is not null) return BadRequest(error);
+        if (error is not null)
+            return BadRequest(error);
 
         if (string.IsNullOrWhiteSpace(recipient.Number))
         {
-            return BadRequest(new
-            {
-                error = new { code = "RecipientNumberRequired", message = "The recipient number is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "RecipientNumberRequired",
+                        message = "The recipient number is required.",
+                    },
+                }
+            );
         }
 
         if (_db.Recipients.Any(r => r.Number == recipient.Number && r.Id != recipient.Id))
         {
-            return BadRequest(new
-            {
-                error = new { code = "RecipientNumberExists", message = "This recipient number already exists." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "RecipientNumberExists",
+                        message = "This recipient number already exists.",
+                    },
+                }
+            );
         }
 
         _db.SaveChanges();
@@ -102,7 +135,8 @@ public class RecipientsController : ODataController
     public IActionResult Delete([FromRoute] long key)
     {
         var recipient = _db.Recipients.Find(key);
-        if (recipient is null) return NotFound();
+        if (recipient is null)
+            return NotFound();
         _db.Recipients.Remove(recipient);
         try
         {
@@ -111,10 +145,16 @@ public class RecipientsController : ODataController
         catch (DbUpdateException)
         {
             // Restrict FK: the recipient is still linked to a grave
-            return BadRequest(new
-            {
-                error = new { code = "RecipientInUse", message = "This recipient is linked to a grave and cannot be deleted." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "RecipientInUse",
+                        message = "This recipient is linked to a grave and cannot be deleted.",
+                    },
+                }
+            );
         }
 
         return NoContent();
@@ -124,12 +164,22 @@ public class RecipientsController : ODataController
     {
         if (string.IsNullOrWhiteSpace(r.Name))
         {
-            return new { error = new { code = "RecipientNameRequired", message = "The name is required." } };
+            return new
+            {
+                error = new { code = "RecipientNameRequired", message = "The name is required." },
+            };
         }
 
         if (string.IsNullOrWhiteSpace(r.Address))
         {
-            return new { error = new { code = "RecipientAddressRequired", message = "The address is required." } };
+            return new
+            {
+                error = new
+                {
+                    code = "RecipientAddressRequired",
+                    message = "The address is required.",
+                },
+            };
         }
 
         return null;

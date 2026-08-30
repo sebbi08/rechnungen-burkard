@@ -29,9 +29,7 @@ export default class Component extends UIComponent {
     this.getRouter().initialize();
 
     // the page title comes from the i18n bundle, not a hardcoded <title>
-    const bundle = (
-      this.getModel("i18n") as ResourceModel
-    ).getResourceBundle() as ResourceBundle;
+    const bundle = (this.getModel("i18n") as ResourceModel).getResourceBundle() as ResourceBundle;
     document.title = bundle.getText("appTitle") ?? "";
 
     // The root view's onInit runs before the view is aggregated into the

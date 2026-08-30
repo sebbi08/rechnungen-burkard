@@ -5,11 +5,23 @@ namespace Burkard.Invoicing.Api.Services.Import;
 public sealed record ImportProblem(string File, int? Row, string Code, string Message);
 
 /// <summary>Counts per file after a successful import (FR-062).</summary>
-public sealed record ImportSummary(int Recipients, int Items, int Graves, int ItemLinks, int RecipientLinks);
+public sealed record ImportSummary(
+    int Recipients,
+    int Items,
+    int Graves,
+    int ItemLinks,
+    int RecipientLinks
+);
 
 public sealed record RecipientRow(int Row, string Number, string Name, string Address);
 
-public sealed record ItemRow(int Row, string Number, string Description, decimal VatRate, decimal? Price);
+public sealed record ItemRow(
+    int Row,
+    string Number,
+    string Description,
+    decimal VatRate,
+    decimal? Price
+);
 
 public sealed record GraveRow(int Row, string Number, DateOnly StartDate, DateOnly EndDate);
 

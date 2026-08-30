@@ -1,10 +1,10 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net;
-using System.Net.Http.Json;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
@@ -29,10 +29,16 @@ public class SettingsTests : IClassFixture<ApiTestHost>
     public async Task Patch_empty_stamp_word_is_rejected()
     {
         using var client = _host.CreateClient();
-        var response = await client.PatchAsync("/odata/Settings", ODataJson.Body(new { StampWord = "" }));
+        var response = await client.PatchAsync(
+            "/odata/Settings",
+            ODataJson.Body(new { StampWord = "" })
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("StampWordRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "StampWordRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -40,7 +46,10 @@ public class SettingsTests : IClassFixture<ApiTestHost>
     {
         using var client = _host.CreateClient();
         const string text = "Line one\nLine two";
-        var response = await client.PatchAsync("/odata/Settings", ODataJson.Body(new { EndingText = text }));
+        var response = await client.PatchAsync(
+            "/odata/Settings",
+            ODataJson.Body(new { EndingText = text })
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var get = await client.GetAsync("/odata/Settings");

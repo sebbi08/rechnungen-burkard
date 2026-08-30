@@ -14,33 +14,58 @@ namespace Burkard.Invoicing.IntegrationTests;
 /// client-side and saves them in one request.</summary>
 public class SaveGraveTests
 {
-    private async Task<(long PricedItemId, long UnpricedItemId, long RecipientId, long OtherRecipientId)> SeedAsync(HttpClient client)
+    private async Task<(
+        long PricedItemId,
+        long UnpricedItemId,
+        long RecipientId,
+        long OtherRecipientId
+    )> SeedAsync(HttpClient client)
     {
         await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 7.0m }));
-        var priced = await ReadIdAsync(client.PostAsync("/odata/InvoiceItems", ODataJson.Body(new
-        {
-            Number = "4001",
-            Description = "Grabpflege",
-            VatRate = 7.0m,
-            DefaultPrice = 120.00m,
-        })));
-        var unpriced = await ReadIdAsync(client.PostAsync("/odata/InvoiceItems", ODataJson.Body(new
-        {
-            Number = "4002",
-            Description = "Sonderleistung",
-            VatRate = 7.0m,
-            DefaultPrice = (decimal?)null,
-        })));
-        var recipient = await ReadIdAsync(client.PostAsync("/odata/Recipients", ODataJson.Body(new
-        {
-            Name = "Anna Beispiel",
-            Address = "Hauptstraße 1\n99999 Musterdorf",
-        })));
-        var other = await ReadIdAsync(client.PostAsync("/odata/Recipients", ODataJson.Body(new
-        {
-            Name = "Bert Beispiel",
-            Address = "Nebenweg 2\n99999 Musterdorf",
-        })));
+        var priced = await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "4001",
+                        Description = "Grabpflege",
+                        VatRate = 7.0m,
+                        DefaultPrice = 120.00m,
+                    }
+                )
+            )
+        );
+        var unpriced = await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "4002",
+                        Description = "Sonderleistung",
+                        VatRate = 7.0m,
+                        DefaultPrice = (decimal?)null,
+                    }
+                )
+            )
+        );
+        var recipient = await ReadIdAsync(
+            client.PostAsync(
+                "/odata/Recipients",
+                ODataJson.Body(
+                    new { Name = "Anna Beispiel", Address = "Hauptstraße 1\n99999 Musterdorf" }
+                )
+            )
+        );
+        var other = await ReadIdAsync(
+            client.PostAsync(
+                "/odata/Recipients",
+                ODataJson.Body(
+                    new { Name = "Bert Beispiel", Address = "Nebenweg 2\n99999 Musterdorf" }
+                )
+            )
+        );
         return (priced, unpriced, recipient, other);
     }
 
@@ -57,23 +82,36 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (pricedItem, _, recipient, other) = await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveId = (long?)null,
-            graveNumber = "S-001",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = pricedItem, count = 2, unitPrice = (decimal?)null } },
-            recipientIds = new[] { recipient, other },
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "S-001",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient, other },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
         var graveId = json.RootElement.GetProperty("Id").GetInt64();
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var grave = await db.Graves
-            .Include(g => g.Items)
+        var grave = await db
+            .Graves.Include(g => g.Items)
             .Include(g => g.Recipients)
             .SingleAsync(g => g.Id == graveId);
         Assert.Equal("S-001", grave.GraveNumber);
@@ -82,8 +120,10 @@ public class SaveGraveTests
         Assert.Equal(pricedItem, item.ItemId);
         Assert.Equal(2, item.Count);
         Assert.Null(item.UnitPrice);
-        Assert.Equal(new[] { recipient, other }.OrderBy(id => id),
-            grave.Recipients.Select(r => r.RecipientId).OrderBy(id => id));
+        Assert.Equal(
+            new[] { recipient, other }.OrderBy(id => id),
+            grave.Recipients.Select(r => r.RecipientId).OrderBy(id => id)
+        );
     }
 
     [Fact]
@@ -93,39 +133,67 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (pricedItem, unpricedItem, recipient, _) = await SeedAsync(client);
 
-        var created = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-002",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = pricedItem, count = 1, unitPrice = (decimal?)null } },
-            recipientIds = new[] { recipient },
-        }));
+        var created = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-002",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         using var createdJson = await ODataJson.ReadAsync(created);
         var graveId = createdJson.RootElement.GetProperty("Id").GetInt64();
 
         // the same item stays (so the unique (GraveId, ItemId) index sees a re-add),
         // the second one is new; the recipient set is unchanged, since a grave's
         // recipients are fixed once it exists (see GraveRecipientImmutabilityTests)
-        var updated = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveId,
-            graveNumber = "S-002b",
-            startDate = "2027-01-01",
-            endDate = "2041-12-31",
-            items = new object[]
-            {
-                new { itemId = pricedItem, count = 3, unitPrice = (decimal?)null },
-                new { itemId = unpricedItem, count = 1, unitPrice = (decimal?)45.50m },
-            },
-            recipientIds = new[] { recipient },
-        }));
+        var updated = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId,
+                    graveNumber = "S-002b",
+                    startDate = "2027-01-01",
+                    endDate = "2041-12-31",
+                    items = new object[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                        new
+                        {
+                            itemId = unpricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)45.50m,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var grave = await db.Graves
-            .Include(g => g.Items)
+        var grave = await db
+            .Graves.Include(g => g.Items)
             .Include(g => g.Recipients)
             .SingleAsync(g => g.Id == graveId);
         Assert.Equal("S-002b", grave.GraveNumber);
@@ -145,17 +213,33 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (_, unpricedItem, recipient, _) = await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-003",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = unpricedItem, count = 1, unitPrice = (decimal?)null } },
-            recipientIds = new[] { recipient },
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-003",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = unpricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("PriceRequired", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "PriceRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -169,14 +253,27 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (_, unpricedItem, recipient, _) = await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-004",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = unpricedItem, count = 1, unitPrice = (decimal?)33.00m } },
-            recipientIds = new[] { recipient },
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-004",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = unpricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)33.00m,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var scope = host.Services.CreateScope();
@@ -188,23 +285,35 @@ public class SaveGraveTests
     [Theory]
     [InlineData("", "2026-01-01", "GraveNumberRequired")]
     [InlineData("S-005", "not-a-date", "InvalidDate")]
-    public async Task Save_rejects_invalid_grave_fields(string graveNumber, string startDate, string expectedCode)
+    public async Task Save_rejects_invalid_grave_fields(
+        string graveNumber,
+        string startDate,
+        string expectedCode
+    )
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
         await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber,
-            startDate,
-            endDate = "2040-12-31",
-            items = new List<object>(),
-            recipientIds = new List<long>(),
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber,
+                    startDate,
+                    endDate = "2040-12-31",
+                    items = new List<object>(),
+                    recipientIds = new List<long>(),
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal(expectedCode, json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            expectedCode,
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -214,17 +323,33 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (pricedItem, _, recipient, _) = await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-006",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = pricedItem, count = 0, unitPrice = (decimal?)null } },
-            recipientIds = new[] { recipient },
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-006",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 0,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("InvalidCount", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "InvalidCount",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -234,21 +359,39 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (pricedItem, _, recipient, _) = await SeedAsync(client);
 
-        var response = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-007",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[]
-            {
-                new { itemId = pricedItem, count = 1, unitPrice = (decimal?)null },
-                new { itemId = pricedItem, count = 2, unitPrice = (decimal?)null },
-            },
-            recipientIds = new[] { recipient },
-        }));
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-007",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal("GraveItemLinkExists", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            "GraveItemLinkExists",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
     }
 
     [Fact]
@@ -258,14 +401,27 @@ public class SaveGraveTests
         using var client = host.CreateClient();
         var (pricedItem, _, recipient, _) = await SeedAsync(client);
 
-        var created = await client.PostAsync("/odata/SaveGrave", ODataJson.Body(new
-        {
-            graveNumber = "S-008",
-            startDate = "2026-01-01",
-            endDate = "2040-12-31",
-            items = new[] { new { itemId = pricedItem, count = 1, unitPrice = (decimal?)99.00m } },
-            recipientIds = new[] { recipient },
-        }));
+        var created = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveNumber = "S-008",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)99.00m,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
         using var createdJson = await ODataJson.ReadAsync(created);
         var graveId = createdJson.RootElement.GetProperty("Id").GetInt64();
 

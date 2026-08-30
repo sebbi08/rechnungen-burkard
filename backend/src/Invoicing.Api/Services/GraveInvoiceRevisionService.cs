@@ -20,24 +20,33 @@ public sealed class GraveInvoiceRevisionService
         _documentFactory = documentFactory;
     }
 
-    public async Task<List<Invoice>> CreateAsync(long invoiceId,
-        IReadOnlyList<InvoiceLineInput> lineInputs, CancellationToken ct)
+    public async Task<List<Invoice>> CreateAsync(
+        long invoiceId,
+        IReadOnlyList<InvoiceLineInput> lineInputs,
+        CancellationToken ct
+    )
     {
-        var edited = await _db.Invoices.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invoiceId, ct)
+        var edited =
+            await _db.Invoices.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
         if (edited.GraveId is null || edited.PeriodYear is null || edited.PeriodHalf is null)
         {
-            throw new ValidationException("NotAGraveInvoice", "The invoice does not belong to a grave.");
+            throw new ValidationException(
+                "NotAGraveInvoice",
+                "The invoice does not belong to a grave."
+            );
         }
 
         var graveLines = await BuildGraveLinesAsync(lineInputs, ct);
 
-        var siblings = await _db.Invoices
-            .Where(i => i.GraveId == edited.GraveId
-                        && i.PeriodYear == edited.PeriodYear
-                        && i.PeriodHalf == edited.PeriodHalf
-                        && i.IsLatestRevision)
+        var siblings = await _db
+            .Invoices.Where(i =>
+                i.GraveId == edited.GraveId
+                && i.PeriodYear == edited.PeriodYear
+                && i.PeriodHalf == edited.PeriodHalf
+                && i.IsLatestRevision
+            )
             // generation assigned these ids in the order it split the grave's
             // lines (one SaveChangesAsync per recipient, in recipient-list
             // order), so ordering by id puts every recipient back at the same
@@ -64,17 +73,26 @@ public sealed class GraveInvoiceRevisionService
         for (var r = 0; r < siblings.Count; r++)
         {
             var sibling = siblings[r];
-            var recipient = await _db.Recipients.FindAsync(new object[] { sibling.RecipientId }, ct)
-                ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
+            var recipient =
+                await _db.Recipients.FindAsync(new object[] { sibling.RecipientId }, ct)
+                ?? throw new ValidationException(
+                    "RecipientNotFound",
+                    "The recipient does not exist."
+                );
             if (string.IsNullOrWhiteSpace(recipient.Address))
             {
-                throw new ValidationException("RecipientAddressRequired", "The recipient address is required.");
+                throw new ValidationException(
+                    "RecipientAddressRequired",
+                    "The recipient address is required."
+                );
             }
 
             // the number continues the whole chain, not just the row that was edited
-            var lastRevision = await _db.Invoices
-                .Where(i => i.RootId == sibling.RootId)
-                .MaxAsync(i => (int?)i.RevisionNumber, ct) ?? sibling.RevisionNumber;
+            var lastRevision =
+                await _db
+                    .Invoices.Where(i => i.RootId == sibling.RootId)
+                    .MaxAsync(i => (int?)i.RevisionNumber, ct)
+                ?? sibling.RevisionNumber;
             var revisionNumber = lastRevision + 1;
             var baseNumber = InvoiceNumberFormatter.StripRevision(sibling.InvoiceNumber);
 
@@ -117,7 +135,9 @@ public sealed class GraveInvoiceRevisionService
     /// <summary>The grave's lines from what the dialog sent: the full count at the
     /// full price, before any split.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
-        IReadOnlyList<InvoiceLineInput> inputs, CancellationToken ct)
+        IReadOnlyList<InvoiceLineInput> inputs,
+        CancellationToken ct
+    )
     {
         if (inputs.Count == 0)
         {
@@ -125,8 +145,8 @@ public sealed class GraveInvoiceRevisionService
         }
 
         var itemIds = inputs.Select(l => l.ItemId).ToArray();
-        var items = await _db.InvoiceItems
-            .Where(i => itemIds.Contains(i.Id))
+        var items = await _db
+            .InvoiceItems.Where(i => itemIds.Contains(i.Id))
             .ToDictionaryAsync(i => i.Id, ct);
 
         var lines = new List<GraveLine>(inputs.Count);
@@ -134,7 +154,10 @@ public sealed class GraveInvoiceRevisionService
         {
             if (!items.TryGetValue(input.ItemId, out var item))
             {
-                throw new ValidationException($"ItemNotFound:{input.ItemId}", $"The item {input.ItemId} does not exist.");
+                throw new ValidationException(
+                    $"ItemNotFound:{input.ItemId}",
+                    $"The item {input.ItemId} does not exist."
+                );
             }
 
             if (input.Count <= 0)
@@ -142,10 +165,24 @@ public sealed class GraveInvoiceRevisionService
                 throw new ValidationException("InvalidCount", "The count must be positive.");
             }
 
-            var unitPrice = input.UnitPrice ?? item.DefaultPrice
-                ?? throw new ValidationException("PriceRequired", $"A price is required for item '{item.Number}'.");
+            var unitPrice =
+                input.UnitPrice
+                ?? item.DefaultPrice
+                ?? throw new ValidationException(
+                    "PriceRequired",
+                    $"A price is required for item '{item.Number}'."
+                );
 
-            lines.Add(new GraveLine(item.Id, item.Number, item.Description, input.Count, unitPrice, item.VatRate));
+            lines.Add(
+                new GraveLine(
+                    item.Id,
+                    item.Number,
+                    item.Description,
+                    input.Count,
+                    unitPrice,
+                    item.VatRate
+                )
+            );
         }
 
         return lines;

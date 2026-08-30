@@ -1,9 +1,24 @@
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns:core="sap.ui.core" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.GraveInvoiceDetail" displayBlock="true">
-    <Page id="graveInvoiceDetailPage" title="{i18n>graveInvoiceDetailTitle}" titleLevel="H1"
-        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns:core="sap.ui.core"
+    xmlns="sap.m"
+    controllerName="burkard.invoicing.controller.GraveInvoiceDetail"
+    displayBlock="true"
+>
+    <Page
+        id="graveInvoiceDetailPage"
+        title="{i18n>graveInvoiceDetailTitle}"
+        titleLevel="H1"
+        showNavButton="true"
+        navButtonPress=".onNavBack"
+        class="sapUiResponsiveContentPadding"
+    >
         <headerContent>
-            <Button icon="sap-icon://edit" tooltip="{i18n>actionEdit}" press=".onEditGraveInvoice" />
+            <Button
+                icon="sap-icon://edit"
+                tooltip="{i18n>actionEdit}"
+                press=".onEditGraveInvoice"
+            />
         </headerContent>
         <content>
             <VBox class="sapUiSmallMarginTop">
@@ -12,19 +27,31 @@
                 <!-- the address is stored with line breaks, as it is printed -->
                 <Text text="{detail>/recipientAddress}" renderWhitespace="true" />
                 <HBox wrap="Wrap" class="sapUiSmallMarginTop">
-                    <ObjectStatus title="{i18n>graveNumber}" class="sapUiSmallMarginEnd"
-                        text="{detail>/graveNumber}" />
-                    <ObjectStatus title="{i18n>halfYear}" class="sapUiSmallMarginEnd"
-                        text="{detail>/halfYear}" />
+                    <ObjectStatus
+                        title="{i18n>graveNumber}"
+                        class="sapUiSmallMarginEnd"
+                        text="{detail>/graveNumber}"
+                    />
+                    <ObjectStatus
+                        title="{i18n>halfYear}"
+                        class="sapUiSmallMarginEnd"
+                        text="{detail>/halfYear}"
+                    />
                     <ObjectStatus title="{i18n>sharePercent}" text="{detail>/shareText}" />
                 </HBox>
             </VBox>
 
-            <Panel headerText="{i18n>otherRecipients}" class="sapUiSmallMarginTop"
-                visible="{= ${detail>/others}.length > 0 }">
+            <Panel
+                headerText="{i18n>otherRecipients}"
+                class="sapUiSmallMarginTop"
+                visible="{= ${detail>/others}.length > 0 }"
+            >
                 <List items="{detail>/others}" noDataText="{i18n>noData}">
-                    <StandardListItem title="{detail>Name}" type="Navigation"
-                        press=".onOpenSibling" />
+                    <StandardListItem
+                        title="{detail>Name}"
+                        type="Navigation"
+                        press=".onOpenSibling"
+                    />
                 </List>
             </Panel>
 
@@ -32,7 +59,10 @@
                  RevisionPanel is shared with InvoiceDetail.view.xml as the
                  aggregation-binding template. -->
             <VBox items="{detail>/revisions}">
-                <core:Fragment fragmentName="burkard.invoicing.view.fragments.RevisionPanel" type="XML" />
+                <core:Fragment
+                    fragmentName="burkard.invoicing.view.fragments.RevisionPanel"
+                    type="XML"
+                />
             </VBox>
         </content>
     </Page>

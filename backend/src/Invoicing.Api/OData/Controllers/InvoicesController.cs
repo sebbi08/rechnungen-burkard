@@ -28,7 +28,8 @@ public class InvoicesController : ODataController
             return _db.Invoices.AsNoTracking();
         }
 
-        var candidates = _db.Invoices.AsNoTracking()
+        var candidates = _db
+            .Invoices.AsNoTracking()
             .Select(i => new
             {
                 i.Id,
@@ -36,15 +37,33 @@ public class InvoicesController : ODataController
                 i.RecipientName,
                 i.RecipientAddress,
                 i.GeneratedAt,
-                Lines = i.Lines.Select(l => new { l.Count, l.UnitPrice, l.VatRate }).ToList(),
+                Lines = i
+                    .Lines.Select(l => new
+                    {
+                        l.Count,
+                        l.UnitPrice,
+                        l.VatRate,
+                    })
+                    .ToList(),
             })
             .ToList();
 
         var matched = candidates
-            .Where(c => InvoiceSearch.Matches(
-                new InvoiceSearch.Row(c.Id, c.InvoiceNumber, c.RecipientName, c.RecipientAddress, c.GeneratedAt,
-                    InvoiceSearch.GrossTotal(c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate)))),
-                term))
+            .Where(c =>
+                InvoiceSearch.Matches(
+                    new InvoiceSearch.Row(
+                        c.Id,
+                        c.InvoiceNumber,
+                        c.RecipientName,
+                        c.RecipientAddress,
+                        c.GeneratedAt,
+                        InvoiceSearch.GrossTotal(
+                            c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
+                        )
+                    ),
+                    term
+                )
+            )
             .Select(c => c.Id)
             .ToHashSet();
 

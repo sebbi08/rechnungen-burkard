@@ -27,28 +27,46 @@ public class VatRatesController : ODataController
     {
         if (rate is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         rate.Rate = VatRateNormalizer.Normalize(rate.Rate);
 
         if (rate.Rate <= 0)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidVatRate", message = "The VAT rate must be positive." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidVatRate",
+                        message = "The VAT rate must be positive.",
+                    },
+                }
+            );
         }
 
         if (_db.VatRates.Any(v => v.Rate == rate.Rate))
         {
-            return BadRequest(new
-            {
-                error = new { code = "VatRateExists", message = "This VAT rate is already configured." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "VatRateExists",
+                        message = "This VAT rate is already configured.",
+                    },
+                }
+            );
         }
 
         _db.VatRates.Add(rate);
@@ -59,7 +77,8 @@ public class VatRatesController : ODataController
     public IActionResult Delete([FromRoute] long key)
     {
         var rate = _db.VatRates.Find(key);
-        if (rate is null) return NotFound();
+        if (rate is null)
+            return NotFound();
         _db.VatRates.Remove(rate);
         _db.SaveChanges();
         return NoContent();

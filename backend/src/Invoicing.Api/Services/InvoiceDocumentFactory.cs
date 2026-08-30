@@ -1,5 +1,5 @@
-using Burkard.Invoicing.Domain.Entities;
 using Burkard.Invoicing.Documents;
+using Burkard.Invoicing.Domain.Entities;
 
 namespace Burkard.Invoicing.Api.Services;
 

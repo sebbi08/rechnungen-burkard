@@ -1,9 +1,9 @@
+using System.IO.Compression;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
-using System.IO.Compression;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
@@ -19,34 +19,44 @@ public class BulkDownloadController : ODataController
     {
         if (request is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (request.Kind is not ("Normal" or "Copy"))
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidKind", message = "Kind must be Normal or Copy." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new { code = "InvalidKind", message = "Kind must be Normal or Copy." },
+                }
+            );
         }
 
         var kind = request.Kind == "Normal" ? DocumentKind.Normal : DocumentKind.Copy;
         // a superseded revision's documents were replaced; a bulk download must
         // not put them next to the revision that replaced them
-        IQueryable<Document> query = _db.Documents
-            .Where(d => d.Kind == kind && d.Invoice != null && d.Invoice.IsLatestRevision);
+        IQueryable<Document> query = _db.Documents.Where(d =>
+            d.Kind == kind && d.Invoice != null && d.Invoice.IsLatestRevision
+        );
         if (request.Year is not null && request.Half is not null)
         {
-            query = query.Where(d => d.Invoice != null
-                && d.Invoice.PeriodYear == request.Year && d.Invoice.PeriodHalf == request.Half);
+            query = query.Where(d =>
+                d.Invoice != null
+                && d.Invoice.PeriodYear == request.Year
+                && d.Invoice.PeriodHalf == request.Half
+            );
         }
 
-        var documents = await query
-            .OrderBy(d => d.FileName)
-            .ToListAsync();
+        var documents = await query.OrderBy(d => d.FileName).ToListAsync();
 
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))

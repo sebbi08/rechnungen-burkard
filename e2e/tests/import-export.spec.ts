@@ -24,8 +24,7 @@ function validArchive(suffix: string): Buffer {
       RECIPIENTS_HEADER +
       `IMP-R1-${suffix},Anna Import,"Hauptstraße 1\n99999 Musterdorf"\r\n` +
       `IMP-R2-${suffix},Bert Import,"Nebenweg 2\n99999 Musterdorf"\r\n`,
-    "items.csv":
-      ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00\r\n`,
+    "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00\r\n`,
     "graves.csv": GRAVES_HEADER + `IMP-G1-${suffix},2026-01-01,2040-12-31\r\n`,
     "mapping.csv":
       MAPPING_HEADER +
@@ -43,9 +42,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("download the import template and read its four CSV files (Story 10)", async ({
-  page,
-}) => {
+test("download the import template and read its four CSV files (Story 10)", async ({ page }) => {
   await page.goto("/index.html#/import-export");
 
   const downloadPromise = page.waitForEvent("download");
@@ -58,12 +55,7 @@ test("download the import template and read its four CSV files (Story 10)", asyn
     .getEntries()
     .map((entry) => entry.entryName)
     .sort();
-  expect(names).toEqual([
-    "graves.csv",
-    "items.csv",
-    "mapping.csv",
-    "recipients.csv",
-  ]);
+  expect(names).toEqual(["graves.csv", "items.csv", "mapping.csv", "recipients.csv"]);
   // each file carries nothing but its header row
   expect(zip.readAsText("recipients.csv").trim()).toContain("RecipientNumber");
   expect(zip.readAsText("mapping.csv").trim()).toContain("Type,GraveNumber");
@@ -98,9 +90,7 @@ test("a defective archive is reported per file and row and imports nothing (Stor
 
   // and nothing reached the database
   const graves = await (
-    await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'`,
-    )
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'`)
   ).json();
   expect(graves.value).toHaveLength(0);
 });
@@ -129,32 +119,24 @@ test("a valid archive imports recipients, items, graves and their links (Story 1
 
   // every reference resolves to an entry from the archive
   const graves = await (
-    await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'&$select=Id`,
-    )
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'&$select=Id`)
   ).json();
   expect(graves.value).toHaveLength(1);
   const graveId = graves.value[0].Id;
 
   const itemLinks = await (
-    await page.request.get(
-      `/odata/GraveItems?$filter=GraveId eq ${graveId}`,
-    )
+    await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${graveId}`)
   ).json();
   expect(itemLinks.value).toHaveLength(1);
   expect(Number(itemLinks.value[0].Count)).toBe(2);
 
   const recipientLinks = await (
-    await page.request.get(
-      `/odata/GraveRecipients?$filter=GraveId eq ${graveId}`,
-    )
+    await page.request.get(`/odata/GraveRecipients?$filter=GraveId eq ${graveId}`)
   ).json();
   expect(recipientLinks.value).toHaveLength(2);
 
   const recipients = await (
-    await page.request.get(
-      `/odata/Recipients?$filter=Number eq 'IMP-R1-${suffix}'`,
-    )
+    await page.request.get(`/odata/Recipients?$filter=Number eq 'IMP-R1-${suffix}'`)
   ).json();
   expect(recipients.value[0].Name).toBe("Anna Import");
   // the quoted CSV field kept its line break
@@ -192,9 +174,7 @@ test("importing the same archive twice is rejected as already existing (Story 11
 
   // still exactly one grave with that number
   const graves = await (
-    await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'`,
-    )
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'`)
   ).json();
   expect(graves.value).toHaveLength(1);
 });

@@ -12,24 +12,31 @@ using Microsoft.Extensions.FileProviders.Physical;
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddControllers().AddOData(o =>
-{
-    // Without this, the no-$-prefix alias for the built-in $search option claims our
-    // custom "search" query option (InvoicesController.Get reads it from Request.Query),
-    // and OData's own query-option parser then 400s on an empty "search=" before our
-    // action code ever runs.
-    o.EnableNoDollarQueryOptions = false;
-    // Expand() was missing until the invoice detail page's readList became the
-    // first caller to pass $expand (Lines, Documents): without it every
-    // navigation property — collection or single-valued — is rejected with
-    // "The property 'X' cannot be used in the $expand query option.", which is
-    // not what D-002 promises for reads through the OData v4 model.
-    o.Select().Filter().OrderBy().Count().Expand().SetMaxTop(200)
-     .AddRouteComponents("odata", EdmModelBuilder.Build());
-});
+builder
+    .Services.AddControllers()
+    .AddOData(o =>
+    {
+        // Without this, the no-$-prefix alias for the built-in $search option claims our
+        // custom "search" query option (InvoicesController.Get reads it from Request.Query),
+        // and OData's own query-option parser then 400s on an empty "search=" before our
+        // action code ever runs.
+        o.EnableNoDollarQueryOptions = false;
+        // Expand() was missing until the invoice detail page's readList became the
+        // first caller to pass $expand (Lines, Documents): without it every
+        // navigation property — collection or single-valued — is rejected with
+        // "The property 'X' cannot be used in the $expand query option.", which is
+        // not what D-002 promises for reads through the OData v4 model.
+        o.Select()
+            .Filter()
+            .OrderBy()
+            .Count()
+            .Expand()
+            .SetMaxTop(200)
+            .AddRouteComponents("odata", EdmModelBuilder.Build());
+    });
 
-var connectionString = builder.Configuration.GetConnectionString("Invoicing")
-    ?? "Data Source=invoicing.db";
+var connectionString =
+    builder.Configuration.GetConnectionString("Invoicing") ?? "Data Source=invoicing.db";
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
@@ -63,7 +70,9 @@ using (var scope = app.Services.CreateScope())
 // without it. A missing message bundle costs the framework every text it
 // renders itself, so buttons and value states show the raw message key.
 var ui5ContentTypes = new FileExtensionContentTypeProvider();
-foreach (var extension in new[] { ".properties", ".library", ".supportrc", ".theme", ".theming", ".hpb" })
+foreach (
+    var extension in new[] { ".properties", ".library", ".supportrc", ".theme", ".theming", ".hpb" }
+)
 {
     // The middleware answers only for extensions it can name a content type
     // for, and knows none of the runtime's own. application/octet-stream is what
@@ -80,8 +89,10 @@ if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
     // hidden, so excluding hidden files excludes exactly these again. wwwroot
     // holds nothing but the UI5 build, and every dot-prefixed name in it is
     // OpenUI5 metadata.
-    app.Environment.WebRootFileProvider =
-        new PhysicalFileProvider(app.Environment.WebRootPath, ExclusionFilters.None);
+    app.Environment.WebRootFileProvider = new PhysicalFileProvider(
+        app.Environment.WebRootPath,
+        ExclusionFilters.None
+    );
 }
 
 app.UseDefaultFiles();
@@ -95,7 +106,5 @@ app.Run();
 // Required by WebApplicationFactory<Program>
 namespace Burkard.Invoicing.Api
 {
-    public partial class Program
-    {
-    }
+    public partial class Program { }
 }

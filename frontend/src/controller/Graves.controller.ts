@@ -35,9 +35,7 @@ export default class Graves extends GraveEdit {
    * announced as a validation error, which an open half-year is not.
    */
   public statusAnnouncement(invoiced: boolean | null | undefined): string {
-    return this.i18nText(
-      invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
-    );
+    return this.i18nText(invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement");
   }
 
   public statusFormatter(invoiced: boolean | null | undefined): string {
@@ -155,9 +153,7 @@ export default class Graves extends GraveEdit {
 
   public async onGenerateDialogSave(): Promise<void> {
     const draft = (
-      this._generateDialog.getModel(
-        "generateDraft",
-      ) as TypedJSONModel<GenerateDraft>
+      this._generateDialog.getModel("generateDraft") as TypedJSONModel<GenerateDraft>
     ).getData();
     const year = Number(draft.year);
     const half = Number(draft.half);
@@ -172,9 +168,7 @@ export default class Graves extends GraveEdit {
     try {
       const job = await api.generateGraveInvoices(year, half);
       finished = await this.pollJob(job.Id, (percent) =>
-        busy.setTitle(
-          this.i18nText("generationProgress").replace("{0}", String(percent)),
-        ),
+        busy.setTitle(this.i18nText("generationProgress").replace("{0}", String(percent))),
       );
     } catch (error) {
       failure = error;
@@ -198,9 +192,7 @@ export default class Graves extends GraveEdit {
       return;
     }
 
-    const result = JSON.parse(
-      finished.ResultJson ?? "{}",
-    ) as api.GenerationResult;
+    const result = JSON.parse(finished.ResultJson ?? "{}") as api.GenerationResult;
     const skipped = (result.SkippedGraves ?? [])
       .map((entry) => {
         const number = typeof entry === "string" ? entry : entry.Number;
@@ -224,10 +216,7 @@ export default class Graves extends GraveEdit {
     this._generateDialog.close();
   }
 
-  private async pollJob(
-    jobId: number,
-    onProgress: (percent: number) => void,
-  ): Promise<api.JobDto> {
+  private async pollJob(jobId: number, onProgress: (percent: number) => void): Promise<api.JobDto> {
     const deadline = Date.now() + Graves.JOB_TIMEOUT_MS;
     for (;;) {
       if (Date.now() > deadline) {

@@ -659,12 +659,13 @@ public partial class Program
 Add to `Invoicing.Api.csproj`:
 
 ```xml
-  <ItemGroup>
+<ItemGroup>
     <ProjectReference Include="../Invoicing.Domain/Invoicing.Domain.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.*">
       <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <IncludeAssets
+    >runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 ```
@@ -4765,8 +4766,12 @@ export default class App extends BaseController {
 `frontend/src/view/App.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.App" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="burkard.invoicing.controller.App"
+  displayBlock="true"
+>
     <App id="app" />
 </mvc:View>
 ```
@@ -4788,14 +4793,22 @@ export default class App extends BaseController {
 The five view files start as identical shells (toolpage with the navigation fragment + a titled page). `Settings.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Settings" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  controllerName="burkard.invoicing.controller.Settings"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -4868,16 +4881,12 @@ git commit -m "feat: UI5 TypeScript app shell with routing and E2E harness"
 ```ts
 import { test, expect } from "@playwright/test";
 
-test("settings: stamp word validation and VAT rate (Story 1)", async ({
-  page,
-}) => {
+test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/index.html");
 
   await page.getByLabel("Stempelwort").fill("");
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page.locator(".sapMMessageToast, .sapMDialog")).toContainText(
-    "Stempelwort",
-  );
+  await expect(page.locator(".sapMMessageToast, .sapMDialog")).toContainText("Stempelwort");
 
   await page.getByLabel("Stempelwort").fill("Kopie");
   await page.getByLabel("VAT-Satz").fill("7");
@@ -4887,9 +4896,7 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
   await expect(page.locator(".sapMListTbl")).toContainText("7");
 });
 
-test("items: create an item without default price (Story 2)", async ({
-  page,
-}) => {
+test("items: create an item without default price (Story 2)", async ({ page }) => {
   await page.request.post("http://localhost:8080/odata/VatRates", {
     data: { Rate: 7 },
   });
@@ -4904,9 +4911,7 @@ test("items: create an item without default price (Story 2)", async ({
   await expect(page.locator("table")).toContainText("Grabpflege");
 });
 
-test("recipients: create and search a recipient (Story 3)", async ({
-  page,
-}) => {
+test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
   await page.goto("/index.html#/recipients");
   await page.getByRole("button", { name: "Empfänger anlegen" }).click();
   await page.getByLabel("Name").fill("Familie Mahr");
@@ -4966,10 +4971,7 @@ const CODE_TO_I18N: Record<string, string> = {
   JobAlreadyRunning: "errorJobAlreadyRunning",
 };
 
-export async function showError(
-  controller: Controller,
-  error: unknown,
-): Promise<void> {
+export async function showError(controller: Controller, error: unknown): Promise<void> {
   const raw = error instanceof Error ? error.message : String(error);
   const key = CODE_TO_I18N[raw] ?? "errorGeneric";
   const bundle = (
@@ -4983,9 +4985,7 @@ export async function showError(
   await MessageBox.error(text);
 }
 
-export async function patchSettings(
-  payload: Record<string, unknown>,
-): Promise<void> {
+export async function patchSettings(payload: Record<string, unknown>): Promise<void> {
   const response = await fetch("/odata/Settings", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -5016,10 +5016,7 @@ export async function createItem(item: {
   );
 }
 
-export async function createRecipient(recipient: {
-  Name: string;
-  Address: string;
-}): Promise<void> {
+export async function createRecipient(recipient: { Name: string; Address: string }): Promise<void> {
   await ensureOk(await post("/odata/Recipients", recipient));
 }
 ```
@@ -5050,14 +5047,23 @@ addVatRate=VAT-Satz hinzufügen
 `Settings.view.xml` (replaces the shell from Task 13):
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core" xmlns:form="sap.ui.layout.form"
-    controllerName="burkard.invoicing.controller.Settings" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  xmlns:form="sap.ui.layout.form"
+  controllerName="burkard.invoicing.controller.Settings"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -5069,12 +5075,21 @@ addVatRate=VAT-Satz hinzufügen
                             <Label text="{i18n>settingsStampWord}" labelFor="stampWord" />
                             <Input id="stampWord" value="{odata>StampWord}" width="20rem" />
                             <Label text="{i18n>settingsEndingText}" labelFor="endingText" />
-                            <TextArea id="endingText" value="{odata>EndingText}" rows="6" width="100%" />
+                            <TextArea
+                id="endingText"
+                value="{odata>EndingText}"
+                rows="6"
+                width="100%"
+              />
                         </form:SimpleForm>
                     </Panel>
                     <Panel headerText="{i18n>settingsVatRates}">
                         <content>
-                            <Table id="vatRates" items="{odata>/VatRates}" noDataText="{i18n>noData}">
+                            <Table
+                id="vatRates"
+                items="{odata>/VatRates}"
+                noDataText="{i18n>noData}"
+              >
                                 <columns>
                                     <Column><Text text="{i18n>vatRate}" /></Column>
                                     <Column />
@@ -5083,7 +5098,11 @@ addVatRate=VAT-Satz hinzufügen
                                     <ColumnListItem>
                                         <cells>
                                             <Text text="{odata>Rate}" />
-                                            <Button text="{i18n>delete}" press="onDeleteVatRate" type="Transparent" />
+                                            <Button
+                        text="{i18n>delete}"
+                        press="onDeleteVatRate"
+                        type="Transparent"
+                      />
                                         </cells>
                                     </ColumnListItem>
                                 </items>
@@ -5131,9 +5150,7 @@ export default class Settings extends BaseController {
         EndingText: context.getProperty("EndingText"),
       });
       await MessageBox.information(
-        (this.getView()!.getModel("i18n") as any)
-          .getResourceBundle()
-          .getText("saved"),
+        (this.getView()!.getModel("i18n") as any).getResourceBundle().getText("saved"),
       );
     } catch (error) {
       await api.showError(this, error);
@@ -5181,14 +5198,22 @@ export default class Settings extends BaseController {
 `Items.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Items" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  controllerName="burkard.invoicing.controller.Items"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -5196,7 +5221,11 @@ export default class Settings extends BaseController {
             <Page title="{i18n>menuItems}" titleLevel="H1">
                 <subHeader>
                     <Toolbar>
-                        <SearchField width="16rem" search="onSearch" placeholder="{i18n>searchByNumber}" />
+                        <SearchField
+              width="16rem"
+              search="onSearch"
+              placeholder="{i18n>searchByNumber}"
+            />
                         <ToolbarSpacer />
                         <Button text="{i18n>createItem}" press="onCreateItem" type="Emphasized" />
                     </Toolbar>
@@ -5246,9 +5275,7 @@ export default class Items extends BaseController {
 
   public onSearch(event: any): void {
     const term = event.getParameter("query") as string;
-    const binding = (this.byId("itemsTable") as any).getBinding(
-      "items",
-    ) as ODataListBinding;
+    const binding = (this.byId("itemsTable") as any).getBinding("items") as ODataListBinding;
     if (!term) {
       binding.filter([]);
       return;
@@ -5286,9 +5313,7 @@ export default class Items extends BaseController {
           : null,
       });
       dialog.close();
-      (
-        (this.byId("itemsTable") as any).getBinding("items") as ODataListBinding
-      ).refresh();
+      ((this.byId("itemsTable") as any).getBinding("items") as ODataListBinding).refresh();
     } catch (error) {
       await api.showError(this, error);
     }
@@ -5330,14 +5355,22 @@ export default class Items extends BaseController {
 `Recipients.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Recipients" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  controllerName="burkard.invoicing.controller.Recipients"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -5345,9 +5378,17 @@ export default class Items extends BaseController {
             <Page title="{i18n>menuRecipients}" titleLevel="H1">
                 <subHeader>
                     <Toolbar>
-                        <SearchField width="16rem" search="onSearch" placeholder="{i18n>searchByName}" />
+                        <SearchField
+              width="16rem"
+              search="onSearch"
+              placeholder="{i18n>searchByName}"
+            />
                         <ToolbarSpacer />
-                        <Button text="{i18n>createRecipient}" press="onCreateRecipient" type="Emphasized" />
+                        <Button
+              text="{i18n>createRecipient}"
+              press="onCreateRecipient"
+              type="Emphasized"
+            />
                     </Toolbar>
                 </subHeader>
                 <content>
@@ -5391,9 +5432,7 @@ export default class Recipients extends BaseController {
 
   public onSearch(event: any): void {
     const term = event.getParameter("query") as string;
-    const binding = (this.byId("recipientsTable") as any).getBinding(
-      "items",
-    ) as ODataListBinding;
+    const binding = (this.byId("recipientsTable") as any).getBinding("items") as ODataListBinding;
     if (!term) {
       binding.filter([]);
       return;
@@ -5419,11 +5458,7 @@ export default class Recipients extends BaseController {
         Address: (this.byId("recipientAddress") as Input).getValue(),
       });
       dialog.close();
-      (
-        (this.byId("recipientsTable") as any).getBinding(
-          "items",
-        ) as ODataListBinding
-      ).refresh();
+      ((this.byId("recipientsTable") as any).getBinding("items") as ODataListBinding).refresh();
     } catch (error) {
       await api.showError(this, error);
     }
@@ -5510,9 +5545,7 @@ git commit -m "feat: settings, items and recipients views"
 ```ts
 import { test, expect } from "@playwright/test";
 
-async function seedMasterData(
-  page: import("@playwright/test").Page,
-): Promise<void> {
+async function seedMasterData(page: import("@playwright/test").Page): Promise<void> {
   // direct API calls keep the test focused on the UI flow
   await page.request.post("http://localhost:8080/odata/VatRates", {
     data: { Rate: 7 },
@@ -5541,13 +5574,9 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
   await page.locator("[id$='invoiceDialog--recipient']").click(); // Select opens popover
-  await page
-    .locator("li.sapMSelectListItem", { hasText: "Familie Mahr" })
-    .click();
+  await page.locator("li.sapMSelectListItem", { hasText: "Familie Mahr" }).click();
   await page.locator("[id$='lineItem']").click();
-  await page
-    .locator("li.sapMSelectListItem", { hasText: "Grabpflege" })
-    .click();
+  await page.locator("li.sapMSelectListItem", { hasText: "Grabpflege" }).click();
   await page.getByLabel("Anzahl").fill("2");
   await page.getByLabel("Preis").fill("120");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -5561,21 +5590,15 @@ test("create an invoice with a mandatory price and download documents (Story 4, 
   expect(download.suggestedFilename()).not.toContain("Kopie");
 });
 
-test("invoice without price cannot be saved (Story 4.3/edge case)", async ({
-  page,
-}) => {
+test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
   await seedMasterData(page);
   await page.goto("/index.html#/invoices");
 
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
   await page.locator("[id$='invoiceDialog--recipient']").click();
-  await page
-    .locator("li.sapMSelectListItem", { hasText: "Familie Mahr" })
-    .click();
+  await page.locator("li.sapMSelectListItem", { hasText: "Familie Mahr" }).click();
   await page.locator("[id$='lineItem']").click();
-  await page
-    .locator("li.sapMSelectListItem", { hasText: "Grabpflege" })
-    .click();
+  await page.locator("li.sapMSelectListItem", { hasText: "Grabpflege" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.locator(".sapMDialog")).toContainText("Preis");
@@ -5603,10 +5626,7 @@ export interface DocumentDto {
   FileName: string;
 }
 
-export async function createInvoice(
-  recipientId: number,
-  lines: InvoiceLineDto[],
-): Promise<void> {
+export async function createInvoice(recipientId: number, lines: InvoiceLineDto[]): Promise<void> {
   await ensureOk(await post("/odata/CreateInvoice", { recipientId, lines }));
 }
 
@@ -5615,14 +5635,10 @@ export async function createRevision(
   recipientId: number,
   lines: InvoiceLineDto[],
 ): Promise<void> {
-  await ensureOk(
-    await post("/odata/CreateRevision", { invoiceId, recipientId, lines }),
-  );
+  await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
 }
 
-export async function fetchDocuments(
-  invoiceId: number,
-): Promise<DocumentDto[]> {
+export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
   const response = await fetch(`/odata/Invoices(${invoiceId})/Documents`);
   await ensureOk(response);
   const body = await response.json();
@@ -5633,20 +5649,14 @@ export function downloadUrl(documentId: number): string {
   return `/odata/Documents(${documentId})/$value`;
 }
 
-export async function bulkDownload(
-  kind: "Normal" | "Copy",
-  fileName: string,
-): Promise<void> {
+export async function bulkDownload(kind: "Normal" | "Copy", fileName: string): Promise<void> {
   const response = await post("/odata/BulkDownloadDocuments", { kind });
   await ensureOk(response);
   const blob = await response.blob();
   await downloadBlob(blob, fileName);
 }
 
-export async function downloadBlob(
-  blob: Blob,
-  fileName: string,
-): Promise<void> {
+export async function downloadBlob(blob: Blob, fileName: string): Promise<void> {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -5663,14 +5673,22 @@ export async function downloadBlob(
 `Invoices.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Invoices" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  controllerName="burkard.invoicing.controller.Invoices"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -5688,7 +5706,11 @@ export async function downloadBlob(
                         <ToolbarSpacer />
                         <Button text="{i18n>bulkNormal}" press="onBulkNormal" />
                         <Button text="{i18n>bulkCopy}" press="onBulkCopy" />
-                        <Button text="{i18n>createInvoice}" press="onCreateInvoice" type="Emphasized" />
+                        <Button
+              text="{i18n>createInvoice}"
+              press="onCreateInvoice"
+              type="Emphasized"
+            />
                     </Toolbar>
                 </subHeader>
                 <content>
@@ -5708,9 +5730,21 @@ export async function downloadBlob(
                                     <Text text="{odata>GeneratedAt}" />
                                     <Text text="{odata>RevisionNumber}" />
                                     <HBox>
-                                        <Button text="{i18n>downloadNormal}" press="onDownloadNormal" type="Transparent" />
-                                        <Button text="{i18n>downloadCopy}" press="onDownloadCopy" type="Transparent" />
-                                        <Button text="{i18n>editInvoice}" press="onEditInvoice" type="Transparent" />
+                                        <Button
+                      text="{i18n>downloadNormal}"
+                      press="onDownloadNormal"
+                      type="Transparent"
+                    />
+                                        <Button
+                      text="{i18n>downloadCopy}"
+                      press="onDownloadCopy"
+                      type="Transparent"
+                    />
+                                        <Button
+                      text="{i18n>editInvoice}"
+                      press="onEditInvoice"
+                      type="Transparent"
+                    />
                                     </HBox>
                                 </cells>
                             </ColumnListItem>
@@ -5744,9 +5778,7 @@ export default class Invoices extends BaseController {
 
   public onHalfYearChange(event: any): void {
     const key = (event.getSource() as Select).getSelectedKey();
-    const binding = (this.byId("invoicesTable") as any).getBinding(
-      "items",
-    ) as ODataListBinding;
+    const binding = (this.byId("invoicesTable") as any).getBinding("items") as ODataListBinding;
     if (!key) {
       binding.filter([]);
       return;
@@ -5773,9 +5805,7 @@ export default class Invoices extends BaseController {
     await this.openInvoiceDialog(context);
   }
 
-  private async openInvoiceDialog(
-    invoiceContext: Context | null,
-  ): Promise<void> {
+  private async openInvoiceDialog(invoiceContext: Context | null): Promise<void> {
     if (!this._dialog) {
       this._dialog = (await Fragment.load({
         name: "burkard.invoicing.view.fragments.InvoiceDialog",
@@ -5826,21 +5856,13 @@ export default class Invoices extends BaseController {
 
     try {
       if (draft.invoiceId) {
-        await api.createRevision(
-          Number(draft.invoiceId),
-          Number(draft.recipientId),
-          lines,
-        );
+        await api.createRevision(Number(draft.invoiceId), Number(draft.recipientId), lines);
       } else {
         await api.createInvoice(Number(draft.recipientId), lines);
       }
 
       this._dialog.close();
-      (
-        (this.byId("invoicesTable") as any).getBinding(
-          "items",
-        ) as ODataListBinding
-      ).refresh();
+      ((this.byId("invoicesTable") as any).getBinding("items") as ODataListBinding).refresh();
     } catch (error) {
       await api.showError(this, error);
     }
@@ -5851,25 +5873,17 @@ export default class Invoices extends BaseController {
   }
 
   public async onDownloadNormal(event: any): Promise<void> {
-    await this.download(
-      event.getSource().getBindingContext("odata") as Context,
-      false,
-    );
+    await this.download(event.getSource().getBindingContext("odata") as Context, false);
   }
 
   public async onDownloadCopy(event: any): Promise<void> {
-    await this.download(
-      event.getSource().getBindingContext("odata") as Context,
-      true,
-    );
+    await this.download(event.getSource().getBindingContext("odata") as Context, true);
   }
 
   private async download(context: Context, isCopy: boolean): Promise<void> {
     const invoiceId = context.getProperty("Id") as number;
     const documents = await api.fetchDocuments(invoiceId);
-    const match = documents.find(
-      (d) => d.FileName.includes("Kopie") === isCopy,
-    );
+    const match = documents.find((d) => d.FileName.includes("Kopie") === isCopy);
     if (match) {
       window.open(api.downloadUrl(match.Id), "_blank");
     }
@@ -5895,8 +5909,11 @@ export default class Invoices extends BaseController {
         <content>
             <VBox class="sapUiContentPadding">
                 <Label text="{i18n>recipientName}" labelFor="recipient" />
-                <Select id="recipient" items="{odata>/Recipients}"
-                    selectedKey="{invoiceDraft>/recipientId}">
+                <Select
+          id="recipient"
+          items="{odata>/Recipients}"
+          selectedKey="{invoiceDraft>/recipientId}"
+        >
                     <core:Item key="{odata>Id}" text="{odata>Name}" />
                 </Select>
                 <Table id="lineTable" items="{invoiceDraft>/lines}">
@@ -5908,12 +5925,23 @@ export default class Invoices extends BaseController {
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <Select id="lineItem" items="{odata>/InvoiceItems}"
-                                    selectedKey="{invoiceDraft>itemId}">
+                                <Select
+                  id="lineItem"
+                  items="{odata>/InvoiceItems}"
+                  selectedKey="{invoiceDraft>itemId}"
+                >
                                     <core:Item key="{odata>Id}" text="{odata>Number}" />
                                 </Select>
-                                <Input value="{invoiceDraft>count}" type="Number" ariaLabel="{i18n>itemCount}" />
-                                <Input value="{invoiceDraft>unitPrice}" type="Number" ariaLabel="{i18n>itemPrice}" />
+                                <Input
+                  value="{invoiceDraft>count}"
+                  type="Number"
+                  ariaLabel="{i18n>itemCount}"
+                />
+                                <Input
+                  value="{invoiceDraft>unitPrice}"
+                  type="Number"
+                  ariaLabel="{i18n>itemPrice}"
+                />
                             </cells>
                         </ColumnListItem>
                     </items>
@@ -5983,10 +6011,7 @@ git commit -m "feat: invoice creation, revision and document downloads"
 ```ts
 import { test, expect } from "@playwright/test";
 
-async function seedManyGraves(
-  page: import("@playwright/test").Page,
-  count: number,
-): Promise<void> {
+async function seedManyGraves(page: import("@playwright/test").Page, count: number): Promise<void> {
   await page.request.post("http://localhost:8080/odata/VatRates", {
     data: { Rate: 7 },
   });
@@ -6042,9 +6067,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   });
 
   // status column now shows all graves as invoiced
-  await expect(
-    page.locator("table").getByText("erstellt").first(),
-  ).toBeVisible();
+  await expect(page.locator("table").getByText("erstellt").first()).toBeVisible();
 
   // dismiss the success message, then a second generation is prevented
   await page.locator(".sapMDialog").getByRole("button", { name: "OK" }).click();
@@ -6053,9 +6076,7 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   await expect(page.locator(".sapMDialog")).toContainText("bereits");
 });
 
-test("create a grave and link item and recipient (Story 5)", async ({
-  page,
-}) => {
+test("create a grave and link item and recipient (Story 5)", async ({ page }) => {
   await page.request.post("http://localhost:8080/odata/VatRates", {
     data: { Rate: 7 },
   });
@@ -6089,9 +6110,7 @@ test("create a grave and link item and recipient (Story 5)", async ({
   await expect(page.locator(".sapMDialog")).toContainText("8002");
 
   await page.locator("[id$='linkRecipient']").click();
-  await page
-    .locator("li.sapMSelectListItem", { hasText: "Bert Beispiel" })
-    .click();
+  await page.locator("li.sapMSelectListItem", { hasText: "Bert Beispiel" }).click();
   await page.getByRole("button", { name: "Hinzufügen" }).last().click();
   await expect(page.locator(".sapMDialog")).toContainText("Bert Beispiel");
 
@@ -6116,22 +6135,14 @@ export interface JobDto {
   ResultJson?: string;
 }
 
-export async function generateGraveInvoices(
-  year: number,
-  half: number,
-): Promise<JobDto> {
+export async function generateGraveInvoices(year: number, half: number): Promise<JobDto> {
   const response = await post("/odata/GenerateGraveInvoices", { year, half });
   await ensureOk(response);
   return (await response.json()) as JobDto;
 }
 
-export async function fetchGraveStatus(
-  year: number,
-  half: number,
-): Promise<any[]> {
-  const response = await fetch(
-    `/odata/GraveInvoicingStatus?year=${year}&half=${half}`,
-  );
+export async function fetchGraveStatus(year: number, half: number): Promise<any[]> {
+  const response = await fetch(`/odata/GraveInvoicingStatus?year=${year}&half=${half}`);
   await ensureOk(response);
   const body = await response.json();
   return body.value as any[];
@@ -6182,10 +6193,7 @@ export async function fetchGraveDetails(graveId: number): Promise<any> {
   return response.json();
 }
 
-export async function patchGrave(
-  graveId: number,
-  fields: Record<string, unknown>,
-): Promise<void> {
+export async function patchGrave(graveId: number, fields: Record<string, unknown>): Promise<void> {
   const response = await fetch(`/odata/Graves(${graveId})`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -6195,15 +6203,11 @@ export async function patchGrave(
 }
 
 export async function deleteGraveItemLink(linkId: number): Promise<void> {
-  await ensureOk(
-    await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }),
-  );
+  await ensureOk(await fetch(`/odata/GraveItems(${linkId})`, { method: "DELETE" }));
 }
 
 export async function deleteGraveRecipientLink(linkId: number): Promise<void> {
-  await ensureOk(
-    await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }),
-  );
+  await ensureOk(await fetch(`/odata/GraveRecipients(${linkId})`, { method: "DELETE" }));
 }
 ```
 
@@ -6214,14 +6218,22 @@ Also add `GraveNotSaved: "errorGraveNotSaved"` to the `CODE_TO_I18N` map in `api
 `Graves.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt"
-    xmlns:core="sap.ui.core"
-    controllerName="burkard.invoicing.controller.Graves" displayBlock="true">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  xmlns:tnt="sap.tnt"
+  xmlns:core="sap.ui.core"
+  controllerName="burkard.invoicing.controller.Graves"
+  displayBlock="true"
+>
     <tnt:ToolPage>
         <tnt:sideContent>
             <tnt:SideNavigation>
                 <tnt:item>
-                    <core:Fragment fragmentName="burkard.invoicing.view.fragments.Navigation" type="XML" />
+                    <core:Fragment
+            fragmentName="burkard.invoicing.view.fragments.Navigation"
+            type="XML"
+          />
                 </tnt:item>
             </tnt:SideNavigation>
         </tnt:sideContent>
@@ -6238,7 +6250,11 @@ Also add `GraveNotSaved: "errorGraveNotSaved"` to the `CODE_TO_I18N` map in `api
                         </Select>
                         <ToolbarSpacer />
                         <Button text="{i18n>createGrave}" press="onCreateGrave" />
-                        <Button text="{i18n>generateInvoices}" press="onGenerateInvoices" type="Emphasized" />
+                        <Button
+              text="{i18n>generateInvoices}"
+              press="onGenerateInvoices"
+              type="Emphasized"
+            />
                     </Toolbar>
                 </subHeader>
                 <content>
@@ -6256,8 +6272,14 @@ Also add `GraveNotSaved: "errorGraveNotSaved"` to the `CODE_TO_I18N` map in `api
                                     <Text text="{odata>GraveNumber}" />
                                     <Text text="{odata>StartDate}" />
                                     <Text text="{odata>EndDate}" />
-                                    <Text text="{parts: [{path: 'odata>Id'}, {path: 'status>/statuses'}], formatter: '.statusFormatter'}" />
-                                    <Button text="{i18n>edit}" press="onEditGrave" type="Transparent" />
+                                    <Text
+                    text="{parts: [{path: 'odata>Id'}, {path: 'status>/statuses'}], formatter: '.statusFormatter'}"
+                  />
+                                    <Button
+                    text="{i18n>edit}"
+                    press="onEditGrave"
+                    type="Transparent"
+                  />
                                 </cells>
                             </ColumnListItem>
                         </items>
@@ -6291,13 +6313,8 @@ export default class Graves extends BaseController {
     void this.refreshStatus();
   }
 
-  public statusFormatter(
-    graveId: number,
-    statuses: Record<string, any>,
-  ): string {
-    const bundle = (
-      this.getView()!.getModel("i18n") as any
-    ).getResourceBundle();
+  public statusFormatter(graveId: number, statuses: Record<string, any>): string {
+    const bundle = (this.getView()!.getModel("i18n") as any).getResourceBundle();
     return statuses?.[String(graveId)]?.Invoiced
       ? bundle.getText("statusInvoiced")
       : bundle.getText("statusOpen");
@@ -6319,10 +6336,7 @@ export default class Graves extends BaseController {
         statuses[String(row.Id)] = row;
       }
 
-      (this.getView()!.getModel("status") as JSONModel).setProperty(
-        "/statuses",
-        statuses,
-      );
+      (this.getView()!.getModel("status") as JSONModel).setProperty("/statuses", statuses);
     } catch (error) {
       await api.showError(this, error);
     }
@@ -6346,9 +6360,7 @@ export default class Graves extends BaseController {
     this._graveDialog = dialog;
 
     if (graveContext) {
-      const details = await api.fetchGraveDetails(
-        graveContext.getProperty("Id") as number,
-      );
+      const details = await api.fetchGraveDetails(graveContext.getProperty("Id") as number);
       dialog.setModel(
         new JSONModel({
           Id: details.Id,
@@ -6368,10 +6380,7 @@ export default class Graves extends BaseController {
         "graveDraft",
       );
     } else {
-      dialog.setModel(
-        new JSONModel({ Items: [], Recipients: [] }),
-        "graveDraft",
-      );
+      dialog.setModel(new JSONModel({ Items: [], Recipients: [] }), "graveDraft");
     }
 
     dialog.open();
@@ -6396,11 +6405,7 @@ export default class Graves extends BaseController {
       }
 
       dialog.close();
-      (
-        (this.byId("gravesTable") as any).getBinding(
-          "items",
-        ) as ODataListBinding
-      ).refresh();
+      ((this.byId("gravesTable") as any).getBinding("items") as ODataListBinding).refresh();
     } catch (error) {
       await api.showError(this, error);
     }
@@ -6471,9 +6476,7 @@ export default class Graves extends BaseController {
 
   private async reloadGraveLinks(): Promise<void> {
     const draft = this._graveDialog.getModel("graveDraft") as JSONModel;
-    const details = await api.fetchGraveDetails(
-      Number(draft.getProperty("/Id")),
-    );
+    const details = await api.fetchGraveDetails(Number(draft.getProperty("/Id")));
     draft.setProperty(
       "/Items",
       details.Items.map((link: any) => ({
@@ -6559,9 +6562,7 @@ export default class Graves extends BaseController {
   }
 
   private i18nText(key: string): string {
-    return (this.getView()!.getModel("i18n") as any)
-      .getResourceBundle()
-      .getText(key);
+    return (this.getView()!.getModel("i18n") as any).getResourceBundle().getText(key);
   }
 
   private _running = false;
@@ -6579,11 +6580,21 @@ export default class Graves extends BaseController {
                 <Label text="{i18n>graveNumber}" labelFor="graveNumber" />
                 <Input id="graveNumber" width="16rem" value="{graveDraft>/GraveNumber}" />
                 <Label text="{i18n>startDate}" labelFor="graveStart" />
-                <DatePicker id="graveStart" width="16rem" displayFormat="yyyy-MM-dd"
-                    valueFormat="yyyy-MM-dd" value="{graveDraft>/StartDate}" />
+                <DatePicker
+          id="graveStart"
+          width="16rem"
+          displayFormat="yyyy-MM-dd"
+          valueFormat="yyyy-MM-dd"
+          value="{graveDraft>/StartDate}"
+        />
                 <Label text="{i18n>endDate}" labelFor="graveEnd" />
-                <DatePicker id="graveEnd" width="16rem" displayFormat="yyyy-MM-dd"
-                    valueFormat="yyyy-MM-dd" value="{graveDraft>/EndDate}" />
+                <DatePicker
+          id="graveEnd"
+          width="16rem"
+          displayFormat="yyyy-MM-dd"
+          valueFormat="yyyy-MM-dd"
+          value="{graveDraft>/EndDate}"
+        />
                 <Panel headerText="{i18n>graveItems}">
                     <Table items="{graveDraft>/Items}">
                         <columns>
@@ -6596,7 +6607,11 @@ export default class Graves extends BaseController {
                                 <cells>
                                     <Text text="{graveDraft>Number}" />
                                     <Text text="{graveDraft>Count}" />
-                                    <Button text="{i18n>delete}" press="onDeleteItemLink" type="Transparent" />
+                                    <Button
+                    text="{i18n>delete}"
+                    press="onDeleteItemLink"
+                    type="Transparent"
+                  />
                                 </cells>
                             </ColumnListItem>
                         </items>
@@ -6605,7 +6620,13 @@ export default class Graves extends BaseController {
                         <Select id="linkItem" items="{odata>/InvoiceItems}">
                             <core:Item key="{odata>Id}" text="{odata>Number}" />
                         </Select>
-                        <Input id="linkCount" type="Number" width="6rem" value="1" ariaLabel="{i18n>itemCount}" />
+                        <Input
+              id="linkCount"
+              type="Number"
+              width="6rem"
+              value="1"
+              ariaLabel="{i18n>itemCount}"
+            />
                         <Button text="{i18n>add}" press="onAddItemLink" />
                     </HBox>
                 </Panel>
@@ -6619,7 +6640,11 @@ export default class Graves extends BaseController {
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{graveDraft>Name}" />
-                                    <Button text="{i18n>delete}" press="onDeleteRecipientLink" type="Transparent" />
+                                    <Button
+                    text="{i18n>delete}"
+                    press="onDeleteRecipientLink"
+                    type="Transparent"
+                  />
                                 </cells>
                             </ColumnListItem>
                         </items>

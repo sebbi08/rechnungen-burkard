@@ -54,6 +54,42 @@ control. Leave it as it is.
   tablet projects only run `tests/layout.spec.ts`.
 - **Release scripts**: `scripts/test-release-scripts.sh`.
 
+## Formatting is automatic
+
+Two formatters, split by directory. **CSharpier** owns `backend/`; **Prettier**
+owns everything else — `.prettierignore` excludes `backend/` so no file answers
+to both. Prettier also honours `.gitignore`, so `dist/`, `node_modules/` and
+`data/` need no entry.
+
+`.husky/pre-commit` runs `lint-staged`, which formats staged files in place. The
+C# entry starts the SDK container, so it costs a couple of seconds — but only
+when C# is actually staged; a docs-only commit never needs Docker. CI re-checks
+both in the `format` job, since hooks only exist where `npm install` has been
+run and `--no-verify` skips them.
+
+By hand:
+
+```sh
+npm run format          # rewrite
+npm run format:check    # fail if anything is unformatted
+```
+
+CSharpier goes through `scripts/csharpier.sh`, which runs it in the SDK
+container like `scripts/dotnet.sh`. It parses syntax and never loads MSBuild, so
+unlike `dotnet format` it does not restore into `backend/obj` and cannot collide
+with the dev container — the conflict described at the end of this file does not
+apply to it.
+
+`printWidth` is 100 rather than Prettier's default 80, which is roughly where
+this codebase already wrapped, and matches CSharpier's own default.
+
+`git blame` skips the initial reformat via `.git-blame-ignore-revs`. To have it
+do that automatically:
+
+```sh
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
 ## Commit messages are linted
 
 Run `npm install` once at the repository root. It installs the `commit-msg`

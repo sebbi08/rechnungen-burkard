@@ -5,7 +5,8 @@ namespace Burkard.Invoicing.Api.Jobs;
 public sealed class JobQueue
 {
     private readonly Channel<long> _channel = Channel.CreateUnbounded<long>(
-        new UnboundedChannelOptions { SingleReader = true });
+        new UnboundedChannelOptions { SingleReader = true }
+    );
 
     public void Enqueue(long jobId) => _channel.Writer.TryWrite(jobId);
 

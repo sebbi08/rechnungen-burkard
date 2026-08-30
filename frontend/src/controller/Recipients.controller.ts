@@ -64,9 +64,7 @@ export default class Recipients extends BaseController {
         await api.updateRecipient(draft.id, { ...fields, Number: number });
       } else {
         // an empty number means "assign the next free one"
-        await api.createRecipient(
-          number ? { ...fields, Number: number } : fields,
-        );
+        await api.createRecipient(number ? { ...fields, Number: number } : fields);
       }
       this._dialog.close();
       this.odata().refresh();
@@ -81,9 +79,7 @@ export default class Recipients extends BaseController {
 
   /** The draft lives on the dialog rather than the view, so it is read there. */
   private draft(): TypedJSONModel<RecipientDraft> {
-    return this._dialog.getModel(
-      "recipientDraft",
-    ) as TypedJSONModel<RecipientDraft>;
+    return this._dialog.getModel("recipientDraft") as TypedJSONModel<RecipientDraft>;
   }
 
   private _dialog!: Dialog;

@@ -21,44 +21,77 @@ public class GraveRecipientsController : ODataController
     /// on a grave that was never invoiced stay writable.</summary>
     private bool WasInvoiced(long graveId) => _db.GraveInvoiceRuns.Any(r => r.GraveId == graveId);
 
-    private static ObjectResult Immutable() => new(new
-    {
-        error = new { code = "GraveRecipientsImmutable", message = "A grave's recipients cannot be changed." }
-    })
-    { StatusCode = StatusCodes.Status400BadRequest };
+    private static ObjectResult Immutable() =>
+        new(
+            new
+            {
+                error = new
+                {
+                    code = "GraveRecipientsImmutable",
+                    message = "A grave's recipients cannot be changed.",
+                },
+            }
+        )
+        {
+            StatusCode = StatusCodes.Status400BadRequest,
+        };
 
     public IActionResult Post([FromBody] GraveRecipient? link)
     {
         if (link is null)
         {
-            return BadRequest(new
-            {
-                error = new { code = "InvalidRequest", message = "The request body is required." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
         }
 
         if (!_db.Graves.Any(g => g.Id == link.GraveId))
         {
-            return BadRequest(new
-            {
-                error = new { code = "GraveNotFound", message = "The grave does not exist." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new { code = "GraveNotFound", message = "The grave does not exist." },
+                }
+            );
         }
 
         if (!_db.Recipients.Any(r => r.Id == link.RecipientId))
         {
-            return BadRequest(new
-            {
-                error = new { code = "RecipientNotFound", message = "The recipient does not exist." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "RecipientNotFound",
+                        message = "The recipient does not exist.",
+                    },
+                }
+            );
         }
 
-        if (_db.GraveRecipients.Any(l => l.GraveId == link.GraveId && l.RecipientId == link.RecipientId))
+        if (
+            _db.GraveRecipients.Any(l =>
+                l.GraveId == link.GraveId && l.RecipientId == link.RecipientId
+            )
+        )
         {
-            return BadRequest(new
-            {
-                error = new { code = "GraveRecipientLinkExists", message = "This recipient is already linked to the grave." }
-            });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "GraveRecipientLinkExists",
+                        message = "This recipient is already linked to the grave.",
+                    },
+                }
+            );
         }
 
         if (WasInvoiced(link.GraveId))
@@ -74,7 +107,8 @@ public class GraveRecipientsController : ODataController
     public IActionResult Delete([FromRoute] long key)
     {
         var link = _db.GraveRecipients.Find(key);
-        if (link is null) return NotFound();
+        if (link is null)
+            return NotFound();
         if (WasInvoiced(link.GraveId))
         {
             return Immutable();

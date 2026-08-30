@@ -11,7 +11,13 @@ public static class ImportArchiveLayout
     public const string MappingFile = "mapping.csv";
 
     public static readonly string[] RecipientsHeader = { "RecipientNumber", "Name", "Address" };
-    public static readonly string[] ItemsHeader = { "ItemNumber", "Description", "VatRate", "Price" };
+    public static readonly string[] ItemsHeader =
+    {
+        "ItemNumber",
+        "Description",
+        "VatRate",
+        "Price",
+    };
     public static readonly string[] GravesHeader = { "GraveNumber", "StartDate", "EndDate" };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
@@ -21,14 +27,16 @@ public static class ImportArchiveLayout
     public const string ItemLinkType = "Item";
     public const string RecipientLinkType = "Recipient";
 
-    public static readonly IReadOnlyDictionary<string, string[]> Headers =
-        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-        {
-            [RecipientsFile] = RecipientsHeader,
-            [ItemsFile] = ItemsHeader,
-            [GravesFile] = GravesHeader,
-            [MappingFile] = MappingHeader,
-        };
+    public static readonly IReadOnlyDictionary<string, string[]> Headers = new Dictionary<
+        string,
+        string[]
+    >(StringComparer.OrdinalIgnoreCase)
+    {
+        [RecipientsFile] = RecipientsHeader,
+        [ItemsFile] = ItemsHeader,
+        [GravesFile] = GravesHeader,
+        [MappingFile] = MappingHeader,
+    };
 
     public static IReadOnlyList<string> FileNames { get; } =
         new[] { RecipientsFile, ItemsFile, GravesFile, MappingFile };

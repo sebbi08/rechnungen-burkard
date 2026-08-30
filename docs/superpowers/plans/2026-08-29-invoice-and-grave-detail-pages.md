@@ -41,7 +41,7 @@ with TypeScript; Playwright for E2E; Docker for everything.
 - **Only `e2e/tests/graves.spec.ts` may trigger grave generation**, and only it
   may assert on the current half-year's invoicing state. The backend allows one
   `GraveInvoices` job at a time and answers a second with `JobAlreadyRunning`,
-  and a generation invoices *every* grave in the stack — including the ones
+  and a generation invoices _every_ grave in the stack — including the ones
   other specs just created. Playwright runs spec files in parallel but the tests
   inside one file sequentially, so keeping generation in a single file makes
   both the job and the resulting status deterministic. New generation-dependent
@@ -65,13 +65,13 @@ with TypeScript; Playwright for E2E; Docker for everything.
 
 **Backend — created**
 
-| File | Responsibility |
-|---|---|
-| `backend/src/Invoicing.Domain/GraveInvoiceSplitter.cs` | `GraveLine` record; `Split` (grave lines → per-recipient lines) and `Combine` (the best-effort inverse, for pre-migration rows) |
-| `backend/src/Invoicing.Api/Services/GraveInvoiceRevisionService.cs` | Revises every recipient invoice of one grave + half-year in one transaction |
-| `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceRunsController.cs` | Read-only entity set over the existing runs table |
-| `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceGroupController.cs` | The `GraveInvoiceGroup` projection that fills the edit dialog |
-| `backend/src/Invoicing.Api/Migrations/<ts>_LatestRevisionAndGraveUnitPrice.cs` | The single migration |
+| File                                                                           | Responsibility                                                                                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/src/Invoicing.Domain/GraveInvoiceSplitter.cs`                         | `GraveLine` record; `Split` (grave lines → per-recipient lines) and `Combine` (the best-effort inverse, for pre-migration rows) |
+| `backend/src/Invoicing.Api/Services/GraveInvoiceRevisionService.cs`            | Revises every recipient invoice of one grave + half-year in one transaction                                                     |
+| `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceRunsController.cs`    | Read-only entity set over the existing runs table                                                                               |
+| `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceGroupController.cs`   | The `GraveInvoiceGroup` projection that fills the edit dialog                                                                   |
+| `backend/src/Invoicing.Api/Migrations/<ts>_LatestRevisionAndGraveUnitPrice.cs` | The single migration                                                                                                            |
 
 **Backend — modified**
 
@@ -115,19 +115,21 @@ The revision panel markup is shared between `InvoiceDetail.view.xml` and
 used as the aggregation-binding template for the `{detail>/revisions}` `VBox`
 on both views (`<core:Fragment fragmentName="..." type="XML"/>` as the
 `VBox`'s sole item, cloned and bound once per revision the same way inline
-markup would be). The *logic* is shared through `InvoiceRevisions`.
+markup would be). The _logic_ is shared through `InvoiceRevisions`.
 
 ---
 
 ### Task 1: `GraveInvoiceSplitter` — the split, in one place
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Domain/GraveInvoiceSplitter.cs`
 - Test: `backend/tests/Invoicing.IntegrationTests/GraveInvoiceSplitterTests.cs`
 - Modify: `backend/src/Invoicing.Api/Services/GraveInvoiceGenerator.cs` (drop its
   private `EffectivePrice`/`GrossCents`/`BuildLines`, call the splitter)
 
 **Interfaces:**
+
 - Consumes: `ShareCalculator.SplitCents(long totalCents, int recipients) -> long[]`
   and `InvoiceLine` from `Burkard.Invoicing.Domain.Entities`.
 - Produces:
@@ -431,6 +433,7 @@ known lossy case for small amounts."
 ### Task 2: The migration — `IsLatestRevision` and `GraveUnitPrice`
 
 **Files:**
+
 - Modify: `backend/src/Invoicing.Domain/Entities/Invoice.cs`
 - Modify: `backend/src/Invoicing.Api/Persistence/AppDbContext.cs`
 - Create: `backend/src/Invoicing.Api/Migrations/<timestamp>_LatestRevisionAndGraveUnitPrice.cs` (generated)
@@ -439,6 +442,7 @@ known lossy case for small amounts."
 - Test: `backend/tests/Invoicing.IntegrationTests/LatestRevisionTests.cs`
 
 **Interfaces:**
+
 - Consumes: `GraveLine`/`Split` from Task 1; `InvoiceLine.GraveUnitPrice`, added
   in Task 1 Step 3.
 - Produces: `Invoice.IsLatestRevision` (bool, default `true`) — every later task
@@ -832,11 +836,13 @@ was invoiced instead of a reconstruction."
 ### Task 3: Invoice search as a custom query option
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/Services/InvoiceSearch.cs`
 - Modify: `backend/src/Invoicing.Api/OData/Controllers/InvoicesController.cs`
 - Test: `backend/tests/Invoicing.IntegrationTests/InvoiceSearchTests.cs`
 
 **Interfaces:**
+
 - Produces: `GET /odata/Invoices?search=<term>` — narrows the entity set before
   `EnableQuery` applies `$filter`, `$orderby`, `$skip` and `$top`, so paging still
   works. Task 8's search field is the only consumer.
@@ -1147,12 +1153,14 @@ SQLite folds case for ASCII only, which would miss German umlauts."
 ### Task 4: `GraveInvoiceRuns` and `GraveInvoiceGroup`
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceRunsController.cs`
 - Create: `backend/src/Invoicing.Api/OData/Controllers/GraveInvoiceGroupController.cs`
 - Modify: `backend/src/Invoicing.Api/OData/EdmModelBuilder.cs`
 - Test: `backend/tests/Invoicing.IntegrationTests/GraveInvoiceGroupTests.cs`
 
 **Interfaces:**
+
 - Consumes: `GraveInvoiceSplitter.Combine`, `InvoiceLine.GraveUnitPrice`,
   `Invoice.IsLatestRevision`.
 - Produces:
@@ -1492,6 +1500,7 @@ read-only entity set so a grave detail page can show its half-years."
 ### Task 5: `CreateGraveInvoiceRevision` — revise every recipient at once
 
 **Files:**
+
 - Create: `backend/src/Invoicing.Api/Services/InvoiceDocumentFactory.cs`
 - Create: `backend/src/Invoicing.Api/Services/GraveInvoiceRevisionService.cs`
 - Modify: `backend/src/Invoicing.Api/Services/InvoiceService.cs` (use the factory)
@@ -1502,6 +1511,7 @@ read-only entity set so a grave detail page can show its half-years."
 - Test: `backend/tests/Invoicing.IntegrationTests/GraveInvoiceRevisionTests.cs`
 
 **Interfaces:**
+
 - Consumes: `GraveInvoiceSplitter.Split`, `InvoiceLineInput`, `ValidationException`,
   `Invoice.IsLatestRevision`.
 - Produces:
@@ -2039,11 +2049,13 @@ half-year is never left with some recipients revised and others not."
 ### Task 6: A grave's recipients cannot change
 
 **Files:**
+
 - Modify: `backend/src/Invoicing.Api/Services/GraveService.cs`
 - Modify: `backend/src/Invoicing.Api/OData/Controllers/GraveRecipientsController.cs`
 - Test: `backend/tests/Invoicing.IntegrationTests/GraveRecipientImmutabilityTests.cs`
 
 **Interfaces:**
+
 - Produces: error code `GraveRecipientsImmutable`, mapped to German text by
   Task 7's `CODE_TO_I18N`.
 
@@ -2306,6 +2318,7 @@ with what was sent out."
 ### Task 7: Frontend groundwork — shared controllers, API, texts
 
 **Files:**
+
 - Modify: `frontend/src/controller/Base.controller.ts`
 - Create: `frontend/src/controller/InvoiceRevisions.controller.ts`
 - Modify: `frontend/src/model/api.ts`
@@ -2314,6 +2327,7 @@ with what was sent out."
   (drop what moved to `Base`)
 
 **Interfaces:**
+
 - Consumes: Task 3–5's endpoints.
 - Produces, on `BaseController`: `router()`, `odata()`, `bindODataRoot()`,
   `readList(path, parameters) -> Promise<any[]>`, `formatDate`, `formatAmount`,
@@ -2356,10 +2370,7 @@ export default abstract class BaseController extends Controller {
    * they are added to the App, so view.getModel("odata") is not visible yet.
    */
   protected bindODataRoot(): void {
-    this.getView()!.setBindingContext(
-      this.odata().createBindingContext("/") as Context,
-      "odata",
-    );
+    this.getView()!.setBindingContext(this.odata().createBindingContext("/") as Context, "odata");
   }
 
   /**
@@ -2367,17 +2378,8 @@ export default abstract class BaseController extends Controller {
    * (D-002) — and hands back plain objects for a JSONModel. The detail pages
    * compute totals per revision, which a list binding cannot express.
    */
-  protected async readList(
-    path: string,
-    parameters: Record<string, unknown>,
-  ): Promise<any[]> {
-    const binding = this.odata().bindList(
-      path,
-      undefined,
-      undefined,
-      undefined,
-      parameters as any,
-    );
+  protected async readList(path: string, parameters: Record<string, unknown>): Promise<any[]> {
+    const binding = this.odata().bindList(path, undefined, undefined, undefined, parameters as any);
     const contexts = await binding.requestContexts(0, 500);
     const rows = contexts.map((context) => context.getObject());
     binding.destroy();
@@ -2385,9 +2387,7 @@ export default abstract class BaseController extends Controller {
   }
 
   protected i18nText(key: string): string {
-    return (this.getView()!.getModel("i18n") as any)
-      .getResourceBundle()
-      .getText(key);
+    return (this.getView()!.getModel("i18n") as any).getResourceBundle().getText(key);
   }
 
   public formatDate(value: Date | string | null | undefined): string {
@@ -2423,10 +2423,7 @@ export default abstract class BaseController extends Controller {
   }
 
   /** Opens an invoice's PDF in a new tab, where the browser displays it. */
-  protected async openDocument(
-    invoiceId: number,
-    isCopy: boolean,
-  ): Promise<void> {
+  protected async openDocument(invoiceId: number, isCopy: boolean): Promise<void> {
     // The tab is opened before the documents are fetched: one opened after the
     // await no longer belongs to the click, and browsers block it as a popup.
     const tab = window.open("", "_blank");
@@ -2525,9 +2522,7 @@ export interface GraveInvoiceGroup {
 
 /** The grave, half-year and recipients a grave invoice belongs to, with the
  *  grave's lines as they were invoiced — not as the grave looks today. */
-export async function fetchGraveInvoiceGroup(
-  invoiceId: number,
-): Promise<GraveInvoiceGroup> {
+export async function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveInvoiceGroup> {
   const response = await fetch(`/odata/GraveInvoiceGroup?invoiceId=${invoiceId}`);
   await ensureOk(response);
   return (await response.json()) as GraveInvoiceGroup;
@@ -2539,9 +2534,7 @@ export async function createGraveInvoiceRevision(
   invoiceId: number,
   lines: InvoiceLineDto[],
 ): Promise<void> {
-  await ensureOk(
-    await post("/odata/CreateGraveInvoiceRevision", { invoiceId, lines }),
-  );
+  await ensureOk(await post("/odata/CreateGraveInvoiceRevision", { invoiceId, lines }));
 }
 ```
 
@@ -2777,6 +2770,7 @@ the texts they need."
 ### Task 8: The invoice detail page
 
 **Files:**
+
 - Create: `frontend/src/controller/InvoiceEdit.controller.ts`
 - Create: `frontend/src/view/InvoiceDetail.view.xml`
 - Create: `frontend/src/controller/InvoiceDetail.controller.ts`
@@ -2785,6 +2779,7 @@ the texts they need."
 - Test: `e2e/tests/invoice-detail.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `InvoiceRevisions.loadChain` / `buildRevisionModel` (Task 7).
 - Produces:
   - Route `invoiceDetail`, pattern `invoices/{rootId}` — Task 9's details button
@@ -2841,12 +2836,8 @@ test("the detail page shows every revision of an invoice", async ({ page }) => {
   await expect(page.getByText("321,00 €").first()).toBeVisible();
 
   // both documents of a revision are reachable from its panel
-  await expect(
-    page.getByRole("button", { name: "Rechnung herunterladen" }).first(),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Kopie herunterladen" }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rechnung herunterladen" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kopie herunterladen" }).first()).toBeVisible();
 });
 ```
 
@@ -2892,12 +2883,8 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       })) as any;
     }
 
-    const lines =
-      invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
-    this._invoiceDialog.setModel(
-      new JSONModel({ recipientId, invoiceId, lines }),
-      "invoiceDraft",
-    );
+    const lines = invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
+    this._invoiceDialog.setModel(new JSONModel({ recipientId, invoiceId, lines }), "invoiceDraft");
     this._invoiceDialog.open();
   }
 
@@ -2939,18 +2926,12 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     const path = rowContext.getPath();
     const model = rowContext.getModel() as JSONModel;
     model.setProperty(path + "/itemNumber", itemContext.getProperty("Number") as string);
-    model.setProperty(
-      path + "/description",
-      itemContext.getProperty("Description") as string,
-    );
+    model.setProperty(path + "/description", itemContext.getProperty("Description") as string);
     // the item's default price is pre-filled and stays overridable; an item
     // without one leaves the field empty so a price has to be typed
     const defaultPrice = itemContext.getProperty("DefaultPrice");
     model.setProperty(path + "/defaultPrice", defaultPrice);
-    model.setProperty(
-      path + "/unitPrice",
-      defaultPrice != null ? Number(defaultPrice) : null,
-    );
+    model.setProperty(path + "/unitPrice", defaultPrice != null ? Number(defaultPrice) : null);
   }
 
   public onAddLine(): void {
@@ -2991,8 +2972,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       itemId: Number(line.itemId),
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
-      unitPrice:
-        line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
+      unitPrice: line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
     }));
 
     // The invoice goes to the recipient the dialog shows. The dialog is built
@@ -3056,10 +3036,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       // then select it in the parent invoice dialog, which stays open
       const select = this.byId("recipient") as Select;
       await (select.getBinding("items") as ODataListBinding).refresh();
-      (this._invoiceDialog.getModel("invoiceDraft") as JSONModel).setProperty(
-        "/recipientId",
-        id,
-      );
+      (this._invoiceDialog.getModel("invoiceDraft") as JSONModel).setProperty("/recipientId", id);
       dialog.close();
     } catch (error) {
       await api.showError(this, error);
@@ -3129,10 +3106,20 @@ and to `targets`:
 Create `frontend/src/view/InvoiceDetail.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.InvoiceDetail" displayBlock="true">
-    <Page id="invoiceDetailPage" title="{i18n>invoiceDetailTitle}" titleLevel="H1"
-        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="burkard.invoicing.controller.InvoiceDetail"
+  displayBlock="true"
+>
+    <Page
+    id="invoiceDetailPage"
+    title="{i18n>invoiceDetailTitle}"
+    titleLevel="H1"
+    showNavButton="true"
+    navButtonPress=".onNavBack"
+    class="sapUiResponsiveContentPadding"
+  >
         <headerContent>
             <Button icon="sap-icon://edit" tooltip="{i18n>actionEdit}" press=".onEditInvoice" />
         </headerContent>
@@ -3145,26 +3132,50 @@ Create `frontend/src/view/InvoiceDetail.view.xml`:
             </VBox>
             <!-- one panel per revision, newest first; the history stays collapsed -->
             <VBox items="{detail>/revisions}">
-                <Panel headerText="{detail>Title}" expandable="true" expanded="{detail>Expanded}"
-                    class="sapUiSmallMarginTop">
+                <Panel
+          headerText="{detail>Title}"
+          expandable="true"
+          expanded="{detail>Expanded}"
+          class="sapUiSmallMarginTop"
+        >
                     <content>
                         <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginBottom">
                             <Text text="{detail>InvoiceNumber}" class="sapUiSmallMarginEnd" />
-                            <Text text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
-                                class="sapUiSmallMarginEnd" />
-                            <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                tooltip="{i18n>actionDownloadNormal}" press=".onDownloadRevisionNormal" />
-                            <Button icon="sap-icon://copy" type="Transparent"
-                                tooltip="{i18n>actionDownloadCopy}" press=".onDownloadRevisionCopy" />
+                            <Text
+                text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
+                class="sapUiSmallMarginEnd"
+              />
+                            <Button
+                icon="sap-icon://pdf-attachment"
+                type="Transparent"
+                tooltip="{i18n>actionDownloadNormal}"
+                press=".onDownloadRevisionNormal"
+              />
+                            <Button
+                icon="sap-icon://copy"
+                type="Transparent"
+                tooltip="{i18n>actionDownloadCopy}"
+                press=".onDownloadRevisionCopy"
+              />
                         </HBox>
                         <Table items="{detail>Lines}" autoPopinMode="true" popinLayout="Block">
                             <columns>
                                 <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
-                                <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
-                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>lineTotal}" /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text
+                    text="{i18n>itemDescription}"
+                  /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text
+                    text="{i18n>itemCount}"
+                  /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text
+                    text="{i18n>itemPrice}"
+                  /></Column>
+                                <Column importance="Low" popinDisplay="Inline"><Text
+                    text="{i18n>vatRate}"
+                  /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text
+                    text="{i18n>lineTotal}"
+                  /></Column>
                             </columns>
                             <items>
                                 <ColumnListItem>
@@ -3172,20 +3183,33 @@ Create `frontend/src/view/InvoiceDetail.view.xml`:
                                         <Text text="{detail>ItemNumber}" />
                                         <Text text="{detail>Description}" wrapping="true" />
                                         <Text text="{detail>Count}" />
-                                        <Text text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}" />
+                                        <Text
+                      text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}"
+                    />
                                         <Text text="{detail>VatRate}" />
-                                        <Text text="{path: 'detail>LineTotal', formatter: '.formatAmount'}" />
+                                        <Text
+                      text="{path: 'detail>LineTotal', formatter: '.formatAmount'}"
+                    />
                                     </cells>
                                 </ColumnListItem>
                             </items>
                         </Table>
                         <HBox wrap="Wrap" justifyContent="End" class="sapUiSmallMarginTop">
-                            <ObjectStatus title="{i18n>netTotal}" class="sapUiSmallMarginEnd"
-                                text="{path: 'detail>NetTotal', formatter: '.formatAmount'}" />
-                            <ObjectStatus title="{i18n>vatTotal}" class="sapUiSmallMarginEnd"
-                                text="{path: 'detail>VatTotal', formatter: '.formatAmount'}" />
-                            <ObjectStatus title="{i18n>grossTotal}" state="Information"
-                                text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}" />
+                            <ObjectStatus
+                title="{i18n>netTotal}"
+                class="sapUiSmallMarginEnd"
+                text="{path: 'detail>NetTotal', formatter: '.formatAmount'}"
+              />
+                            <ObjectStatus
+                title="{i18n>vatTotal}"
+                class="sapUiSmallMarginEnd"
+                text="{path: 'detail>VatTotal', formatter: '.formatAmount'}"
+              />
+                            <ObjectStatus
+                title="{i18n>grossTotal}"
+                state="Information"
+                text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}"
+              />
                         </HBox>
                     </content>
                 </Panel>
@@ -3208,9 +3232,7 @@ import InvoiceEdit from "./InvoiceEdit.controller";
 export default class InvoiceDetail extends InvoiceEdit {
   public onInit(): void {
     this.bindODataRoot();
-    this.router()
-      .getRoute("invoiceDetail")!
-      .attachPatternMatched(this.onRouteMatched, this);
+    this.router().getRoute("invoiceDetail")!.attachPatternMatched(this.onRouteMatched, this);
   }
 
   private async onRouteMatched(event: any): Promise<void> {
@@ -3241,10 +3263,7 @@ export default class InvoiceDetail extends InvoiceEdit {
     if (invoiceId == null) {
       return;
     }
-    await this.openInvoiceDialog(
-      invoiceId,
-      model.getProperty("/recipientId") as number,
-    );
+    await this.openInvoiceDialog(invoiceId, model.getProperty("/recipientId") as number);
   }
 
   protected async afterInvoiceSaved(): Promise<void> {
@@ -3303,6 +3322,7 @@ detail page can open the same one the list does."
 ### Task 9: The invoice page — no grave invoices, a search, four icon actions
 
 **Files:**
+
 - Modify: `frontend/src/view/Invoices.view.xml`
 - Modify: `frontend/src/controller/Invoices.controller.ts`
 - Modify: `frontend/src/i18n/i18n.properties`, `frontend/src/i18n/i18n_en.properties`
@@ -3310,6 +3330,7 @@ detail page can open the same one the list does."
 - Test: `e2e/tests/invoices.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `search` (Task 3), `IsLatestRevision` (Task 2), route `invoiceDetail`
   (Task 8).
 
@@ -3321,9 +3342,7 @@ download arrives on the grave page in Task 13.
 Append to `e2e/tests/invoices.spec.ts`:
 
 ```ts
-test("the list shows non-grave invoices only and searches them (Story 9)", async ({
-  page,
-}) => {
+test("the list shows non-grave invoices only and searches them (Story 9)", async ({ page }) => {
   const marker = `Suche ${Date.now()}`;
   const { itemNumber, recipientName } = await seedOwnMasterData(page, marker);
   const item = await (
@@ -3345,38 +3364,30 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   const listRequest = page.waitForRequest(
     (request) =>
       request.url().includes("/odata/Invoices") &&
-      decodeURIComponent(request.url()).includes(
-        "GraveId eq null and IsLatestRevision eq true",
-      ),
+      decodeURIComponent(request.url()).includes("GraveId eq null and IsLatestRevision eq true"),
   );
   await page.goto("/index.html#/invoices");
   await listRequest;
 
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // the search reaches the backend as the custom query option
   const search = page.locator("[id$='invoiceSearch'] input");
-  const searchRequest = page.waitForRequest((request) =>
-    request.url().includes("/odata/Invoices") && request.url().includes("search="),
+  const searchRequest = page.waitForRequest(
+    (request) => request.url().includes("/odata/Invoices") && request.url().includes("search="),
   );
   await search.fill(recipientName);
   await search.press("Enter");
   await searchRequest;
 
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
   // clearing the field restores the list
   await search.fill("");
   await search.press("Enter");
-  await expect(
-    invoicesTable.locator("tbody tr", { hasText: recipientName }),
-  ).toBeVisible();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // narrow it again for the row assertions below
   await search.fill(recipientName);
@@ -3419,10 +3430,14 @@ Replace the `subHeader` and the table's binding and action cell in
 `frontend/src/view/Invoices.view.xml`:
 
 ```xml
-        <subHeader>
+<subHeader>
             <OverflowToolbar id="invoicesToolbar">
-                <SearchField id="invoiceSearch" width="18rem" search=".onSearchInvoices"
-                    placeholder="{i18n>searchInvoice}">
+                <SearchField
+      id="invoiceSearch"
+      width="18rem"
+      search=".onSearchInvoices"
+      placeholder="{i18n>searchInvoice}"
+    >
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
@@ -3450,17 +3465,33 @@ appears once, as its newest revision:
 and the action cell:
 
 ```xml
-                                    <!-- wraps in the pop-in, where the actions sit
+<!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
-                                    <HBox wrap="Wrap">
-                                        <Button icon="sap-icon://detail-view" type="Transparent"
-                                            tooltip="{i18n>actionDetails}" press=".onShowDetails" />
-                                        <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                            tooltip="{i18n>actionDownloadNormal}" press=".onDownloadNormal" />
-                                        <Button icon="sap-icon://copy" type="Transparent"
-                                            tooltip="{i18n>actionDownloadCopy}" press=".onDownloadCopy" />
-                                        <Button icon="sap-icon://edit" type="Transparent"
-                                            tooltip="{i18n>actionEdit}" press=".onEditInvoice" />
+<HBox wrap="Wrap">
+                                        <Button
+    icon="sap-icon://detail-view"
+    type="Transparent"
+    tooltip="{i18n>actionDetails}"
+    press=".onShowDetails"
+  />
+                                        <Button
+    icon="sap-icon://pdf-attachment"
+    type="Transparent"
+    tooltip="{i18n>actionDownloadNormal}"
+    press=".onDownloadNormal"
+  />
+                                        <Button
+    icon="sap-icon://copy"
+    type="Transparent"
+    tooltip="{i18n>actionDownloadCopy}"
+    press=".onDownloadCopy"
+  />
+                                        <Button
+    icon="sap-icon://edit"
+    type="Transparent"
+    tooltip="{i18n>actionEdit}"
+    press=".onEditInvoice"
+  />
                                     </HBox>
 ```
 
@@ -3557,12 +3588,14 @@ total."
 ### Task 10: The grave dialog — a warning, and recipients that cannot change
 
 **Files:**
+
 - Create: `frontend/src/controller/GraveEdit.controller.ts`
 - Modify: `frontend/src/view/fragments/GraveDialog.fragment.xml`
 - Modify: `frontend/src/controller/Graves.controller.ts` (extend `GraveEdit`)
 - Test: `e2e/tests/graves.spec.ts`
 
 **Interfaces:**
+
 - Produces: `GraveEdit.openGraveDialog(graveId: number | null)` and the abstract
   `refreshAfterSave(): void | Promise<void>`, which every screen implements to
   reload what it shows. Task 11's detail page opens the same dialog; Task 12 adds
@@ -3573,9 +3606,7 @@ total."
 Append to `e2e/tests/graves.spec.ts`:
 
 ```ts
-test("editing a grave warns about future invoices and freezes its recipients", async ({
-  page,
-}) => {
+test("editing a grave warns about future invoices and freezes its recipients", async ({ page }) => {
   const marker = Date.now();
   await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
   const item = await (
@@ -3783,8 +3814,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           itemId: Number(row.itemId),
           count: Number(row.count),
           // a price of 0 is a real value, not a missing one
-          unitPrice:
-            row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+          unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
         })),
         recipientIds: (draft.Recipients as any[]).map((row) => Number(row.recipientId)),
       });
@@ -3873,23 +3903,37 @@ Give the dialog a title that says which of the two things it is doing:
 Add the warning as the first child of the content `VBox`:
 
 ```xml
-                <!-- an edit changes the grave, never an invoice already issued
+<!-- an edit changes the grave, never an invoice already issued
                      from it; the invoices are snapshots -->
-                <MessageStrip type="Warning" showIcon="true" class="sapUiSmallMarginBottom"
-                    text="{i18n>graveEditWarning}" visible="{= ${graveDraft>/Id} !== null }" />
+<MessageStrip
+  type="Warning"
+  showIcon="true"
+  class="sapUiSmallMarginBottom"
+  text="{i18n>graveEditWarning}"
+  visible="{= ${graveDraft>/Id} !== null }"
+/>
 ```
 
 In the recipients `Panel`, add the note and hide both ways of changing the set
 once the grave exists:
 
 ```xml
-                <Panel headerText="{i18n>graveRecipients}">
+<Panel headerText="{i18n>graveRecipients}">
                     <!-- the even split across them is baked into every invoice the
                          grave has generated, so the set is fixed at creation -->
-                    <MessageStrip type="Information" showIcon="true" class="sapUiSmallMarginBottom"
-                        text="{i18n>graveRecipientsFixed}" visible="{= ${graveDraft>/Id} !== null }" />
-                    <Table id="graveRecipientsTable" items="{graveDraft>/Recipients}"
-                        autoPopinMode="true" popinLayout="Block">
+                    <MessageStrip
+    type="Information"
+    showIcon="true"
+    class="sapUiSmallMarginBottom"
+    text="{i18n>graveRecipientsFixed}"
+    visible="{= ${graveDraft>/Id} !== null }"
+  />
+                    <Table
+    id="graveRecipientsTable"
+    items="{graveDraft>/Recipients}"
+    autoPopinMode="true"
+    popinLayout="Block"
+  >
                         <columns>
                             <Column importance="High"><Text text="{i18n>recipientName}" /></Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
@@ -3898,21 +3942,36 @@ once the grave exists:
                             <ColumnListItem>
                                 <cells>
                                     <Text text="{graveDraft>name}" />
-                                    <Button text="{i18n>delete}" press=".onDeleteRecipientLink"
-                                        type="Transparent" visible="{= ${graveDraft>/Id} === null }" />
+                                    <Button
+            text="{i18n>delete}"
+            press=".onDeleteRecipientLink"
+            type="Transparent"
+            visible="{= ${graveDraft>/Id} === null }"
+          />
                                 </cells>
                             </ColumnListItem>
                         </items>
                     </Table>
                     <!-- wraps so the select and both buttons stay usable on a phone -->
-                    <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginTop"
-                        visible="{= ${graveDraft>/Id} === null }">
-                        <Select id="linkRecipient" width="12rem"
-                            items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}">
+                    <HBox
+    wrap="Wrap"
+    alignItems="Center"
+    class="sapUiSmallMarginTop"
+    visible="{= ${graveDraft>/Id} === null }"
+  >
+                        <Select
+      id="linkRecipient"
+      width="12rem"
+      items="{path: 'odata>/Recipients', parameters: {$orderby: 'Id desc'}}"
+    >
                             <core:Item key="{odata>Id}" text="{odata>Name}" />
                         </Select>
                         <Button text="{i18n>add}" press=".onAddRecipientLink" />
-                        <Button text="{i18n>newRecipient}" press=".onNewRecipient" type="Transparent" />
+                        <Button
+      text="{i18n>newRecipient}"
+      press=".onNewRecipient"
+      type="Transparent"
+    />
                     </HBox>
                 </Panel>
 ```
@@ -3950,6 +4009,7 @@ instead of leaving the user to find out."
 ### Task 11: The grave detail page
 
 **Files:**
+
 - Create: `frontend/src/view/GraveDetail.view.xml`
 - Create: `frontend/src/controller/GraveDetail.controller.ts`
 - Modify: `frontend/src/manifest.json` (route + target)
@@ -3958,6 +4018,7 @@ instead of leaving the user to find out."
 - Test: `e2e/tests/graves.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `GraveEdit.openGraveDialog` (Task 10), `GraveInvoiceRuns` (Task 4),
   `IsLatestRevision` (Task 2), `api.invoiceTotals` / `api.halfYearText` (Task 7).
 - Produces: route `graveDetail`, pattern `graves/{graveId}` — Task 13's details
@@ -3993,11 +4054,9 @@ async function generateFor(
   expect(response.status()).toBe(202);
   const job = await response.json();
   await expect
-    .poll(
-      async () =>
-        (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status,
-      { timeout: 90000 },
-    )
+    .poll(async () => (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status, {
+      timeout: 90000,
+    })
     .toBe("Succeeded");
 }
 
@@ -4047,9 +4106,7 @@ async function seedGrave(
 Then append the test:
 
 ```ts
-test("the grave detail page shows the grave, its status and its invoices", async ({
-  page,
-}) => {
+test("the grave detail page shows the grave, its status and its invoices", async ({ page }) => {
   const marker = `GD-${Date.now()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
   const { graveId } = await seedGrave(page, marker, names);
@@ -4126,10 +4183,20 @@ and to `targets`:
 Create `frontend/src/view/GraveDetail.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.GraveDetail" displayBlock="true">
-    <Page id="graveDetailPage" title="{i18n>graveDetailTitle}" titleLevel="H1"
-        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="burkard.invoicing.controller.GraveDetail"
+  displayBlock="true"
+>
+    <Page
+    id="graveDetailPage"
+    title="{i18n>graveDetailTitle}"
+    titleLevel="H1"
+    showNavButton="true"
+    navButtonPress=".onNavBack"
+    class="sapUiResponsiveContentPadding"
+  >
         <headerContent>
             <Button icon="sap-icon://edit" tooltip="{i18n>editGrave}" press=".onEditGrave" />
         </headerContent>
@@ -4137,29 +4204,53 @@ Create `frontend/src/view/GraveDetail.view.xml`:
             <VBox class="sapUiSmallMarginTop">
                 <Title text="{grave>/GraveNumber}" level="H2" />
                 <HBox wrap="Wrap" class="sapUiTinyMarginTop">
-                    <ObjectStatus title="{i18n>startDate}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/StartDate', formatter: '.formatDate'}" />
-                    <ObjectStatus title="{i18n>endDate}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/EndDate', formatter: '.formatDate'}" />
-                    <ObjectStatus title="{i18n>graveCreatedAt}" class="sapUiSmallMarginEnd"
-                        text="{path: 'grave>/CreatedAt', formatter: '.formatDate'}" />
+                    <ObjectStatus
+            title="{i18n>startDate}"
+            class="sapUiSmallMarginEnd"
+            text="{path: 'grave>/StartDate', formatter: '.formatDate'}"
+          />
+                    <ObjectStatus
+            title="{i18n>endDate}"
+            class="sapUiSmallMarginEnd"
+            text="{path: 'grave>/EndDate', formatter: '.formatDate'}"
+          />
+                    <ObjectStatus
+            title="{i18n>graveCreatedAt}"
+            class="sapUiSmallMarginEnd"
+            text="{path: 'grave>/CreatedAt', formatter: '.formatDate'}"
+          />
                     <!-- green when this half-year is done, red while it still needs
                          invoices — the same reading as the grave list -->
-                    <ObjectStatus title="{grave>/currentHalfYearLabel}" text="{grave>/currentStatusText}"
-                        state="{= ${grave>/currentInvoiced} ? 'Success' : 'Error' }"
-                        icon="{= ${grave>/currentInvoiced} ? 'sap-icon://accept' : 'sap-icon://error' }" />
+                    <ObjectStatus
+            title="{grave>/currentHalfYearLabel}"
+            text="{grave>/currentStatusText}"
+            state="{= ${grave>/currentInvoiced} ? 'Success' : 'Error' }"
+            icon="{= ${grave>/currentInvoiced} ? 'sap-icon://accept' : 'sap-icon://error' }"
+          />
                 </HBox>
             </VBox>
 
             <Panel headerText="{i18n>graveItems}" class="sapUiSmallMarginTop">
-                <Table items="{grave>/Items}" autoPopinMode="true" popinLayout="Block"
-                    noDataText="{i18n>noData}">
+                <Table
+          items="{grave>/Items}"
+          autoPopinMode="true"
+          popinLayout="Block"
+          noDataText="{i18n>noData}"
+        >
                     <columns>
                         <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
-                        <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text
+                text="{i18n>itemDescription}"
+              /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text
+                text="{i18n>itemCount}"
+              /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text
+                text="{i18n>itemPrice}"
+              /></Column>
+                        <Column importance="Low" popinDisplay="Inline"><Text
+                text="{i18n>vatRate}"
+              /></Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -4178,11 +4269,17 @@ Create `frontend/src/view/GraveDetail.view.xml`:
             <Panel headerText="{i18n>graveRecipients}" class="sapUiSmallMarginTop">
                 <!-- read-only always: the split across them is baked into every
                      invoice the grave has generated -->
-                <Table items="{grave>/Recipients}" autoPopinMode="true" popinLayout="Block"
-                    noDataText="{i18n>noData}">
+                <Table
+          items="{grave>/Recipients}"
+          autoPopinMode="true"
+          popinLayout="Block"
+          noDataText="{i18n>noData}"
+        >
                     <columns>
                         <Column importance="High"><Text text="{i18n>recipientName}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>recipientAddress}" /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text
+                text="{i18n>recipientAddress}"
+              /></Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -4196,14 +4293,27 @@ Create `frontend/src/view/GraveDetail.view.xml`:
             </Panel>
 
             <Panel headerText="{i18n>graveInvoices}" class="sapUiSmallMarginTop">
-                <Table id="graveInvoicesTable" items="{grave>/Invoices}"
-                    autoPopinMode="true" popinLayout="Block" noDataText="{i18n>noGraveInvoices}">
+                <Table
+          id="graveInvoicesTable"
+          items="{grave>/Invoices}"
+          autoPopinMode="true"
+          popinLayout="Block"
+          noDataText="{i18n>noGraveInvoices}"
+        >
                     <columns>
                         <Column importance="High"><Text text="{i18n>halfYear}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>recipientName}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>invoiceNumber}" /></Column>
-                        <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>invoiceDate}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>grossTotal}" /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text
+                text="{i18n>recipientName}"
+              /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text
+                text="{i18n>invoiceNumber}"
+              /></Column>
+                        <Column importance="Low" popinDisplay="Inline"><Text
+                text="{i18n>invoiceDate}"
+              /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text
+                text="{i18n>grossTotal}"
+              /></Column>
                         <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
@@ -4213,20 +4323,42 @@ Create `frontend/src/view/GraveDetail.view.xml`:
                                 <Text text="{grave>RecipientName}" />
                                 <HBox>
                                     <Text text="{grave>InvoiceNumber}" />
-                                    <Text text="{path: 'grave>RevisionNumber', formatter: '.formatRevisionBadge'}"
-                                        class="sapUiTinyMarginBegin" />
+                                    <Text
+                    text="{path: 'grave>RevisionNumber', formatter: '.formatRevisionBadge'}"
+                    class="sapUiTinyMarginBegin"
+                  />
                                 </HBox>
-                                <Text text="{path: 'grave>GeneratedAt', formatter: '.formatDate'}" />
-                                <Text text="{path: 'grave>GrossTotal', formatter: '.formatAmount'}" />
+                                <Text
+                  text="{path: 'grave>GeneratedAt', formatter: '.formatDate'}"
+                />
+                                <Text
+                  text="{path: 'grave>GrossTotal', formatter: '.formatAmount'}"
+                />
                                 <HBox wrap="Wrap">
-                                    <Button icon="sap-icon://detail-view" type="Transparent"
-                                        tooltip="{i18n>actionDetails}" press=".onShowInvoiceDetails" />
-                                    <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                        tooltip="{i18n>actionDownloadNormal}" press=".onDownloadInvoiceNormal" />
-                                    <Button icon="sap-icon://copy" type="Transparent"
-                                        tooltip="{i18n>actionDownloadCopy}" press=".onDownloadInvoiceCopy" />
-                                    <Button icon="sap-icon://edit" type="Transparent"
-                                        tooltip="{i18n>actionEdit}" press=".onEditGraveInvoice" />
+                                    <Button
+                    icon="sap-icon://detail-view"
+                    type="Transparent"
+                    tooltip="{i18n>actionDetails}"
+                    press=".onShowInvoiceDetails"
+                  />
+                                    <Button
+                    icon="sap-icon://pdf-attachment"
+                    type="Transparent"
+                    tooltip="{i18n>actionDownloadNormal}"
+                    press=".onDownloadInvoiceNormal"
+                  />
+                                    <Button
+                    icon="sap-icon://copy"
+                    type="Transparent"
+                    tooltip="{i18n>actionDownloadCopy}"
+                    press=".onDownloadInvoiceCopy"
+                  />
+                                    <Button
+                    icon="sap-icon://edit"
+                    type="Transparent"
+                    tooltip="{i18n>actionEdit}"
+                    press=".onEditGraveInvoice"
+                  />
                                 </HBox>
                             </cells>
                         </ColumnListItem>
@@ -4252,9 +4384,7 @@ import GraveEdit from "./GraveEdit.controller";
 export default class GraveDetail extends GraveEdit {
   public onInit(): void {
     this.bindODataRoot();
-    this.router()
-      .getRoute("graveDetail")!
-      .attachPatternMatched(this.onRouteMatched, this);
+    this.router().getRoute("graveDetail")!.attachPatternMatched(this.onRouteMatched, this);
   }
 
   private async onRouteMatched(event: any): Promise<void> {
@@ -4278,9 +4408,7 @@ export default class GraveDetail extends GraveEdit {
       const year = now.getFullYear();
       // a half-year is Jan–Jun or Jul–Dec
       const half = now.getMonth() < 6 ? 1 : 2;
-      const invoiced = runs.some(
-        (run) => Number(run.Year) === year && Number(run.Half) === half,
-      );
+      const invoiced = runs.some((run) => Number(run.Year) === year && Number(run.Half) === half);
 
       this.getView()!.setModel(
         new JSONModel({
@@ -4317,10 +4445,7 @@ export default class GraveDetail extends GraveEdit {
             return {
               Id: Number(invoice.Id),
               RootId: Number(invoice.RootId),
-              HalfYear: api.halfYearText(
-                Number(invoice.PeriodYear),
-                Number(invoice.PeriodHalf),
-              ),
+              HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
               RecipientName: invoice.RecipientName,
               InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
               RevisionNumber: Number(invoice.RevisionNumber),
@@ -4415,12 +4540,14 @@ status."
 ### Task 12: The grave-invoice edit dialog
 
 **Files:**
+
 - Create: `frontend/src/view/fragments/GraveInvoiceDialog.fragment.xml`
 - Modify: `frontend/src/controller/GraveEdit.controller.ts`
 - Modify: `frontend/src/controller/GraveDetail.controller.ts` (replace the stub)
 - Test: `e2e/tests/graves.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `api.fetchGraveInvoiceGroup` and `api.createGraveInvoiceRevision` (Task 7),
   which reach Tasks 4 and 5.
 - Produces: `GraveEdit.openGraveInvoiceDialog(invoiceId: number)`.
@@ -4488,42 +4615,77 @@ Create `frontend/src/view/fragments/GraveInvoiceDialog.fragment.xml`:
             <VBox class="sapUiMediumMargin">
                 <!-- an invoice per recipient is one grave bill split evenly, so an
                      edit is an edit to the bill: every recipient is revised -->
-                <MessageStrip type="Warning" showIcon="true" class="sapUiSmallMarginBottom"
-                    text="{graveInvoiceDraft>/warning}" />
-                <Table id="graveInvoiceLineTable" items="{graveInvoiceDraft>/lines}"
-                    autoPopinMode="true" popinLayout="Block">
+                <MessageStrip
+          type="Warning"
+          showIcon="true"
+          class="sapUiSmallMarginBottom"
+          text="{graveInvoiceDraft>/warning}"
+        />
+                <Table
+          id="graveInvoiceLineTable"
+          items="{graveInvoiceDraft>/lines}"
+          autoPopinMode="true"
+          popinLayout="Block"
+        >
                     <columns>
                         <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                        <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                        <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
+                        <Column importance="Medium" popinDisplay="Inline"><Text
+                text="{i18n>itemDescription}"
+              /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text
+                text="{i18n>itemCount}"
+              /></Column>
+                        <Column importance="High" popinDisplay="Inline"><Text
+                text="{i18n>itemPrice}"
+              /></Column>
                         <Column importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
                         <ColumnListItem>
                             <cells>
-                                <ComboBox id="graveInvoiceItem" width="10rem"
-                                    selectedKey="{graveInvoiceDraft>itemId}"
-                                    showSecondaryValues="true"
-                                    items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
-                                    selectionChange=".onGraveInvoiceItemSelected">
-                                    <core:ListItem key="{odata>Id}"
-                                        text="{odata>Number}" additionalText="{odata>Description}" />
+                                <ComboBox
+                  id="graveInvoiceItem"
+                  width="10rem"
+                  selectedKey="{graveInvoiceDraft>itemId}"
+                  showSecondaryValues="true"
+                  items="{path: 'odata>/InvoiceItems', parameters: {$orderby: 'Id desc'}, templateShareable: true}"
+                  selectionChange=".onGraveInvoiceItemSelected"
+                >
+                                    <core:ListItem
+                    key="{odata>Id}"
+                    text="{odata>Number}"
+                    additionalText="{odata>Description}"
+                  />
                                 </ComboBox>
                                 <Text text="{graveInvoiceDraft>description}" wrapping="true" />
                                 <!-- the grave's count and price, before the split -->
-                                <Input value="{graveInvoiceDraft>count}" type="Number" width="5rem"
-                                    ariaLabel="{i18n>itemCount}" />
-                                <Input value="{graveInvoiceDraft>unitPrice}" type="Number" width="7rem"
-                                    placeholder="{graveInvoiceDraft>defaultPrice}" ariaLabel="{i18n>itemPrice}" />
-                                <Button text="{i18n>delete}" press=".onDeleteGraveInvoiceLine"
-                                    type="Transparent" />
+                                <Input
+                  value="{graveInvoiceDraft>count}"
+                  type="Number"
+                  width="5rem"
+                  ariaLabel="{i18n>itemCount}"
+                />
+                                <Input
+                  value="{graveInvoiceDraft>unitPrice}"
+                  type="Number"
+                  width="7rem"
+                  placeholder="{graveInvoiceDraft>defaultPrice}"
+                  ariaLabel="{i18n>itemPrice}"
+                />
+                                <Button
+                  text="{i18n>delete}"
+                  press=".onDeleteGraveInvoiceLine"
+                  type="Transparent"
+                />
                             </cells>
                         </ColumnListItem>
                     </items>
                 </Table>
-                <Button text="{i18n>addLine}" press=".onAddGraveInvoiceLine"
-                    class="sapUiSmallMarginTop" />
+                <Button
+          text="{i18n>addLine}"
+          press=".onAddGraveInvoiceLine"
+          class="sapUiSmallMarginTop"
+        />
             </VBox>
         </content>
         <beginButton>
@@ -4720,11 +4882,13 @@ invoiced for that half-year rather than on the grave's current items."
 ### Task 13: The grave page — colour, a mass download, icon actions
 
 **Files:**
+
 - Modify: `frontend/src/view/Graves.view.xml`
 - Modify: `frontend/src/controller/Graves.controller.ts`
 - Test: `e2e/tests/graves.spec.ts`
 
 **Interfaces:**
+
 - Consumes: route `graveDetail` (Task 11), `api.bulkDownload` (already present),
   `IsLatestRevision`-filtered bulk download (Task 2).
 
@@ -4739,24 +4903,20 @@ generation test so the invoiced state is asserted as green, not just as text —
 replace
 
 ```ts
-  await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
+await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
 ```
 
 with
 
 ```ts
-  await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
-  await expect(
-    gravesTable.locator(".sapMObjStatus.sapMObjStatusSuccess").first(),
-  ).toBeVisible();
+await expect(gravesTable.getByText("erstellt").first()).toBeVisible();
+await expect(gravesTable.locator(".sapMObjStatus.sapMObjStatusSuccess").first()).toBeVisible();
 ```
 
 Then append, reusing `seedGrave` from Task 11:
 
 ```ts
-test("the grave list colours its status and offers the invoice mass download", async ({
-  page,
-}) => {
+test("the grave list colours its status and offers the invoice mass download", async ({ page }) => {
   const marker = `GL-${Date.now()}`;
   await seedGrave(page, marker, [`Liste ${marker}`]);
 
@@ -4794,7 +4954,7 @@ In `frontend/src/view/Graves.view.xml`, add the mass download to the toolbar
 before "Grab anlegen":
 
 ```xml
-                <Button text="{i18n>bulkGraveInvoices}" press=".onBulkGraveInvoices">
+<Button text="{i18n>bulkGraveInvoices}" press=".onBulkGraveInvoices">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
@@ -4819,7 +4979,7 @@ the two icon actions:
 and widen that last column so both icons stay on one line:
 
 ```xml
-                            <Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
+<Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
 ```
 
 - [ ] **Step 4: Update the controller**
@@ -4886,12 +5046,14 @@ this page; copies are downloaded one at a time."
 ### Task 14: The grave-invoice detail page, and the small-screen sweep
 
 **Files:**
+
 - Create: `frontend/src/view/GraveInvoiceDetail.view.xml`
 - Create: `frontend/src/controller/GraveInvoiceDetail.controller.ts`
 - Modify: `frontend/src/manifest.json` (route + target)
 - Test: `e2e/tests/graves.spec.ts`, `e2e/tests/layout.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `InvoiceRevisions.loadChain` / `buildRevisionModel` (Task 7),
   `GraveEdit.openGraveInvoiceDialog` (Task 12), route target from Task 11's
   `onShowInvoiceDetails`.
@@ -4906,9 +5068,7 @@ Append to `e2e/tests/graves.spec.ts`, reusing `seedGrave` and `generateFor` from
 Task 11:
 
 ```ts
-test("a grave invoice's detail page shows its revisions and its siblings", async ({
-  page,
-}) => {
+test("a grave invoice's detail page shows its revisions and its siblings", async ({ page }) => {
   const marker = `GI-${Date.now()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
   const { graveId } = await seedGrave(page, marker, names);
@@ -4948,13 +5108,9 @@ test("detail pages fit the viewport", async ({ page }) => {
   await seed(page);
 
   const invoices = await (
-    await page.request.get(
-      "/odata/Invoices?$filter=GraveId eq null&$select=Id,RootId&$top=1",
-    )
+    await page.request.get("/odata/Invoices?$filter=GraveId eq null&$select=Id,RootId&$top=1")
   ).json();
-  const graves = await (
-    await page.request.get("/odata/Graves?$select=Id&$top=1")
-  ).json();
+  const graves = await (await page.request.get("/odata/Graves?$select=Id&$top=1")).json();
 
   await page.goto(`/index.html#/invoices/${invoices.value[0].RootId}`);
   await expect(page.locator("[id$='invoiceDetailPage']")).toBeVisible();
@@ -5000,12 +5156,26 @@ and to `targets`:
 Create `frontend/src/view/GraveInvoiceDetail.view.xml`:
 
 ```xml
-<mvc:View xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.GraveInvoiceDetail" displayBlock="true">
-    <Page id="graveInvoiceDetailPage" title="{i18n>graveInvoiceDetailTitle}" titleLevel="H1"
-        showNavButton="true" navButtonPress=".onNavBack" class="sapUiResponsiveContentPadding">
+<mvc:View
+  xmlns:mvc="sap.ui.core.mvc"
+  xmlns="sap.m"
+  controllerName="burkard.invoicing.controller.GraveInvoiceDetail"
+  displayBlock="true"
+>
+    <Page
+    id="graveInvoiceDetailPage"
+    title="{i18n>graveInvoiceDetailTitle}"
+    titleLevel="H1"
+    showNavButton="true"
+    navButtonPress=".onNavBack"
+    class="sapUiResponsiveContentPadding"
+  >
         <headerContent>
-            <Button icon="sap-icon://edit" tooltip="{i18n>actionEdit}" press=".onEditGraveInvoice" />
+            <Button
+        icon="sap-icon://edit"
+        tooltip="{i18n>actionEdit}"
+        press=".onEditGraveInvoice"
+      />
         </headerContent>
         <content>
             <VBox class="sapUiSmallMarginTop">
@@ -5014,44 +5184,80 @@ Create `frontend/src/view/GraveInvoiceDetail.view.xml`:
                 <!-- the address is stored with line breaks, as it is printed -->
                 <Text text="{detail>/recipientAddress}" renderWhitespace="true" />
                 <HBox wrap="Wrap" class="sapUiSmallMarginTop">
-                    <ObjectStatus title="{i18n>graveNumber}" class="sapUiSmallMarginEnd"
-                        text="{detail>/graveNumber}" />
-                    <ObjectStatus title="{i18n>halfYear}" class="sapUiSmallMarginEnd"
-                        text="{detail>/halfYear}" />
+                    <ObjectStatus
+            title="{i18n>graveNumber}"
+            class="sapUiSmallMarginEnd"
+            text="{detail>/graveNumber}"
+          />
+                    <ObjectStatus
+            title="{i18n>halfYear}"
+            class="sapUiSmallMarginEnd"
+            text="{detail>/halfYear}"
+          />
                     <ObjectStatus title="{i18n>sharePercent}" text="{detail>/shareText}" />
                 </HBox>
             </VBox>
 
-            <Panel headerText="{i18n>otherRecipients}" class="sapUiSmallMarginTop"
-                visible="{= ${detail>/others}.length > 0 }">
+            <Panel
+        headerText="{i18n>otherRecipients}"
+        class="sapUiSmallMarginTop"
+        visible="{= ${detail>/others}.length > 0 }"
+      >
                 <List items="{detail>/others}" noDataText="{i18n>noData}">
-                    <StandardListItem title="{detail>Name}" type="Navigation"
-                        press=".onOpenSibling" />
+                    <StandardListItem
+            title="{detail>Name}"
+            type="Navigation"
+            press=".onOpenSibling"
+          />
                 </List>
             </Panel>
 
             <!-- one panel per revision, newest first; the history stays collapsed -->
             <VBox items="{detail>/revisions}">
-                <Panel headerText="{detail>Title}" expandable="true" expanded="{detail>Expanded}"
-                    class="sapUiSmallMarginTop">
+                <Panel
+          headerText="{detail>Title}"
+          expandable="true"
+          expanded="{detail>Expanded}"
+          class="sapUiSmallMarginTop"
+        >
                     <content>
                         <HBox wrap="Wrap" alignItems="Center" class="sapUiSmallMarginBottom">
                             <Text text="{detail>InvoiceNumber}" class="sapUiSmallMarginEnd" />
-                            <Text text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
-                                class="sapUiSmallMarginEnd" />
-                            <Button icon="sap-icon://pdf-attachment" type="Transparent"
-                                tooltip="{i18n>actionDownloadNormal}" press=".onDownloadRevisionNormal" />
-                            <Button icon="sap-icon://copy" type="Transparent"
-                                tooltip="{i18n>actionDownloadCopy}" press=".onDownloadRevisionCopy" />
+                            <Text
+                text="{path: 'detail>GeneratedAt', formatter: '.formatDate'}"
+                class="sapUiSmallMarginEnd"
+              />
+                            <Button
+                icon="sap-icon://pdf-attachment"
+                type="Transparent"
+                tooltip="{i18n>actionDownloadNormal}"
+                press=".onDownloadRevisionNormal"
+              />
+                            <Button
+                icon="sap-icon://copy"
+                type="Transparent"
+                tooltip="{i18n>actionDownloadCopy}"
+                press=".onDownloadRevisionCopy"
+              />
                         </HBox>
                         <Table items="{detail>Lines}" autoPopinMode="true" popinLayout="Block">
                             <columns>
                                 <Column importance="High"><Text text="{i18n>itemNumber}" /></Column>
-                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>itemDescription}" /></Column>
-                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemCount}" /></Column>
-                                <Column importance="High" popinDisplay="Inline"><Text text="{i18n>itemPrice}" /></Column>
-                                <Column importance="Low" popinDisplay="Inline"><Text text="{i18n>vatRate}" /></Column>
-                                <Column importance="Medium" popinDisplay="Inline"><Text text="{i18n>lineTotal}" /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text
+                    text="{i18n>itemDescription}"
+                  /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text
+                    text="{i18n>itemCount}"
+                  /></Column>
+                                <Column importance="High" popinDisplay="Inline"><Text
+                    text="{i18n>itemPrice}"
+                  /></Column>
+                                <Column importance="Low" popinDisplay="Inline"><Text
+                    text="{i18n>vatRate}"
+                  /></Column>
+                                <Column importance="Medium" popinDisplay="Inline"><Text
+                    text="{i18n>lineTotal}"
+                  /></Column>
                             </columns>
                             <items>
                                 <ColumnListItem>
@@ -5059,20 +5265,33 @@ Create `frontend/src/view/GraveInvoiceDetail.view.xml`:
                                         <Text text="{detail>ItemNumber}" />
                                         <Text text="{detail>Description}" wrapping="true" />
                                         <Text text="{detail>Count}" />
-                                        <Text text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}" />
+                                        <Text
+                      text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}"
+                    />
                                         <Text text="{detail>VatRate}" />
-                                        <Text text="{path: 'detail>LineTotal', formatter: '.formatAmount'}" />
+                                        <Text
+                      text="{path: 'detail>LineTotal', formatter: '.formatAmount'}"
+                    />
                                     </cells>
                                 </ColumnListItem>
                             </items>
                         </Table>
                         <HBox wrap="Wrap" justifyContent="End" class="sapUiSmallMarginTop">
-                            <ObjectStatus title="{i18n>netTotal}" class="sapUiSmallMarginEnd"
-                                text="{path: 'detail>NetTotal', formatter: '.formatAmount'}" />
-                            <ObjectStatus title="{i18n>vatTotal}" class="sapUiSmallMarginEnd"
-                                text="{path: 'detail>VatTotal', formatter: '.formatAmount'}" />
-                            <ObjectStatus title="{i18n>grossTotal}" state="Information"
-                                text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}" />
+                            <ObjectStatus
+                title="{i18n>netTotal}"
+                class="sapUiSmallMarginEnd"
+                text="{path: 'detail>NetTotal', formatter: '.formatAmount'}"
+              />
+                            <ObjectStatus
+                title="{i18n>vatTotal}"
+                class="sapUiSmallMarginEnd"
+                text="{path: 'detail>VatTotal', formatter: '.formatAmount'}"
+              />
+                            <ObjectStatus
+                title="{i18n>grossTotal}"
+                state="Information"
+                text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}"
+              />
                         </HBox>
                     </content>
                 </Panel>
@@ -5096,9 +5315,7 @@ import GraveEdit from "./GraveEdit.controller";
 export default class GraveInvoiceDetail extends GraveEdit {
   public onInit(): void {
     this.bindODataRoot();
-    this.router()
-      .getRoute("graveInvoiceDetail")!
-      .attachPatternMatched(this.onRouteMatched, this);
+    this.router().getRoute("graveInvoiceDetail")!.attachPatternMatched(this.onRouteMatched, this);
   }
 
   private async onRouteMatched(event: any): Promise<void> {
@@ -5112,10 +5329,7 @@ export default class GraveInvoiceDetail extends GraveEdit {
     try {
       const chain = await this.loadChain(this._rootId);
       if (!chain.length) {
-        this.getView()!.setModel(
-          new JSONModel({ revisions: [], others: [] }),
-          "detail",
-        );
+        this.getView()!.setModel(new JSONModel({ revisions: [], others: [] }), "detail");
         return;
       }
 
@@ -5219,6 +5433,7 @@ revision history the plain invoice detail page shows."
 ### Task 15: Bring the specification up to date
 
 **Files:**
+
 - Modify: `docs/spec.md`
 - Modify: `docs/deviations.md`
 
@@ -5231,9 +5446,9 @@ make the spec describe an application that no longer exists.
 In `docs/spec.md`:
 
 **US8** ("Download Normal Invoices and Copies Separately") — drop the copy bulk
-download. Keep scenarios 1 and 3; replace scenario 2 with: *Given generated
+download. Keep scenarios 1 and 3; replace scenario 2 with: _Given generated
 invoices with copies, When the user downloads a copy, Then only that copy is
-downloaded; there is no bulk download for copies.*
+downloaded; there is no bulk download for copies._
 
 **US9** ("Browse, Filter, and Bulk Download") — rewrite around the new shape: the
 invoice overview lists invoices that are not tied to a grave, one row per invoice
@@ -5272,16 +5487,16 @@ grave overview and covers the selected half-year.
 - **SC-012**: replaced — every copy is downloadable individually from the detail
   pages of the invoice it belongs to.
 
-Add a US5 acceptance scenario: *Given a grave with recipients, When the user
+Add a US5 acceptance scenario: _Given a grave with recipients, When the user
 tries to change its recipients, Then the change is rejected and the grave keeps
-the recipients it was created with.*
+the recipients it was created with._
 
 - [ ] **Step 4: Record the new deviation**
 
 In `docs/deviations.md`, D-001, add `GraveInvoiceGroup` to the list of plain MVC
-routes and extend the "Why" with one sentence: *`GraveInvoiceGroup` reports the
+routes and extend the "Why" with one sentence: _`GraveInvoiceGroup` reports the
 grave-level amounts behind a group of invoices, which is a report about several
-entities rather than any one of them.*
+entities rather than any one of them._
 
 - [ ] **Step 5: Check the spec against what was built**
 

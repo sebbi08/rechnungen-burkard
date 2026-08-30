@@ -2,9 +2,7 @@ import { expect, test } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
 import { createRow } from "../seed";
 
-test("settings: stamp word validation and VAT rate (Story 1)", async ({
-  page,
-}) => {
+test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/index.html#/settings");
 
   await page.getByLabel("Stempelwort").fill("");
@@ -20,9 +18,7 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
   await page.getByRole("button", { name: "MwSt.-Satz hinzufügen" }).click();
   // on reruns the rate may already exist: dismiss the blocking error dialog
   const errorDialog = page.locator(".sapMDialog");
-  await errorDialog
-    .waitFor({ state: "attached", timeout: 2000 })
-    .catch(() => {});
+  await errorDialog.waitFor({ state: "attached", timeout: 2000 }).catch(() => {});
   if (await errorDialog.count()) {
     await errorDialog.getByRole("button").click();
     await expect(errorDialog).toHaveCount(0);
@@ -44,9 +40,7 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({
   await expect(page.getByLabel("Schlusstext")).toHaveValue(endingText);
 });
 
-test("items: create an item without default price (Story 2)", async ({
-  page,
-}) => {
+test("items: create an item without default price (Story 2)", async ({ page }) => {
   await page.request.post("/odata/VatRates", {
     data: { Rate: 7 },
   });
@@ -58,18 +52,14 @@ test("items: create an item without default price (Story 2)", async ({
   await page.getByLabel("Bezeichnung").fill("Grabpflege");
   // the VAT rate is a Select: open the popover and pick the seeded rate
   await page.locator(".sapMDialog .sapMSlt").click();
-  await page
-    .locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "7" })
-    .click();
+  await page.locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "7" }).click();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.locator("table")).toContainText("1001");
   await expect(page.locator("table")).toContainText("Grabpflege");
 });
 
-test("items: edit an existing item via the row dialog (Story 2)", async ({
-  page,
-}) => {
+test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
   const ts = Date.now();
   const number = `E2E-ITEM-${ts}`;
   const original = `Original ${ts}`;
@@ -96,25 +86,17 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({
     .click();
   await waitForDialogOpen(page);
   // the dialog pre-fills the row's current values
-  await expect(page.locator(".sapMDialog").getByLabel("Nummer")).toHaveValue(
-    number,
-  );
+  await expect(page.locator(".sapMDialog").getByLabel("Nummer")).toHaveValue(number);
   await page.locator(".sapMDialog").getByLabel("Bezeichnung").fill(changed);
   await page.getByRole("button", { name: "Speichern" }).click();
 
   // the changed description replaces the original one in the row
-  await expect(
-    itemsTable.locator("tbody tr", { hasText: number }),
-  ).toContainText(changed);
-  await expect(
-    itemsTable.locator("tbody tr", { hasText: number }),
-  ).not.toContainText(original);
+  await expect(itemsTable.locator("tbody tr", { hasText: number })).toContainText(changed);
+  await expect(itemsTable.locator("tbody tr", { hasText: number })).not.toContainText(original);
   await expect(page.locator(".sapMDialog")).toBeHidden();
 });
 
-test("recipients: create and search a recipient (Story 3)", async ({
-  page,
-}) => {
+test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
   await page.goto("/index.html#/recipients");
 
   const createRecipient = async (name: string) => {
@@ -140,9 +122,7 @@ test("recipients: create and search a recipient (Story 3)", async ({
   await expect(page.locator("table")).not.toContainText("Zweiter Empfänger");
 });
 
-test("recipients: edit an existing recipient via the row dialog (Story 3)", async ({
-  page,
-}) => {
+test("recipients: edit an existing recipient via the row dialog (Story 3)", async ({ page }) => {
   const ts = Date.now();
   const name = `Vorher ${ts}`;
   const changed = `Geändert ${ts}`;
@@ -160,16 +140,12 @@ test("recipients: edit an existing recipient via the row dialog (Story 3)", asyn
     .click();
   await waitForDialogOpen(page);
   // the dialog pre-fills the row's current values
-  await expect(page.locator(".sapMDialog").getByLabel("Name")).toHaveValue(
-    name,
-  );
+  await expect(page.locator(".sapMDialog").getByLabel("Name")).toHaveValue(name);
   await page.locator(".sapMDialog").getByLabel("Name").fill(changed);
   await page.getByRole("button", { name: "Speichern" }).click();
 
   // the old name is gone, the new one is shown
-  await expect(
-    recipientsTable.locator("tbody tr", { hasText: changed }),
-  ).toBeVisible();
+  await expect(recipientsTable.locator("tbody tr", { hasText: changed })).toBeVisible();
   await expect(recipientsTable).not.toContainText(name);
   await expect(page.locator(".sapMDialog")).toBeHidden();
 });

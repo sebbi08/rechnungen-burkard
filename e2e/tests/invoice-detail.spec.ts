@@ -7,10 +7,21 @@ const RECIPIENT_NAME = `Detail ${RUN}`;
 
 test("the detail page shows every revision of an invoice", async ({ page }) => {
   await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
-  const item = await createRow(page, "/odata/InvoiceItems", { Number: `D${RUN}`, Description: "Grabpflege", VatRate: 7, DefaultPrice: 100 });
-  const recipient = await createRow(page, "/odata/Recipients", { Name: RECIPIENT_NAME, Address: "Musterstraße 1\n12345 Musterstadt" });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `D${RUN}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: RECIPIENT_NAME,
+    Address: "Musterstraße 1\n12345 Musterstadt",
+  });
 
-  const created = await createRow(page, "/odata/CreateInvoice", { recipientId: recipient.Id, lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }] });
+  const created = await createRow(page, "/odata/CreateInvoice", {
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }],
+  });
   await page.request.post("/odata/CreateRevision", {
     data: {
       invoiceId: created.Id,
@@ -49,10 +60,6 @@ test("the detail page shows every revision of an invoice", async ({ page }) => {
   await expect(page.getByText("214,00 €").first()).toBeVisible();
 
   // both documents of a revision are reachable from its panel
-  await expect(
-    page.getByRole("button", { name: "Rechnung herunterladen" }).first(),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Kopie herunterladen" }).first(),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rechnung herunterladen" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kopie herunterladen" }).first()).toBeVisible();
 });

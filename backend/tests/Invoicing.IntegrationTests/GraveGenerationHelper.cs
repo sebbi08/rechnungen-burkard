@@ -10,8 +10,10 @@ public static class GraveGenerationHelper
 {
     public static async Task RunAsync(HttpClient client, int year, int half)
     {
-        var start = await client.PostAsync("/odata/GenerateGraveInvoices",
-            ODataJson.Body(new { year, half }));
+        var start = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year, half })
+        );
         Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
         using var startJson = await ODataJson.ReadAsync(start);
         var jobId = startJson.RootElement.GetProperty("Id").GetInt64();

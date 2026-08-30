@@ -3,11 +3,7 @@ import BusyDialog from "sap/m/BusyDialog";
 import Dialog from "sap/m/Dialog";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
-import type {
-  DraftLine,
-  InvoiceDraft,
-  QuickRecipientDraft,
-} from "../model/state";
+import type { DraftLine, InvoiceDraft, QuickRecipientDraft } from "../model/state";
 import InvoiceRevisions from "./InvoiceRevisions.controller";
 
 /**
@@ -31,10 +27,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     // the draft starts on whichever recipient this refreshed list shows first
     const newest = await this.refreshRecipients("recipient");
 
-    const lines =
-      invoiceId != null
-        ? await this.loadLines(invoiceId)
-        : [InvoiceEdit.emptyLine()];
+    const lines = invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
     this._invoiceDialog.setModel(
       new TypedJSONModel<InvoiceDraft>({
         // the select matches its keys as strings
@@ -88,19 +81,14 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     // literal keeps the path checkable against InvoiceDraft
     const row = Number(rowContext.getPath().split("/").pop());
     const model = this.draft();
-    model.setProperty(
-      `/lines/${row}/itemNumber`,
-      itemContext.getProperty("Number") as string,
-    );
+    model.setProperty(`/lines/${row}/itemNumber`, itemContext.getProperty("Number") as string);
     model.setProperty(
       `/lines/${row}/description`,
       itemContext.getProperty("Description") as string,
     );
     // the item's default price is pre-filled and stays overridable; an item
     // without one leaves the field empty so a price has to be typed
-    const defaultPrice = itemContext.getProperty("DefaultPrice") as
-      | number
-      | null;
+    const defaultPrice = itemContext.getProperty("DefaultPrice") as number | null;
     model.setProperty(`/lines/${row}/defaultPrice`, defaultPrice);
     model.setProperty(
       `/lines/${row}/unitPrice`,
@@ -144,10 +132,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       itemId: Number(line.itemId),
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
-      unitPrice:
-        line.unitPrice == null || line.unitPrice === ""
-          ? null
-          : Number(line.unitPrice),
+      unitPrice: line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
     }));
 
     // The select is bound two-way, so the draft holds the recipient the dialog
@@ -202,9 +187,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
 
   public async onQuickRecipientSave(): Promise<void> {
     const quick = (
-      this._quickDialog.getModel(
-        "quickRecipientDraft",
-      ) as TypedJSONModel<QuickRecipientDraft>
+      this._quickDialog.getModel("quickRecipientDraft") as TypedJSONModel<QuickRecipientDraft>
     ).getData();
     try {
       const id = await api.createRecipient({
@@ -227,9 +210,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
 
   /** The draft lives on the dialog rather than the view, so it is read there. */
   private draft(): TypedJSONModel<InvoiceDraft> {
-    return this._invoiceDialog.getModel(
-      "invoiceDraft",
-    ) as TypedJSONModel<InvoiceDraft>;
+    return this._invoiceDialog.getModel("invoiceDraft") as TypedJSONModel<InvoiceDraft>;
   }
 
   private _savingInvoice = false;
