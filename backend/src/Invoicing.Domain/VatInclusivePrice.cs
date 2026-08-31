@@ -1,9 +1,9 @@
 namespace Burkard.Invoicing.Domain;
 
-/// <summary>The net price a line is billed at, given the price entered for its
-/// item. Prices in this application are net, except for an item marked as
-/// including VAT: there the entered price is the gross the customer pays, and
-/// the VAT comes back out of it here.</summary>
+/// <summary>The net price a line is billed at, given the price entered for it.
+/// Prices in this application are net, except for a line whose price was
+/// entered as including VAT: there the entered price is the gross the customer
+/// pays, and the VAT comes back out of it here.</summary>
 public static class VatInclusivePrice
 {
     /// <summary>The net keeps three decimals — the precision

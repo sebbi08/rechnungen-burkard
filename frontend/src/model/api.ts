@@ -521,7 +521,9 @@ export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
  *  counterpart function to mirror — the inverse rule lives only in
  *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
  *  — so a future change to `NetOf`'s rounding has nothing forcing this to
- *  follow it. */
+ *  follow it. The two roundings do diverge on an exact half-cent tie, but only
+ *  a net `NetOf` never produces reaches one — every net this function is ever
+ *  called with is `NetOf` output — so that divergence is unreachable here. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }

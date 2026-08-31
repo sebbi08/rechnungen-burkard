@@ -100,8 +100,14 @@ Neither `InvoiceLinesController` nor `GraveItemsController` needs work:
 
 ## The Conversion
 
-A pure helper in `Invoicing.Domain`, unit-tested (Principle III permits unit
-tests for pure business logic). Unchanged from the first version:
+The rule is a pair, unchanged from the first version, but only one half of it
+is a backend function. The net direction is a pure helper in
+`Invoicing.Domain`, `VatInclusivePrice.NetOf`, unit-tested (Principle III
+permits unit tests for pure business logic). The backend never displays a
+gross, so it has no `ToGross` counterpart: the gross direction lives in the
+frontend instead, as `api.ts`'s `grossFromNet`. The round trip between the two
+is pinned by a round-trip test in `VatInclusivePriceTests`, which computes the
+gross with an open-coded expression rather than through a shared function:
 
 ```
 ToNet(gross, rate)  = round(round(gross, 2) / (1 + rate/100), 3, AwayFromZero)

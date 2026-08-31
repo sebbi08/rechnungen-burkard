@@ -1,20 +1,48 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per run: the specs share one stack and write into it in parallel.
 const RUN = Date.now();
 
+/** The invoice dialog's recipient input. */
+function recipientField(page: Page): Locator {
+  return page.locator(".sapMDialog input[id$='--recipient-inner']");
+}
+
+/**
+ * Picks a recipient the way invoices.spec.ts's file-local `pickRecipient`
+ * does: type, then click, then wait for the pick to settle rather than
+ * assuming the click was the last thing to happen — the ComboBox closes its
+ * popover and hands focus back to its own input afterwards. Copied rather
+ * than imported, since that helper is file-local there too.
+ *
+ * Picking explicitly, instead of relying on the dialog defaulting to the
+ * newest recipient (`refreshRecipients`), is the point: on the shared
+ * parallel stack another spec's Recipients POST can land between this dialog
+ * opening and being saved, which would send the invoice to that recipient
+ * instead of this test's own.
+ */
+async function pickRecipient(page: Page, name: string): Promise<void> {
+  const input = recipientField(page);
+  await input.click();
+  await input.fill(name);
+  await page.locator("[id*='recipient'][id$='-popup-list'] li.sapMSLI", { hasText: name }).click();
+  await expect(input).toHaveValue(name);
+  await expect(page.locator("[id*='recipient'][id$='-popup-list']")).toBeHidden();
+}
+
 test("a line ticked as VAT-included bills the price that was entered", async ({ page }) => {
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
-  const item = await createRow(page, "/odata/InvoiceItems", {
+  await createRow(page, "/odata/InvoiceItems", {
     Number: `VI-${RUN}`,
     Description: "Grabpflege",
     VatRate: 19,
     DefaultPrice: 120,
   });
-  const recipient = await createRow(page, "/odata/Recipients", {
-    Name: `Brutto ${RUN}`,
+  const recipientName = `Brutto ${RUN}`;
+  await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
     Address: "Musterstraße 1\n12345 Musterstadt",
   });
 
@@ -23,6 +51,10 @@ test("a line ticked as VAT-included bills the price that was entered", async ({ 
   await waitForDialogOpen(page);
 
   const dialog = page.locator("[id$='invoiceDialog']");
+  // pick the recipient explicitly rather than relying on the dialog's
+  // default (the newest recipient) — see pickRecipient above
+  await pickRecipient(page, recipientName);
+
   // the item field is a typeahead: type the number, then pick the suggestion,
   // the same way invoices.spec.ts drives it — a plain click on the ComboBox
   // opens its dropdown but leaves the row unfilled, since nothing was typed
@@ -46,7 +78,6 @@ test("a line ticked as VAT-included bills the price that was entered", async ({ 
 
   // the invoices list shows no totals, only the invoice detail page does — open
   // it from the row this test just created, the way invoices.spec.ts does
-  const recipientName = `Brutto ${RUN}`;
   const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
   const row = invoicesTable.locator("tbody tr", { hasText: recipientName });
   await expect(row).toBeVisible();

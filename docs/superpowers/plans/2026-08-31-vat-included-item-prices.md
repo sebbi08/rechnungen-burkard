@@ -1,5 +1,14 @@
 # VAT-Included Item Prices Implementation Plan
 
+> **Superseded.** This plan describes the design in which `PriceIncludesVat`
+> lived on the catalogue item, `InvoiceItem`. That design was replaced by
+> `docs/superpowers/plans/2026-08-31-vat-included-flag-on-the-line.md`, which
+> moves the flag onto `InvoiceLine` and `GraveItem`; the reasoning for the move
+> is in the spec's "Revision" section
+> (`docs/superpowers/specs/2026-08-31-vat-included-item-prices-design.md`). Kept
+> here as a historical record — the body below is unchanged and describes the
+> superseded design.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let an invoice item be marked as priced VAT-included, so a price
