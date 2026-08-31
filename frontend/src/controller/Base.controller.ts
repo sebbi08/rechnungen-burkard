@@ -164,6 +164,16 @@ export default abstract class BaseController extends Controller {
     return paidOn ? "Success" : "Warning";
   }
 
+  /**
+   * What a screen reader says about the payment status. Without it,
+   * state="Warning" makes an unpaid row's status announced with a "Warnung"
+   * ("warning") prefix, which an unpaid invoice is not — same reasoning as
+   * Graves.controller's statusAnnouncement for the invoicing-status column.
+   */
+  public paidStatusAnnouncement(paidOn: string | null | undefined): string {
+    return this.i18nText(paidOn ? "statusPaidAnnouncement" : "statusUnpaidAnnouncement");
+  }
+
   public paidActionIcon(paidOn: string | null | undefined): string {
     return paidOn ? "sap-icon://decline" : "sap-icon://money-bills";
   }

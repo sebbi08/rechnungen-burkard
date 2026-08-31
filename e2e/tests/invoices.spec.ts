@@ -428,7 +428,7 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await search.press("Enter");
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
-  // the four row actions are icon-only, named by their tooltips
+  // the five row actions are icon-only, named by their tooltips
   const row = invoicesTable.locator("tbody tr", { hasText: recipientName });
   for (const name of ["Details", "Rechnung herunterladen", "Kopie herunterladen", "Bearbeiten"]) {
     await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
@@ -485,6 +485,7 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
 
   await row.getByRole("button", { name: "Als bezahlt markieren", exact: true }).click();
   await expect(row).toContainText("bezahlt");
+  await expect(row).not.toContainText("unbezahlt");
   // a paid invoice cannot be revised, so its edit button is dead — and its
   // tooltip (the accessible name of this icon-only button) names the reason
   // instead of staying "Bearbeiten", which is what disables it here

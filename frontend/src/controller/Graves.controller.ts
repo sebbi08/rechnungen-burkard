@@ -65,6 +65,23 @@ export default class Graves extends GraveEdit {
     return invoiceCount > 0 && paidCount === invoiceCount ? "Success" : "Warning";
   }
 
+  /**
+   * What a screen reader says about the payment column. Same reasoning as
+   * statusAnnouncement: state="Warning" for a partly- or un-paid half-year
+   * would otherwise be announced with a "Warnung" prefix, which neither is.
+   */
+  public paymentAnnouncement(invoiceCount: number, paidCount: number): string {
+    if (!invoiceCount) {
+      return "";
+    }
+    if (paidCount === 0) {
+      return this.i18nText("paymentUnpaidAnnouncement");
+    }
+    return this.i18nText(
+      paidCount < invoiceCount ? "paymentPartlyPaidAnnouncement" : "paymentPaidAnnouncement",
+    );
+  }
+
   public onPaymentFilterChange(): void {
     this.applyRows();
   }

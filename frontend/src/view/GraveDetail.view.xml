@@ -162,6 +162,7 @@
                                 <ObjectStatus
                                     text="{path: 'grave>PaidOn', formatter: '.paidStatusText'}"
                                     state="{path: 'grave>PaidOn', formatter: '.paidStatusState'}"
+                                    stateAnnouncementText="{path: 'grave>PaidOn', formatter: '.paidStatusAnnouncement'}"
                                 />
                                 <HBox wrap="Wrap">
                                     <Button

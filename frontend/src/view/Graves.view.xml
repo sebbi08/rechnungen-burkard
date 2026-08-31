@@ -127,6 +127,7 @@
                             <ObjectStatus
                                 text="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentText'}"
                                 state="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentState'}"
+                                stateAnnouncementText="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentAnnouncement'}"
                                 visible="{= ${status>InvoiceCount} > 0}"
                             />
                             <HBox wrap="Wrap">

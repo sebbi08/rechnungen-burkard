@@ -97,9 +97,21 @@
                                     class="sapUiTinyMarginBegin"
                                 />
                             </HBox>
+                            <!-- targetType: 'any' on every odata>PaidOn binding below: without it,
+                                         UI5 applies the OData type's formatValue before the formatter,
+                                         using the bound control property's type. For the edit button's
+                                         boolean 'enabled', sap.ui.model.odata.type.Date.formatValue then
+                                         throws a FormatException, UI5 swallows it and resets the property
+                                         to its default (enabled reverts to true, defeating the guard). The
+                                         string-typed properties here would not throw, but without
+                                         targetType they still receive a locale-formatted date string
+                                         ("31.08.2026") where the shared paid* formatters elsewhere are
+                                         handed the raw Edm.Date from a JSON model ("2026-08-31"); pinning
+                                         it everywhere keeps the value shape the same for every consumer. -->
                             <ObjectStatus
-                                text="{path: 'odata>PaidOn', formatter: '.paidStatusText'}"
-                                state="{path: 'odata>PaidOn', formatter: '.paidStatusState'}"
+                                text="{path: 'odata>PaidOn', formatter: '.paidStatusText', targetType: 'any'}"
+                                state="{path: 'odata>PaidOn', formatter: '.paidStatusState', targetType: 'any'}"
+                                stateAnnouncementText="{path: 'odata>PaidOn', formatter: '.paidStatusAnnouncement', targetType: 'any'}"
                             />
                             <!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
@@ -126,13 +138,13 @@
                                     icon="sap-icon://edit"
                                     type="Transparent"
                                     enabled="{path: 'odata>PaidOn', formatter: '.paidEditEnabled', targetType: 'any'}"
-                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidEditTooltip'}"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidEditTooltip', targetType: 'any'}"
                                     press=".onEditInvoice"
                                 />
                                 <Button
-                                    icon="{path: 'odata>PaidOn', formatter: '.paidActionIcon'}"
+                                    icon="{path: 'odata>PaidOn', formatter: '.paidActionIcon', targetType: 'any'}"
                                     type="Transparent"
-                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidActionTooltip'}"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidActionTooltip', targetType: 'any'}"
                                     press=".onTogglePaid"
                                 />
                             </HBox>

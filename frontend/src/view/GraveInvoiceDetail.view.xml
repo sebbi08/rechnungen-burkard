@@ -17,6 +17,7 @@
             <ObjectStatus
                 text="{path: 'detail>/paidOn', formatter: '.paidStatusText'}"
                 state="{path: 'detail>/paidOn', formatter: '.paidStatusState'}"
+                stateAnnouncementText="{path: 'detail>/paidOn', formatter: '.paidStatusAnnouncement'}"
                 class="sapUiSmallMarginEnd"
             />
             <Button
