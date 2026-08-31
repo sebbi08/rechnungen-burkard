@@ -37,3 +37,39 @@ test("an item can be marked as priced VAT-included and stays marked", async ({ p
   await expect(page.locator(".sapMDialog").getByLabel("Standardpreis")).toHaveValue("120.0");
   await expect(page.locator(".sapMDialog input[type='checkbox']")).toBeChecked();
 });
+
+test("an invoice bills a VAT-included item at the price that was entered", async ({ page }) => {
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `VII-${RUN}`,
+    Description: "Grabpflege inklusive",
+    VatRate: 19,
+    DefaultPrice: 120,
+    PriceIncludesVat: true,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Brutto ${RUN}`,
+    Address: "Musterstraße 1\n12345 Musterstadt",
+  });
+  const created = await createRow(page, "/odata/CreateInvoice", {
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.Id, count: 1, unitPrice: null }],
+  });
+
+  await page.goto(`/index.html#/invoices/${created.RootId ?? created.Id}`);
+  // 120,00 gross in, 100,84 net + 19 % = 120,00 out
+  await expect(page.getByText("120,00 €").first()).toBeVisible();
+
+  // the edit dialog opens on the gross, not on the 100,84 that is stored, and
+  // says so; saving it untouched must not take the VAT out a second time
+  await page.getByRole("button", { name: "Bearbeiten" }).first().click();
+  await waitForDialogOpen(page);
+  const dialog = page.locator("[id$='invoiceDialog']");
+  await expect(dialog.getByLabel("Preis")).toHaveValue("120");
+  await expect(dialog).toContainText("inkl. MwSt.");
+
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByText("Revision 1", { exact: true })).toBeVisible();
+  // both the original and the revision total to the entered price
+  await expect(page.getByText("120,00 €").first()).toBeVisible();
+});

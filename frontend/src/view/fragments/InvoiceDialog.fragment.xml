@@ -90,15 +90,33 @@
                                     width="5rem"
                                     ariaLabel="{i18n>itemCount}"
                                 />
-                                <!-- pre-filled with the item's default price; clearing it or
-                                     typing another one overrides it for this invoice -->
-                                <Input
-                                    value="{invoiceDraft>unitPrice}"
-                                    type="Number"
-                                    width="7rem"
-                                    placeholder="{invoiceDraft>defaultPrice}"
-                                    ariaLabel="{i18n>itemPrice}"
-                                />
+                                <VBox>
+                                    <!-- pre-filled with the item's default price; clearing it or
+                                         typing another one overrides it for this invoice.
+                                         Table normally labels a cell's control from its column
+                                         header automatically, but only when that control is the
+                                         cell's direct child (ColumnListItemRenderer.applyAriaLabelledBy
+                                         checks the cell itself for an ariaLabelledBy association) -
+                                         wrapping the Input in this VBox to add the VAT marker below
+                                         it takes that away, since VBox has no such association. The
+                                         explicit ariaLabelledBy below replaces it. -->
+                                    <Input
+                                        value="{invoiceDraft>unitPrice}"
+                                        type="Number"
+                                        width="7rem"
+                                        placeholder="{invoiceDraft>defaultPrice}"
+                                        ariaLabelledBy="unitPriceLabel"
+                                    />
+                                    <core:InvisibleText
+                                        id="unitPriceLabel"
+                                        text="{i18n>itemPrice}"
+                                    />
+                                    <!-- this row's price is the gross the customer pays -->
+                                    <Text
+                                        text="{i18n>priceIncludesVatShort}"
+                                        visible="{invoiceDraft>priceIncludesVat}"
+                                    />
+                                </VBox>
                             </cells>
                         </ColumnListItem>
                     </items>

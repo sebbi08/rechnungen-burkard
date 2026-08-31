@@ -25,6 +25,11 @@ export interface DraftLine {
   /** Empty means "use the default"; 0 is a real price. */
   unitPrice: number | string | null;
   defaultPrice: number | string | null;
+  /** True when this row's item is priced VAT-included: the price above is a
+   *  gross, and the marker beside it says so. */
+  priceIncludesVat: boolean;
+  /** The item's current VAT rate, for the gross the price field shows. */
+  vatRate: number;
 }
 
 export interface ItemsView {

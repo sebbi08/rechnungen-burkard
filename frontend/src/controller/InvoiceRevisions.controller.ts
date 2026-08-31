@@ -106,4 +106,26 @@ export default abstract class InvoiceRevisions extends BaseController {
       revisions,
     };
   }
+
+  /**
+   * The item catalogue indexed by id, for the price fields. Both edit dialogs
+   * already bind the whole catalogue into their item ComboBox, so this is one
+   * more request rather than more data — and it has to be the catalogue rather
+   * than the line, because the backend converts what is sent back using the
+   * item's current rate and flag.
+   */
+  protected async loadItemPricing(): Promise<Map<number, api.ItemPricing>> {
+    const items = await this.readList<{
+      Id: number | string;
+      VatRate: number | string;
+      PriceIncludesVat: boolean;
+    }>("/InvoiceItems", { $select: "Id,VatRate,PriceIncludesVat" });
+
+    return new Map(
+      items.map((item) => [
+        Number(item.Id),
+        { VatRate: Number(item.VatRate), PriceIncludesVat: Boolean(item.PriceIncludesVat) },
+      ]),
+    );
+  }
 }

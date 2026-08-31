@@ -513,6 +513,29 @@ export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
   };
 }
 
+/** The two fields a price field needs about an item: whether its prices are
+ *  gross, and the rate to convert with. Both are read from the item as it is
+ *  now, never from a snapshot — the backend converts what the dialog sends with
+ *  the item's current values, so a display using older ones would move the price
+ *  of a line nobody touched. */
+export interface ItemPricing {
+  VatRate: number;
+  PriceIncludesVat: boolean;
+}
+
+/** The gross a price field shows for a stored net. Mirrors the backend's
+ *  ToGross: round to the cent, away from zero. */
+export function grossFromNet(net: number, vatRate: number): number {
+  return Math.round(net * (1 + vatRate / 100) * 100) / 100;
+}
+
+/** What a price field shows for a line's stored net price: a gross for an item
+ *  priced VAT-included, and the untouched net for every other one — including
+ *  the three decimals a grave split leaves behind. */
+export function priceFieldValue(net: number, pricing: ItemPricing | undefined): number {
+  return pricing?.PriceIncludesVat ? grossFromNet(net, pricing.VatRate) : net;
+}
+
 /** "H1 2026" — the label the half-year selects already use. */
 export function halfYearText(year: number, half: number): string {
   return `H${half} ${year}`;

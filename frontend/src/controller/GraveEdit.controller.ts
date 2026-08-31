@@ -65,6 +65,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         count: link.Count,
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
+        // placeholders: the grave dialogs do not yet show a gross for a
+        // VAT-included item's price field
+        priceIncludesVat: false,
+        vatRate: 0,
       })),
       Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
@@ -171,6 +175,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       count: 1,
       unitPrice: null,
       defaultPrice: null,
+      // placeholders: the grave dialogs do not yet show a gross for a
+      // VAT-included item's price field
+      priceIncludesVat: false,
+      vatRate: 0,
     };
   }
 
@@ -285,6 +293,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           // resubmit a different price for every line the user never touched.
           unitPrice: Number(line.UnitPrice),
           defaultPrice: null,
+          // placeholders: the grave dialogs do not yet show a gross for a
+          // VAT-included item's price field
+          priceIncludesVat: false,
+          vatRate: 0,
         })),
       }),
       "graveInvoiceDraft",
