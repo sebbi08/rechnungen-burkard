@@ -14,9 +14,20 @@
         class="sapUiResponsiveContentPadding"
     >
         <headerContent>
+            <ObjectStatus
+                text="{path: 'detail>/paidOn', formatter: '.paidStatusText'}"
+                state="{path: 'detail>/paidOn', formatter: '.paidStatusState'}"
+                class="sapUiSmallMarginEnd"
+            />
+            <Button
+                icon="{path: 'detail>/paidOn', formatter: '.paidActionIcon'}"
+                tooltip="{path: 'detail>/paidOn', formatter: '.paidActionTooltip'}"
+                press=".onTogglePaid"
+            />
             <Button
                 icon="sap-icon://edit"
-                tooltip="{i18n>actionEdit}"
+                enabled="{path: 'detail>/paidOn', formatter: '.paidEditEnabled'}"
+                tooltip="{path: 'detail>/paidOn', formatter: '.paidEditTooltip'}"
                 press=".onEditGraveInvoice"
             />
         </headerContent>

@@ -175,6 +175,8 @@ export interface RevisionDetailView {
   shareText: string;
   /** The siblings of this half-year, minus the invoice being shown. */
   others: GraveInvoiceRecipient[];
+  /** The latest revision's payment mark; null while it is unpaid. */
+  paidOn: string | null;
 }
 
 /** A detail page with nothing to show: an unknown or deleted invoice. */
@@ -194,5 +196,6 @@ export function emptyRevisionDetail(): RevisionDetailView {
     graveNumber: "",
     shareText: "",
     others: [],
+    paidOn: null,
   };
 }
