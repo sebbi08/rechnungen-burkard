@@ -1,5 +1,6 @@
 import type ResourceBundle from "sap/base/i18n/ResourceBundle";
 import ComboBox from "sap/m/ComboBox";
+import MessageBox from "sap/m/MessageBox";
 import Router from "sap/m/routing/Router";
 import Controller from "sap/ui/core/mvc/Controller";
 import UIComponent from "sap/ui/core/UIComponent";
@@ -141,6 +142,80 @@ export default abstract class BaseController extends Controller {
 
   public formatRevisionBadge(value: number | null | undefined): string {
     return value != null && value > 0 ? `R${value}` : "";
+  }
+
+  /**
+   * The payment state of one invoice, as the lists and detail pages read it.
+   * `PaidOn` holds the day the payment was recorded, but no screen shows it
+   * (spec decision 3): a set date is "paid" and null is "unpaid", nothing more.
+   *
+   * "unbezahlt" rather than "offen": the grave overview already says "offen"
+   * for a half-year with no invoice, and the two columns sit next to each other.
+   */
+  public paidStatusText(paidOn: string | null | undefined): string {
+    return this.i18nText(paidOn ? "statusPaid" : "statusUnpaid");
+  }
+
+  /**
+   * Warning, not Error, for an unpaid invoice: one that was just written is the
+   * normal case, unlike a grave whose half-year has no invoice at all.
+   */
+  public paidStatusState(paidOn: string | null | undefined): string {
+    return paidOn ? "Success" : "Warning";
+  }
+
+  public paidActionIcon(paidOn: string | null | undefined): string {
+    return paidOn ? "sap-icon://decline" : "sap-icon://money-bills";
+  }
+
+  public paidActionTooltip(paidOn: string | null | undefined): string {
+    return this.i18nText(paidOn ? "actionMarkUnpaid" : "actionMarkPaid");
+  }
+
+  /** A paid invoice cannot be revised, so its edit button is dead. The backend
+   *  refuses either way; this only keeps a dialog from opening on a save that
+   *  cannot succeed. */
+  public paidEditEnabled(paidOn: string | null | undefined): boolean {
+    return !paidOn;
+  }
+
+  /** What the edit button says when it is dead: a paid invoice cannot be
+   *  revised, so the tooltip names the reason rather than the action. */
+  public paidEditTooltip(paidOn: string | null | undefined): string {
+    return this.i18nText(paidOn ? "editBlockedPaid" : "actionEdit");
+  }
+
+  /**
+   * Marks an unpaid invoice paid straight away, or asks before taking an
+   * existing mark back — unmarking discards the recorded day, which nothing in
+   * the UI could show again.
+   *
+   * Answers whether anything changed, so each caller refreshes its own model
+   * (a list binding, a JSON model, a whole detail page) rather than this
+   * guessing which one it is in.
+   */
+  protected async togglePaid(invoiceId: number, paidOn: string | null): Promise<boolean> {
+    if (paidOn && !(await this.confirmUnmark())) {
+      return false;
+    }
+
+    try {
+      await api.setInvoicePaid(invoiceId, !paidOn);
+      return true;
+    } catch (error) {
+      api.showError(this, error);
+      return false;
+    }
+  }
+
+  /** `MessageBox.confirm` reports the pressed action through a callback; this
+   *  turns it into something the caller can await. */
+  private confirmUnmark(): Promise<boolean> {
+    return new Promise((resolve) => {
+      MessageBox.confirm(this.i18nText("confirmMarkUnpaid"), {
+        onClose: (action: string | null) => resolve(action === MessageBox.Action.OK),
+      });
+    });
   }
 
   /** Opens an invoice's PDF in a new tab, where the browser displays it. */
