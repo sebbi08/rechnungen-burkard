@@ -201,8 +201,9 @@ third decimal.
   billed exactly as before.
 - Import of an archive with the new column, and rejection of one without it.
 
-**Document** (`Invoicing.DocumentTests`): the gross total of an invoice built
-from a flagged item equals the entered price.
+The gross total is asserted with the integration tests rather than in
+`Invoicing.DocumentTests`: it is computed by `DocumentDataBuilder`, which lives
+in the API project, and the rendering below it does not know the flag exists.
 
 **E2E**: create a VAT-included item, invoice it, and check the totals on the
 detail page; the grave path with two recipients.
