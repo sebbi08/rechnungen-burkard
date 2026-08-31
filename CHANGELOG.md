@@ -5,6 +5,27 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v1.1.0 — 2026-08-31
+
+### Features
+- **documents**: print invoices on the company letterhead (786d9e7)
+- search recipients by typeahead, with the address as secondary value (40096f6)
+
+### Fixes
+- **e2e**: wait out both focus changes around the recipient typeahead (cb5b459)
+- spend the line dialogs' width on their fields, not on gutters (cdeb807)
+- pre-fill an item's default price in the grave dialog (cfac005)
+
+### Other changes
+- Merge pull request #6 from sebbi08/letterhead-din-lang (f0c36bd)
+- Merge pull request #4 from sebbi08/worktree-recipient-typeahead (358c74e)
+- Merge remote-tracking branch 'origin/main' into worktree-recipient-typeahead (2467df0)
+- Merge pull request #5 from sebbi08/worktree-mobile-grave-dialog-layout (1c2b73c)
+- Merge remote-tracking branch 'origin/main' into worktree-recipient-typeahead (66df7ec)
+- Merge pull request #3 from sebbi08/worktree-grave-dialog-default-price (76bd8cd)
+- Merge pull request #2 from sebbi08/worktree-auto-formatting (2efcc6f)
+- Merge remote-tracking branch 'origin/main' into worktree-auto-formatting (2f6b7b7)
+
 ## v1.0.2 — 2026-08-30
 
 ### Fixes
