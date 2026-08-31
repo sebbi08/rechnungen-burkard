@@ -67,7 +67,15 @@
                             <Text text="{odata>Number}" />
                             <Text text="{odata>Description}" />
                             <Text text="{odata>VatRate}" />
-                            <Text text="{odata>DefaultPrice}" />
+                            <VBox>
+                                <Text text="{odata>DefaultPrice}" />
+                                <!-- the column holds a gross for these items, so
+                                     it has to say so -->
+                                <Text
+                                    text="{i18n>priceIncludesVatShort}"
+                                    visible="{odata>PriceIncludesVat}"
+                                />
+                            </VBox>
                             <Button text="{i18n>edit}" press=".onEditItem" type="Transparent" />
                         </cells>
                     </ColumnListItem>

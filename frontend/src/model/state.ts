@@ -40,6 +40,9 @@ export interface ItemDraft {
   vatRate: string;
   /** Kept as typed: "" means no default price, which is not the same as 0. */
   defaultPrice: string;
+  /** True when the price above is the gross the customer pays. Ticking it does
+   *  not rewrite the number — it changes what the number means. */
+  priceIncludesVat: boolean;
 }
 
 export interface RecipientsView {

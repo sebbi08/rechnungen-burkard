@@ -129,6 +129,7 @@ export async function createItem(item: {
   Description: string;
   VatRate: number;
   DefaultPrice?: number | null;
+  PriceIncludesVat?: boolean;
 }): Promise<void> {
   await ensureOk(
     await post("/odata/InvoiceItems", {
@@ -145,6 +146,7 @@ export async function updateItem(
     Description?: string;
     VatRate?: number;
     DefaultPrice?: number | null;
+    PriceIncludesVat?: boolean;
   },
 ): Promise<void> {
   await ensureOk(await patch(`/odata/InvoiceItems(${id})`, fields));
@@ -356,6 +358,7 @@ export interface ItemRow {
   Description: string;
   VatRate: number;
   DefaultPrice: number | null;
+  PriceIncludesVat: boolean;
 }
 
 export interface GraveItemLink {

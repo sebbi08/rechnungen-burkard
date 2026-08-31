@@ -53,6 +53,7 @@ export default class Items extends BaseController {
               description: context.getProperty("Description") as string,
               vatRate: String(context.getProperty("VatRate") as number),
               defaultPrice: defaultPrice != null ? String(defaultPrice) : "",
+              priceIncludesVat: context.getProperty("PriceIncludesVat") as boolean,
             }
           : {
               id: null,
@@ -60,6 +61,7 @@ export default class Items extends BaseController {
               description: "",
               vatRate: "",
               defaultPrice: "",
+              priceIncludesVat: false,
             },
       ),
       "itemDraft",
@@ -79,6 +81,7 @@ export default class Items extends BaseController {
       VatRate: Number(draft.vatRate),
       // an empty input means "no default price"; a price of 0 is a real value
       DefaultPrice: draft.defaultPrice === "" ? null : Number(draft.defaultPrice),
+      PriceIncludesVat: draft.priceIncludesVat,
     };
     try {
       if (draft.id != null) {

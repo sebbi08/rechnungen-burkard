@@ -27,6 +27,11 @@
                     width="100%"
                     value="{itemDraft>/defaultPrice}"
                 />
+                <CheckBox
+                    id="itemPriceIncludesVat"
+                    text="{i18n>itemPriceIncludesVat}"
+                    selected="{itemDraft>/priceIncludesVat}"
+                />
             </VBox>
         </content>
         <beginButton>
