@@ -330,6 +330,77 @@ public class PaymentTests
     }
 
     [Fact]
+    public async Task Revising_an_older_revision_of_a_paid_chain_is_refused()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var originalId = await CreateInvoiceAsync(client, itemId, recipientId);
+
+        var revised = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId = originalId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+        revised.EnsureSuccessStatusCode();
+        using var revisedJson = await ODataJson.ReadAsync(revised);
+        var latestRevisionId = revisedJson.RootElement.GetProperty("Id").GetInt64();
+
+        // only the latest revision can be marked paid
+        (await SetPaidAsync(client, latestRevisionId, true)).EnsureSuccessStatusCode();
+
+        // CreateRevisionAsync's chain-wide check must catch this from the ORIGINAL
+        // invoice's id, not just from the paid row itself — a check written as
+        // `edited.PaidOn != null` would let this through, since `edited` here is
+        // revision 0, which was never marked.
+        var response = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId = originalId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvoicePaid",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+
+        // the refusal left the chain alone: still just the original and its revision
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await db.Invoices.CountAsync(i => i.RootId == originalId));
+    }
+
+    [Fact]
     public async Task Revising_a_grave_invoice_is_refused_when_one_recipient_has_paid()
     {
         using var host = new ApiTestHost();
@@ -362,7 +433,9 @@ public class PaymentTests
         Assert.Equal("GraveInvoicePaid", error.GetProperty("code").GetString());
         // the message names who is paid: from the row the user pressed edit on,
         // another recipient's payment is invisible
-        Assert.Contains("Anna Zahlung", error.GetProperty("message").GetString());
+        var message = error.GetProperty("message").GetString();
+        Assert.Contains("Anna Zahlung", message);
+        Assert.DoesNotContain("Bernd Zahlung", message);
 
         // neither sibling gained a revision
         using var scope = host.Services.CreateScope();
