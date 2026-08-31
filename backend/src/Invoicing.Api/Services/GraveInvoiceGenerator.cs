@@ -68,7 +68,14 @@ public sealed class GraveInvoiceGenerator
                 item.Item.Number,
                 item.Item.Description,
                 item.Count,
-                EffectivePrice(item)!.Value,
+                // the splitter divides a net — that is what makes every
+                // recipient's document add up on its own — so a VAT-included
+                // price gives up its VAT here, before the split rather than after
+                VatInclusivePrice.NetOf(
+                    EffectivePrice(item)!.Value,
+                    item.Item.VatRate,
+                    item.Item.PriceIncludesVat
+                ),
                 item.Item.VatRate
             ))
             .ToList();
