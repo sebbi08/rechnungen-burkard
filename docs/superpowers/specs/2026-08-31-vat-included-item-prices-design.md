@@ -4,10 +4,35 @@
 
 **Status**: Approved
 
-**Input**: Add an option on an invoice item that marks its price as including
-VAT. For such an item the price billed is the entered price minus the VAT, and
-the option applies to that item alone. It must work for graves too, including
-the split across a grave's recipients.
+**Input**: Add an option marking a price as including VAT. For such a line the
+price billed is the entered price minus the VAT, and the option applies to that
+line alone. It must work for graves too, including the split across a grave's
+recipients.
+
+## Revision — the flag lives on the line, not on the item
+
+The first version of this design put `PriceIncludesVat` on `InvoiceItem`, the
+catalogue entry, and it was built that way. That was a misreading: the option
+belongs where a price is **entered** — on the line as it is added to an invoice
+or to a grave — not on the item's master data. An item is not inherently gross
+or net; a price is.
+
+Everything about the conversion survives that correction unchanged. What moves
+is where the flag is stored, where it is ticked, and where the three call sites
+read it from. Two consequences are worth naming up front, because they invert
+claims the first version made:
+
+- **The line now stores the flag**, and must. The earlier design argued a
+  snapshot on `InvoiceLine` would be worse than useless, because a flag toggled
+  on the item after generation would make display and save disagree. That
+  reasoning dissolves when the flag is the line's own data: there is nothing to
+  disagree with, and without the column a revision would silently turn a gross
+  entry into a net one.
+- **`GraveInvoiceSplitter` is no longer untouched.** It has to carry the flag
+  from the grave's line onto each recipient's line, because the grave-invoice
+  dialog reconstructs from the invoices rather than from the grave's current
+  configuration. This is a passed-through field; the split arithmetic does not
+  change.
 
 ## Context
 
@@ -21,7 +46,7 @@ That is the wrong end to type at when a price was quoted gross — "Grabpflege,
 the result, and the invoice then rounds its way back to something that may not
 be the 120 € that was promised.
 
-This design adds a per-item flag saying that prices for this item are entered
+This design adds a per-line flag saying that the price on this line was entered
 gross. Nothing about the invoice document changes: a line is still printed net
 with the VAT shown separately, and the gross total is what the customer was
 quoted.
@@ -30,42 +55,53 @@ quoted.
 
 Settled before the design and treated as fixed:
 
-1. **The flag is a property of the item.** It applies to that item wherever its
-   price is entered, and to no other item on the same invoice.
-2. **Every price field for a flagged item means gross**: the item's default
-   price, a grave's price override, and the price column of the invoice and
-   grave-invoice dialogs. Only the stored invoice line — and therefore the PDF —
-   is net.
-3. **The import archive carries the flag.** `items.csv` gains a column;
-   existing archives must be regenerated.
+1. **The flag is a property of the line.** It is ticked where a price is
+   entered — a line of an invoice, an item on a grave — and applies to that line
+   alone. The catalogue item carries nothing: no flag, and no default that
+   pre-ticks the box.
+2. **A ticked line's price field means gross**: the price typed on an invoice
+   line, and the price typed for an item on a grave. Only the stored invoice
+   line — and therefore the PDF — is net.
+3. **The import archive carries the flag on the grave-item link.**
+   `mapping.csv`'s `Item` rows gain a column; `items.csv` keeps its original
+   four.
 4. **The document is unchanged.** No new wording, no marker, no layout change.
+5. **The VAT rate still comes from the item.** That is an existing rule of this
+   application and this design does not touch it; only the flag is per line.
 
 ## Data Model
 
-One migration for this version (Principle IV), adding one column.
+One migration for this version (Principle IV). The branch has not been released
+and no database has ever run the earlier version's migration, so the feature's
+single migration is **rewritten** rather than supplemented — one migration per
+version, as the constitution requires.
 
-### `InvoiceItem.PriceIncludesVat` (bool, not null, default `false`)
+### `InvoiceLine.PriceIncludesVat` (bool, not null, default `false`)
 
-True when prices entered for this item are gross. Existing items are false,
-which is exactly today's behaviour.
+True when this line's price was entered as a gross. The line still stores a net
+in `UnitPrice`; the flag records how that net was arrived at, which is what lets
+a revision dialog show the gross again and take it back unchanged. Existing
+lines are false, which is exactly today's behaviour.
 
-The column needs no controller work: `InvoiceItemsController` binds the whole
-entity on POST and applies a `Delta<InvoiceItem>` on PATCH, and
-`ODataConventionModelBuilder` exposes every public property, so the flag reaches
-OData for free. The one hand-written projection that must be extended is the
-grave detail query in `GravesController`, which selects the item's fields
-explicitly.
+### `GraveItem.PriceIncludesVat` (bool, not null, default `false`)
 
-Nothing is stored on `InvoiceLine`. A snapshot of the flag would be worse than
-useless: if the flag were toggled after generation, the revision dialog would
-display a gross computed with the old flag and save it with the new one, and an
-untouched line's price would jump. Display and save must both read the item's
-current flag.
+The same, for the price a grave carries for one of its items — whether that is
+the link's own `UnitPrice` or the item's `DefaultPrice` standing in for it.
+
+### `InvoiceItem.PriceIncludesVat` — removed
+
+The catalogue entry keeps no flag. `GravesController`'s hand-written grave
+detail projection selects the **link's** flag (`i.PriceIncludesVat`) rather than
+the item's.
+
+Neither `InvoiceLinesController` nor `GraveItemsController` needs work:
+`GraveItemsController` binds the whole `GraveItem` on POST, and
+`ODataConventionModelBuilder` exposes every public property.
 
 ## The Conversion
 
 A pure helper in `Invoicing.Domain`, unit-tested (Principle III permits unit
-tests for pure business logic):
+tests for pure business logic). Unchanged from the first version:
 
 ```
 ToNet(gross, rate)  = round(round(gross, 2) / (1 + rate/100), 3, AwayFromZero)
@@ -96,30 +132,35 @@ A rate of 0 % makes both directions the identity.
 
 ## Where the Conversion Applies
 
-A flagged item's gross becomes a net at the three places where a price becomes a
-line, and nowhere else:
+A ticked line's gross becomes a net at the three places where a price becomes a
+line, and nowhere else. Each reads the flag from what was submitted or stored,
+never from the catalogue item:
 
-- `InvoiceService.BuildLinesAsync` — an ad-hoc invoice and its revisions.
-- `GraveInvoiceRevisionService.BuildGraveLinesAsync` — a grave invoice revision.
-- `GraveInvoiceGenerator`, on the result of `EffectivePrice`, **before** the
-  `GraveLine` is built.
+- `InvoiceService.BuildLinesAsync` — from `InvoiceLineInput.PriceIncludesVat`,
+  for an ad-hoc invoice and its revisions. The flag is stored on the line it
+  builds.
+- `GraveInvoiceRevisionService.BuildGraveLinesAsync` — from the same input, onto
+  the `GraveLine`.
+- `GraveInvoiceGenerator`, from `GraveItem.PriceIncludesVat`, applied to the
+  result of `EffectivePrice` **before** the `GraveLine` is built.
 
 All three resolve the price the same way today (`input.UnitPrice ?? item
-.DefaultPrice`), and both operands are gross for a flagged item, so the
-conversion wraps the resolved value rather than each operand.
+.DefaultPrice`), and the flag applies to whichever won, so the conversion wraps
+the resolved value rather than each operand.
 
 Converting before the split is what makes graves work. `GraveInvoiceSplitter`
 divides the net on purpose — each recipient's document then works out its own
-VAT from its own net and adds up on its own — so it must keep receiving a net,
-and it does not change. `InvoiceLine.GraveUnitPrice` therefore stays what it is
-today: the grave's net price before the split.
+VAT from its own net and adds up on its own — so it must keep receiving a net.
+Its arithmetic is unchanged; it gains only a `PriceIncludesVat` on `GraveLine`
+that it copies onto every recipient's line, and recovers in `Combine`.
+`InvoiceLine.GraveUnitPrice` stays what it is today: the grave's net price
+before the split.
 
 ## What Does Not Change
 
-`GraveInvoiceSplitter`, `ShareCalculator`, `DocumentDataBuilder`,
-`InvoiceDocument` and the shape of `InvoiceLine`. Every invoice already
-generated is unaffected, and so is every invoice generated from an unflagged
-item.
+`ShareCalculator`, `DocumentDataBuilder`, `InvoiceDocument`, and the split
+arithmetic inside `GraveInvoiceSplitter`. Every invoice already generated is
+unaffected, and so is every invoice generated from an unticked line.
 
 The detail pages and revision panels also keep showing what they show now: the
 invoice's real content, net lines with VAT beside them. Only the **edit
@@ -127,57 +168,67 @@ dialogs** display a gross.
 
 ## Frontend
 
-### Item dialog and item list
+### The item dialog is not touched
 
-`ItemDialog` gains a CheckBox under the default price, bound to
-`itemDraft>/priceIncludesVat`. Ticking it does not rewrite the number in the
-field — it changes what that number means. A user who had entered a net price
-and now wants a gross one retypes it, which is the only reading that does not
-guess at intent.
+The catalogue keeps no flag, so `ItemDialog` and the items table stay exactly as
+they were before this feature.
 
-The items table marks flagged rows so the price column is not ambiguous.
+### A column of its own
 
-### The price columns
+Each dialog that collects a price — the invoice dialog, the grave dialog and the
+grave-invoice dialog — gains a narrow column holding a CheckBox per row, bound
+two-way to that row's `priceIncludesVat`. A column rather than a control tucked
+under the price, for two reasons: the table's own column header labels it, and
+the price `Input` stays a **direct child** of its cell.
 
-Every dialog that collects a price gets a per-row marker — a short "inkl.
-MwSt." next to the price — driven by the row's own item, so a table can hold
-gross and net rows at once and say which is which.
+That second point matters. `sap.m.Table` gives a cell's accessible name from the
+column header, and it reaches only a cell's direct child; wrapping the `Input`
+in a `VBox` silently destroys the name that existing specs find the field by.
+The first version of this design hit exactly that and worked around it with an
+explicit `ariaLabelledBy` and a `core:InvisibleText` in three fragments. With
+the checkbox in its own column the wrapper is gone, so **that workaround is
+reverted** — the automatic labelling does the job again.
 
-`DraftLine` gains `priceIncludesVat`, filled in two ways. It needs no `vatRate`
-of its own: the rate is looked up from the item catalogue map (see below) at
-the point a price is converted, rather than carried on the row.
+### Filling and reading the row
 
-- **From the item**, in the `selectionChange` handlers that already copy the
-  item's number, description and default price into the row. The default price
-  is stored gross, so it is pre-filled unconverted.
-- **From an existing line**, when a revision dialog loads it. The line stores a
-  net, so the field shows `ToGross(net, rate)` — for a grave invoice, of
-  `GraveUnitPrice`, the grave's price before the split.
+`DraftLine` carries `priceIncludesVat`. It is filled two ways:
 
-For the second case the dialog needs the item's _current_ flag and rate. Both
-revision dialogs read the item catalogue once when they open and index it by id;
-they already load the whole catalogue into their item ComboBox, so this adds a
-request, not a volume of data.
+- **On a new row**, false — the user ticks it if the price they are about to
+  type is a gross one. Picking an item does not change it; the catalogue has no
+  opinion.
+- **From an existing line**, when a dialog loads one: the line's own stored
+  flag. The line stores a net, so the field shows `ToGross(net, rate)` when the
+  flag is set — for a grave invoice, of `GraveUnitPrice`, the grave's price
+  before the split.
 
-On save the dialogs send what is in the field. The backend converts.
+The rate for that display comes from the item catalogue, read once when the
+dialog opens and indexed by id, because the backend converts what the dialog
+sends using the item's **current** rate. Using the line's stored rate instead
+would make an untouched line's price move whenever an item's rate had changed
+since the invoice was generated.
 
-The same `ToNet`/`ToGross` pair is needed in `model/api.ts`, next to `lineTotal`
-and `invoiceTotals`, which already mirror the backend's rounding for the same
-reason: a screen must not disagree with the PDF it links to.
+On save the dialogs send the field and the flag together. The backend converts.
+
+`grossFromNet` lives in `model/api.ts` next to `lineTotal` and `invoiceTotals`,
+which already mirror the backend's rounding for the same reason: a screen must
+not disagree with the PDF it links to.
 
 ### Grave pages
 
-The grave dialog stores its override as typed, so it needs the marker and
-nothing else. The grave detail item table shows the stored price and needs the
-marker too.
+The grave dialog stores its price as typed and its flag alongside it. The grave
+detail item table is read-only and shows the stored price, so it keeps a plain
+"inkl. MwSt." marker, bound to the **link's** flag.
 
 ## Import
 
-`items.csv` gains a fifth column, `PriceIncludesVat`, in
-`ImportArchiveLayout.ItemsHeader`. The header check is exact and the template
-download shares this definition, so a freshly downloaded template validates and
-an archive from before this change does not — which is the accepted cost of the
-decision.
+`mapping.csv` gains a fifth column, `PriceIncludesVat`, in
+`ImportArchiveLayout.MappingHeader`. It is meaningful on `Item` rows, which
+carry a count and now a flag; `Recipient` rows leave it empty, as they already
+leave `Count` empty. `items.csv` returns to its original four columns.
+
+The header check is exact and the template download shares this definition, so a
+freshly downloaded template validates and an archive from before this change
+does not — the accepted cost of carrying the flag at all.
 
 The column is optional in content, not in presence: an empty cell means false.
 `true`/`false`, `1`/`0`, `ja`/`nein` and `yes`/`no` are accepted
@@ -188,27 +239,33 @@ every other malformed cell.
 
 **Unit** (`Invoicing.Domain`): the conversion pair — round-trip stability across
 rates and prices, 0 %, a gross with more than two decimals, a net that needs the
-third decimal.
+third decimal. Plus `GraveInvoiceSplitter` carrying the flag onto every
+recipient's line and recovering it in `Combine`.
 
 **Integration** (`Invoicing.IntegrationTests`):
 
-- An ad-hoc invoice with a flagged item stores the net and totals to the entered
-  gross.
-- A grave with a flagged item and two recipients splits the net; the recipients'
-  grosses sum to the grave's gross.
+- An ad-hoc invoice with a ticked line stores the net, stores the flag, and
+  totals to the entered gross.
+- The same at a count above one — the case the third decimal exists for.
+- A grave whose item is ticked, split across two recipients: the net is what
+  divides, every recipient's line carries the flag, and their grosses sum to the
+  grave's gross.
+- A grave price override on a ticked item, so the override rather than the
+  item's default is what gives up its VAT.
 - A revision saved with the values the dialog was given reproduces the identical
-  net — the double-deduction trap, and the reason the display uses the current
-  flag.
-- A mixed invoice: one flagged and one unflagged line, with the unflagged line
+  net — the double-deduction trap.
+- A mixed invoice: one ticked and one unticked line, with the unticked line
   billed exactly as before.
-- Import of an archive with the new column, and rejection of one without it.
+- Import of an archive carrying the flag on a mapping row, and rejection of one
+  whose `mapping.csv` still has the old four-column header.
 
 The gross total is asserted with the integration tests rather than in
 `Invoicing.DocumentTests`: it is computed by `DocumentDataBuilder`, which lives
 in the API project, and the rendering below it does not know the flag exists.
 
-**E2E**: create a VAT-included item, invoice it, and check the totals on the
-detail page; the grave path with two recipients.
+**E2E**: tick the box on an invoice line, save, and check the totals on the
+detail page and that the reopened dialog shows the gross with the box still
+ticked; the grave path with two recipients.
 
 ## Limits
 
@@ -220,5 +277,5 @@ net make it rare rather than routine.
 
 ## Out of Scope
 
-Per-invoice or per-grave overriding of the flag; a gross-entry mode for
-unflagged items; any change to how the document presents VAT.
+A catalogue-level default that pre-ticks the box; a gross-entry mode for
+unticked lines; any change to how the document presents VAT.
