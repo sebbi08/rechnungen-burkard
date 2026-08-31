@@ -199,7 +199,13 @@ public sealed class InvoiceService
                     ItemNumber = item.Number,
                     Description = item.Description,
                     Count = input.Count,
-                    UnitPrice = unitPrice.Value,
+                    // an item priced VAT-included is entered as the gross the
+                    // customer pays; the line itself is always net
+                    UnitPrice = VatInclusivePrice.NetOf(
+                        unitPrice.Value,
+                        item.VatRate,
+                        item.PriceIncludesVat
+                    ),
                     VatRate = item.VatRate,
                     LineNumber = index + 1,
                 }
