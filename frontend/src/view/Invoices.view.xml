@@ -85,15 +85,25 @@
                         <cells>
                             <Text text="{odata>InvoiceNumber}" />
                             <Text text="{odata>RecipientName}" />
-                            <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
+                            <!-- targetType: 'any' hands the formatter the raw value. Without
+                                 it UI5 converts through the OData type to the target property's
+                                 type first: Edm.DateTimeOffset to a string the date formatter
+                                 cannot parse back, and Edm.Int32 to a boolean, which throws.
+                                 The exception is swallowed and the control keeps its default,
+                                 so the date column rendered empty and the revision marker was
+                                 visible on every row, originals included. In an expression
+                                 binding %{...} is that same raw read. -->
+                            <Text
+                                text="{path: 'odata>GeneratedAt', formatter: '.formatDate', targetType: 'any'}"
+                            />
                             <HBox>
                                 <Text
                                     text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}"
-                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                    visible="{= %{odata>RevisionNumber} > 0}"
                                 />
                                 <Text
-                                    text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
-                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                    text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge', targetType: 'any'}"
+                                    visible="{= %{odata>RevisionNumber} > 0}"
                                     class="sapUiTinyMarginBegin"
                                 />
                             </HBox>

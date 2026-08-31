@@ -266,6 +266,71 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await expect(revisionRow.getByText("R1", { exact: true })).toBeVisible();
 });
 
+test("the list shows the invoice date, and marks revisions only (Story 9)", async ({ page }) => {
+  const ts = Date.now();
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `DAT-${ts}`,
+    Description: "E2E Datum",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const plain = await createRow(page, "/odata/Recipients", {
+    Name: `Datum Original ${ts}`,
+    Address: "Musterweg 1",
+  });
+  const revised = await createRow(page, "/odata/Recipients", {
+    Name: `Datum Revision ${ts}`,
+    Address: "Musterweg 2",
+  });
+
+  const createInvoice = async (recipientId: number): Promise<number> => {
+    const response = await page.request.post("/odata/CreateInvoice", {
+      data: { recipientId, lines: [{ itemId: item.Id, count: 1, unitPrice: 100 }] },
+    });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).Id as number;
+  };
+
+  await createInvoice(plain.Id);
+  const revisedId = await createInvoice(revised.Id);
+  const revision = await page.request.post("/odata/CreateRevision", {
+    data: {
+      invoiceId: revisedId,
+      recipientId: revised.Id,
+      lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }],
+    },
+  });
+  expect(revision.ok()).toBe(true);
+
+  await page.goto("/index.html#/invoices");
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+
+  // Cells follow the column order: invoice number, recipient, date, revision,
+  // payment, actions — after one leading spacer cell the table renders itself.
+  const DATE = 3;
+  const REVISION = 4;
+
+  // Both bindings read OData-typed properties through a formatter or an
+  // expression. UI5 converts the value to the target property's type *before*
+  // the formatter runs, and a failed conversion is swallowed, leaving the
+  // control at its default — an empty date and a revision marker that is
+  // always visible. Neither symptom raises an error, so only an assertion
+  // catches it.
+  const original = invoicesTable.locator("tbody tr", { hasText: `Datum Original ${ts}` }).first();
+  await expect(original).toBeVisible();
+  await expect(original.locator("td").nth(DATE)).toHaveText(/^\d{1,2}\.\d{1,2}\.\d{4}$/);
+  // an original carries no revision marker at all
+  await expect(original.locator("td").nth(REVISION)).toHaveText("");
+
+  const revisionRow = invoicesTable
+    .locator("tbody tr", { hasText: `Datum Revision ${ts}` })
+    .first();
+  await expect(revisionRow).toBeVisible();
+  await expect(revisionRow.locator("td").nth(DATE)).toHaveText(/^\d{1,2}\.\d{1,2}\.\d{4}$/);
+  await expect(revisionRow.locator("td").nth(REVISION)).toContainText("R1");
+});
+
 /** Seeds a VAT rate, one item and one recipient, all unique to this test. */
 async function seedOwnMasterData(
   page: Page,
