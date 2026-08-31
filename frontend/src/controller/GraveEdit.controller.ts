@@ -63,10 +63,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         itemNumber: link.Item.Number,
         description: link.Item.Description,
         count: link.Count,
-        // stored as it was typed — for a VAT-included item that is the gross
+        // stored as it was typed — for a VAT-included line that is the gross
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
-        priceIncludesVat: link.Item.PriceIncludesVat,
+        priceIncludesVat: link.PriceIncludesVat,
       })),
       Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
@@ -276,9 +276,9 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       .replace("{0}", api.halfYearText(group.PeriodYear, group.PeriodHalf))
       .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
 
-    let pricing: Map<number, api.ItemPricing>;
+    let rates: Map<number, number>;
     try {
-      pricing = await this.loadItemPricing();
+      rates = await this.loadItemVatRates();
     } catch (error) {
       api.showError(this, error);
       return;
@@ -289,7 +289,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         invoiceId,
         warning,
         lines: group.Lines.map((line) => {
-          const item = pricing.get(Number(line.ItemId));
+          const vatRate = rates.get(Number(line.ItemId)) ?? 0;
           return {
             // the ComboBox matches its keys as strings
             itemId: String(line.ItemId),
@@ -300,11 +300,15 @@ export default abstract class GraveEdit extends InvoiceRevisions {
             // reconstructed by GraveInvoiceSplitter.Combine at 3-decimal precision
             // on purpose, to reproduce its historical net cents exactly. Rounding
             // here would resubmit a different price for every line the user never
-            // touched. A VAT-included item is the one case that does convert, and
+            // touched. A VAT-included line is the one case that does convert, and
             // its round trip is exact.
-            unitPrice: api.priceFieldValue(Number(line.UnitPrice), item),
+            unitPrice: api.priceFieldValue(
+              Number(line.UnitPrice),
+              Boolean(line.PriceIncludesVat),
+              vatRate,
+            ),
             defaultPrice: null,
-            priceIncludesVat: item?.PriceIncludesVat ?? false,
+            priceIncludesVat: Boolean(line.PriceIncludesVat),
           };
         }),
       }),
@@ -372,6 +376,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       count: Number(row.count),
       // a price of 0 is a real value, not a missing one
       unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+      priceIncludesVat: row.priceIncludesVat,
     }));
 
     // long-running task: a revision renders both documents for every recipient

@@ -129,7 +129,6 @@ export async function createItem(item: {
   Description: string;
   VatRate: number;
   DefaultPrice?: number | null;
-  PriceIncludesVat?: boolean;
 }): Promise<void> {
   await ensureOk(
     await post("/odata/InvoiceItems", {
@@ -146,7 +145,6 @@ export async function updateItem(
     Description?: string;
     VatRate?: number;
     DefaultPrice?: number | null;
-    PriceIncludesVat?: boolean;
   },
 ): Promise<void> {
   await ensureOk(await patch(`/odata/InvoiceItems(${id})`, fields));
@@ -179,6 +177,7 @@ export interface InvoiceLineDto {
   itemId: number;
   count: number;
   unitPrice: number | null;
+  priceIncludesVat: boolean;
 }
 
 export interface DocumentDto {
@@ -358,13 +357,14 @@ export interface ItemRow {
   Description: string;
   VatRate: number;
   DefaultPrice: number | null;
-  PriceIncludesVat: boolean;
 }
 
 export interface GraveItemLink {
   Count: number;
   /** The link's own price. Without one the item's default is billed. */
   UnitPrice: number | null;
+  /** The link's own flag, not the item's: it was entered on this grave's line. */
+  PriceIncludesVat: boolean;
   Item: ItemRow;
 }
 
@@ -467,6 +467,7 @@ export interface InvoiceLineRow {
   UnitPrice: number | string;
   GraveUnitPrice: number | string | null;
   VatRate: number | string;
+  PriceIncludesVat: boolean;
 }
 
 /** A GraveInvoiceRuns row: which half-year a grave has already been invoiced for. */
@@ -513,16 +514,6 @@ export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
   };
 }
 
-/** The two fields a price field needs about an item: whether its prices are
- *  gross, and the rate to convert with. Both are read from the item as it is
- *  now, never from a snapshot — the backend converts what the dialog sends with
- *  the item's current values, so a display using older ones would move the price
- *  of a line nobody touched. */
-export interface ItemPricing {
-  VatRate: number;
-  PriceIncludesVat: boolean;
-}
-
 /** The gross a price field shows for a stored net: rounds to the cent,
  *  half-up on a double, which equals the backend's away-from-zero rounding
  *  for every net that `VatInclusivePrice.NetOf` produces. The backend has no
@@ -534,11 +525,14 @@ export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }
 
-/** What a price field shows for a line's stored net price: a gross for an item
- *  priced VAT-included, and the untouched net for every other one — including
- *  the three decimals a grave split leaves behind. */
-export function priceFieldValue(net: number, pricing: ItemPricing | undefined): number {
-  return pricing?.PriceIncludesVat ? grossFromNet(net, pricing.VatRate) : net;
+/** What a price field shows for a line's stored net price: the gross for a line
+ *  entered VAT-included, and the untouched net for every other one — including
+ *  the three decimals a grave split leaves behind. The rate is the item's
+ *  current one, not the line's stored one: the backend converts what the dialog
+ *  sends using the item as it is now, so displaying with an older rate would
+ *  move the price of a line nobody touched. */
+export function priceFieldValue(net: number, priceIncludesVat: boolean, vatRate: number): number {
+  return priceIncludesVat ? grossFromNet(net, vatRate) : net;
 }
 
 /** "H1 2026" — the label the half-year selects already use. */
@@ -553,6 +547,7 @@ export interface GraveInvoiceGroupLine {
   Count: number;
   UnitPrice: number;
   VatRate: number;
+  PriceIncludesVat: boolean;
 }
 
 export interface GraveInvoiceGroup {

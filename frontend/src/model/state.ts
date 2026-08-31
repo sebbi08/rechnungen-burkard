@@ -25,8 +25,8 @@ export interface DraftLine {
   /** Empty means "use the default"; 0 is a real price. */
   unitPrice: number | string | null;
   defaultPrice: number | string | null;
-  /** True when this row's item is priced VAT-included: the price above is a
-   *  gross, and the marker beside it says so. */
+  /** True when this row was entered VAT-included: the price above is a gross,
+   *  and the checkbox beside it says so. */
   priceIncludesVat: boolean;
 }
 
@@ -43,9 +43,6 @@ export interface ItemDraft {
   vatRate: string;
   /** Kept as typed: "" means no default price, which is not the same as 0. */
   defaultPrice: string;
-  /** True when the price above is the gross the customer pays. Ticking it does
-   *  not rewrite the number — it changes what the number means. */
-  priceIncludesVat: boolean;
 }
 
 export interface RecipientsView {

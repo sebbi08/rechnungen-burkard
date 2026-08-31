@@ -63,6 +63,9 @@
                         <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <Column width="9rem" importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatShort}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -85,33 +88,15 @@
                                 <!-- a width of their own, or the pop-in gives a count
                                      the whole row to hold one digit -->
                                 <Input value="{invoiceDraft>count}" type="Number" width="5rem" />
-                                <VBox>
-                                    <!-- pre-filled with the item's default price; clearing it or
-                                         typing another one overrides it for this invoice.
-                                         Table normally labels a cell's control from its column
-                                         header automatically, but only when that control is the
-                                         cell's direct child (ColumnListItemRenderer.applyAriaLabelledBy
-                                         checks the cell itself for an ariaLabelledBy association) -
-                                         wrapping the Input in this VBox to add the VAT marker below
-                                         it takes that away, since VBox has no such association. The
-                                         explicit ariaLabelledBy below replaces it. -->
-                                    <Input
-                                        value="{invoiceDraft>unitPrice}"
-                                        type="Number"
-                                        width="7rem"
-                                        placeholder="{invoiceDraft>defaultPrice}"
-                                        ariaLabelledBy="unitPriceLabel"
-                                    />
-                                    <core:InvisibleText
-                                        id="unitPriceLabel"
-                                        text="{i18n>itemPrice}"
-                                    />
-                                    <!-- this row's price is the gross the customer pays -->
-                                    <Text
-                                        text="{i18n>priceIncludesVatShort}"
-                                        visible="{invoiceDraft>priceIncludesVat}"
-                                    />
-                                </VBox>
+                                <!-- pre-filled with the item's default price; clearing it or
+                                     typing another one overrides it for this invoice -->
+                                <Input
+                                    value="{invoiceDraft>unitPrice}"
+                                    type="Number"
+                                    width="7rem"
+                                    placeholder="{invoiceDraft>defaultPrice}"
+                                />
+                                <CheckBox selected="{invoiceDraft>priceIncludesVat}" />
                             </cells>
                         </ColumnListItem>
                     </items>

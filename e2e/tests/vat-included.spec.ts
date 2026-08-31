@@ -5,71 +5,86 @@ import { createRow, ensureRow } from "../seed";
 // Unique per run: the specs share one stack and write into it in parallel.
 const RUN = Date.now();
 
-test("an item can be marked as priced VAT-included and stays marked", async ({ page }) => {
-  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
-  const number = `VI-${RUN}`;
-
-  await page.goto("/index.html#/items");
-  await page.getByRole("button", { name: "Leistung anlegen" }).click();
-  await waitForDialogOpen(page);
-
-  const dialog = page.locator(".sapMDialog");
-  // scope to the dialog: the page's search field placeholder also says "Nummer"
-  await dialog.getByLabel("Nummer").fill(number);
-  await dialog.getByLabel("Bezeichnung").fill("Grabpflege inklusive");
-  await dialog.locator(".sapMSlt").click();
-  await page.locator("ul.sapMSltList-CTX li.sapMSelectListItem", { hasText: "19" }).click();
-  await dialog.getByLabel("Standardpreis").fill("120");
-  await dialog.getByText("Preis inkl. MwSt.").click();
-  await page.getByRole("button", { name: "Speichern" }).click();
-
-  // the list says which prices are gross, so the price column is not ambiguous
-  const itemsTable = page.locator("[id$='itemsTable-listUl']");
-  const row = itemsTable.locator("tbody tr", { hasText: number });
-  await expect(row).toContainText("inkl. MwSt.");
-
-  // and the dialog reopens on what was saved, price and flag alike
-  // (the OData v4 model preserves the server's Edm.Decimal literal verbatim,
-  // which a round trip through the DB renders as "120.0" rather than "120" —
-  // pre-existing on DefaultPrice, unrelated to the VAT flag under test here)
-  await row.getByRole("button", { name: "Bearbeiten" }).click();
-  await waitForDialogOpen(page);
-  await expect(page.locator(".sapMDialog").getByLabel("Standardpreis")).toHaveValue("120.0");
-  await expect(page.locator(".sapMDialog input[type='checkbox']")).toBeChecked();
-});
-
-test("an invoice bills a VAT-included item at the price that was entered", async ({ page }) => {
+test("a line ticked as VAT-included bills the price that was entered", async ({ page }) => {
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   const item = await createRow(page, "/odata/InvoiceItems", {
-    Number: `VII-${RUN}`,
-    Description: "Grabpflege inklusive",
+    Number: `VI-${RUN}`,
+    Description: "Grabpflege",
     VatRate: 19,
     DefaultPrice: 120,
-    PriceIncludesVat: true,
   });
   const recipient = await createRow(page, "/odata/Recipients", {
     Name: `Brutto ${RUN}`,
     Address: "Musterstraße 1\n12345 Musterstadt",
   });
+
+  await page.goto("/index.html#/invoices");
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
+
+  const dialog = page.locator("[id$='invoiceDialog']");
+  // the item field is a typeahead: type the number, then pick the suggestion,
+  // the same way invoices.spec.ts drives it — a plain click on the ComboBox
+  // opens its dropdown but leaves the row unfilled, since nothing was typed
+  // for it to match against
+  const lineInput = dialog.locator("input[id*='lineItem'][id$='-inner']");
+  await lineInput.click();
+  await lineInput.fill(`VI-${RUN}`);
+  await page
+    .locator("[id*='lineItem'][id$='-popup-list'] li.sapMSLI", { hasText: `VI-${RUN}` })
+    .click();
+  await expect(dialog.getByLabel("Preis")).toHaveValue("120");
+
+  // the price above is the gross the customer pays.
+  // sap.m.CheckBox toggles aria-checked on its own async render tick rather
+  // than synchronously with the click, so locator.check() reads it too soon
+  // and reports no state change; click and then wait for the attribute like
+  // every other control state this suite polls for.
+  await dialog.getByRole("checkbox").click();
+  await expect(dialog.getByRole("checkbox")).toBeChecked();
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+
+  // the invoices list shows no totals, only the invoice detail page does — open
+  // it from the row this test just created, the way invoices.spec.ts does
+  const recipientName = `Brutto ${RUN}`;
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+  const row = invoicesTable.locator("tbody tr", { hasText: recipientName });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: "Details", exact: true }).click();
+
+  // 120,00 gross in, 100,84 net + 19 % = 120,00 out
+  await expect(page.getByText("120,00 €").first()).toBeVisible();
+});
+
+test("a ticked line reopens on its gross and re-saves to the same net", async ({ page }) => {
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `VII-${RUN}`,
+    Description: "Grabpflege",
+    VatRate: 19,
+    DefaultPrice: 120,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Brutto zwei ${RUN}`,
+    Address: "Musterstraße 1\n12345 Musterstadt",
+  });
   const created = await createRow(page, "/odata/CreateInvoice", {
     recipientId: recipient.Id,
-    lines: [{ itemId: item.Id, count: 1, unitPrice: null }],
+    lines: [{ itemId: item.Id, count: 1, unitPrice: null, priceIncludesVat: true }],
   });
 
   await page.goto(`/index.html#/invoices/${created.RootId ?? created.Id}`);
-  // 120,00 gross in, 100,84 net + 19 % = 120,00 out
   await expect(page.getByText("120,00 €").first()).toBeVisible();
 
-  // the edit dialog opens on the gross, not on the 100,84 that is stored, and
-  // says so; saving it untouched must not take the VAT out a second time
+  // the dialog opens on the gross with the box still ticked, not on the stored 100,84
   await page.getByRole("button", { name: "Bearbeiten" }).first().click();
   await waitForDialogOpen(page);
   const dialog = page.locator("[id$='invoiceDialog']");
   await expect(dialog.getByLabel("Preis")).toHaveValue("120");
-  await expect(dialog).toContainText("inkl. MwSt.");
+  await expect(dialog.getByRole("checkbox")).toBeChecked();
 
+  // saved untouched, the VAT must not come out a second time
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Revision 1", { exact: true })).toBeVisible();
-  // both the original and the revision total to the entered price
   await expect(page.getByText("120,00 €").first()).toBeVisible();
 });

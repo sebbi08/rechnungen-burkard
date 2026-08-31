@@ -29,14 +29,14 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
 
     let lines: DraftLine[];
     if (invoiceId != null) {
-      let pricing: Map<number, api.ItemPricing>;
+      let rates: Map<number, number>;
       try {
-        pricing = await this.loadItemPricing();
+        rates = await this.loadItemVatRates();
       } catch (error) {
         api.showError(this, error);
         return;
       }
-      lines = await this.loadLines(invoiceId, pricing);
+      lines = await this.loadLines(invoiceId, rates);
     } else {
       lines = [InvoiceEdit.emptyLine()];
     }
@@ -52,10 +52,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     this._invoiceDialog.open();
   }
 
-  private async loadLines(
-    invoiceId: number,
-    pricing: Map<number, api.ItemPricing>,
-  ): Promise<DraftLine[]> {
+  private async loadLines(invoiceId: number, rates: Map<number, number>): Promise<DraftLine[]> {
     try {
       const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
       if (!response.ok) {
@@ -65,16 +62,20 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
         value: api.InvoiceLineRow[];
       };
       return body.value.map((line) => {
-        const item = line.ItemId != null ? pricing.get(Number(line.ItemId)) : undefined;
+        const vatRate = line.ItemId != null ? (rates.get(Number(line.ItemId)) ?? 0) : 0;
         return {
           // the ComboBox matches its keys as strings
           itemId: line.ItemId != null ? String(line.ItemId) : "",
           itemNumber: line.ItemNumber,
           count: line.Count,
-          // the line stores a net; a VAT-included item is edited as its gross
-          unitPrice: api.priceFieldValue(Number(line.UnitPrice), item),
+          // the line stores a net; a line entered VAT-included is edited as its gross
+          unitPrice: api.priceFieldValue(
+            Number(line.UnitPrice),
+            Boolean(line.PriceIncludesVat),
+            vatRate,
+          ),
           defaultPrice: null,
-          priceIncludesVat: item?.PriceIncludesVat ?? false,
+          priceIncludesVat: Boolean(line.PriceIncludesVat),
           description: line.Description,
         };
       });
@@ -113,12 +114,6 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     model.setProperty(
       `/lines/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
-    );
-    // the default price is stored as it was entered, so for a VAT-included item
-    // it is already the gross this field wants
-    model.setProperty(
-      `/lines/${row}/priceIncludesVat`,
-      itemContext.getProperty("PriceIncludesVat") as boolean,
     );
   }
 
@@ -160,6 +155,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
       unitPrice: line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
+      priceIncludesVat: line.priceIncludesVat,
     }));
 
     // The ComboBox is bound two-way, so the draft holds the recipient the dialog
