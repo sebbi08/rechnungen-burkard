@@ -25,6 +25,7 @@ export default class Graves extends GraveEdit {
     this.setState<GravesView>("view", {
       halfYearOptions: api.halfYearOptions(2, 1),
       halfYear: `${year}-${half}`,
+      paymentFilter: "all",
     });
 
     void this.refreshStatus();
@@ -44,6 +45,28 @@ export default class Graves extends GraveEdit {
 
   public onHalfYearChange(): void {
     void this.refreshStatus();
+  }
+
+  /**
+   * How much of the selected half-year this grave has paid. Takes both counts:
+   * the state comes from the pair, not from one property.
+   */
+  public paymentText(invoiceCount: number, paidCount: number): string {
+    if (!invoiceCount) {
+      return "";
+    }
+    if (paidCount === 0) {
+      return this.i18nText("statusUnpaid");
+    }
+    return this.i18nText(paidCount < invoiceCount ? "statusPartlyPaid" : "statusPaid");
+  }
+
+  public paymentState(invoiceCount: number, paidCount: number): string {
+    return invoiceCount > 0 && paidCount === invoiceCount ? "Success" : "Warning";
+  }
+
+  public onPaymentFilterChange(): void {
+    this.applyRows();
   }
 
   public async onSearchGraves(event: SearchField$SearchEvent): Promise<void> {
@@ -83,11 +106,19 @@ export default class Graves extends GraveEdit {
     }
   }
 
-  /// The rows the table shows: the status order, narrowed to the last search.
+  /// The rows the table shows: the status order, narrowed to the last search
+  /// and to the payment filter.
   private applyRows(): void {
-    const rows = this._searchIds
+    const searched = this._searchIds
       ? this._rows.filter((row) => this._searchIds!.has(Number(row.Id)))
       : this._rows;
+    // "only unpaid" means money is outstanding, so a grave with nothing
+    // invoiced for this half-year is not in it — the invoicing status is where
+    // that grave is already visible
+    const rows =
+      this.state<GravesView>("view").getProperty("/paymentFilter") === "unpaid"
+        ? searched.filter((row) => row.InvoiceCount > 0 && row.PaidCount < row.InvoiceCount)
+        : searched;
     this.state<GravesStatus>("status").setProperty("/graves", rows);
   }
 

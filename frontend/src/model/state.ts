@@ -84,6 +84,8 @@ export interface GravesView {
   halfYearOptions: YearHalfOption[];
   /** "2026-1" — year and half, as the select's key. */
   halfYear: string;
+  /** "all" | "unpaid" — the payment filter's key. */
+  paymentFilter: string;
 }
 
 export interface GenerateDraft {

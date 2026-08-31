@@ -41,6 +41,13 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     Name: `Anna Beispiel ${RUN}`,
     Address: "Hauptstraße 1",
   });
+  // linked to the last grave only (below): a grave billed to more than one
+  // recipient is what makes "teilweise bezahlt" observable at all, and none
+  // of the single-recipient graves below produce that
+  const secondRecipient = await createRow(page, "/odata/Recipients", {
+    Name: `Clara Beispiel ${RUN}`,
+    Address: "Seitenweg 2",
+  });
 
   // self-heal leftovers from interrupted runs: graves without item/recipient
   // links would be skipped by the generator and keep the duplicate check
@@ -81,6 +88,15 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     await page.request.post("/odata/GraveRecipients", {
       data: { GraveId: grave.Id, RecipientId: recipient.Id },
     });
+    if (i === count) {
+      // the generator processes graves ordered by GraveNumber, so this one —
+      // last alphabetically — is also invoiced last: its invoices get the
+      // highest ids of the half-year's batch and stay within the desc-ordered
+      // top page a later test reads them through
+      await page.request.post("/odata/GraveRecipients", {
+        data: { GraveId: grave.Id, RecipientId: secondRecipient.Id },
+      });
+    }
   }
   return firstGraveNumber;
 }
@@ -645,4 +661,48 @@ test("overview and generate dialog open on the half-year today falls in", async 
     `H${CURRENT_HALF}`,
   );
   await page.getByRole("button", { name: "Abbrechen" }).click();
+});
+
+test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {
+  // the file's earlier tests have already generated this half-year's invoices;
+  // this one only marks them, so it starts no job of its own
+  await page.goto("/index.html#/graves");
+
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  // any grave of this run that has invoices for the current half-year
+  const invoices = await (
+    await page.request.get(
+      `/odata/Invoices?$filter=GraveId ne null and PeriodYear eq ${CURRENT_YEAR}` +
+        ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id desc&$top=50`,
+    )
+  ).json();
+  const byGrave = new Map<number, number[]>();
+  for (const invoice of invoices.value as any[]) {
+    byGrave.set(invoice.GraveId, [...(byGrave.get(invoice.GraveId) ?? []), invoice.Id]);
+  }
+  // a grave billed to more than one recipient is what makes "teilweise bezahlt"
+  // observable at all
+  const [graveId, invoiceIds] = [...byGrave].find(([, ids]) => ids.length > 1)!;
+  const grave = await (await page.request.get(`/odata/Graves(${graveId})`)).json();
+  const row = gravesTable.locator("tbody tr", { hasText: grave.GraveNumber }).first();
+
+  await page.request.post("/odata/SetInvoicePaid", {
+    data: { invoiceId: invoiceIds[0], paid: true },
+  });
+  await page.reload();
+  await expect(row).toContainText("teilweise bezahlt");
+
+  for (const invoiceId of invoiceIds.slice(1)) {
+    await page.request.post("/odata/SetInvoicePaid", { data: { invoiceId, paid: true } });
+  }
+  await page.reload();
+  // strengthened from the brief: "bezahlt" alone would also match "teilweise
+  // bezahlt", so this would pass even if the last recipient's mark did nothing
+  await expect(row).toContainText("bezahlt");
+  await expect(row).not.toContainText("teilweise");
+
+  // fully paid, so the unpaid filter drops it
+  await page.locator("[id$='paymentFilter']").click();
+  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await expect(gravesTable.locator("tbody tr", { hasText: grave.GraveNumber })).toHaveCount(0);
 });
