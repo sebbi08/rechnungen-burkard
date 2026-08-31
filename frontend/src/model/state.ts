@@ -32,6 +32,12 @@ export interface ItemsView {
   searchTerm: string | null;
 }
 
+/** The invoice overview's toolbar state. */
+export interface InvoicesView {
+  /** "all" | "unpaid" | "paid" — the payment filter's key. */
+  paymentFilter: string;
+}
+
 export interface ItemDraft {
   /** null while creating, the item's id while editing. */
   id: number | null;

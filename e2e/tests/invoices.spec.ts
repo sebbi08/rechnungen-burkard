@@ -438,3 +438,78 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await row.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.getByText("Original", { exact: true })).toBeVisible();
 });
+
+test("mark an invoice paid, filter by payment, and take it back (Story 4)", async ({ page }) => {
+  // its own recipient and item, unique to this run: the unpaid-filter
+  // assertion below would otherwise catch the invoice the first test in this
+  // file leaves behind for the shared RECIPIENT_NAME, which stays unpaid
+  const ts = Date.now();
+  const recipientName = `Zahlung ${ts}`;
+  const itemNumber = `9006-${ts}`;
+  await page.request.post("/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.request.post("/odata/InvoiceItems", {
+    data: {
+      Number: itemNumber,
+      Description: "E2E Zahlung",
+      VatRate: 7,
+      DefaultPrice: null,
+    },
+  });
+  await page.request.post("/odata/Recipients", {
+    data: {
+      Name: recipientName,
+      Address: "Zahlungsweg 1\n12345 Zahlungsstadt",
+    },
+  });
+
+  await page.goto("/index.html#/invoices");
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+
+  // a row of this run's own, so the assertions below cannot pick up an invoice
+  // another spec or an earlier run created
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
+  await pickRecipient(page, recipientName);
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
+  await lineInput.click();
+  await lineInput.fill(itemNumber);
+  await suggestions(page, "lineItem").filter({ hasText: itemNumber }).click();
+  await page.getByLabel("Anzahl").fill("1");
+  await page.getByLabel("Preis").fill("50");
+  await page.getByRole("button", { name: "Speichern" }).click();
+
+  const row = invoicesTable.locator("tbody tr", { hasText: recipientName }).first();
+  await expect(row).toContainText("unbezahlt");
+
+  await row.getByRole("button", { name: "Als bezahlt markieren", exact: true }).click();
+  await expect(row).toContainText("bezahlt");
+  // a paid invoice cannot be revised, so its edit button is dead — and its
+  // tooltip (the accessible name of this icon-only button) names the reason
+  // instead of staying "Bearbeiten", which is what disables it here
+  await expect(
+    row.getByRole("button", {
+      name: "Eine bezahlte Rechnung kann nicht bearbeitet werden.",
+      exact: true,
+    }),
+  ).toBeDisabled();
+
+  // the unpaid filter drops it, the paid filter keeps it
+  const paymentFilter = page.locator("[id$='paymentFilter']");
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(0);
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Nur bezahlte" }).click();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(1);
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Alle" }).click();
+
+  // taking the payment back asks first
+  await row.getByRole("button", { name: "Zahlung zurücknehmen", exact: true }).click();
+  await waitForDialogOpen(page);
+  await page.locator(".sapMDialog.sapMMessageBox").getByRole("button", { name: "OK" }).click();
+  await expect(row).toContainText("unbezahlt");
+  await expect(row.getByRole("button", { name: "Bearbeiten", exact: true })).toBeEnabled();
+});

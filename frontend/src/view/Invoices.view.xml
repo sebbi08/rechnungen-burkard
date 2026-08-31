@@ -1,5 +1,6 @@
 <mvc:View
     xmlns:mvc="sap.ui.core.mvc"
+    xmlns:core="sap.ui.core"
     xmlns="sap.m"
     controllerName="burkard.invoicing.controller.Invoices"
     displayBlock="true"
@@ -23,6 +24,24 @@
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
                 </SearchField>
+                <Label text="{i18n>paymentFilter}" labelFor="paymentFilter">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Label>
+                <Select
+                    id="paymentFilter"
+                    width="10rem"
+                    change=".onPaymentFilterChange"
+                    selectedKey="{view>/paymentFilter}"
+                >
+                    <core:Item key="all" text="{i18n>paymentFilterAll}" />
+                    <core:Item key="unpaid" text="{i18n>paymentFilterUnpaid}" />
+                    <core:Item key="paid" text="{i18n>paymentFilterPaid}" />
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Select>
                 <ToolbarSpacer />
                 <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized">
                     <layoutData>
@@ -55,8 +74,11 @@
                     <Column importance="Medium" popinDisplay="Inline">
                         <Text text="{i18n>revision}" />
                     </Column>
-                    <!-- wide enough for the four actions to stay on one line -->
-                    <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>paidStatus}" />
+                    </Column>
+                    <!-- wide enough for the five actions to stay on one line -->
+                    <Column width="13rem" importance="Low" popinDisplay="WithoutHeader" />
                 </columns>
                 <items>
                     <ColumnListItem>
@@ -75,6 +97,10 @@
                                     class="sapUiTinyMarginBegin"
                                 />
                             </HBox>
+                            <ObjectStatus
+                                text="{path: 'odata>PaidOn', formatter: '.paidStatusText'}"
+                                state="{path: 'odata>PaidOn', formatter: '.paidStatusState'}"
+                            />
                             <!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
                             <HBox wrap="Wrap">
@@ -99,8 +125,15 @@
                                 <Button
                                     icon="sap-icon://edit"
                                     type="Transparent"
-                                    tooltip="{i18n>actionEdit}"
+                                    enabled="{path: 'odata>PaidOn', formatter: '.paidEditEnabled', targetType: 'any'}"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidEditTooltip'}"
                                     press=".onEditInvoice"
+                                />
+                                <Button
+                                    icon="{path: 'odata>PaidOn', formatter: '.paidActionIcon'}"
+                                    type="Transparent"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidActionTooltip'}"
+                                    press=".onTogglePaid"
                                 />
                             </HBox>
                         </cells>
