@@ -436,7 +436,6 @@ async function seedGrave(
     Description: "Grabpflege",
     VatRate: vatRate,
     DefaultPrice: pricing.price ?? 100,
-    PriceIncludesVat: pricing.priceIncludesVat ?? false,
   });
   const grave = await createRow(page, "/odata/Graves", {
     GraveNumber: marker,
@@ -447,6 +446,7 @@ async function seedGrave(
     GraveId: grave.Id,
     ItemId: item.Id,
     Count: 1,
+    PriceIncludesVat: pricing.priceIncludesVat ?? false,
   });
   for (const name of recipientNames) {
     const recipient = await createRow(page, "/odata/Recipients", {
@@ -681,6 +681,7 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   const dialog = page.locator("[id$='graveInvoiceDialog']");
   await expect(dialog.getByLabel("Preis")).toHaveValue("119");
   await expect(dialog).toContainText("inkl. MwSt.");
+  await expect(dialog.getByRole("checkbox")).toBeChecked();
 
   // saved back untouched, every share stays where it was
   await dialog.getByRole("button", { name: "Speichern" }).click();

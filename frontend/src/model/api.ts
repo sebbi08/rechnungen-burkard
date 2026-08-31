@@ -329,6 +329,7 @@ export interface GraveItemInput {
   itemId: number;
   count: number;
   unitPrice: number | null;
+  priceIncludesVat: boolean;
 }
 
 export interface SaveGraveInput {

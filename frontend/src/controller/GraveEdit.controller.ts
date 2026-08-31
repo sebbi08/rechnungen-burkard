@@ -102,10 +102,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/Items/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
     );
-    model.setProperty(
-      `/Items/${row}/priceIncludesVat`,
-      itemContext.getProperty("PriceIncludesVat") as boolean,
-    );
   }
 
   public onAddItemLink(): void {
@@ -199,6 +195,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           count: Number(row.count),
           // a price of 0 is a real value, not a missing one
           unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+          priceIncludesVat: row.priceIncludesVat,
         })),
         recipientIds: draft.Recipients.map((row) => Number(row.recipientId)),
       });
@@ -337,10 +334,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     model.setProperty(
       `/lines/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
-    );
-    model.setProperty(
-      `/lines/${row}/priceIncludesVat`,
-      itemContext.getProperty("PriceIncludesVat") as boolean,
     );
   }
 

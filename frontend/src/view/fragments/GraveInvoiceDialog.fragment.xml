@@ -53,6 +53,9 @@
                         <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <Column width="9rem" importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatShort}" />
+                        </Column>
                         <Column importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
@@ -79,31 +82,13 @@
                                     type="Number"
                                     width="5rem"
                                 />
-                                <VBox>
-                                    <!-- Table normally labels a cell's control from its column
-                                         header automatically, but only when that control is the
-                                         cell's direct child (ColumnListItemRenderer.applyAriaLabelledBy
-                                         checks the cell itself for an ariaLabelledBy association) -
-                                         wrapping the Input in this VBox to add the VAT marker below
-                                         it takes that away, since VBox has no such association. The
-                                         explicit ariaLabelledBy below replaces it. -->
-                                    <Input
-                                        value="{graveInvoiceDraft>unitPrice}"
-                                        type="Number"
-                                        width="7rem"
-                                        placeholder="{graveInvoiceDraft>defaultPrice}"
-                                        ariaLabelledBy="graveInvoiceUnitPriceLabel"
-                                    />
-                                    <core:InvisibleText
-                                        id="graveInvoiceUnitPriceLabel"
-                                        text="{i18n>itemPrice}"
-                                    />
-                                    <!-- this row's price is the gross the customer pays -->
-                                    <Text
-                                        text="{i18n>priceIncludesVatShort}"
-                                        visible="{graveInvoiceDraft>priceIncludesVat}"
-                                    />
-                                </VBox>
+                                <Input
+                                    value="{graveInvoiceDraft>unitPrice}"
+                                    type="Number"
+                                    width="7rem"
+                                    placeholder="{graveInvoiceDraft>defaultPrice}"
+                                />
+                                <CheckBox selected="{graveInvoiceDraft>priceIncludesVat}" />
                                 <Button
                                     text="{i18n>delete}"
                                     press=".onDeleteGraveInvoiceLine"
