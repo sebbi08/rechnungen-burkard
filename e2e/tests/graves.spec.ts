@@ -14,6 +14,15 @@ const RUN = Date.now();
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_HALF = new Date().getMonth() < 6 ? 1 : 2;
 
+// How many graves the generation test below seeds. Shared so the payment test
+// further down can name the exact grave `seedGraveGenerationData` gives two
+// recipients (`G-${RUN}-<this, zero-padded>`) instead of searching across
+// every grave invoiced for the current half-year: a full-suite run also
+// invoices other spec files' graves for this same period, and at least one of
+// them (import-export.spec.ts's `IMP-G1-*`) has two recipients too, so an
+// unscoped search could pick their grave instead of this run's own.
+const GRAVE_GENERATION_COUNT = 60;
+
 /**
  * One field's suggestion rows. The item and recipient fields of the grave
  * dialog are both ComboBoxes and both leave their list in the DOM after a pick,
@@ -89,10 +98,9 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
       data: { GraveId: grave.Id, RecipientId: recipient.Id },
     });
     if (i === count) {
-      // the generator processes graves ordered by GraveNumber, so this one —
-      // last alphabetically — is also invoiced last: its invoices get the
-      // highest ids of the half-year's batch and stay within the desc-ordered
-      // top page a later test reads them through
+      // the last grave only: the payment test below names it directly by its
+      // GraveNumber (G-${RUN}-<count>), so which one gets the second
+      // recipient is arbitrary — this just keeps it to a single, fixed grave
       await page.request.post("/odata/GraveRecipients", {
         data: { GraveId: grave.Id, RecipientId: secondRecipient.Id },
       });
@@ -104,7 +112,7 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
 test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
   page,
 }) => {
-  const firstGraveNumber = await seedGraveGenerationData(page, 60);
+  const firstGraveNumber = await seedGraveGenerationData(page, GRAVE_GENERATION_COUNT);
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
   await expect(gravesTable).toContainText(firstGraveNumber);
@@ -669,21 +677,27 @@ test("a half-year reads partly paid until every recipient has paid (Story 6)", a
   await page.goto("/index.html#/graves");
 
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
-  // any grave of this run that has invoices for the current half-year
-  const invoices = await (
+  // the grave seedGraveGenerationData gave two recipients, named directly by
+  // its GraveNumber rather than found by scanning every grave invoiced for
+  // the current half-year: a full-suite run also invoices other spec files'
+  // graves for this same period (a generation sweeps up every grave in the
+  // stack), and at least one of them is billed to more than one recipient
+  // too, so an unscoped search could resolve to their grave instead of ours
+  const graveNumber = `G-${RUN}-${String(GRAVE_GENERATION_COUNT).padStart(3, "0")}`;
+  const graves = await (
     await page.request.get(
-      `/odata/Invoices?$filter=GraveId ne null and PeriodYear eq ${CURRENT_YEAR}` +
-        ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id desc&$top=50`,
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id,GraveNumber`,
     )
   ).json();
-  const byGrave = new Map<number, number[]>();
-  for (const invoice of invoices.value as any[]) {
-    byGrave.set(invoice.GraveId, [...(byGrave.get(invoice.GraveId) ?? []), invoice.Id]);
-  }
-  // a grave billed to more than one recipient is what makes "teilweise bezahlt"
-  // observable at all
-  const [graveId, invoiceIds] = [...byGrave].find(([, ids]) => ids.length > 1)!;
-  const grave = await (await page.request.get(`/odata/Graves(${graveId})`)).json();
+  const grave = graves.value[0];
+  const invoices = await (
+    await page.request.get(
+      `/odata/Invoices?$filter=GraveId eq ${grave.Id} and PeriodYear eq ${CURRENT_YEAR}` +
+        ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id`,
+    )
+  ).json();
+  const invoiceIds = (invoices.value as any[]).map((invoice) => invoice.Id);
+  expect(invoiceIds.length).toBeGreaterThan(1);
   const row = gravesTable.locator("tbody tr", { hasText: grave.GraveNumber }).first();
 
   await page.request.post("/odata/SetInvoicePaid", {
