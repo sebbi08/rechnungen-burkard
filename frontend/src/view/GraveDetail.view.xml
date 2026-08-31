@@ -76,7 +76,15 @@
                                 <Text text="{grave>Number}" />
                                 <Text text="{grave>Description}" wrapping="true" />
                                 <Text text="{grave>Count}" />
-                                <Text text="{path: 'grave>Price', formatter: '.formatAmount'}" />
+                                <VBox>
+                                    <Text
+                                        text="{path: 'grave>Price', formatter: '.formatAmount'}"
+                                    />
+                                    <Text
+                                        text="{i18n>priceIncludesVatShort}"
+                                        visible="{grave>PriceIncludesVat}"
+                                    />
+                                </VBox>
                                 <Text text="{grave>VatRate}" />
                             </cells>
                         </ColumnListItem>

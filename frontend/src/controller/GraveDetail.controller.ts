@@ -10,6 +10,7 @@ interface GraveItemRow {
   Count: number;
   Price: number;
   VatRate: number;
+  PriceIncludesVat: boolean;
 }
 
 interface GraveRecipientRow {
@@ -103,6 +104,7 @@ export default class GraveDetail extends GraveEdit {
           // the link's own price wins; without one the item's default is billed
           Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
           VatRate: link.Item.VatRate,
+          PriceIncludesVat: link.Item.PriceIncludesVat,
         })),
         Recipients: details.Recipients.map((link) => ({
           Name: link.Recipient.Name,

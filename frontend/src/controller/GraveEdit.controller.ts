@@ -63,12 +63,11 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         itemNumber: link.Item.Number,
         description: link.Item.Description,
         count: link.Count,
+        // stored as it was typed — for a VAT-included item that is the gross
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
-        // placeholders: the grave dialogs do not yet show a gross for a
-        // VAT-included item's price field
-        priceIncludesVat: false,
-        vatRate: 0,
+        priceIncludesVat: link.Item.PriceIncludesVat,
+        vatRate: Number(link.Item.VatRate),
       })),
       Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
@@ -104,6 +103,11 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/Items/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
     );
+    model.setProperty(
+      `/Items/${row}/priceIncludesVat`,
+      itemContext.getProperty("PriceIncludesVat") as boolean,
+    );
+    model.setProperty(`/Items/${row}/vatRate`, Number(itemContext.getProperty("VatRate")));
   }
 
   public onAddItemLink(): void {
@@ -175,8 +179,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       count: 1,
       unitPrice: null,
       defaultPrice: null,
-      // placeholders: the grave dialogs do not yet show a gross for a
-      // VAT-included item's price field
       priceIncludesVat: false,
       vatRate: 0,
     };
@@ -277,27 +279,32 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       .replace("{0}", api.halfYearText(group.PeriodYear, group.PeriodHalf))
       .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
 
+    const pricing = await this.loadItemPricing();
+
     this._graveInvoiceDialog.setModel(
       new TypedJSONModel<GraveInvoiceDraft>({
         invoiceId,
         warning,
-        lines: group.Lines.map((line) => ({
-          // the ComboBox matches its keys as strings
-          itemId: String(line.ItemId),
-          itemNumber: line.ItemNumber,
-          description: line.Description,
-          count: Number(line.Count),
-          // no rounding: a pre-GraveUnitPrice-migration line is reconstructed
-          // by GraveInvoiceSplitter.Combine at 3-decimal precision on purpose,
-          // to reproduce its historical net cents exactly. Rounding here would
-          // resubmit a different price for every line the user never touched.
-          unitPrice: Number(line.UnitPrice),
-          defaultPrice: null,
-          // placeholders: the grave dialogs do not yet show a gross for a
-          // VAT-included item's price field
-          priceIncludesVat: false,
-          vatRate: 0,
-        })),
+        lines: group.Lines.map((line) => {
+          const item = pricing.get(Number(line.ItemId));
+          return {
+            // the ComboBox matches its keys as strings
+            itemId: String(line.ItemId),
+            itemNumber: line.ItemNumber,
+            description: line.Description,
+            count: Number(line.Count),
+            // No rounding for a net price: a pre-GraveUnitPrice-migration line is
+            // reconstructed by GraveInvoiceSplitter.Combine at 3-decimal precision
+            // on purpose, to reproduce its historical net cents exactly. Rounding
+            // here would resubmit a different price for every line the user never
+            // touched. A VAT-included item is the one case that does convert, and
+            // its round trip is exact.
+            unitPrice: api.priceFieldValue(Number(line.UnitPrice), item),
+            defaultPrice: null,
+            priceIncludesVat: item?.PriceIncludesVat ?? false,
+            vatRate: item?.VatRate ?? 0,
+          };
+        }),
       }),
       "graveInvoiceDraft",
     );
@@ -325,6 +332,11 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/lines/${row}/unitPrice`,
       defaultPrice != null ? Number(defaultPrice) : null,
     );
+    model.setProperty(
+      `/lines/${row}/priceIncludesVat`,
+      itemContext.getProperty("PriceIncludesVat") as boolean,
+    );
+    model.setProperty(`/lines/${row}/vatRate`, Number(itemContext.getProperty("VatRate")));
   }
 
   public onAddGraveInvoiceLine(): void {
