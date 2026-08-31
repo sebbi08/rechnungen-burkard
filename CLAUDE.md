@@ -139,6 +139,19 @@ scripts/next-version.sh                       # e.g. 1.3.0
 scripts/changelog-entry.sh "$(scripts/next-version.sh)"
 ```
 
+And to release, instead of the "Run workflow" button in the GitHub UI:
+
+```sh
+scripts/release.sh          # or: npm run release
+```
+
+It previews the version, the changelog entry and the state of CI on the commit,
+asks, dispatches `.github/workflows/release.yml` and follows the run. The
+preview comes from a throwaway worktree at `origin/<branch>`, because that is
+what the workflow releases — unpushed commits are not in it, and a branch with
+nothing releasable on it stops the script instead of starting a run that
+`next-version.sh` would fail a minute later.
+
 ## The dev container and the SDK container share `backend/obj`
 
 `backend/` is bind-mounted into the dev backend container (`dotnet watch`) and

@@ -6,6 +6,7 @@
   "scripts": {
     "prepare": "husky",
     "commitlint": "commitlint",
+    "release": "scripts/release.sh",
     "test:release": "scripts/test-release-scripts.sh",
     "format": "prettier --write . && scripts/csharpier.sh format .",
     "format:check": "prettier --check . && scripts/csharpier.sh check ."
