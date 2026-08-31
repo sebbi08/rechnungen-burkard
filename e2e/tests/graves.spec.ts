@@ -704,7 +704,8 @@ test("a half-year reads partly paid until every recipient has paid (Story 6)", a
     data: { invoiceId: invoiceIds[0], paid: true },
   });
   await page.reload();
-  await expect(row).toContainText("teilweise bezahlt");
+  // the count says how many of the grave's recipients have settled
+  await expect(row).toContainText(`teilweise bezahlt (1 / ${invoiceIds.length})`);
 
   for (const invoiceId of invoiceIds.slice(1)) {
     await page.request.post("/odata/SetInvoicePaid", { data: { invoiceId, paid: true } });

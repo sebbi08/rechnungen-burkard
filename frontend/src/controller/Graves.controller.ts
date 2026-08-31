@@ -58,7 +58,14 @@ export default class Graves extends GraveEdit {
     if (paidCount === 0) {
       return this.i18nText("statusUnpaid");
     }
-    return this.i18nText(paidCount < invoiceCount ? "statusPartlyPaid" : "statusPaid");
+    if (paidCount < invoiceCount) {
+      // a half-year settled by some of its recipients says how many, since the
+      // one number the reader wants next is how much is still outstanding
+      return this.i18nText("statusPartlyPaid")
+        .replace("{0}", String(paidCount))
+        .replace("{1}", String(invoiceCount));
+    }
+    return this.i18nText("statusPaid");
   }
 
   public paymentState(invoiceCount: number, paidCount: number): string {
