@@ -198,13 +198,14 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 4, file, line, problems))
+            if (!HasColumns(row, 5, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
             var description = row[1].Trim();
             var rawVat = row[2].Trim();
             var rawPrice = row[3].Trim();
+            var rawIncludesVat = row[4].Trim();
             if (number.Length > 0)
                 data.DeclaredItems.Add(number);
             if (
@@ -248,6 +249,19 @@ public sealed class ImportValidator
                 price = parsedPrice;
             }
 
+            if (!TryParseBool(rawIncludesVat, out var priceIncludesVat))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "PriceIncludesVatInvalid",
+                        $"'{rawIncludesVat}' is not a valid yes/no value."
+                    )
+                );
+                continue;
+            }
+
             if (seen.TryGetValue(number, out var first))
             {
                 problems.Add(
@@ -263,7 +277,14 @@ public sealed class ImportValidator
 
             seen[number] = line;
             data.Items.Add(
-                new ItemRow(line, number, description, VatRateNormalizer.Normalize(vatRate), price)
+                new ItemRow(
+                    line,
+                    number,
+                    description,
+                    VatRateNormalizer.Normalize(vatRate),
+                    price,
+                    priceIncludesVat
+                )
             );
         }
     }
@@ -652,6 +673,32 @@ public sealed class ImportValidator
             CultureInfo.InvariantCulture,
             out value
         );
+
+    // Templates are filled in by hand, in German and in English, so both
+    // spellings have to be understood. An empty cell is the common case and
+    // means net — what every item was before this column existed.
+    private static bool TryParseBool(string raw, out bool value)
+    {
+        switch (raw.ToLowerInvariant())
+        {
+            case "":
+            case "false":
+            case "0":
+            case "nein":
+            case "no":
+                value = false;
+                return true;
+            case "true":
+            case "1":
+            case "ja":
+            case "yes":
+                value = true;
+                return true;
+            default:
+                value = false;
+                return false;
+        }
+    }
 
     private static bool TryParseDate(string raw, out DateOnly value) =>
         DateOnly.TryParseExact(

@@ -20,7 +20,8 @@ public sealed record ItemRow(
     string Number,
     string Description,
     decimal VatRate,
-    decimal? Price
+    decimal? Price,
+    bool PriceIncludesVat
 );
 
 public sealed record GraveRow(int Row, string Number, DateOnly StartDate, DateOnly EndDate);
