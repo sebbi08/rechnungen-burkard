@@ -17,13 +17,20 @@ public static class ImportArchiveLayout
         "Description",
         "VatRate",
         "Price",
-        "PriceIncludesVat",
     };
     public static readonly string[] GravesHeader = { "GraveNumber", "StartDate", "EndDate" };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
-    /// "Item" rows carry a count, "Recipient" rows leave it empty.</summary>
-    public static readonly string[] MappingHeader = { "Type", "GraveNumber", "Reference", "Count" };
+    /// "Item" rows carry a count and a VAT-included flag, "Recipient" rows leave
+    /// both empty.</summary>
+    public static readonly string[] MappingHeader =
+    {
+        "Type",
+        "GraveNumber",
+        "Reference",
+        "Count",
+        "PriceIncludesVat",
+    };
 
     public const string ItemLinkType = "Item";
     public const string RecipientLinkType = "Recipient";

@@ -20,13 +20,18 @@ public sealed record ItemRow(
     string Number,
     string Description,
     decimal VatRate,
-    decimal? Price,
-    bool PriceIncludesVat
+    decimal? Price
 );
 
 public sealed record GraveRow(int Row, string Number, DateOnly StartDate, DateOnly EndDate);
 
-public sealed record ItemLinkRow(int Row, string GraveNumber, string ItemNumber, int Count);
+public sealed record ItemLinkRow(
+    int Row,
+    string GraveNumber,
+    string ItemNumber,
+    int Count,
+    bool PriceIncludesVat
+);
 
 public sealed record RecipientLinkRow(int Row, string GraveNumber, string RecipientNumber);
 

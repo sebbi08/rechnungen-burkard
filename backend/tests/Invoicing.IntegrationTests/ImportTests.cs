@@ -19,9 +19,9 @@ namespace Burkard.Invoicing.IntegrationTests;
 public class ImportTests
 {
     private const string RecipientsHeader = "RecipientNumber,Name,Address\r\n";
-    private const string ItemsHeader = "ItemNumber,Description,VatRate,Price,PriceIncludesVat\r\n";
+    private const string ItemsHeader = "ItemNumber,Description,VatRate,Price\r\n";
     private const string GravesHeader = "GraveNumber,StartDate,EndDate\r\n";
-    private const string MappingHeader = "Type,GraveNumber,Reference,Count\r\n";
+    private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 
     private static async Task ConfigureVatAsync(ApiTestHost host, params decimal[] rates)
     {
@@ -64,16 +64,16 @@ public class ImportTests
             ),
             (
                 "items.csv",
-                ItemsHeader + "9001,Grabpflege,7,120.00,\r\n" + "9002,Sonderleistung,7,,true\r\n"
+                ItemsHeader + "9001,Grabpflege,7,120.00\r\n" + "9002,Sonderleistung,7,\r\n"
             ),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
             (
                 "mapping.csv",
                 MappingHeader
-                    + "Item,IMP-1,9001,2\r\n"
-                    + "Item,IMP-1,9002,1\r\n"
-                    + "Recipient,IMP-1,E-1000,\r\n"
-                    + "Recipient,IMP-1,E-1001,\r\n"
+                    + "Item,IMP-1,9001,2,\r\n"
+                    + "Item,IMP-1,9002,1,true\r\n"
+                    + "Recipient,IMP-1,E-1000,,\r\n"
+                    + "Recipient,IMP-1,E-1001,,\r\n"
             )
         );
 
@@ -215,7 +215,7 @@ public class ImportTests
     }
 
     [Fact]
-    public async Task An_item_row_carries_its_vat_included_flag()
+    public async Task An_item_link_carries_its_vat_included_flag()
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 7m);
@@ -228,14 +228,16 @@ public class ImportTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.False(
             await db
-                .InvoiceItems.Where(i => i.Number == "9001")
-                .Select(i => i.PriceIncludesVat)
+                .GraveItems.Include(l => l.Item)
+                .Where(l => l.Item.Number == "9001")
+                .Select(l => l.PriceIncludesVat)
                 .SingleAsync()
         );
         Assert.True(
             await db
-                .InvoiceItems.Where(i => i.Number == "9002")
-                .Select(i => i.PriceIncludesVat)
+                .GraveItems.Include(l => l.Item)
+                .Where(l => l.Item.Number == "9002")
+                .Select(l => l.PriceIncludesVat)
                 .SingleAsync()
         );
     }
@@ -249,9 +251,9 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,vielleicht\r\n"),
+            ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", MappingHeader)
+            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,vielleicht\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -259,17 +261,17 @@ public class ImportTests
         var problems = await ProblemsAsync(response);
         Assert.Contains(
             problems,
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceIncludesVatInvalid"
+            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceIncludesVatInvalid"
         );
     }
 
-    /// <summary>An archive built before this feature has an items.csv with the
+    /// <summary>An archive built before this feature has a mapping.csv with the
     /// old four-column header, missing PriceIncludesVat. Regenerating the
     /// archive from the current template is the accepted cost of the new
     /// column, so the old header must be rejected rather than silently read as
-    /// if every item were not VAT-included.</summary>
+    /// if every item link were not VAT-included.</summary>
     [Fact]
-    public async Task An_items_header_without_the_vat_included_column_is_rejected()
+    public async Task A_mapping_header_without_the_vat_included_column_is_rejected()
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 7m);
@@ -277,12 +279,9 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            (
-                "items.csv",
-                "ItemNumber,Description,VatRate,Price\r\n" + "9001,Grabpflege,7,120.00\r\n"
-            ),
+            ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", MappingHeader)
+            ("mapping.csv", "Type,GraveNumber,Reference,Count\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -290,7 +289,7 @@ public class ImportTests
         var problems = await ProblemsAsync(response);
         Assert.Contains(
             problems,
-            p => p.File == "items.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
+            p => p.File == "mapping.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -348,7 +347,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,nicht-ein-datum,2040-12-31\r\n"),
             ("mapping.csv", MappingHeader)
         );
@@ -382,9 +381,9 @@ public class ImportTests
         // another: users fix an archive in one pass, not one error at a time
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,GIBTSNICHT,1\r\n")
+            ("mapping.csv", MappingHeader + "Item,IMP-1,GIBTSNICHT,1,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -413,7 +412,7 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            ("mapping.csv", MappingHeader + "Recipient,IMP-1,E-1000,\r\n")
+            ("mapping.csv", MappingHeader + "Recipient,IMP-1,E-1000,,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -431,14 +430,14 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
             (
                 "mapping.csv",
                 MappingHeader
-                    + "Item,IMP-1,9999,1\r\n"
-                    + "Recipient,IMP-1,E-9999,\r\n"
-                    + "Recipient,IMP-9,E-1000,\r\n"
+                    + "Item,IMP-1,9999,1,\r\n"
+                    + "Recipient,IMP-1,E-9999,,\r\n"
+                    + "Recipient,IMP-9,E-1000,,\r\n"
             )
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -472,12 +471,12 @@ public class ImportTests
                 "recipients.csv",
                 RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n" + "E-1000,Bert,Nebenweg 2\r\n"
             ),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n" + "9001,Doppelt,7,10,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n" + "9001,Doppelt,7,10\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n" + "IMP-1,2026-01-01,2040-12-31\r\n"
             ),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1\r\n" + "Item,IMP-1,9001,2\r\n")
+            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n" + "Item,IMP-1,9001,2,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -537,7 +536,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120\r\n"),
             ("graves.csv", GravesHeader),
             ("mapping.csv", MappingHeader)
         );

@@ -198,14 +198,13 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 5, file, line, problems))
+            if (!HasColumns(row, 4, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
             var description = row[1].Trim();
             var rawVat = row[2].Trim();
             var rawPrice = row[3].Trim();
-            var rawIncludesVat = row[4].Trim();
             if (number.Length > 0)
                 data.DeclaredItems.Add(number);
             if (
@@ -249,19 +248,6 @@ public sealed class ImportValidator
                 price = parsedPrice;
             }
 
-            if (!TryParseBool(rawIncludesVat, out var priceIncludesVat))
-            {
-                problems.Add(
-                    new ImportProblem(
-                        file,
-                        line,
-                        "PriceIncludesVatInvalid",
-                        $"'{rawIncludesVat}' is not a valid yes/no value."
-                    )
-                );
-                continue;
-            }
-
             if (seen.TryGetValue(number, out var first))
             {
                 problems.Add(
@@ -277,14 +263,7 @@ public sealed class ImportValidator
 
             seen[number] = line;
             data.Items.Add(
-                new ItemRow(
-                    line,
-                    number,
-                    description,
-                    VatRateNormalizer.Normalize(vatRate),
-                    price,
-                    priceIncludesVat
-                )
+                new ItemRow(line, number, description, VatRateNormalizer.Normalize(vatRate), price)
             );
         }
     }
@@ -389,13 +368,14 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 4, file, line, problems))
+            if (!HasColumns(row, 5, file, line, problems))
                 continue;
 
             var type = row[0].Trim();
             var graveNumber = row[1].Trim();
             var reference = row[2].Trim();
             var rawCount = row[3].Trim();
+            var rawIncludesVat = row[4].Trim();
             if (
                 Missing(type, file, line, "Type", problems)
                 | Missing(graveNumber, file, line, "GraveNumber", problems)
@@ -428,6 +408,19 @@ public sealed class ImportValidator
                     continue;
                 }
 
+                if (!TryParseBool(rawIncludesVat, out var priceIncludesVat))
+                {
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "PriceIncludesVatInvalid",
+                            $"'{rawIncludesVat}' is not a valid yes/no value."
+                        )
+                    );
+                    continue;
+                }
+
                 var key = (graveNumber.ToUpperInvariant(), reference.ToUpperInvariant());
                 if (itemLinks.TryGetValue(key, out var firstItemRow))
                 {
@@ -443,7 +436,9 @@ public sealed class ImportValidator
                 }
 
                 itemLinks[key] = line;
-                data.ItemLinks.Add(new ItemLinkRow(line, graveNumber, reference, count));
+                data.ItemLinks.Add(
+                    new ItemLinkRow(line, graveNumber, reference, count, priceIncludesVat)
+                );
             }
             else if (
                 type.Equals(

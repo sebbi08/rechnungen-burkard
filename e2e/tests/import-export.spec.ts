@@ -6,9 +6,9 @@ import { expect, test } from "@playwright/test";
 const RUN = Date.now();
 
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
-const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,PriceIncludesVat\r\n";
+const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price\r\n";
 const GRAVES_HEADER = "GraveNumber,StartDate,EndDate\r\n";
-const MAPPING_HEADER = "Type,GraveNumber,Reference,Count\r\n";
+const MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 
 function archive(files: Record<string, string>): Buffer {
   const zip = new AdmZip();
@@ -24,13 +24,13 @@ function validArchive(suffix: string): Buffer {
       RECIPIENTS_HEADER +
       `IMP-R1-${suffix},Anna Import,"Hauptstraße 1\n99999 Musterdorf"\r\n` +
       `IMP-R2-${suffix},Bert Import,"Nebenweg 2\n99999 Musterdorf"\r\n`,
-    "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00,\r\n`,
+    "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00\r\n`,
     "graves.csv": GRAVES_HEADER + `IMP-G1-${suffix},2026-01-01,2040-12-31\r\n`,
     "mapping.csv":
       MAPPING_HEADER +
-      `Item,IMP-G1-${suffix},IMP-I1-${suffix},2\r\n` +
-      `Recipient,IMP-G1-${suffix},IMP-R1-${suffix},\r\n` +
-      `Recipient,IMP-G1-${suffix},IMP-R2-${suffix},\r\n`,
+      `Item,IMP-G1-${suffix},IMP-I1-${suffix},2,\r\n` +
+      `Recipient,IMP-G1-${suffix},IMP-R1-${suffix},,\r\n` +
+      `Recipient,IMP-G1-${suffix},IMP-R2-${suffix},,\r\n`,
   });
 }
 
@@ -67,9 +67,9 @@ test("a defective archive is reported per file and row and imports nothing (Stor
   const graveNumber = `BAD-G-${RUN}`;
   const broken = archive({
     "recipients.csv": RECIPIENTS_HEADER + `BAD-R-${RUN},,Hauptstraße 1\r\n`,
-    "items.csv": ITEMS_HEADER + `BAD-I-${RUN},Grabpflege,7,120,\r\n`,
+    "items.csv": ITEMS_HEADER + `BAD-I-${RUN},Grabpflege,7,120\r\n`,
     "graves.csv": GRAVES_HEADER + `${graveNumber},2026-01-01,2040-12-31\r\n`,
-    "mapping.csv": MAPPING_HEADER + `Item,${graveNumber},GIBTSNICHT,1\r\n`,
+    "mapping.csv": MAPPING_HEADER + `Item,${graveNumber},GIBTSNICHT,1,\r\n`,
   });
 
   await page.goto("/index.html#/import-export");

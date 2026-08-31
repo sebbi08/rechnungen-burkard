@@ -75,7 +75,6 @@ public sealed class ImportService
                 Description = row.Description,
                 VatRate = row.VatRate,
                 DefaultPrice = row.Price,
-                PriceIncludesVat = row.PriceIncludesVat,
             },
             StringComparer.OrdinalIgnoreCase
         );
@@ -106,6 +105,7 @@ public sealed class ImportService
                     GraveId = graves[link.GraveNumber].Id,
                     ItemId = items[link.ItemNumber].Id,
                     Count = link.Count,
+                    PriceIncludesVat = link.PriceIncludesVat,
                 }
             );
         }
