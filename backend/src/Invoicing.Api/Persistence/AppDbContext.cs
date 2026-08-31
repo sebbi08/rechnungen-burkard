@@ -35,8 +35,16 @@ public sealed class AppDbContext : DbContext
             })
             .IsUnique();
         mb.Entity<Invoice>().HasIndex(i => i.RootId);
-        // the invoice list and the grave detail page both filter on this pair
-        mb.Entity<Invoice>().HasIndex(i => new { i.GraveId, i.IsLatestRevision });
+        // the invoice list filters on all three at once; the grave detail page's
+        // (GraveId, IsLatestRevision) query still matches the leading columns,
+        // so one index serves both
+        mb.Entity<Invoice>()
+            .HasIndex(i => new
+            {
+                i.GraveId,
+                i.IsLatestRevision,
+                i.PaidOn,
+            });
         mb.Entity<InvoiceLine>().HasIndex(l => l.InvoiceId);
         mb.Entity<Document>().HasIndex(d => d.InvoiceId);
         mb.Entity<GraveInvoiceRun>()
