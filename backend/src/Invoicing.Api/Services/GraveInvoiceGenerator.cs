@@ -74,9 +74,10 @@ public sealed class GraveInvoiceGenerator
                 VatInclusivePrice.NetOf(
                     EffectivePrice(item)!.Value,
                     item.Item.VatRate,
-                    item.Item.PriceIncludesVat
+                    item.PriceIncludesVat
                 ),
-                item.Item.VatRate
+                item.Item.VatRate,
+                item.PriceIncludesVat
             ))
             .ToList();
         var perRecipient = GraveInvoiceSplitter.Split(graveLines, recipients.Count);

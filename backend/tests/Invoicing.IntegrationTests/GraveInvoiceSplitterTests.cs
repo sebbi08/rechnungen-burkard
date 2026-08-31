@@ -7,8 +7,21 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class GraveInvoiceSplitterTests
 {
-    private static GraveLine Line(int count, decimal unitPrice, decimal vatRate) =>
-        new(ItemId: 1, ItemNumber: "1001", Description: "Grabpflege", count, unitPrice, vatRate);
+    private static GraveLine Line(
+        int count,
+        decimal unitPrice,
+        decimal vatRate,
+        bool priceIncludesVat = false
+    ) =>
+        new(
+            ItemId: 1,
+            ItemNumber: "1001",
+            Description: "Grabpflege",
+            count,
+            unitPrice,
+            vatRate,
+            priceIncludesVat
+        );
 
     [Fact]
     public void One_recipient_gets_the_grave_line_unchanged()
@@ -116,5 +129,16 @@ public class GraveInvoiceSplitterTests
                 Array.Empty<System.Collections.Generic.IReadOnlyList<Domain.Entities.InvoiceLine>>()
             )
         );
+    }
+
+    [Fact]
+    public void Every_recipient_line_remembers_how_the_grave_price_was_entered()
+    {
+        var lines = new[] { new GraveLine(1, "1001", "Grabpflege", 1, 100.840m, 19m, true) };
+
+        var split = GraveInvoiceSplitter.Split(lines, 2);
+
+        Assert.All(split, recipient => Assert.True(Assert.Single(recipient).PriceIncludesVat));
+        Assert.True(Assert.Single(GraveInvoiceSplitter.Combine(split)).PriceIncludesVat);
     }
 }

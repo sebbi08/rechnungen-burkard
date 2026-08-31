@@ -180,9 +180,10 @@ public sealed class GraveInvoiceRevisionService
                     item.Description,
                     input.Count,
                     // the dialog sends the grave's price as it shows it, which
-                    // for a VAT-included item is the gross; the split needs the net
-                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, item.PriceIncludesVat),
-                    item.VatRate
+                    // for a VAT-included line is the gross; the split needs the net
+                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
+                    item.VatRate,
+                    input.PriceIncludesVat
                 )
             );
         }

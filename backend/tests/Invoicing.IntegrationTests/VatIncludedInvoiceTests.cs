@@ -27,7 +27,6 @@ public class VatIncludedInvoiceTests
             Description = "Grabpflege inklusive",
             VatRate = 19m,
             DefaultPrice = 120.00m,
-            PriceIncludesVat = true,
         };
         var net = new InvoiceItem
         {
@@ -75,6 +74,7 @@ public class VatIncludedInvoiceTests
                             itemId = grossItemId,
                             count = 1,
                             unitPrice = (decimal?)null,
+                            priceIncludesVat = true,
                         },
                     },
                 }
@@ -86,6 +86,7 @@ public class VatIncludedInvoiceTests
 
         var line = Assert.Single(invoice.Lines);
         Assert.Equal(100.840m, line.UnitPrice);
+        Assert.True(line.PriceIncludesVat);
 
         var data = new DocumentDataBuilder().Build(invoice);
         Assert.Equal(120.00m, data.GrossTotal);
@@ -112,12 +113,14 @@ public class VatIncludedInvoiceTests
                             itemId = grossItemId,
                             count = 1,
                             unitPrice = (decimal?)null,
+                            priceIncludesVat = true,
                         },
                         new
                         {
                             itemId = netItemId,
                             count = 1,
                             unitPrice = (decimal?)null,
+                            priceIncludesVat = false,
                         },
                     },
                 }
@@ -156,6 +159,7 @@ public class VatIncludedInvoiceTests
                             itemId = grossItemId,
                             count = 3,
                             unitPrice = (decimal?)null,
+                            priceIncludesVat = true,
                         },
                     },
                 }
@@ -192,6 +196,7 @@ public class VatIncludedInvoiceTests
                             itemId = grossItemId,
                             count = 1,
                             unitPrice = (decimal?)null,
+                            priceIncludesVat = true,
                         },
                     },
                 }
@@ -216,6 +221,7 @@ public class VatIncludedInvoiceTests
                             itemId = grossItemId,
                             count = 1,
                             unitPrice = 120.00m,
+                            priceIncludesVat = true,
                         },
                     },
                 }

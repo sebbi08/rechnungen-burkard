@@ -10,6 +10,7 @@ public sealed class InvoiceLineInput
     public long ItemId { get; set; }
     public int Count { get; set; }
     public decimal? UnitPrice { get; set; }
+    public bool PriceIncludesVat { get; set; }
 }
 
 public sealed class InvoiceService
@@ -199,14 +200,15 @@ public sealed class InvoiceService
                     ItemNumber = item.Number,
                     Description = item.Description,
                     Count = input.Count,
-                    // an item priced VAT-included is entered as the gross the
+                    // a line priced VAT-included is entered as the gross the
                     // customer pays; the line itself is always net
                     UnitPrice = VatInclusivePrice.NetOf(
                         unitPrice.Value,
                         item.VatRate,
-                        item.PriceIncludesVat
+                        input.PriceIncludesVat
                     ),
                     VatRate = item.VatRate,
+                    PriceIncludesVat = input.PriceIncludesVat,
                     LineNumber = index + 1,
                 }
             );

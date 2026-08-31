@@ -37,7 +37,6 @@ public class VatIncludedGraveTests
             Description = "Grabpflege inklusive",
             VatRate = 19m,
             DefaultPrice = EnteredGross,
-            PriceIncludesVat = true,
         };
         db.InvoiceItems.Add(item);
         for (var i = 1; i <= 2; i++)
@@ -68,6 +67,7 @@ public class VatIncludedGraveTests
                 GraveId = grave.Id,
                 ItemId = item.Id,
                 Count = 1,
+                PriceIncludesVat = true,
             }
         );
         foreach (var recipient in await db.Recipients.ToListAsync())
@@ -145,7 +145,6 @@ public class VatIncludedGraveTests
                 // deliberately different from the override below, so a result
                 // matching this price instead would show the override was ignored
                 DefaultPrice = EnteredGross,
-                PriceIncludesVat = true,
             };
             db.InvoiceItems.Add(item);
             for (var i = 1; i <= 2; i++)
@@ -177,6 +176,7 @@ public class VatIncludedGraveTests
                     ItemId = item.Id,
                     Count = 1,
                     UnitPrice = EnteredOverrideGross,
+                    PriceIncludesVat = true,
                 }
             );
             foreach (var recipient in await db.Recipients.ToListAsync())
@@ -244,6 +244,7 @@ public class VatIncludedGraveTests
                             itemId,
                             count = 1,
                             unitPrice = EnteredGross,
+                            priceIncludesVat = true,
                         },
                     },
                 }

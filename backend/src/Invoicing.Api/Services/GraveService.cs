@@ -9,6 +9,7 @@ public sealed class GraveItemInput
     public long ItemId { get; set; }
     public int Count { get; set; }
     public decimal? UnitPrice { get; set; }
+    public bool PriceIncludesVat { get; set; }
 }
 
 public sealed class GraveService
@@ -69,6 +70,7 @@ public sealed class GraveService
                     ItemId = input.ItemId,
                     Count = input.Count,
                     UnitPrice = input.UnitPrice,
+                    PriceIncludesVat = input.PriceIncludesVat,
                 }
             );
         }
