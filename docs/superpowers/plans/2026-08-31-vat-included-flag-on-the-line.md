@@ -172,14 +172,24 @@ In `backend/src/Invoicing.Domain/Entities/Grave.cs`, add to `GraveItem` after
 - [ ] **Step 4: Rewrite the migration**
 
 The old migration is wrong now, and the branch is unreleased, so it is replaced
-rather than added to. Delete both files:
+rather than added to. **Use EF's own removal command, not `rm`.** Deleting the
+files by hand leaves `AppDbContextModelSnapshot.cs` still claiming
+`InvoiceItem.PriceIncludesVat` exists, and the next `migrations add` would then
+emit a `DropColumn` against a column no database ever had. `migrations remove`
+pops the migration _and_ rewinds the snapshot:
 
 ```bash
-rm backend/src/Invoicing.Api/Migrations/20260831144527_VatIncludedItemPrices.cs
-rm backend/src/Invoicing.Api/Migrations/20260831144527_VatIncludedItemPrices.Designer.cs
+./scripts/ef.sh migrations remove -p src/Invoicing.Api -s src/Invoicing.Api
 ```
 
-Then regenerate against the new model:
+If it refuses because it wants to reach a database to check whether the
+migration was applied, add `--force` — nothing has ever run it. If it still
+refuses, stop and report BLOCKED rather than deleting files by hand; a
+half-rewound snapshot is worse than no progress.
+
+Confirm both `20260831144527_VatIncludedItemPrices*.cs` files are gone and that
+`AppDbContextModelSnapshot.cs` no longer mentions `PriceIncludesVat` before
+continuing. Then generate the replacement against the new model:
 
 ```bash
 ./scripts/ef.sh migrations add VatIncludedLinePrices -p src/Invoicing.Api -s src/Invoicing.Api
