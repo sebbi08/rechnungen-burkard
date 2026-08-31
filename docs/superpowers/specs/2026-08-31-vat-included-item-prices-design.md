@@ -150,9 +150,9 @@ never from the catalogue item:
 - `GraveInvoiceGenerator`, from `GraveItem.PriceIncludesVat`, applied to the
   result of `EffectivePrice` **before** the `GraveLine` is built.
 
-All three resolve the price the same way today (`input.UnitPrice ?? item
-.DefaultPrice`), and the flag applies to whichever won, so the conversion wraps
-the resolved value rather than each operand.
+All three resolve the price the same way today — the line's own price, falling
+back to the item's default — and the flag applies to whichever won, so the
+conversion wraps the resolved value rather than each operand.
 
 Converting before the split is what makes graves work. `GraveInvoiceSplitter`
 divides the net on purpose — each recipient's document then works out its own
