@@ -84,12 +84,7 @@
                                 <Text text="{invoiceDraft>description}" wrapping="true" />
                                 <!-- a width of their own, or the pop-in gives a count
                                      the whole row to hold one digit -->
-                                <Input
-                                    value="{invoiceDraft>count}"
-                                    type="Number"
-                                    width="5rem"
-                                    ariaLabel="{i18n>itemCount}"
-                                />
+                                <Input value="{invoiceDraft>count}" type="Number" width="5rem" />
                                 <VBox>
                                     <!-- pre-filled with the item's default price; clearing it or
                                          typing another one overrides it for this invoice.

@@ -131,6 +131,47 @@ public class VatIncludedInvoiceTests
         Assert.Equal(100.00m, invoice.Lines.Single(l => l.ItemNumber == "V-100").UnitPrice);
     }
 
+    /// <summary>The case the 3-decimal net exists for: at a count above one, a
+    /// net rounded to the cent would drift the total away from the gross the
+    /// customer was quoted. 120,00 € / 1,19 = 100,840 (3 decimals). At count 3
+    /// that is 302,52 € net; VAT is round(30252 × 0,19) = 5748 ct = 57,48 €;
+    /// gross is 302,52 + 57,48 = 360,00 €.</summary>
+    [Fact]
+    public async Task A_count_above_one_on_a_flagged_line_still_totals_to_the_entered_gross()
+    {
+        using var host = new ApiTestHost();
+        var (grossItemId, _, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = grossItemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var invoice = await LoadAsync(host, json.RootElement.GetProperty("Id").GetInt64());
+
+        var line = Assert.Single(invoice.Lines);
+        Assert.Equal(100.840m, line.UnitPrice);
+
+        var data = new DocumentDataBuilder().Build(invoice);
+        Assert.Equal(360.00m, data.GrossTotal);
+    }
+
     [Fact]
     public async Task A_revision_that_returns_the_shown_gross_stores_the_same_net()
     {

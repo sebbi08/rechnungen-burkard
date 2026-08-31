@@ -28,8 +28,6 @@ export interface DraftLine {
   /** True when this row's item is priced VAT-included: the price above is a
    *  gross, and the marker beside it says so. */
   priceIncludesVat: boolean;
-  /** The item's current VAT rate, for the gross the price field shows. */
-  vatRate: number;
 }
 
 export interface ItemsView {

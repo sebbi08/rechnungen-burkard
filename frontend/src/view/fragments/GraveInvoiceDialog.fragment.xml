@@ -78,7 +78,6 @@
                                     value="{graveInvoiceDraft>count}"
                                     type="Number"
                                     width="5rem"
-                                    ariaLabel="{i18n>itemCount}"
                                 />
                                 <VBox>
                                     <!-- Table normally labels a cell's control from its column

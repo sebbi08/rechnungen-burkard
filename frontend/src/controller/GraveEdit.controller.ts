@@ -67,7 +67,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
         priceIncludesVat: link.Item.PriceIncludesVat,
-        vatRate: Number(link.Item.VatRate),
       })),
       Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
@@ -107,7 +106,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/Items/${row}/priceIncludesVat`,
       itemContext.getProperty("PriceIncludesVat") as boolean,
     );
-    model.setProperty(`/Items/${row}/vatRate`, Number(itemContext.getProperty("VatRate")));
   }
 
   public onAddItemLink(): void {
@@ -180,7 +178,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       unitPrice: null,
       defaultPrice: null,
       priceIncludesVat: false,
-      vatRate: 0,
     };
   }
 
@@ -279,7 +276,13 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       .replace("{0}", api.halfYearText(group.PeriodYear, group.PeriodHalf))
       .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
 
-    const pricing = await this.loadItemPricing();
+    let pricing: Map<number, api.ItemPricing>;
+    try {
+      pricing = await this.loadItemPricing();
+    } catch (error) {
+      api.showError(this, error);
+      return;
+    }
 
     this._graveInvoiceDialog.setModel(
       new TypedJSONModel<GraveInvoiceDraft>({
@@ -302,7 +305,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
             unitPrice: api.priceFieldValue(Number(line.UnitPrice), item),
             defaultPrice: null,
             priceIncludesVat: item?.PriceIncludesVat ?? false,
-            vatRate: item?.VatRate ?? 0,
           };
         }),
       }),
@@ -336,7 +338,6 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       `/lines/${row}/priceIncludesVat`,
       itemContext.getProperty("PriceIncludesVat") as boolean,
     );
-    model.setProperty(`/lines/${row}/vatRate`, Number(itemContext.getProperty("VatRate")));
   }
 
   public onAddGraveInvoiceLine(): void {

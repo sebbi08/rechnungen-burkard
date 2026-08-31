@@ -143,7 +143,9 @@ Every dialog that collects a price gets a per-row marker — a short "inkl.
 MwSt." next to the price — driven by the row's own item, so a table can hold
 gross and net rows at once and say which is which.
 
-`DraftLine` gains `priceIncludesVat` and `vatRate`, filled in two ways:
+`DraftLine` gains `priceIncludesVat`, filled in two ways. It needs no `vatRate`
+of its own: the rate is looked up from the item catalogue map (see below) at
+the point a price is converted, rather than carried on the row.
 
 - **From the item**, in the `selectionChange` handlers that already copy the
   item's number, description and default price into the row. The default price

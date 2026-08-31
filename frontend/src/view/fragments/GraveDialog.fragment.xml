@@ -87,12 +87,7 @@
                                         />
                                     </ComboBox>
                                     <Text text="{graveDraft>description}" wrapping="true" />
-                                    <Input
-                                        value="{graveDraft>count}"
-                                        type="Number"
-                                        width="5rem"
-                                        ariaLabel="{i18n>itemCount}"
-                                    />
+                                    <Input value="{graveDraft>count}" type="Number" width="5rem" />
                                     <VBox>
                                         <!-- pre-filled with the item's default price, as in the
                                              invoice dialog; clearing it means "use the item's

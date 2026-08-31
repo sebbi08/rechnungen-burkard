@@ -263,6 +263,38 @@ public class ImportTests
         );
     }
 
+    /// <summary>An archive built before this feature has an items.csv with the
+    /// old four-column header, missing PriceIncludesVat. Regenerating the
+    /// archive from the current template is the accepted cost of the new
+    /// column, so the old header must be rejected rather than silently read as
+    /// if every item were not VAT-included.</summary>
+    [Fact]
+    public async Task An_items_header_without_the_vat_included_column_is_rejected()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            (
+                "items.csv",
+                "ItemNumber,Description,VatRate,Price\r\n" + "9001,Grabpflege,7,120.00\r\n"
+            ),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
+        );
+        await AssertNothingImportedAsync(host);
+    }
+
     [Fact]
     public async Task Missing_file_is_reported_and_nothing_is_imported()
     {

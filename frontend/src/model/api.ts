@@ -523,8 +523,13 @@ export interface ItemPricing {
   PriceIncludesVat: boolean;
 }
 
-/** The gross a price field shows for a stored net. Mirrors the backend's
- *  ToGross: round to the cent, away from zero. */
+/** The gross a price field shows for a stored net: rounds to the cent,
+ *  half-up on a double, which equals the backend's away-from-zero rounding
+ *  for every net that `VatInclusivePrice.NetOf` produces. The backend has no
+ *  counterpart function to mirror — the inverse rule lives only in
+ *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
+ *  — so a future change to `NetOf`'s rounding has nothing forcing this to
+ *  follow it. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }

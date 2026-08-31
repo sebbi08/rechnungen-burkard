@@ -27,9 +27,19 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     // the draft starts on whichever recipient this refreshed list shows first
     const newest = await this.refreshRecipients("recipient");
 
-    const pricing = await this.loadItemPricing();
-    const lines =
-      invoiceId != null ? await this.loadLines(invoiceId, pricing) : [InvoiceEdit.emptyLine()];
+    let lines: DraftLine[];
+    if (invoiceId != null) {
+      let pricing: Map<number, api.ItemPricing>;
+      try {
+        pricing = await this.loadItemPricing();
+      } catch (error) {
+        api.showError(this, error);
+        return;
+      }
+      lines = await this.loadLines(invoiceId, pricing);
+    } else {
+      lines = [InvoiceEdit.emptyLine()];
+    }
     this._invoiceDialog.setModel(
       new TypedJSONModel<InvoiceDraft>({
         // the ComboBox matches its keys as strings
@@ -65,7 +75,6 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
           unitPrice: api.priceFieldValue(Number(line.UnitPrice), item),
           defaultPrice: null,
           priceIncludesVat: item?.PriceIncludesVat ?? false,
-          vatRate: item?.VatRate ?? 0,
           description: line.Description,
         };
       });
@@ -111,7 +120,6 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       `/lines/${row}/priceIncludesVat`,
       itemContext.getProperty("PriceIncludesVat") as boolean,
     );
-    model.setProperty(`/lines/${row}/vatRate`, Number(itemContext.getProperty("VatRate")));
   }
 
   public onAddLine(): void {
@@ -129,7 +137,6 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       unitPrice: null,
       defaultPrice: null,
       priceIncludesVat: false,
-      vatRate: 0,
       description: "",
     };
   }
