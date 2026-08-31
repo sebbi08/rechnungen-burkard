@@ -54,6 +54,7 @@ public class GravesController : ODataController
                     i.Id,
                     i.Count,
                     i.UnitPrice,
+                    i.PriceIncludesVat,
                     Item = new
                     {
                         i.Item.Id,
@@ -61,7 +62,6 @@ public class GravesController : ODataController
                         i.Item.Description,
                         i.Item.DefaultPrice,
                         i.Item.VatRate,
-                        i.Item.PriceIncludesVat,
                     },
                 })
                 .ToList(),

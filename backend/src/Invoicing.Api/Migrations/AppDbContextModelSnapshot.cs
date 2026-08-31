@@ -138,6 +138,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("PriceIncludesVat")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal?>("UnitPrice")
                         .HasColumnType("TEXT");
 
@@ -265,9 +268,6 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("PriceIncludesVat")
-                        .HasColumnType("INTEGER");
-
                     b.Property<decimal>("VatRate")
                         .HasColumnType("TEXT");
 
@@ -306,6 +306,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PriceIncludesVat")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("UnitPrice")

@@ -43,5 +43,11 @@ public sealed class InvoiceLine
     /// generated before this column existed.</summary>
     public decimal? GraveUnitPrice { get; set; }
     public decimal VatRate { get; set; }
+
+    /// <summary>True when this line's price was entered as a gross — the amount
+    /// the customer pays, VAT included. <see cref="UnitPrice"/> is still the net
+    /// it was converted to; this records how that net was arrived at, so a
+    /// revision dialog can show the gross again and take it back unchanged.</summary>
+    public bool PriceIncludesVat { get; set; }
     public int LineNumber { get; set; }
 }

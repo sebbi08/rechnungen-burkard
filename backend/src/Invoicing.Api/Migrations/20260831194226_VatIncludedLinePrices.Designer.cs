@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Burkard.Invoicing.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260831144527_VatIncludedItemPrices")]
-    partial class VatIncludedItemPrices
+    [Migration("20260831194226_VatIncludedLinePrices")]
+    partial class VatIncludedLinePrices
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -139,6 +139,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<long>("ItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PriceIncludesVat")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("UnitPrice")
@@ -268,9 +271,6 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("PriceIncludesVat")
-                        .HasColumnType("INTEGER");
-
                     b.Property<decimal>("VatRate")
                         .HasColumnType("TEXT");
 
@@ -309,6 +309,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PriceIncludesVat")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("UnitPrice")

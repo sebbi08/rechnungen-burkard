@@ -5,14 +5,22 @@
 namespace Burkard.Invoicing.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class VatIncludedItemPrices : Migration
+    public partial class VatIncludedLinePrices : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<bool>(
                 name: "PriceIncludesVat",
-                table: "InvoiceItems",
+                table: "InvoiceLines",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: false
+            );
+
+            migrationBuilder.AddColumn<bool>(
+                name: "PriceIncludesVat",
+                table: "GraveItems",
                 type: "INTEGER",
                 nullable: false,
                 defaultValue: false
@@ -22,7 +30,9 @@ namespace Burkard.Invoicing.Api.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(name: "PriceIncludesVat", table: "InvoiceItems");
+            migrationBuilder.DropColumn(name: "PriceIncludesVat", table: "InvoiceLines");
+
+            migrationBuilder.DropColumn(name: "PriceIncludesVat", table: "GraveItems");
         }
     }
 }
