@@ -13,7 +13,9 @@ public class GraveInvoicingStatusController : ODataController
     public GraveInvoicingStatusController(AppDbContext db) => _db = db;
 
     /// <summary>The grave overview for one half-year: graves that still need an
-    /// invoice for it come first (FR-028), each with the flag the list shows.</summary>
+    /// invoice for it come first (FR-028), each with the flag the list shows,
+    /// plus how many invoices that half-year produced for the grave and how
+    /// many of them are paid (latest revisions only).</summary>
     [HttpGet("GraveInvoicingStatus")]
     public async Task<IActionResult> Status([FromQuery] int year, [FromQuery] int half)
     {

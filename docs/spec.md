@@ -620,7 +620,9 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-075**: Only the latest revision of an invoice MUST be markable as paid.
 - **FR-076**: The invoice list MUST be filterable by payment status.
 - **FR-077**: The grave overview MUST show, for the selected half-year, whether a
-  grave's invoices are unpaid, partly paid or paid, and MUST be filterable to the
+  grave's invoices are unpaid, partly paid or paid; for a half-year with no
+  invoice at all, this MUST show nothing, since the invoicing-status column
+  beside it already reports that. The overview MUST be filterable to the
   graves that still have an unpaid invoice in that half-year.
 
 ### Key Entities _(include if feature involves data)_
