@@ -22,6 +22,26 @@ public class GraveInvoicingStatusController : ODataController
             .Select(r => r.GraveId)
             .ToHashSet();
 
+        // How many invoices this half-year produced per grave, and how many of
+        // them are paid. Latest revisions only, matching every list that shows
+        // them. Counted here rather than derived by the client so the overview
+        // stays one request.
+        var payment = await _db
+            .Invoices.Where(i =>
+                i.GraveId != null
+                && i.PeriodYear == year
+                && i.PeriodHalf == half
+                && i.IsLatestRevision
+            )
+            .GroupBy(i => i.GraveId!.Value)
+            .Select(g => new
+            {
+                GraveId = g.Key,
+                InvoiceCount = g.Count(),
+                PaidCount = g.Count(i => i.PaidOn != null),
+            })
+            .ToDictionaryAsync(row => row.GraveId);
+
         var graves = await _db
             .Graves
             // false sorts before true, so ordering by "is invoiced" puts the
@@ -44,6 +64,8 @@ public class GraveInvoicingStatusController : ODataController
             g.StartDate,
             g.EndDate,
             Invoiced = invoicedIds.Contains(g.Id),
+            InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
+            PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
         });
 
         return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);

@@ -405,4 +405,49 @@ public class PaymentTests
         // two originals plus one revision per recipient
         Assert.Equal(4, await db.Invoices.CountAsync(i => i.GraveId != null));
     }
+
+    [Fact]
+    public async Task Grave_status_and_group_report_how_many_recipients_have_paid()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, _, firstInvoiceId, _) = await SeedGraveAsync(host);
+        using var client = host.CreateClient();
+        (await SetPaidAsync(client, firstInvoiceId, true)).EnsureSuccessStatusCode();
+
+        var status = await client.GetAsync("/odata/GraveInvoicingStatus?year=2031&half=1");
+        status.EnsureSuccessStatusCode();
+        using var statusJson = await ODataJson.ReadAsync(status);
+        var row = statusJson
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Single(g => g.GetProperty("Id").GetInt64() == graveId);
+        Assert.True(row.GetProperty("Invoiced").GetBoolean());
+        Assert.Equal(2, row.GetProperty("InvoiceCount").GetInt32());
+        Assert.Equal(1, row.GetProperty("PaidCount").GetInt32());
+
+        // a half-year this grave was never invoiced for has nothing outstanding
+        var other = await client.GetAsync("/odata/GraveInvoicingStatus?year=2031&half=2");
+        other.EnsureSuccessStatusCode();
+        using var otherJson = await ODataJson.ReadAsync(other);
+        var otherRow = otherJson
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Single(g => g.GetProperty("Id").GetInt64() == graveId);
+        Assert.Equal(0, otherRow.GetProperty("InvoiceCount").GetInt32());
+        Assert.Equal(0, otherRow.GetProperty("PaidCount").GetInt32());
+
+        var group = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={firstInvoiceId}");
+        group.EnsureSuccessStatusCode();
+        using var groupJson = await ODataJson.ReadAsync(group);
+        var paid = groupJson
+            .RootElement.GetProperty("Recipients")
+            .EnumerateArray()
+            .Single(r => r.GetProperty("InvoiceId").GetInt64() == firstInvoiceId);
+        Assert.True(paid.GetProperty("Paid").GetBoolean());
+        var unpaid = groupJson
+            .RootElement.GetProperty("Recipients")
+            .EnumerateArray()
+            .Single(r => r.GetProperty("InvoiceId").GetInt64() != firstInvoiceId);
+        Assert.False(unpaid.GetProperty("Paid").GetBoolean());
+    }
 }
