@@ -182,7 +182,7 @@ public static class VatInclusivePrice
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `./scripts/dotnet.sh test Invoicing.sln --filter FullyQualifiedName~VatInclusivePriceTests`
-Expected: PASS, 17 tests.
+Expected: PASS, 16 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -270,7 +270,9 @@ the class:
             $"/odata/InvoiceItems({id})",
             ODataJson.Body(new { PriceIncludesVat = false })
         );
-        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+        // Updated() answers 204 or 200 depending on the Prefer header, so the
+        // status is only checked for success; the re-read below is the assertion
+        Assert.True(patched.IsSuccessStatusCode, $"PATCH returned {patched.StatusCode}");
 
         var reread = await client.GetAsync($"/odata/InvoiceItems({id})");
         using var rereadJson = await ODataJson.ReadAsync(reread);
