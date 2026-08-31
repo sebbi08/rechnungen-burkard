@@ -210,4 +210,199 @@ public class PaymentTests
             json.RootElement.GetProperty("error").GetProperty("code").GetString()
         );
     }
+
+    /// <summary>A grave with one item (count 2 at 100.00, 7% VAT) and two
+    /// recipients, invoiced for 2031 H1. Returns the grave and the two invoice
+    /// ids, ordered as generation created them.</summary>
+    private static async Task<(
+        long GraveId,
+        long ItemId,
+        long FirstInvoiceId,
+        long SecondInvoiceId
+    )> SeedGraveAsync(ApiTestHost host)
+    {
+        long graveId,
+            itemId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.VatRates.Add(new VatRate { Rate = 7m });
+            var item = new InvoiceItem
+            {
+                Number = "7002",
+                Description = "Grabpflege",
+                VatRate = 7m,
+                DefaultPrice = 100m,
+            };
+            var anna = new Recipient
+            {
+                Number = "E-0071",
+                Name = "Anna Zahlung",
+                Address = "A 1",
+            };
+            var bernd = new Recipient
+            {
+                Number = "E-0072",
+                Name = "Bernd Zahlung",
+                Address = "B 2",
+            };
+            db.InvoiceItems.Add(item);
+            db.Recipients.AddRange(anna, bernd);
+            var grave = new Grave
+            {
+                GraveNumber = "G-700",
+                StartDate = new DateOnly(2020, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            db.GraveItems.Add(
+                new GraveItem
+                {
+                    GraveId = grave.Id,
+                    ItemId = item.Id,
+                    Count = 2,
+                }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = anna.Id }
+            );
+            db.GraveRecipients.Add(
+                new GraveRecipient { GraveId = grave.Id, RecipientId = bernd.Id }
+            );
+            await db.SaveChangesAsync();
+            (graveId, itemId) = (grave.Id, item.Id);
+        }
+
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2031, 1);
+
+        using var verify = host.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoices = await verifyDb
+            .Invoices.Where(i => i.GraveId == graveId)
+            .OrderBy(i => i.Id)
+            .ToListAsync();
+        return (graveId, itemId, invoices[0].Id, invoices[1].Id);
+    }
+
+    [Fact]
+    public async Task Revising_a_paid_invoice_is_refused()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var invoiceId = await CreateInvoiceAsync(client, itemId, recipientId);
+        (await SetPaidAsync(client, invoiceId, true)).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync(
+            "/odata/CreateRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvoicePaid",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+
+        // the refusal left the chain alone
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.Invoices.CountAsync(i => i.RootId == invoiceId));
+    }
+
+    [Fact]
+    public async Task Revising_a_grave_invoice_is_refused_when_one_recipient_has_paid()
+    {
+        using var host = new ApiTestHost();
+        var (_, itemId, firstInvoiceId, secondInvoiceId) = await SeedGraveAsync(host);
+        using var client = host.CreateClient();
+        (await SetPaidAsync(client, firstInvoiceId, true)).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId = secondInvoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var error = json.RootElement.GetProperty("error");
+        Assert.Equal("GraveInvoicePaid", error.GetProperty("code").GetString());
+        // the message names who is paid: from the row the user pressed edit on,
+        // another recipient's payment is invisible
+        Assert.Contains("Anna Zahlung", error.GetProperty("message").GetString());
+
+        // neither sibling gained a revision
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId != null));
+    }
+
+    [Fact]
+    public async Task Revising_a_grave_invoice_succeeds_once_the_mark_is_taken_back()
+    {
+        using var host = new ApiTestHost();
+        var (_, itemId, firstInvoiceId, secondInvoiceId) = await SeedGraveAsync(host);
+        using var client = host.CreateClient();
+        (await SetPaidAsync(client, firstInvoiceId, true)).EnsureSuccessStatusCode();
+        (await SetPaidAsync(client, firstInvoiceId, false)).EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId = secondInvoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        // two originals plus one revision per recipient
+        Assert.Equal(4, await db.Invoices.CountAsync(i => i.GraveId != null));
+    }
 }

@@ -84,6 +84,18 @@ public sealed class InvoiceService
             );
         }
 
+        // A paid invoice is settled; revising it would move the ground under a
+        // payment that already happened. The chain is what matters, not the row
+        // that was passed: only its latest revision can carry a mark, and an
+        // older revision may well be the one handed in.
+        if (await _db.Invoices.AnyAsync(i => i.RootId == edited.RootId && i.PaidOn != null, ct))
+        {
+            throw new ValidationException(
+                "InvoicePaid",
+                "The invoice is paid and cannot be revised."
+            );
+        }
+
         var recipient =
             await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
