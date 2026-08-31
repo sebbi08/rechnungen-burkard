@@ -29,6 +29,7 @@ public static class EdmModelBuilder
         b.Action("CreateRevision").ReturnsFromEntitySet<Invoice>("Invoices");
         b.Action("CreateGraveInvoiceRevision").ReturnsCollectionFromEntitySet<Invoice>("Invoices");
         b.Action("GenerateGraveInvoices").ReturnsFromEntitySet<Job>("Jobs");
+        b.Action("SetInvoicePaid").ReturnsFromEntitySet<Invoice>("Invoices");
         return b.GetEdmModel();
     }
 }
