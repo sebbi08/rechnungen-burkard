@@ -287,12 +287,30 @@ async function seedOwnMasterData(
   return { itemNumber, recipientName, recipientId: recipient.Id };
 }
 
-/** Invoices whose snapshotted recipient name matches, by name rather than id:
- *  the caller knows what the dialog displayed, not which row it came from. */
-async function countInvoicesFor(page: Page, recipientName: string): Promise<number> {
-  const filter = encodeURIComponent(`RecipientName eq '${recipientName.replace(/'/g, "''")}'`);
-  const response = await page.request.get(`/odata/Invoices?$filter=${filter}&$select=Id`);
-  return ((await response.json()).value as unknown[]).length;
+/**
+ * The id of the recipient the dialog currently has selected.
+ *
+ * Read off the control instead of resolved from the name it displays, because
+ * the name does not hold still: `masterdata.spec.ts` renames its recipient
+ * ("Vorher ..." to "Geaendert ...") while this spec runs beside it, and a
+ * reopened dialog starts on whichever recipient is newest -- which can be that
+ * one. An invoice snapshots the recipient's name as it is saved, so a rename
+ * landing between this read and the save leaves the new invoice carrying a name
+ * this test never saw, and counting by name then finds nothing. Ids do not move.
+ */
+async function shownRecipientId(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const registry = (
+      window as unknown as {
+        sap?: { ui?: { core?: { Element?: { registry?: { all(): object } } } } };
+      }
+    ).sap?.ui?.core?.Element?.registry;
+    const combo = Object.values(registry!.all()).find(
+      (control: any) =>
+        control.isA?.("sap.m.ComboBox") && String(control.getId()).endsWith("--recipient"),
+    ) as any;
+    return Number(combo.getSelectedKey());
+  });
 }
 
 async function countInvoices(page: Page, recipientId: number): Promise<number> {
@@ -327,13 +345,14 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // recipient field. *Which* recipient it shows is not this test's business — a
   // reopened dialog carries no draft selection, so the dialog starts on the
   // newest recipient, and a spec running beside this one may have created one
-  // since. What must hold is that the save invoices exactly the recipient on
-  // screen.
+  // since, or renamed it. What must hold is that the save invoices exactly the
+  // recipient on screen, which is why the assertion follows its id.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
   await waitForDialogOpen(page);
   const shown = (await recipientField(page).inputValue()).trim();
   expect(shown).not.toBe("");
-  const before = await countInvoicesFor(page, shown);
+  const shownId = await shownRecipientId(page);
+  const before = await countInvoices(page, shownId);
 
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -341,7 +360,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // before the fix the second save sent recipient 0 and the backend answered
   // "Der Empfänger wurde nicht gefunden", because the fresh draft never picked
   // up the shown selection
-  await expect.poll(() => countInvoicesFor(page, shown)).toBe(before + 1);
+  await expect.poll(() => countInvoices(page, shownId)).toBe(before + 1);
 });
 
 test("a double click on save creates one invoice, not two", async ({ page }) => {
