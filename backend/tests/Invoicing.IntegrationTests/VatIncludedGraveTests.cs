@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
@@ -105,5 +106,61 @@ public class VatIncludedGraveTests
         }
 
         Assert.Equal(EnteredGross, invoices.Sum(i => builder.Build(i).GrossTotal));
+    }
+
+    [Fact]
+    public async Task A_revision_that_returns_the_shown_gross_reproduces_the_same_shares()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(host);
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
+
+        long invoiceId;
+        long itemId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            invoiceId = await db.Invoices.OrderBy(i => i.Id).Select(i => i.Id).FirstAsync();
+            itemId = await db.InvoiceItems.Select(i => i.Id).FirstAsync();
+        }
+
+        // the dialog opens on GraveUnitPrice (100,840) and shows it as 120,00;
+        // sending that back untouched must reproduce the same split
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = EnteredGross,
+                        },
+                    },
+                }
+            )
+        );
+        // the action answers with the revisions themselves, so 200 rather than 201
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verifyScope = host.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var revisions = await verifyDb
+            .Invoices.Include(i => i.Lines)
+            .Where(i => i.RevisionNumber == 1)
+            .ToListAsync();
+
+        Assert.Equal(2, revisions.Count);
+        var builder = new DocumentDataBuilder();
+        foreach (var revision in revisions)
+        {
+            Assert.Equal(ExpectedShareNet, Assert.Single(revision.Lines).UnitPrice);
+            Assert.Equal(ExpectedShareGross, builder.Build(revision).GrossTotal);
+        }
     }
 }
