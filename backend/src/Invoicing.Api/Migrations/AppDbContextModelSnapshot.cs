@@ -265,6 +265,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("PriceIncludesVat")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("VatRate")
                         .HasColumnType("TEXT");
 

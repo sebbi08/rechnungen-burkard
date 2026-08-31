@@ -61,6 +61,7 @@ public class GravesController : ODataController
                         i.Item.Description,
                         i.Item.DefaultPrice,
                         i.Item.VatRate,
+                        i.Item.PriceIncludesVat,
                     },
                 })
                 .ToList(),
