@@ -181,8 +181,10 @@ appears twice.
    is created, each with the grave's configured items and counts billed in full,
    at the same amount as every other recipient's invoice.
 2. **Given** a grave has multiple recipients, **When** its invoice is generated,
-   **Then** each recipient receives their own invoice stating above the item list
-   which percentage of the total it represents (e.g., 50% for two, 33.3% for three).
+   **Then** each recipient receives their own invoice listing the grave's items in
+   full and summarising, beneath them, the grave's net sum and the recipient's
+   share of it labelled with the percentage it represents (e.g., 50 % for two,
+   33,33 % for three).
 3. **Given** an invoice has already been generated for a grave and half-year,
    **When** the user attempts to generate again for the same half-year, **Then** the
    system prevents duplicates and shows that the grave is already invoiced.
@@ -490,8 +492,11 @@ non-interactive until completion, and the task runs exactly once.
   not divide evenly, the grave's price MUST be raised by whole cents — never
   reduced — until it does, and every invoice's VAT MUST follow from its own share
   of that net.
-- **FR-022**: Each recipient invoice MUST state, above the item list, which
-  percentage of the total grave invoice it represents.
+- **FR-022**: Each recipient invoice MUST state which percentage of the grave's
+  bill it represents, in its summary beneath the item list: the grave's net sum,
+  then the recipient's share of it labelled with that percentage, then the VAT
+  worked out per rate from that share. The percentage MUST be shown to at most
+  two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
 - **FR-024**: Users MUST be able to search graves.
 
