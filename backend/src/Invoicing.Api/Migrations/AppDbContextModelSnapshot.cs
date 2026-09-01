@@ -216,6 +216,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("RecipientCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("RecipientId")
                         .HasColumnType("INTEGER");
 

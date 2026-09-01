@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Burkard.Invoicing.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class InvoicePaymentStatus : Migration
+    public partial class PaymentVatAndGraveShare : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -21,6 +21,29 @@ namespace Burkard.Invoicing.Api.Migrations
                 table: "Invoices",
                 type: "TEXT",
                 nullable: true
+            );
+
+            migrationBuilder.AddColumn<int>(
+                name: "RecipientCount",
+                table: "Invoices",
+                type: "INTEGER",
+                nullable: true
+            );
+
+            migrationBuilder.AddColumn<bool>(
+                name: "PriceIncludesVat",
+                table: "InvoiceLines",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: false
+            );
+
+            migrationBuilder.AddColumn<bool>(
+                name: "PriceIncludesVat",
+                table: "GraveItems",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: false
             );
 
             migrationBuilder.CreateIndex(
@@ -39,6 +62,12 @@ namespace Burkard.Invoicing.Api.Migrations
             );
 
             migrationBuilder.DropColumn(name: "PaidOn", table: "Invoices");
+
+            migrationBuilder.DropColumn(name: "RecipientCount", table: "Invoices");
+
+            migrationBuilder.DropColumn(name: "PriceIncludesVat", table: "InvoiceLines");
+
+            migrationBuilder.DropColumn(name: "PriceIncludesVat", table: "GraveItems");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Invoices_GraveId_IsLatestRevision",

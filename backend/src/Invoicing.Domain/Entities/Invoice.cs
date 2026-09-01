@@ -17,6 +17,13 @@ public sealed class Invoice
     public int? PeriodYear { get; set; } // invoiced half-year period (grave invoices)
     public int? PeriodHalf { get; set; }
     public decimal? SharePercent { get; set; } // grave split share, e.g. 50 or 33.3333
+
+    /// <summary>How many recipients the grave's bill was divided by, on invoices
+    /// that carry the grave's lines at 100 % and apply a share. Null on every
+    /// other invoice — including grave invoices generated before that change,
+    /// whose lines are already one recipient's share. The document renderer
+    /// branches on it, so it is what keeps those older documents reproducible.</summary>
+    public int? RecipientCount { get; set; }
     public long RecipientId { get; set; }
     public string RecipientName { get; set; } = "";
     public string RecipientAddress { get; set; } = "";
