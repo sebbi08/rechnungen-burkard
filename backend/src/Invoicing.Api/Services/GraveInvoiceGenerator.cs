@@ -33,9 +33,10 @@ public sealed class GraveInvoiceGenerator
         CancellationToken ct
     )
     {
-        // ordered explicitly by link id: GraveInvoiceRevisionService relies on
-        // this order matching the order invoice ids were assigned in below, so
-        // it can reproduce the same GraveInvoiceSplitter split on revision.
+        // ordered explicitly by link id, so which recipient gets which sequence
+        // number is deterministic and reproducible across runs. Revision no
+        // longer depends on this order: every recipient is billed the same
+        // lines regardless of it.
         var recipients = await _db
             .GraveRecipients.Where(r => r.GraveId == grave.Id)
             .OrderBy(r => r.Id)

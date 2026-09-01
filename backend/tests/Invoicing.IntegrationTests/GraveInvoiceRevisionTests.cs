@@ -346,7 +346,7 @@ public class GraveInvoiceRevisionTests
         }
 
         Dictionary<long, decimal> originalNetTotals;
-        Dictionary<long, byte[]> originalDocumentContent;
+        Dictionary<long, Dictionary<DocumentKind, byte[]>> originalDocumentContent;
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -358,9 +358,12 @@ public class GraveInvoiceRevisionTests
 
             var builder = new DocumentDataBuilder();
             originalNetTotals = originals.ToDictionary(i => i.Id, i => builder.Build(i).NetTotal);
+            // both the normal document and the copy are persisted, and both must
+            // reproduce — comparing only one would miss a bug that regenerates or
+            // corrupts just the other
             originalDocumentContent = originals.ToDictionary(
                 i => i.Id,
-                i => i.Documents.OrderBy(d => d.Kind).First().Content
+                i => i.Documents.ToDictionary(d => d.Kind, d => d.Content)
             );
         }
         // both original invoices bill 2 x 50.00 = 100.00 net each — the OLD
@@ -439,10 +442,14 @@ public class GraveInvoiceRevisionTests
         Assert.All(
             superseded,
             i =>
-                Assert.Equal(
-                    originalDocumentContent[i.Id],
-                    i.Documents.OrderBy(d => d.Kind).First().Content
-                )
+            {
+                var before = originalDocumentContent[i.Id];
+                Assert.Equal(2, i.Documents.Count);
+                Assert.All(
+                    i.Documents,
+                    document => Assert.Equal(before[document.Kind], document.Content)
+                );
+            }
         );
     }
 
