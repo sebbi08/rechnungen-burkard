@@ -39,6 +39,18 @@ public sealed class Invoice
     public DateOnly? PaidOn { get; set; }
     public List<InvoiceLine> Lines { get; set; } = new();
     public List<Document> Documents { get; set; } = new();
+
+    /// <summary>Net, VAT and gross of what this invoice actually bills — the
+    /// recipient's share on a grave invoice, the whole of it on every other one.
+    /// Derived from <see cref="Lines"/> and <see cref="RecipientCount"/> by the
+    /// same calculation the PDF uses (<c>DocumentDataBuilder</c>), so a screen
+    /// showing an invoice's total never disagrees with the document it links to.
+    /// The OData invoices controller stamps these after loading an invoice;
+    /// nothing else sets them, and <c>AppDbContext</c> excludes them from the
+    /// model, so they are never persisted and need no migration.</summary>
+    public decimal NetTotal { get; set; }
+    public decimal VatTotal { get; set; }
+    public decimal GrossTotal { get; set; }
 }
 
 public sealed class InvoiceLine

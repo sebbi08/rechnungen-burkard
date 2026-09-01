@@ -62,10 +62,12 @@ export default abstract class InvoiceRevisions extends BaseController {
             ...amounts,
             ItemNumber: line.ItemNumber,
             Description: line.Description,
-            LineTotal: api.lineTotal(amounts),
+            // the line as printed — Count × UnitPrice, rounded to the cent the
+            // way the document rounds it — not affected by a grave's share,
+            // which only scales the invoice-level totals below
+            LineTotal: Math.round(amounts.Count * amounts.UnitPrice * 100) / 100,
           };
         });
-      const totals = api.invoiceTotals(lines);
       const revisionNumber = Number(invoice.RevisionNumber);
 
       return {
@@ -80,9 +82,9 @@ export default abstract class InvoiceRevisions extends BaseController {
         // the current revision opens; the history stays collapsed
         Expanded: index === 0,
         Lines: lines,
-        NetTotal: totals.net,
-        VatTotal: totals.vat,
-        GrossTotal: totals.gross,
+        NetTotal: Number(invoice.NetTotal),
+        VatTotal: Number(invoice.VatTotal),
+        GrossTotal: Number(invoice.GrossTotal),
       };
     });
 

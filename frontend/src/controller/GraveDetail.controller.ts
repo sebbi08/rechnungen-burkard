@@ -76,7 +76,6 @@ export default class GraveDetail extends GraveEdit {
         this.readList<api.InvoiceRow>("/Invoices", {
           $filter: `GraveId eq ${this._graveId} and IsLatestRevision eq true`,
           $orderby: "PeriodYear desc,PeriodHalf desc,RecipientName",
-          $expand: "Lines",
         }),
       ]);
 
@@ -112,25 +111,18 @@ export default class GraveDetail extends GraveEdit {
           Name: link.Recipient.Name,
           Address: link.Recipient.Address,
         })),
-        Invoices: invoices.map((invoice) => {
-          const lines = (invoice.Lines ?? []).map((line) => ({
-            // the OData V4 model serialises Edm.Decimal as a string
-            Count: Number(line.Count),
-            UnitPrice: Number(line.UnitPrice),
-            VatRate: Number(line.VatRate),
-          }));
-          return {
-            Id: Number(invoice.Id),
-            RootId: Number(invoice.RootId),
-            HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
-            RecipientName: invoice.RecipientName,
-            InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
-            RevisionNumber: Number(invoice.RevisionNumber),
-            GeneratedAt: invoice.GeneratedAt,
-            GrossTotal: api.invoiceTotals(lines).gross,
-            PaidOn: invoice.PaidOn,
-          };
-        }),
+        Invoices: invoices.map((invoice) => ({
+          Id: Number(invoice.Id),
+          RootId: Number(invoice.RootId),
+          HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
+          RecipientName: invoice.RecipientName,
+          InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
+          RevisionNumber: Number(invoice.RevisionNumber),
+          GeneratedAt: invoice.GeneratedAt,
+          // the OData V4 model serialises Edm.Decimal as a string
+          GrossTotal: Number(invoice.GrossTotal),
+          PaidOn: invoice.PaidOn,
+        })),
       });
     } catch (error) {
       api.showError(this, error);

@@ -471,6 +471,13 @@ export interface InvoiceRow {
   PeriodYear: number | null;
   PeriodHalf: number | null;
   SharePercent: number | string | null;
+  /** What this invoice actually bills — the recipient's share on a grave
+   *  invoice, the whole of it on every other one — computed by the backend
+   *  from the same calculation the PDF uses, so a screen never disagrees with
+   *  the document it links to. */
+  NetTotal: number | string;
+  VatTotal: number | string;
+  GrossTotal: number | string;
   Lines?: InvoiceLineRow[];
 }
 
@@ -493,41 +500,6 @@ export interface GraveInvoiceRunRow {
   Year: number;
   Half: number;
   CreatedAt: string;
-}
-
-export interface InvoiceLineAmounts {
-  Count: number;
-  UnitPrice: number;
-  VatRate: number;
-}
-
-export interface InvoiceTotals {
-  net: number;
-  vat: number;
-  gross: number;
-}
-
-/** A line's net total, rounded to the cent the way the document rounds it. */
-export function lineTotal(line: InvoiceLineAmounts): number {
-  return Math.round(line.Count * line.UnitPrice * 100) / 100;
-}
-
-/** Net, VAT and gross of an invoice. Each line is rounded on its own, exactly
- *  as DocumentDataBuilder does it, so a detail page never disagrees with the
- *  PDF it links to. */
-export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
-  let netCents = 0;
-  let vatCents = 0;
-  for (const line of lines) {
-    const lineCents = Math.round(line.Count * line.UnitPrice * 100);
-    netCents += lineCents;
-    vatCents += Math.round((lineCents * line.VatRate) / 100);
-  }
-  return {
-    net: netCents / 100,
-    vat: vatCents / 100,
-    gross: (netCents + vatCents) / 100,
-  };
 }
 
 /** The gross a price field shows for a stored net: rounds to the cent,
