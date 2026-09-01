@@ -43,7 +43,12 @@ Settled with the user before this design:
    follows from it.
 2. **The split must never collect less than the grave's bill.** Adding a few
    cents is acceptable, losing them is not.
-3. **No three-decimal prices anywhere.** Every printed price has two decimals.
+3. **The split introduces no three-decimal prices.** Dividing a line was what
+   produced them — a recipient's third of 24,95 is 8,317 — and nothing is
+   divided any more; the cents added for divisibility are whole. This is a
+   statement about the split, not about every price on the page: a VAT-included
+   item still carries the three decimals its net has always had, which the
+   Limits section records.
 4. **The invoice shows the whole grave, then the share.** Lines at 100 %, the
    net sum, the recipient's share, and the VAT worked out from the share.
 5. **Non-grave invoices do not change** in any way.
@@ -120,10 +125,12 @@ becomes 47,81 — and the subtotal becomes 97,71.
                               GESAMTBETRAG             81,03
 ```
 
-Every price has two decimals. Every line multiplies out exactly. The three
-shares sum to 216,21, which is the net sum printed directly above them — the
-document verifies itself on its own face, which is the property the old layout
-could not offer.
+Every price here has two decimals and every line multiplies out exactly — true
+of this example, and of every grave whose items are priced net, which is the
+common case. A VAT-included item is the exception; see Limits. The three shares
+sum to 216,21, which is the net sum printed directly above them — the document
+verifies itself on its own face, which is the property the old layout could not
+offer.
 
 The share percentage is shown to two decimals, so three recipients read
 33,33 % and the percentages sum to 99,99 %. The amounts are exact; only the
@@ -237,6 +244,25 @@ label.
 A grave's printed line price can be a cent above what the grave record holds —
 that is the mechanism, and the grave detail page should show the adjusted
 figures so the two agree.
+
+**A VAT-included item still prints a three-decimal unit price.** Decision 3
+scopes to the split, and this is not the split: `VatInclusivePrice.NetOf`
+returns a three-decimal net, and the generator stores it as the line's
+`UnitPrice` unchanged. A 119,00 € gross at 7 % becomes a net of 111,215, and the
+line then prints a unit price of 111,215 against a line total of 111,22 — so
+that line does not multiply out exactly on its face.
+
+That is a pre-existing property of the already-merged VAT-included feature, not
+something this change introduces, and it applies to ordinary invoices just the
+same. The third decimal is what keeps the entered gross reachable once a count
+is above one: three lines at 100,00 € gross bill 300,00 € from a net of 84,034
+and only 299,99 € from 84,03. Rounding `NetOf` to two decimals to satisfy the
+letter of decision 3 would lose those cents, which decision 2 forbids. The
+document already formats unit prices as `#,0.00#` for exactly this reason.
+
+The cents `MakeDivisible` adds land on such a price the same way they land on
+any other — whole cents onto a three-decimal net — so the split itself remains
+free of three-decimal prices of its own making.
 
 The gross totals of the `n` invoices still need not sum to the VAT of the 100 %
 net, because each invoice rounds its own VAT once per rate. No document prints

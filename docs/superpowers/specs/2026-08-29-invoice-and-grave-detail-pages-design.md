@@ -4,6 +4,16 @@
 
 **Status**: Approved
 
+> **Note added 2026-09-01**: partly superseded by
+> `2026-09-01-grave-share-on-the-invoice-design.md`. SC-004 has been rewritten
+> since this was written, so the wording quoted below — and the follow-up this
+> document leaves open, the cents a gross-cent split loses on small grave
+> amounts — no longer describe the requirement or the code. Grave lines are no
+> longer split at all: every recipient is billed the grave's own lines in full
+> and the share is worked out on the document. `GraveInvoiceSplitter.Split` and
+> `ShareCalculator` are gone. The body below is left as it was, as the record of
+> what was believed on 2026-08-29.
+
 **Input**: Rework the invoice overview around non-grave invoices and a search,
 move grave invoicing entirely behind the grave pages, and add detail pages for
 invoices, graves and grave invoices — including editing a grave invoice for all
