@@ -503,14 +503,22 @@ export interface GraveInvoiceRunRow {
 }
 
 /** The gross a price field shows for a stored net: rounds to the cent,
- *  half-up on a double, which equals the backend's away-from-zero rounding
- *  for every net that `VatInclusivePrice.NetOf` produces. The backend has no
- *  counterpart function to mirror — the inverse rule lives only in
+ *  half-up on a double, which equals the backend's away-from-zero rounding for
+ *  every price this application deals in. The backend has no counterpart
+ *  function to mirror — the inverse rule lives only in
  *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
  *  — so a future change to `NetOf`'s rounding has nothing forcing this to
  *  follow it. The two roundings do diverge on an exact half-cent tie, but only
- *  a net `NetOf` never produces reaches one — every net this function is ever
- *  called with is `NetOf` output — so that divergence is unreachable here. */
+ *  on a negative one: `Math.round` takes a .5 towards +Infinity, away-from-zero
+ *  takes it away from it. A price is never negative, so that divergence is
+ *  unreachable here.
+ *
+ *  It is worth being precise about which premise carries that, because the
+ *  narrower one no longer holds: the nets reaching this function are not all
+ *  `NetOf` output any more. A grave's line is `NetOf` output plus the whole
+ *  cents `GraveShare.MakeDivisible` added to make the subtotals divide, and
+ *  both the grave detail page and the grave edit dialog display those. The sign
+ *  is what rules the tie out, not the provenance. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }

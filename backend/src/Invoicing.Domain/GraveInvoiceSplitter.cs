@@ -2,9 +2,11 @@ using Burkard.Invoicing.Domain.Entities;
 
 namespace Burkard.Invoicing.Domain;
 
-/// <summary>One line of a grave invoice before it is split across the grave's
-/// recipients: the grave's count at the grave's price, as if the grave were
-/// invoiced to a single recipient.</summary>
+/// <summary>One line of a grave's bill: the grave's count at the grave's price,
+/// billed to every recipient in full. It is what generation and revision hand to
+/// <see cref="GraveShare.MakeDivisible"/>, and what the edit dialog opens on;
+/// the recipient's share of it is worked out when the document is built, not by
+/// dividing the line.</summary>
 public sealed record GraveLine(
     long ItemId,
     string ItemNumber,
@@ -15,10 +17,17 @@ public sealed record GraveLine(
     bool PriceIncludesVat
 );
 
-/// <summary>Recovers a grave's lines from its recipients' invoices. Legacy path:
-/// it only serves grave invoices generated before this feature, when each
-/// recipient's invoice stored their own share of the grave's lines rather than
-/// the grave's lines in full.</summary>
+/// <summary>Recovers a grave's lines from its recipients' invoices. Nothing
+/// splits any more — the name is historical, kept so the file's history stays
+/// readable. <c>Split</c> is gone along with <c>ShareCalculator</c>, and what
+/// remains is a legacy reconstruction path: it only serves grave invoices
+/// generated before this feature, when each recipient's invoice stored their own
+/// share of the grave's lines rather than the grave's lines in full.
+///
+/// Nothing written since then reaches it. New invoices carry the grave's lines
+/// directly and are marked by <c>Invoice.RecipientCount</c>, so
+/// <c>GraveInvoiceGroupController</c> reads them rather than reconstructing
+/// them.</summary>
 public static class GraveInvoiceSplitter
 {
     /// <summary>The grave's lines, recovered from the recipients' invoices by

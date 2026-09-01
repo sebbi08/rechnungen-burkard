@@ -80,6 +80,14 @@ public class InvoicesController : ODataController
                             c.RecipientName,
                             c.RecipientAddress,
                             c.GeneratedAt,
+                            // the lines' full gross, not divided by
+                            // RecipientCount: this search only serves the
+                            // invoice list, whose every query pins
+                            // "GraveId eq null" (Invoices.view.xml and
+                            // Invoices.controller.ts), and the matches are
+                            // re-filtered by it below. No grave invoice can
+                            // reach a user through here, so there is no share
+                            // to take.
                             InvoiceSearch.GrossTotal(
                                 c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
                             )
