@@ -445,33 +445,47 @@ async function generateFor(page: Page, year: number, half: number): Promise<void
     .toBe("Succeeded");
 }
 
-/** A grave with one item at 100.00 net and the given recipients, unique per run.
- *  `pricing` overrides the item's rate, price and VAT-included flag. */
+/** One item line `seedGrave` links to the grave. Every field defaults to what
+ *  every caller needed before `seedGrave` took a list of these rather than one. */
+interface SeedGraveItem {
+  description?: string;
+  vatRate?: number;
+  price?: number;
+  priceIncludesVat?: boolean;
+  count?: number;
+}
+
+/** A grave with the given items and recipients, unique per run. Defaults to
+ *  one 100.00 net item, count 1, at 7 %, matching every caller from before
+ *  `seedGrave` took a list of items rather than one. */
 async function seedGrave(
   page: Page,
   marker: string,
   recipientNames: string[],
-  pricing: { vatRate?: number; price?: number; priceIncludesVat?: boolean } = {},
+  items: SeedGraveItem[] = [{}],
 ): Promise<{ graveId: number; recipientNames: string[] }> {
-  const vatRate = pricing.vatRate ?? 7;
-  await ensureRow(page, "/odata/VatRates", { Rate: vatRate });
-  const item = await createRow(page, "/odata/InvoiceItems", {
-    Number: `${marker}-item`,
-    Description: "Grabpflege",
-    VatRate: vatRate,
-    DefaultPrice: pricing.price ?? 100,
-  });
   const grave = await createRow(page, "/odata/Graves", {
     GraveNumber: marker,
     StartDate: "2026-01-01",
     EndDate: "2040-12-31",
   });
-  await createRow(page, "/odata/GraveItems", {
-    GraveId: grave.Id,
-    ItemId: item.Id,
-    Count: 1,
-    PriceIncludesVat: pricing.priceIncludesVat ?? false,
-  });
+  for (const [index, spec] of items.entries()) {
+    const vatRate = spec.vatRate ?? 7;
+    await ensureRow(page, "/odata/VatRates", { Rate: vatRate });
+    // a single item keeps the old, suffix-free number; several get one each
+    const item = await createRow(page, "/odata/InvoiceItems", {
+      Number: items.length > 1 ? `${marker}-item${index + 1}` : `${marker}-item`,
+      Description: spec.description ?? "Grabpflege",
+      VatRate: vatRate,
+      DefaultPrice: spec.price ?? 100,
+    });
+    await createRow(page, "/odata/GraveItems", {
+      GraveId: grave.Id,
+      ItemId: item.Id,
+      Count: spec.count ?? 1,
+      PriceIncludesVat: spec.priceIncludesVat ?? false,
+    });
+  }
   for (const name of recipientNames) {
     const recipient = await createRow(page, "/odata/Recipients", {
       Name: name,
@@ -675,14 +689,39 @@ test("overview and generate dialog open on the half-year today falls in", async 
   await page.getByRole("button", { name: "Abbrechen" }).click();
 });
 
+test("a grave with three recipients bills every one of them the identical share (2035/2)", async ({
+  page,
+}) => {
+  const marker = `GT-${Date.now()}`;
+  const names = [`Erna ${marker}`, `Otto ${marker}`, `Rosa ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, [
+    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.8, count: 1 },
+    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+  ]);
+  // 2035 H2 is not used by any other test, so no duplicate-generation conflicts
+  await generateFor(page, 2035, 2);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(3);
+
+  // the 7 % subtotal (100,00 + 18,50 = 118,50) divides evenly by three, but the
+  // 19 % one (49,90 + 47,80 = 97,70) does not — a cent goes onto the cheapest,
+  // count-1 line (Grabstein reinigen) to make it 97,71. Each recipient then
+  // pays 39,50 net at 7 % and 32,57 net at 19 %: 72,07 net, VAT 2,77 + 6,19 =
+  // 8,96, total 81,03 — asserted per row, not just "at least one", so a split
+  // that shortchanged even one recipient would fail this
+  await expect(invoicesTable.locator("tbody tr", { hasText: "81,03 €" })).toHaveCount(3);
+});
+
 test("a grave splits a VAT-included price without taking its VAT out twice", async ({ page }) => {
   const marker = `GV-${Date.now()}`;
   const names = [`Vera ${marker}`, `Walter ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names, {
-    vatRate: 7,
-    price: 119,
-    priceIncludesVat: true,
-  });
+  const { graveId } = await seedGrave(page, marker, names, [
+    { vatRate: 7, price: 119, priceIncludesVat: true },
+  ]);
   await generateFor(page, 2036, 2);
 
   await page.goto(`/index.html#/graves/${graveId}`);

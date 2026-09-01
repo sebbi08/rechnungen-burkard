@@ -82,6 +82,39 @@ export default class GraveDetail extends GraveEdit {
       const [year, half] = api.currentHalfYear();
       const invoiced = runs.some((run) => Number(run.Year) === year && Number(run.Half) === half);
 
+      // the grave's own lines as this half-year actually billed them, when it
+      // has been invoiced — a per-VAT-rate subtotal that did not divide evenly
+      // among recipients can carry a price a cent higher than the grave's
+      // configuration, and the page should show the same figure the invoices
+      // do rather than the unadjusted one. Any of this half-year's invoices
+      // names the same group, since they all carry the grave's own lines at
+      // 100 %; falling back to the grave's configuration when none exists yet.
+      const currentInvoice = invoices.find(
+        (invoice) => Number(invoice.PeriodYear) === year && Number(invoice.PeriodHalf) === half,
+      );
+      const items: GraveItemRow[] = currentInvoice
+        ? (await api.fetchGraveInvoiceGroup(Number(currentInvoice.Id))).Lines.map((line) => ({
+            Number: line.ItemNumber,
+            Description: line.Description,
+            Count: Number(line.Count),
+            Price: api.priceFieldValue(
+              Number(line.UnitPrice),
+              Boolean(line.PriceIncludesVat),
+              Number(line.VatRate),
+            ),
+            VatRate: Number(line.VatRate),
+            PriceIncludesVat: Boolean(line.PriceIncludesVat),
+          }))
+        : details.Items.map((link) => ({
+            Number: link.Item.Number,
+            Description: link.Item.Description,
+            Count: link.Count,
+            // the link's own price wins; without one the item's default is billed
+            Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+            VatRate: link.Item.VatRate,
+            PriceIncludesVat: link.PriceIncludesVat,
+          }));
+
       this.setState<GraveDetailView>("grave", {
         Id: details.Id,
         GraveNumber: details.GraveNumber,
@@ -98,15 +131,7 @@ export default class GraveDetail extends GraveEdit {
           invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
         ),
         currentInvoiced: invoiced,
-        Items: details.Items.map((link) => ({
-          Number: link.Item.Number,
-          Description: link.Item.Description,
-          Count: link.Count,
-          // the link's own price wins; without one the item's default is billed
-          Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
-          VatRate: link.Item.VatRate,
-          PriceIncludesVat: link.PriceIncludesVat,
-        })),
+        Items: items,
         Recipients: details.Recipients.map((link) => ({
           Name: link.Recipient.Name,
           Address: link.Recipient.Address,
