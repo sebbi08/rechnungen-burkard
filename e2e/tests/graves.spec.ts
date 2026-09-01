@@ -14,6 +14,15 @@ const RUN = Date.now();
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_HALF = new Date().getMonth() < 6 ? 1 : 2;
 
+// How many graves the generation test below seeds. Shared so the payment test
+// further down can name the exact grave `seedGraveGenerationData` gives two
+// recipients (`G-${RUN}-<this, zero-padded>`) instead of searching across
+// every grave invoiced for the current half-year: a full-suite run also
+// invoices other spec files' graves for this same period, and at least one of
+// them (import-export.spec.ts's `IMP-G1-*`) has two recipients too, so an
+// unscoped search could pick their grave instead of this run's own.
+const GRAVE_GENERATION_COUNT = 60;
+
 /**
  * One field's suggestion rows. The item and recipient fields of the grave
  * dialog are both ComboBoxes and both leave their list in the DOM after a pick,
@@ -40,6 +49,13 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
   const recipient = await createRow(page, "/odata/Recipients", {
     Name: `Anna Beispiel ${RUN}`,
     Address: "Hauptstraße 1",
+  });
+  // linked to the last grave only (below): a grave billed to more than one
+  // recipient is what makes "teilweise bezahlt" observable at all, and none
+  // of the single-recipient graves below produce that
+  const secondRecipient = await createRow(page, "/odata/Recipients", {
+    Name: `Clara Beispiel ${RUN}`,
+    Address: "Seitenweg 2",
   });
 
   // self-heal leftovers from interrupted runs: graves without item/recipient
@@ -81,6 +97,14 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     await page.request.post("/odata/GraveRecipients", {
       data: { GraveId: grave.Id, RecipientId: recipient.Id },
     });
+    if (i === count) {
+      // the last grave only: the payment test below names it directly by its
+      // GraveNumber (G-${RUN}-<count>), so which one gets the second
+      // recipient is arbitrary — this just keeps it to a single, fixed grave
+      await page.request.post("/odata/GraveRecipients", {
+        data: { GraveId: grave.Id, RecipientId: secondRecipient.Id },
+      });
+    }
   }
   return firstGraveNumber;
 }
@@ -88,7 +112,7 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
 test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
   page,
 }) => {
-  const firstGraveNumber = await seedGraveGenerationData(page, 60);
+  const firstGraveNumber = await seedGraveGenerationData(page, GRAVE_GENERATION_COUNT);
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
   await expect(gravesTable).toContainText(firstGraveNumber);
@@ -421,18 +445,21 @@ async function generateFor(page: Page, year: number, half: number): Promise<void
     .toBe("Succeeded");
 }
 
-/** A grave with one item at 100.00 and the given recipients, unique per run. */
+/** A grave with one item at 100.00 net and the given recipients, unique per run.
+ *  `pricing` overrides the item's rate, price and VAT-included flag. */
 async function seedGrave(
   page: Page,
   marker: string,
   recipientNames: string[],
+  pricing: { vatRate?: number; price?: number; priceIncludesVat?: boolean } = {},
 ): Promise<{ graveId: number; recipientNames: string[] }> {
-  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const vatRate = pricing.vatRate ?? 7;
+  await ensureRow(page, "/odata/VatRates", { Rate: vatRate });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: `${marker}-item`,
     Description: "Grabpflege",
-    VatRate: 7,
-    DefaultPrice: 100,
+    VatRate: vatRate,
+    DefaultPrice: pricing.price ?? 100,
   });
   const grave = await createRow(page, "/odata/Graves", {
     GraveNumber: marker,
@@ -443,6 +470,7 @@ async function seedGrave(
     GraveId: grave.Id,
     ItemId: item.Id,
     Count: 1,
+    PriceIncludesVat: pricing.priceIncludesVat ?? false,
   });
   for (const name of recipientNames) {
     const recipient = await createRow(page, "/odata/Recipients", {
@@ -645,4 +673,92 @@ test("overview and generate dialog open on the half-year today falls in", async 
     `H${CURRENT_HALF}`,
   );
   await page.getByRole("button", { name: "Abbrechen" }).click();
+});
+
+test("a grave splits a VAT-included price without taking its VAT out twice", async ({ page }) => {
+  const marker = `GV-${Date.now()}`;
+  const names = [`Vera ${marker}`, `Walter ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, {
+    vatRate: 7,
+    price: 119,
+    priceIncludesVat: true,
+  });
+  await generateFor(page, 2036, 2);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  // the grave's own item list shows the gross and says so
+  await expect(page.getByText("inkl. MwSt.").first()).toBeVisible();
+
+  // 119,00 gross at 7 % is a net of 111,215; halved that is 55,61 net and
+  // 59,50 gross each — 119,00 together, the price that was entered
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+
+  await invoicesTable
+    .locator("tbody tr", { hasText: names[0] })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForDialogOpen(page);
+
+  // the dialog opens on the grave's gross — not on the 111,215 net it stores,
+  // and not on either recipient's share
+  const dialog = page.locator("[id$='graveInvoiceDialog']");
+  await expect(dialog.getByLabel("Preis")).toHaveValue("119");
+  await expect(dialog).toContainText("inkl. MwSt.");
+  await expect(dialog.getByRole("checkbox")).toBeChecked();
+
+  // saved back untouched, every share stays where it was
+  await dialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+});
+
+test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {
+  // the file's earlier tests have already generated this half-year's invoices;
+  // this one only marks them, so it starts no job of its own
+  await page.goto("/index.html#/graves");
+
+  const gravesTable = page.locator("[id$='gravesTable-listUl']");
+  // the grave seedGraveGenerationData gave two recipients, named directly by
+  // its GraveNumber rather than found by scanning every grave invoiced for
+  // the current half-year: a full-suite run also invoices other spec files'
+  // graves for this same period (a generation sweeps up every grave in the
+  // stack), and at least one of them is billed to more than one recipient
+  // too, so an unscoped search could resolve to their grave instead of ours
+  const graveNumber = `G-${RUN}-${String(GRAVE_GENERATION_COUNT).padStart(3, "0")}`;
+  const graves = await (
+    await page.request.get(
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id,GraveNumber`,
+    )
+  ).json();
+  const grave = graves.value[0];
+  const invoices = await (
+    await page.request.get(
+      `/odata/Invoices?$filter=GraveId eq ${grave.Id} and PeriodYear eq ${CURRENT_YEAR}` +
+        ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id`,
+    )
+  ).json();
+  const invoiceIds = (invoices.value as any[]).map((invoice) => invoice.Id);
+  expect(invoiceIds.length).toBeGreaterThan(1);
+  const row = gravesTable.locator("tbody tr", { hasText: grave.GraveNumber }).first();
+
+  await page.request.post("/odata/SetInvoicePaid", {
+    data: { invoiceId: invoiceIds[0], paid: true },
+  });
+  await page.reload();
+  // the count says how many of the grave's recipients have settled
+  await expect(row).toContainText(`teilweise bezahlt (1 / ${invoiceIds.length})`);
+
+  for (const invoiceId of invoiceIds.slice(1)) {
+    await page.request.post("/odata/SetInvoicePaid", { data: { invoiceId, paid: true } });
+  }
+  await page.reload();
+  // strengthened from the brief: "bezahlt" alone would also match "teilweise
+  // bezahlt", so this would pass even if the last recipient's mark did nothing
+  await expect(row).toContainText("bezahlt");
+  await expect(row).not.toContainText("teilweise");
+
+  // fully paid, so the unpaid filter drops it
+  await page.locator("[id$='paymentFilter']").click();
+  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await expect(gravesTable.locator("tbody tr", { hasText: grave.GraveNumber })).toHaveCount(0);
 });

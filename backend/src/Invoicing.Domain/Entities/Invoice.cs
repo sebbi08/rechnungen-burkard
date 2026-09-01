@@ -24,6 +24,12 @@ public sealed class Invoice
     public string StampWord { get; set; } = "";
     public string Language { get; set; } = "de"; // document language at generation time
     public DateTime GeneratedAt { get; set; } // UTC
+
+    /// <summary>The day the invoice was marked paid; null while it is unpaid.
+    /// Nullability carries the whole meaning — there is no second flag to
+    /// disagree with it. Only SetInvoicePaid writes it, and the UI reads it as
+    /// paid/unpaid without ever showing the date.</summary>
+    public DateOnly? PaidOn { get; set; }
     public List<InvoiceLine> Lines { get; set; } = new();
     public List<Document> Documents { get; set; } = new();
 }
@@ -43,5 +49,11 @@ public sealed class InvoiceLine
     /// generated before this column existed.</summary>
     public decimal? GraveUnitPrice { get; set; }
     public decimal VatRate { get; set; }
+
+    /// <summary>True when this line's price was entered as a gross — the amount
+    /// the customer pays, VAT included. <see cref="UnitPrice"/> is still the net
+    /// it was converted to; this records how that net was arrived at, so a
+    /// revision dialog can show the gross again and take it back unchanged.</summary>
+    public bool PriceIncludesVat { get; set; }
     public int LineNumber { get; set; }
 }

@@ -1,5 +1,6 @@
 <mvc:View
     xmlns:mvc="sap.ui.core.mvc"
+    xmlns:core="sap.ui.core"
     xmlns="sap.m"
     controllerName="burkard.invoicing.controller.Invoices"
     displayBlock="true"
@@ -23,6 +24,24 @@
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
                 </SearchField>
+                <Label text="{i18n>paymentFilter}" labelFor="paymentFilter">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Label>
+                <Select
+                    id="paymentFilter"
+                    width="10rem"
+                    change=".onPaymentFilterChange"
+                    selectedKey="{view>/paymentFilter}"
+                >
+                    <core:Item key="all" text="{i18n>paymentFilterAll}" />
+                    <core:Item key="unpaid" text="{i18n>paymentFilterUnpaid}" />
+                    <core:Item key="paid" text="{i18n>paymentFilterPaid}" />
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="1" />
+                    </layoutData>
+                </Select>
                 <ToolbarSpacer />
                 <Button text="{i18n>createInvoice}" press=".onCreateInvoice" type="Emphasized">
                     <layoutData>
@@ -55,26 +74,55 @@
                     <Column importance="Medium" popinDisplay="Inline">
                         <Text text="{i18n>revision}" />
                     </Column>
-                    <!-- wide enough for the four actions to stay on one line -->
-                    <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>paidStatus}" />
+                    </Column>
+                    <!-- wide enough for the five actions to stay on one line -->
+                    <Column width="13rem" importance="Low" popinDisplay="WithoutHeader" />
                 </columns>
                 <items>
                     <ColumnListItem>
                         <cells>
                             <Text text="{odata>InvoiceNumber}" />
                             <Text text="{odata>RecipientName}" />
-                            <Text text="{path:'odata>GeneratedAt', formatter:'.formatDate'}" />
+                            <!-- targetType: 'any' hands the formatter the raw value. Without
+                                 it UI5 converts through the OData type to the target property's
+                                 type first: Edm.DateTimeOffset to a string the date formatter
+                                 cannot parse back, and Edm.Int32 to a boolean, which throws.
+                                 The exception is swallowed and the control keeps its default,
+                                 so the date column rendered empty and the revision marker was
+                                 visible on every row, originals included. In an expression
+                                 binding %{...} is that same raw read. -->
+                            <Text
+                                text="{path: 'odata>GeneratedAt', formatter: '.formatDate', targetType: 'any'}"
+                            />
                             <HBox>
                                 <Text
                                     text="{path: 'odata>InvoiceNumber', formatter: '.formatInvoiceNumber'}"
-                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                    visible="{= %{odata>RevisionNumber} > 0}"
                                 />
                                 <Text
-                                    text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge'}"
-                                    visible="{= ${odata>RevisionNumber} > 0}"
+                                    text="{path: 'odata>RevisionNumber', formatter: '.formatRevisionBadge', targetType: 'any'}"
+                                    visible="{= %{odata>RevisionNumber} > 0}"
                                     class="sapUiTinyMarginBegin"
                                 />
                             </HBox>
+                            <!-- targetType: 'any' on every odata>PaidOn binding below: without it,
+                                         UI5 applies the OData type's formatValue before the formatter,
+                                         using the bound control property's type. For the edit button's
+                                         boolean 'enabled', sap.ui.model.odata.type.Date.formatValue then
+                                         throws a FormatException, UI5 swallows it and resets the property
+                                         to its default (enabled reverts to true, defeating the guard). The
+                                         string-typed properties here would not throw, but without
+                                         targetType they still receive a locale-formatted date string
+                                         ("31.08.2026") where the shared paid* formatters elsewhere are
+                                         handed the raw Edm.Date from a JSON model ("2026-08-31"); pinning
+                                         it everywhere keeps the value shape the same for every consumer. -->
+                            <ObjectStatus
+                                text="{path: 'odata>PaidOn', formatter: '.paidStatusText', targetType: 'any'}"
+                                state="{path: 'odata>PaidOn', formatter: '.paidStatusState', targetType: 'any'}"
+                                stateAnnouncementText="{path: 'odata>PaidOn', formatter: '.paidStatusAnnouncement', targetType: 'any'}"
+                            />
                             <!-- wraps in the pop-in, where the actions sit
                                          below the row instead of next to it -->
                             <HBox wrap="Wrap">
@@ -99,8 +147,15 @@
                                 <Button
                                     icon="sap-icon://edit"
                                     type="Transparent"
-                                    tooltip="{i18n>actionEdit}"
+                                    enabled="{path: 'odata>PaidOn', formatter: '.paidEditEnabled', targetType: 'any'}"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidEditTooltip', targetType: 'any'}"
                                     press=".onEditInvoice"
+                                />
+                                <Button
+                                    icon="{path: 'odata>PaidOn', formatter: '.paidActionIcon', targetType: 'any'}"
+                                    type="Transparent"
+                                    tooltip="{path: 'odata>PaidOn', formatter: '.paidActionTooltip', targetType: 'any'}"
+                                    press=".onTogglePaid"
                                 />
                             </HBox>
                         </cells>

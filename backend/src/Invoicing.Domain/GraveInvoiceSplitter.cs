@@ -11,7 +11,8 @@ public sealed record GraveLine(
     string Description,
     int Count,
     decimal UnitPrice,
-    decimal VatRate
+    decimal VatRate,
+    bool PriceIncludesVat
 );
 
 /// <summary>Splits a grave's lines evenly across its recipients, and recovers
@@ -69,6 +70,10 @@ public static class GraveInvoiceSplitter
                             MidpointRounding.AwayFromZero
                         ),
                         VatRate = line.VatRate,
+                        // the recipient's line remembers what the grave's line was
+                        // entered as, so reopening the edit dialog shows the gross
+                        // again rather than this recipient's net share
+                        PriceIncludesVat = line.PriceIncludesVat,
                         LineNumber = i + 1,
                         GraveUnitPrice = line.UnitPrice,
                     }
@@ -125,7 +130,8 @@ public static class GraveInvoiceSplitter
                         3,
                         MidpointRounding.AwayFromZero
                     ),
-                    template.VatRate
+                    template.VatRate,
+                    template.PriceIncludesVat
                 )
             );
         }

@@ -27,7 +27,19 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     // the draft starts on whichever recipient this refreshed list shows first
     const newest = await this.refreshRecipients("recipient");
 
-    const lines = invoiceId != null ? await this.loadLines(invoiceId) : [InvoiceEdit.emptyLine()];
+    let lines: DraftLine[];
+    if (invoiceId != null) {
+      let rates: Map<number, number>;
+      try {
+        rates = await this.loadItemVatRates();
+      } catch (error) {
+        api.showError(this, error);
+        return;
+      }
+      lines = await this.loadLines(invoiceId, rates);
+    } else {
+      lines = [InvoiceEdit.emptyLine()];
+    }
     this._invoiceDialog.setModel(
       new TypedJSONModel<InvoiceDraft>({
         // the ComboBox matches its keys as strings
@@ -40,7 +52,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
     this._invoiceDialog.open();
   }
 
-  private async loadLines(invoiceId: number): Promise<DraftLine[]> {
+  private async loadLines(invoiceId: number, rates: Map<number, number>): Promise<DraftLine[]> {
     try {
       const response = await fetch(`/odata/Invoices(${invoiceId})/Lines`);
       if (!response.ok) {
@@ -49,15 +61,24 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       const body = (await response.json()) as {
         value: api.InvoiceLineRow[];
       };
-      return body.value.map((line) => ({
-        // the ComboBox matches its keys as strings
-        itemId: line.ItemId != null ? String(line.ItemId) : "",
-        itemNumber: line.ItemNumber,
-        count: line.Count,
-        unitPrice: line.UnitPrice,
-        defaultPrice: null,
-        description: line.Description,
-      }));
+      return body.value.map((line) => {
+        const vatRate = line.ItemId != null ? (rates.get(Number(line.ItemId)) ?? 0) : 0;
+        return {
+          // the ComboBox matches its keys as strings
+          itemId: line.ItemId != null ? String(line.ItemId) : "",
+          itemNumber: line.ItemNumber,
+          count: line.Count,
+          // the line stores a net; a line entered VAT-included is edited as its gross
+          unitPrice: api.priceFieldValue(
+            Number(line.UnitPrice),
+            Boolean(line.PriceIncludesVat),
+            vatRate,
+          ),
+          defaultPrice: null,
+          priceIncludesVat: Boolean(line.PriceIncludesVat),
+          description: line.Description,
+        };
+      });
     } catch (error) {
       api.showError(this, error);
       return [InvoiceEdit.emptyLine()];
@@ -110,6 +131,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       count: 1,
       unitPrice: null,
       defaultPrice: null,
+      priceIncludesVat: false,
       description: "",
     };
   }
@@ -133,6 +155,7 @@ export default abstract class InvoiceEdit extends InvoiceRevisions {
       count: Number(line.count),
       // a price of 0 is a real value, not a missing one
       unitPrice: line.unitPrice == null || line.unitPrice === "" ? null : Number(line.unitPrice),
+      priceIncludesVat: line.priceIncludesVat,
     }));
 
     // The ComboBox is bound two-way, so the draft holds the recipient the dialog

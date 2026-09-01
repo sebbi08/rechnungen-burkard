@@ -138,6 +138,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("PriceIncludesVat")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal?>("UnitPrice")
                         .HasColumnType("TEXT");
 
@@ -200,6 +203,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("PeriodHalf")
                         .HasColumnType("INTEGER");
 
@@ -240,7 +246,7 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasIndex("RootId");
 
-                    b.HasIndex("GraveId", "IsLatestRevision");
+                    b.HasIndex("GraveId", "IsLatestRevision", "PaidOn");
 
                     b.HasIndex("Year", "Sequence", "RevisionNumber")
                         .IsUnique();
@@ -303,6 +309,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PriceIncludesVat")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("UnitPrice")

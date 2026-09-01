@@ -61,6 +61,21 @@ public sealed class GraveInvoiceRevisionService
             throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
         }
 
+        // One edit revises every recipient of the half-year, so one paid
+        // recipient blocks all of them. Naming them is the point: from the row
+        // the user pressed edit on, another recipient's payment is invisible.
+        var paidRecipients = siblings
+            .Where(s => s.PaidOn is not null)
+            .Select(s => s.RecipientName)
+            .ToList();
+        if (paidRecipients.Count > 0)
+        {
+            throw new ValidationException(
+                "GraveInvoicePaid",
+                $"The invoices of {string.Join(", ", paidRecipients)} are paid and cannot be revised."
+            );
+        }
+
         // A grave's recipients cannot change, so the group is always the grave's
         // full set and the split matches the one generation used.
         var perRecipient = GraveInvoiceSplitter.Split(graveLines, siblings.Count);
@@ -179,8 +194,11 @@ public sealed class GraveInvoiceRevisionService
                     item.Number,
                     item.Description,
                     input.Count,
-                    unitPrice,
-                    item.VatRate
+                    // the dialog sends the grave's price as it shows it, which
+                    // for a VAT-included line is the gross; the split needs the net
+                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
+                    item.VatRate,
+                    input.PriceIncludesVat
                 )
             );
         }

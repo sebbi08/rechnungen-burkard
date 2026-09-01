@@ -52,11 +52,8 @@ public class RecipientsController : ODataController
         // the recipient number identifies the row in the import mapping file; a
         // client that does not care (the quick-create dialog, the UI form) gets
         // the next free one assigned
-        if (string.IsNullOrWhiteSpace(recipient.Number))
-        {
-            recipient.Number = _numbers.Next();
-        }
-        else if (_db.Recipients.Any(r => r.Number == recipient.Number))
+        var assignNumber = string.IsNullOrWhiteSpace(recipient.Number);
+        if (!assignNumber && _db.Recipients.Any(r => r.Number == recipient.Number))
         {
             return BadRequest(
                 new
@@ -70,9 +67,45 @@ public class RecipientsController : ODataController
             );
         }
 
-        _db.Recipients.Add(recipient);
-        _db.SaveChanges();
-        return Created(recipient);
+        for (var attempt = 0; ; attempt++)
+        {
+            if (assignNumber)
+            {
+                recipient.Number = _numbers.Next();
+            }
+
+            try
+            {
+                _db.Recipients.Add(recipient);
+                _db.SaveChanges();
+                return Created(recipient);
+            }
+            catch (DbUpdateException) when (assignNumber && attempt < 4)
+            {
+                // Two clients reading the next free number before either has
+                // saved both get the same one, and the unique index rejects the
+                // loser. Retry with a freshly read number, as InvoiceService
+                // does for the invoice sequence; without this the loser came
+                // back as an unhandled 500. The failed attempt leaves the
+                // entity tracked as Added, which would poison every retry.
+                _db.ChangeTracker.Clear();
+            }
+            catch (DbUpdateException)
+            {
+                // an explicit number that survived the check above, or a race
+                // that outlasted the retries
+                return BadRequest(
+                    new
+                    {
+                        error = new
+                        {
+                            code = "RecipientNumberExists",
+                            message = "This recipient number already exists.",
+                        },
+                    }
+                );
+            }
+        }
     }
 
     public IActionResult Patch([FromRoute] long key, [FromBody] Delta<Recipient>? delta)

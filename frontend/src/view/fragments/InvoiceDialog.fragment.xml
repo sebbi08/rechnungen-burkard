@@ -63,6 +63,9 @@
                         <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <Column width="9rem" importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatShort}" />
+                        </Column>
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -84,12 +87,7 @@
                                 <Text text="{invoiceDraft>description}" wrapping="true" />
                                 <!-- a width of their own, or the pop-in gives a count
                                      the whole row to hold one digit -->
-                                <Input
-                                    value="{invoiceDraft>count}"
-                                    type="Number"
-                                    width="5rem"
-                                    ariaLabel="{i18n>itemCount}"
-                                />
+                                <Input value="{invoiceDraft>count}" type="Number" width="5rem" />
                                 <!-- pre-filled with the item's default price; clearing it or
                                      typing another one overrides it for this invoice -->
                                 <Input
@@ -97,8 +95,8 @@
                                     type="Number"
                                     width="7rem"
                                     placeholder="{invoiceDraft>defaultPrice}"
-                                    ariaLabel="{i18n>itemPrice}"
                                 />
+                                <CheckBox selected="{invoiceDraft>priceIncludesVat}" />
                             </cells>
                         </ColumnListItem>
                     </items>

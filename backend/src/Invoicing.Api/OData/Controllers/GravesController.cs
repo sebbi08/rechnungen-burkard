@@ -54,6 +54,7 @@ public class GravesController : ODataController
                     i.Id,
                     i.Count,
                     i.UnitPrice,
+                    i.PriceIncludesVat,
                     Item = new
                     {
                         i.Item.Id,

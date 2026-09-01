@@ -104,6 +104,23 @@ export default abstract class InvoiceRevisions extends BaseController {
           : "",
       sharePercent: latest.SharePercent != null ? Number(latest.SharePercent) : null,
       revisions,
+      paidOn: latest.PaidOn,
     };
+  }
+
+  /**
+   * Each item's current VAT rate, indexed by id, for the price fields. Both edit
+   * dialogs already bind the whole catalogue into their item ComboBox, so this is
+   * one more request rather than more data — and it has to be the catalogue
+   * rather than the line, because the backend converts what is sent back using
+   * the item's current rate.
+   */
+  protected async loadItemVatRates(): Promise<Map<number, number>> {
+    const items = await this.readList<{ Id: number | string; VatRate: number | string }>(
+      "/InvoiceItems",
+      { $select: "Id,VatRate" },
+    );
+
+    return new Map(items.map((item) => [Number(item.Id), Number(item.VatRate)]));
   }
 }

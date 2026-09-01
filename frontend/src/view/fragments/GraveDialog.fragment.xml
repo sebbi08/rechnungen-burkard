@@ -67,6 +67,9 @@
                             <Column width="8rem" importance="High" popinDisplay="Inline">
                                 <Text text="{i18n>itemPrice}" />
                             </Column>
+                            <Column width="9rem" importance="Medium" popinDisplay="Inline">
+                                <Text text="{i18n>priceIncludesVatShort}" />
+                            </Column>
                             <Column importance="Low" popinDisplay="WithoutHeader" />
                         </columns>
                         <items>
@@ -87,22 +90,17 @@
                                         />
                                     </ComboBox>
                                     <Text text="{graveDraft>description}" wrapping="true" />
-                                    <Input
-                                        value="{graveDraft>count}"
-                                        type="Number"
-                                        width="5rem"
-                                        ariaLabel="{i18n>itemCount}"
-                                    />
+                                    <Input value="{graveDraft>count}" type="Number" width="5rem" />
                                     <!-- pre-filled with the item's default price, as in the
-                                         invoice dialog; clearing it means "use the item's
-                                         default price", which the placeholder shows -->
+                                         invoice dialog; clearing it means "use the item's default
+                                         price", which the placeholder shows -->
                                     <Input
                                         value="{graveDraft>unitPrice}"
                                         type="Number"
                                         width="7rem"
                                         placeholder="{graveDraft>defaultPrice}"
-                                        ariaLabel="{i18n>itemPrice}"
                                     />
+                                    <CheckBox selected="{graveDraft>priceIncludesVat}" />
                                     <Button
                                         text="{i18n>delete}"
                                         press=".onDeleteItemLink"

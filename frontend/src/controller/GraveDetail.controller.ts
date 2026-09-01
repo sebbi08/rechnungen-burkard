@@ -10,6 +10,7 @@ interface GraveItemRow {
   Count: number;
   Price: number;
   VatRate: number;
+  PriceIncludesVat: boolean;
 }
 
 interface GraveRecipientRow {
@@ -27,6 +28,8 @@ interface GraveInvoiceRow {
   RevisionNumber: number;
   GeneratedAt: string;
   GrossTotal: number;
+  /** Set when this recipient's invoice is paid; the date itself is never shown. */
+  PaidOn: string | null;
 }
 
 /** Everything this page shows about one grave. */
@@ -63,7 +66,7 @@ export default class GraveDetail extends GraveEdit {
     await this.refresh();
   }
 
-  private async refresh(): Promise<void> {
+  protected async refresh(): Promise<void> {
     try {
       const [details, runs, invoices] = await Promise.all([
         api.fetchGraveDetails(this._graveId),
@@ -103,6 +106,7 @@ export default class GraveDetail extends GraveEdit {
           // the link's own price wins; without one the item's default is billed
           Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
           VatRate: link.Item.VatRate,
+          PriceIncludesVat: link.PriceIncludesVat,
         })),
         Recipients: details.Recipients.map((link) => ({
           Name: link.Recipient.Name,
@@ -124,6 +128,7 @@ export default class GraveDetail extends GraveEdit {
             RevisionNumber: Number(invoice.RevisionNumber),
             GeneratedAt: invoice.GeneratedAt,
             GrossTotal: api.invoiceTotals(lines).gross,
+            PaidOn: invoice.PaidOn,
           };
         }),
       });
@@ -169,6 +174,18 @@ export default class GraveDetail extends GraveEdit {
   public async onEditGraveInvoice(event: Button$PressEvent): Promise<void> {
     const context = event.getSource().getBindingContext("grave")!;
     await this.openGraveInvoiceDialog(Number(context.getProperty("Id")));
+  }
+
+  public async onToggleInvoicePaid(event: Button$PressEvent): Promise<void> {
+    const context = event.getSource().getBindingContext("grave")!;
+    const changed = await this.togglePaid(
+      Number(context.getProperty("Id")),
+      context.getProperty("PaidOn") as string | null,
+    );
+    if (changed) {
+      // the page's header status and the row are built from one read
+      await this.refresh();
+    }
   }
 
   private _graveId = 0;

@@ -83,6 +83,9 @@ const CODE_TO_I18N: Record<string, string> = {
   NotAGraveInvoice: "errorNotAGraveInvoice",
   GraveInvoiceGroupInconsistent: "errorGraveInvoiceGroupInconsistent",
   GraveInvoiceRevisionRequired: "errorGraveInvoiceRevisionRequired",
+  InvoicePaid: "errorInvoicePaid",
+  GraveInvoicePaid: "errorGraveInvoicePaid",
+  NotLatestRevision: "errorNotLatestRevision",
 };
 
 /**
@@ -177,6 +180,7 @@ export interface InvoiceLineDto {
   itemId: number;
   count: number;
   unitPrice: number | null;
+  priceIncludesVat: boolean;
 }
 
 export interface DocumentDto {
@@ -195,6 +199,11 @@ export async function createRevision(
   lines: InvoiceLineDto[],
 ): Promise<void> {
   await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
+}
+
+/** Marks an invoice paid — the backend stamps the day — or takes the mark back. */
+export async function setInvoicePaid(invoiceId: number, paid: boolean): Promise<void> {
+  await ensureOk(await post("/odata/SetInvoicePaid", { invoiceId, paid }));
 }
 
 export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
@@ -302,6 +311,10 @@ export interface GraveStatusRow {
   StartDate: string;
   EndDate: string;
   Invoiced: boolean;
+  /** Latest-revision invoices this grave has for the requested half-year, and
+   *  how many of them are paid. Both 0 when it was never invoiced for it. */
+  InvoiceCount: number;
+  PaidCount: number;
 }
 
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
@@ -328,6 +341,7 @@ export interface GraveItemInput {
   itemId: number;
   count: number;
   unitPrice: number | null;
+  priceIncludesVat: boolean;
 }
 
 export interface SaveGraveInput {
@@ -362,6 +376,8 @@ export interface GraveItemLink {
   Count: number;
   /** The link's own price. Without one the item's default is billed. */
   UnitPrice: number | null;
+  /** The link's own flag, not the item's: it was entered on this grave's line. */
+  PriceIncludesVat: boolean;
   Item: ItemRow;
 }
 
@@ -448,6 +464,9 @@ export interface InvoiceRow {
   RecipientName: string;
   RecipientAddress: string;
   GeneratedAt: string;
+  /** An Edm.Date ("2026-08-31") when the invoice is paid, null while it is not.
+   *  Only ever read as a null check: the date is stored, never shown. */
+  PaidOn: string | null;
   GraveId: number | null;
   PeriodYear: number | null;
   PeriodHalf: number | null;
@@ -464,6 +483,7 @@ export interface InvoiceLineRow {
   UnitPrice: number | string;
   GraveUnitPrice: number | string | null;
   VatRate: number | string;
+  PriceIncludesVat: boolean;
 }
 
 /** A GraveInvoiceRuns row: which half-year a grave has already been invoiced for. */
@@ -510,6 +530,29 @@ export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
   };
 }
 
+/** The gross a price field shows for a stored net: rounds to the cent,
+ *  half-up on a double, which equals the backend's away-from-zero rounding
+ *  for every net that `VatInclusivePrice.NetOf` produces. The backend has no
+ *  counterpart function to mirror — the inverse rule lives only in
+ *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
+ *  — so a future change to `NetOf`'s rounding has nothing forcing this to
+ *  follow it. The two roundings do diverge on an exact half-cent tie, but only
+ *  a net `NetOf` never produces reaches one — every net this function is ever
+ *  called with is `NetOf` output — so that divergence is unreachable here. */
+export function grossFromNet(net: number, vatRate: number): number {
+  return Math.round(net * (1 + vatRate / 100) * 100) / 100;
+}
+
+/** What a price field shows for a line's stored net price: the gross for a line
+ *  entered VAT-included, and the untouched net for every other one — including
+ *  the three decimals a grave split leaves behind. The rate is the item's
+ *  current one, not the line's stored one: the backend converts what the dialog
+ *  sends using the item as it is now, so displaying with an older rate would
+ *  move the price of a line nobody touched. */
+export function priceFieldValue(net: number, priceIncludesVat: boolean, vatRate: number): number {
+  return priceIncludesVat ? grossFromNet(net, vatRate) : net;
+}
+
 /** "H1 2026" — the label the half-year selects already use. */
 export function halfYearText(year: number, half: number): string {
   return `H${half} ${year}`;
@@ -522,6 +565,7 @@ export interface GraveInvoiceGroupLine {
   Count: number;
   UnitPrice: number;
   VatRate: number;
+  PriceIncludesVat: boolean;
 }
 
 export interface GraveInvoiceGroup {
@@ -538,6 +582,7 @@ export interface GraveInvoiceRecipient {
   Id: number;
   Name: string;
   InvoiceId: number;
+  Paid: boolean;
   RootId: number;
 }
 

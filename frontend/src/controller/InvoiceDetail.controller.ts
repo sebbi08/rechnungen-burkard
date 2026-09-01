@@ -21,7 +21,7 @@ export default class InvoiceDetail extends InvoiceEdit {
     await this.refresh();
   }
 
-  private async refresh(): Promise<void> {
+  protected async refresh(): Promise<void> {
     try {
       const chain = await this.loadChain(this._rootId);
       this.setState<RevisionDetailView>(
@@ -45,6 +45,18 @@ export default class InvoiceDetail extends InvoiceEdit {
       return;
     }
     await this.openInvoiceDialog(invoiceId, model.getProperty("/recipientId"));
+  }
+
+  public async onTogglePaid(): Promise<void> {
+    const model = this.state<RevisionDetailView>("detail");
+    const invoiceId = model.getProperty("/latestInvoiceId");
+    if (invoiceId == null) {
+      return;
+    }
+
+    if (await this.togglePaid(invoiceId, model.getProperty("/paidOn"))) {
+      await this.refresh();
+    }
   }
 
   protected async afterInvoiceSaved(): Promise<void> {

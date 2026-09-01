@@ -202,4 +202,57 @@ public class GraveTests
         );
         Assert.Equal(HttpStatusCode.BadRequest, link.StatusCode);
     }
+
+    [Fact]
+    public async Task A_grave_item_link_carries_its_vat_included_flag()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19.0m }));
+
+        var item = await client.PostAsync(
+            "/odata/InvoiceItems",
+            ODataJson.Body(
+                new
+                {
+                    Number = "L-100",
+                    Description = "Grabpflege",
+                    VatRate = 19.0m,
+                    DefaultPrice = 120.00m,
+                }
+            )
+        );
+        using var itemJson = await ODataJson.ReadAsync(item);
+        var itemId = itemJson.RootElement.GetProperty("Id").GetInt64();
+
+        var grave = await client.PostAsync(
+            "/odata/Graves",
+            ODataJson.Body(
+                new
+                {
+                    GraveNumber = "L-1",
+                    StartDate = "2026-01-01",
+                    EndDate = "2040-12-31",
+                }
+            )
+        );
+        using var graveJson = await ODataJson.ReadAsync(grave);
+        var graveId = graveJson.RootElement.GetProperty("Id").GetInt64();
+
+        var link = await client.PostAsync(
+            "/odata/GraveItems",
+            ODataJson.Body(
+                new
+                {
+                    GraveId = graveId,
+                    ItemId = itemId,
+                    Count = 1,
+                    PriceIncludesVat = true,
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.Created, link.StatusCode);
+        using var linkJson = await ODataJson.ReadAsync(link);
+        Assert.True(linkJson.RootElement.GetProperty("PriceIncludesVat").GetBoolean());
+    }
 }

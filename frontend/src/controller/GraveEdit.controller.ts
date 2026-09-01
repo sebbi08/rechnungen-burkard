@@ -2,6 +2,7 @@ import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
 import type { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Dialog from "sap/m/Dialog";
+import MessageBox from "sap/m/MessageBox";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
 import type { DraftLine, GraveDraft, GraveInvoiceDraft, QuickRecipientDraft } from "../model/state";
@@ -63,8 +64,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
         itemNumber: link.Item.Number,
         description: link.Item.Description,
         count: link.Count,
+        // stored as it was typed — for a VAT-included line that is the gross
         unitPrice: link.UnitPrice,
         defaultPrice: link.Item.DefaultPrice,
+        priceIncludesVat: link.PriceIncludesVat,
       })),
       Recipients: details.Recipients.map((link) => ({
         recipientId: String(link.Recipient.Id),
@@ -171,6 +174,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       count: 1,
       unitPrice: null,
       defaultPrice: null,
+      priceIncludesVat: false,
     };
   }
 
@@ -192,6 +196,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
           count: Number(row.count),
           // a price of 0 is a real value, not a missing one
           unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+          priceIncludesVat: row.priceIncludesVat,
         })),
         recipientIds: draft.Recipients.map((row) => Number(row.recipientId)),
       });
@@ -259,6 +264,20 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return;
     }
 
+    // One edit revises every recipient of the half-year, so one paid recipient
+    // blocks all of them. The group knows who they are; saying so here beats
+    // letting the user fill a dialog the backend will refuse.
+    const paid = group.Recipients.filter((recipient) => recipient.Paid);
+    if (paid.length) {
+      MessageBox.error(
+        this.i18nText("errorGraveInvoicePaidNames").replace(
+          "{0}",
+          paid.map((recipient) => recipient.Name).join(", "),
+        ),
+      );
+      return;
+    }
+
     if (!this._graveInvoiceDialog) {
       this._graveInvoiceDialog = (await this.loadFragment({
         name: "burkard.invoicing.view.fragments.GraveInvoiceDialog",
@@ -269,23 +288,41 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       .replace("{0}", api.halfYearText(group.PeriodYear, group.PeriodHalf))
       .replace("{1}", group.Recipients.map((r) => r.Name).join(", "));
 
+    let rates: Map<number, number>;
+    try {
+      rates = await this.loadItemVatRates();
+    } catch (error) {
+      api.showError(this, error);
+      return;
+    }
+
     this._graveInvoiceDialog.setModel(
       new TypedJSONModel<GraveInvoiceDraft>({
         invoiceId,
         warning,
-        lines: group.Lines.map((line) => ({
-          // the ComboBox matches its keys as strings
-          itemId: String(line.ItemId),
-          itemNumber: line.ItemNumber,
-          description: line.Description,
-          count: Number(line.Count),
-          // no rounding: a pre-GraveUnitPrice-migration line is reconstructed
-          // by GraveInvoiceSplitter.Combine at 3-decimal precision on purpose,
-          // to reproduce its historical net cents exactly. Rounding here would
-          // resubmit a different price for every line the user never touched.
-          unitPrice: Number(line.UnitPrice),
-          defaultPrice: null,
-        })),
+        lines: group.Lines.map((line) => {
+          const vatRate = rates.get(Number(line.ItemId)) ?? 0;
+          return {
+            // the ComboBox matches its keys as strings
+            itemId: String(line.ItemId),
+            itemNumber: line.ItemNumber,
+            description: line.Description,
+            count: Number(line.Count),
+            // No rounding for a net price: a pre-GraveUnitPrice-migration line is
+            // reconstructed by GraveInvoiceSplitter.Combine at 3-decimal precision
+            // on purpose, to reproduce its historical net cents exactly. Rounding
+            // here would resubmit a different price for every line the user never
+            // touched. A VAT-included line is the one case that does convert, and
+            // its round trip is exact.
+            unitPrice: api.priceFieldValue(
+              Number(line.UnitPrice),
+              Boolean(line.PriceIncludesVat),
+              vatRate,
+            ),
+            defaultPrice: null,
+            priceIncludesVat: Boolean(line.PriceIncludesVat),
+          };
+        }),
       }),
       "graveInvoiceDraft",
     );
@@ -347,6 +384,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       count: Number(row.count),
       // a price of 0 is a real value, not a missing one
       unitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+      priceIncludesVat: row.priceIncludesVat,
     }));
 
     // long-running task: a revision renders both documents for every recipient

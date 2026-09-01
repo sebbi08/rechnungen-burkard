@@ -105,6 +105,7 @@ public sealed class ImportService
                     GraveId = graves[link.GraveNumber].Id,
                     ItemId = items[link.ItemNumber].Id,
                     Count = link.Count,
+                    PriceIncludesVat = link.PriceIncludesVat,
                 }
             );
         }

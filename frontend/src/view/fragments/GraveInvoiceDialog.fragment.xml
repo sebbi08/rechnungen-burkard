@@ -53,6 +53,9 @@
                         <Column width="8rem" importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <Column width="9rem" importance="Medium" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatShort}" />
+                        </Column>
                         <Column importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
@@ -78,15 +81,14 @@
                                     value="{graveInvoiceDraft>count}"
                                     type="Number"
                                     width="5rem"
-                                    ariaLabel="{i18n>itemCount}"
                                 />
                                 <Input
                                     value="{graveInvoiceDraft>unitPrice}"
                                     type="Number"
                                     width="7rem"
                                     placeholder="{graveInvoiceDraft>defaultPrice}"
-                                    ariaLabel="{i18n>itemPrice}"
                                 />
+                                <CheckBox selected="{graveInvoiceDraft>priceIncludesVat}" />
                                 <Button
                                     text="{i18n>delete}"
                                     press=".onDeleteGraveInvoiceLine"
