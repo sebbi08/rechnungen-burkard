@@ -14,9 +14,56 @@
 #
 # Safe to re-run: a database the consolidated migration already applies to
 # is recognised and left alone.
+#
+# The dev stack must be stopped first -- see the -wal check below.
+#
+# Usage: scripts/patch-dev-db.sh [database]   (default: <repo>/data/invoicing.db)
+# It can be run from any directory; nothing here depends on the working one.
 set -euo pipefail
-DB="${1:-data/invoicing.db}"
-NEW_ID="$(basename "$(ls backend/src/Invoicing.Api/Migrations/*_PaymentVatAndGraveShare.cs)" .cs)"
+
+# Both the migrations folder and the default database are resolved from the
+# script's own location, not from the working directory: a relative path only
+# resolves when the script happens to be run from the repository root, and
+# resolving to nothing is what the guard below exists to catch.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DB="${1:-$ROOT/data/invoicing.db}"
+
+# `set -e` does not stop a failing command inside a command substitution, and
+# `basename ""` succeeds -- so a missing or renamed migration would leave
+# NEW_ID empty and nothing would complain. The precondition check does not look
+# at it either, so it would still report PATCH, and the patch body would then
+# delete the _InvoicePaymentStatus history row and insert MigrationId = '' in
+# its place: a database with the new columns and no record of the migration,
+# which EF re-runs on the next start and dies on a duplicate PaidOn column.
+# Hence an explicit non-empty check, before anything is read or written.
+MIGRATIONS=("$ROOT"/backend/src/Invoicing.Api/Migrations/*_PaymentVatAndGraveShare.cs)
+# an unmatched glob stays literal, so count it as none rather than as one
+MIGRATION_COUNT="${#MIGRATIONS[@]}"
+[ -e "${MIGRATIONS[0]}" ] || MIGRATION_COUNT=0
+NEW_ID=""
+if [ "$MIGRATION_COUNT" -eq 1 ]; then
+    NEW_ID="$(basename "${MIGRATIONS[0]}" .cs)"
+fi
+if [ -z "$NEW_ID" ]; then
+    echo "patch-dev-db.sh: cannot determine the consolidated migration id." >&2
+    echo "Expected exactly one file matching" >&2
+    echo "  $ROOT/backend/src/Invoicing.Api/Migrations/*_PaymentVatAndGraveShare.cs" >&2
+    echo "but found $MIGRATION_COUNT. Nothing was read or changed." >&2
+    exit 1
+fi
+
+# The backup below is a plain `cp` of the main database file. SQLite in WAL
+# mode keeps committed pages in "$DB-wal" until a checkpoint, so with a -wal
+# present that copy is not a consistent snapshot -- and whatever is holding the
+# database open is a running app whose own migrator this would race.
+if [ -e "$DB-wal" ]; then
+    echo "patch-dev-db.sh: $DB-wal exists, so something has $DB open in WAL mode." >&2
+    echo "A backup taken now would miss the write-ahead log, and the patch would" >&2
+    echo "race the running app's migrator. Stop the dev stack first:" >&2
+    echo "  docker compose stop backend" >&2
+    echo "Nothing was read or changed." >&2
+    exit 1
+fi
 
 # --- Precondition check: read-only, no backup taken yet. -------------------
 set +e
