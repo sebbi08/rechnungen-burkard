@@ -508,10 +508,13 @@ export interface GraveInvoiceRunRow {
  *  function to mirror — the inverse rule lives only in
  *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
  *  — so a future change to `NetOf`'s rounding has nothing forcing this to
- *  follow it. The two roundings do diverge on an exact half-cent tie, but only
- *  on a negative one: `Math.round` takes a .5 towards +Infinity, away-from-zero
- *  takes it away from it. A price is never negative, so that divergence is
- *  unreachable here.
+ *  follow it. The two rules diverge on an exact half-cent tie, but only on a
+ *  negative one: `Math.round` takes a .5 towards +Infinity, away-from-zero takes
+ *  it away from it, and a price is never negative. They can also diverge where a
+ *  binary double lands just under a value the decimal arithmetic treats as a
+ *  tie. Neither is reachable at the rates this application uses: over every
+ *  `NetOf` output for a gross of 0,01 to 2000,00, plus the whole cents
+ *  `MakeDivisible` can add, no rate in the settings produces a disagreement.
  *
  *  It is worth being precise about which premise carries that, because the
  *  narrower one no longer holds: the nets reaching this function are not all
