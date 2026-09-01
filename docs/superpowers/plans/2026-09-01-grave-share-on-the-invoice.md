@@ -733,8 +733,11 @@ leave it for `Share is null` ones and suppress it when `Share` is set.
 
 - [ ] **Step 7: Rewrite the tests that asserted split amounts**
 
-`VatIncludedGraveTests` and `GraveMultiItemGenerationTests` assert per-recipient
-unit prices from the old split. Rewrite their assertions against the new form:
+Four classes assert per-recipient split amounts and can be rewritten once the
+document builds a share: `VatIncludedGraveTests`, `GraveMultiItemGenerationTests`,
+`GraveGenerationTests` and `LatestRevisionTests`. (`GraveInvoiceRevisionTests`
+and `GraveInvoiceGroupTests` need the revision path and belong to Task 5.)
+Rewrite their assertions against the new form:
 lines carry the grave's price, and the recipient's total comes from
 `new DocumentDataBuilder().Build(invoice).Share!.GrossTotal`. Keep every scenario;
 only the expected numbers change. Derive each expected value from the rule
@@ -744,7 +747,8 @@ rather than from a previous run, and show the derivation in a comment.
 
 Run: `./scripts/dotnet.sh test Invoicing.sln`
 Expected: everything green except `GraveInvoiceRevisionTests` and
-`GraveInvoiceGroupTests`, which Task 5 owns.
+`GraveInvoiceGroupTests`, which Task 5 owns. If any of the four classes this
+task rewrote is still red, that is a real failure, not a planned one.
 
 - [ ] **Step 9: Commit**
 
