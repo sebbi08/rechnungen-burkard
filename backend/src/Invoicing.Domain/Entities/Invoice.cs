@@ -45,9 +45,13 @@ public sealed class Invoice
     /// Derived from <see cref="Lines"/> and <see cref="RecipientCount"/> by the
     /// same calculation the PDF uses (<c>DocumentDataBuilder</c>), so a screen
     /// showing an invoice's total never disagrees with the document it links to.
-    /// The OData invoices controller stamps these after loading an invoice;
-    /// nothing else sets them, and <c>AppDbContext</c> excludes them from the
-    /// model, so they are never persisted and need no migration.</summary>
+    /// <c>AppDbContext</c> excludes them from the model, so they are never
+    /// persisted and need no migration. Only InvoicesController's list Get()
+    /// stamps them; they default to and stay 0 on an invoice read through the
+    /// single-key Get(key) route or returned directly by CreateInvoice,
+    /// CreateRevision, CreateGraveInvoiceRevision or SetInvoicePaid — harmless
+    /// today since nothing reads totals from those paths, but worth knowing
+    /// before something starts to.</summary>
     public decimal NetTotal { get; set; }
     public decimal VatTotal { get; set; }
     public decimal GrossTotal { get; set; }

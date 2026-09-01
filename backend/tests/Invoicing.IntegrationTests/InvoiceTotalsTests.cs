@@ -161,4 +161,84 @@ public class InvoiceTotalsTests
         Assert.Equal(14.00m, row.GetProperty("VatTotal").GetDecimal());
         Assert.Equal(214.00m, row.GetProperty("GrossTotal").GetDecimal());
     }
+
+    /// <summary>Get() now fills Documents from a lightweight projection instead
+    /// of an EF Include (to keep Document.Content — the PDF bytes — out of the
+    /// query), so this pins that $expand=Documents($select=...) still returns
+    /// exactly the fields it selects, for every document, and never the PDF
+    /// content.</summary>
+    [Fact]
+    public async Task Expand_on_documents_returns_the_same_fields_without_the_pdf_bytes()
+    {
+        using var host = new ApiTestHost();
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.VatRates.Add(new VatRate { Rate = 7m });
+        var item = new InvoiceItem
+        {
+            Number = "9003",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 100m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0095",
+            Name = "Erik Total",
+            Address = "E 5",
+        };
+        db.InvoiceItems.Add(item);
+        db.Recipients.Add(recipient);
+        await db.SaveChangesAsync();
+
+        using var client = host.CreateClient();
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId = recipient.Id,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = item.Id,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                }
+            )
+        );
+        created.EnsureSuccessStatusCode();
+        using var createdJson = await ODataJson.ReadAsync(created);
+        var invoiceId = createdJson.RootElement.GetProperty("Id").GetInt64();
+
+        var response = await client.GetAsync(
+            $"/odata/Invoices?$filter=Id eq {invoiceId}&$expand=Documents($select=Id,FileName,Kind)"
+        );
+        response.EnsureSuccessStatusCode();
+        using var json = await ODataJson.ReadAsync(response);
+        var row = json.RootElement.GetProperty("value").EnumerateArray().Single();
+        var documents = row.GetProperty("Documents").EnumerateArray().ToList();
+
+        // both the normal document and the copy are present, each with exactly
+        // the fields the $select asked for and none of the PDF bytes
+        Assert.Equal(2, documents.Count);
+        Assert.All(
+            documents,
+            document =>
+            {
+                Assert.True(document.TryGetProperty("Id", out _));
+                Assert.True(document.TryGetProperty("FileName", out _));
+                Assert.True(document.TryGetProperty("Kind", out _));
+                Assert.False(document.TryGetProperty("Content", out _));
+            }
+        );
+        var kinds = documents
+            .Select(d => d.GetProperty("Kind").GetString())
+            .OrderBy(k => k)
+            .ToList();
+        Assert.Equal(new[] { "Copy", "Normal" }, kinds);
+    }
 }
