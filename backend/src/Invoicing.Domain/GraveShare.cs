@@ -24,6 +24,21 @@ public static class GraveShare
             throw new ArgumentOutOfRangeException(nameof(recipients));
         }
 
+        // A non-positive count breaks the search below rather than producing a
+        // wrong answer. Count 0 gives the residue graph a zero-cost self-loop,
+        // and the lexicographic tie-break keeps accepting an ever-longer path
+        // through it, so the relaxation never settles. A negative count indexes
+        // best[next] negatively and throws. Callers reject non-positive counts
+        // already, so this only keeps that from being the sole thing between an
+        // edit here and a hang.
+        if (lines.Any(l => l.Count <= 0))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(lines),
+                "Every line's count must be positive."
+            );
+        }
+
         var result = lines.ToList();
         // materialised: the loop rewrites result as it goes
         foreach (var rate in result.Select(l => l.VatRate).Distinct().ToList())

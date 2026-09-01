@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Burkard.Invoicing.Domain;
@@ -58,13 +59,44 @@ public class GraveShareTests
     }
 
     [Fact]
-    public void Prices_keep_two_decimals()
+    public void Bumping_a_two_decimal_price_keeps_it_at_two_decimals()
     {
+        // A bump adds exactly 0,01, so it cannot introduce a third decimal. It
+        // says nothing about prices that arrive with three already: a
+        // VAT-included grave line is billed on VatInclusivePrice.NetOf's
+        // 3-decimal net, and MakeDivisible carries that precision through
+        // untouched — see the design's Limits section.
         var lines = new[] { Line(3, 8.31m, 19m), Line(7, 2.22m, 19m) };
 
         var adjusted = GraveShare.MakeDivisible(lines, 4);
 
         Assert.All(adjusted, l => Assert.Equal(l.UnitPrice, decimal.Round(l.UnitPrice, 2)));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_non_positive_recipient_count_is_rejected(int recipients)
+    {
+        var lines = new[] { Line(1, 10.00m, 19m) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GraveShare.MakeDivisible(lines, recipients)
+        );
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_non_positive_line_count_is_rejected(int count)
+    {
+        // Count 0 would give the residue graph a zero-cost self-loop that the
+        // lexicographic tie-break keeps taking, so the relaxation would never
+        // settle; a negative count would index the cost array negatively. Both
+        // are caught up front rather than reached.
+        var lines = new[] { Line(1, 10.00m, 19m), Line(count, 5.00m, 19m) };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => GraveShare.MakeDivisible(lines, 3));
     }
 
     // Round-robin — add a cent to each line in turn — cannot solve this: one lap
