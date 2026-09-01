@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { waitForDialogOpen } from "../dialog";
+import { pickSelectOption, waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per test run. `npm test` starts with an empty database, but
@@ -758,7 +758,6 @@ test("a half-year reads partly paid until every recipient has paid (Story 6)", a
   await expect(row).not.toContainText("teilweise");
 
   // fully paid, so the unpaid filter drops it
-  await page.locator("[id$='paymentFilter']").click();
-  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await pickSelectOption(page, page.locator("[id$='paymentFilter']"), "Nur unbezahlte");
   await expect(gravesTable.locator("tbody tr", { hasText: grave.GraveNumber })).toHaveCount(0);
 });

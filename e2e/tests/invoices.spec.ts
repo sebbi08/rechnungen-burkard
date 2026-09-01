@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { waitForDialogOpen } from "../dialog";
+import { pickSelectOption, waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow } from "../seed";
 
 // Unique per run: the parallel grave generation (graves.spec.ts) inserts
@@ -582,14 +582,11 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
 
   // the unpaid filter drops it, the paid filter keeps it
   const paymentFilter = page.locator("[id$='paymentFilter']");
-  await paymentFilter.click();
-  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await pickSelectOption(page, paymentFilter, "Nur unbezahlte");
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(0);
-  await paymentFilter.click();
-  await page.getByRole("option", { name: "Nur bezahlte" }).click();
+  await pickSelectOption(page, paymentFilter, "Nur bezahlte");
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(1);
-  await paymentFilter.click();
-  await page.getByRole("option", { name: "Alle" }).click();
+  await pickSelectOption(page, paymentFilter, "Alle");
 
   // taking the payment back asks first
   await row.getByRole("button", { name: "Zahlung zurücknehmen", exact: true }).click();
