@@ -82,7 +82,11 @@ internal sealed class InvoiceDocument : IDocument
             page.Content()
                 .Column(column =>
                 {
-                    if (!string.IsNullOrEmpty(_data.ShareText))
+                    // The old share note above the table only ever applied when the
+                    // lines were already the share (Share is null); the summary
+                    // column prints the share block itself once Share is set, so the
+                    // note would be redundant there.
+                    if (_data.Share is null && !string.IsNullOrEmpty(_data.ShareText))
                     {
                         column.Item().PaddingBottom(8).Text(_data.ShareText).SemiBold();
                     }
@@ -152,17 +156,45 @@ internal sealed class InvoiceDocument : IDocument
                                 summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
                             }
 
-                            summary
-                                .Item()
-                                .PaddingTop(6)
-                                .Text(_texts.NetTotal(_data.NetTotal))
-                                .SemiBold();
-                            summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
-                            summary
-                                .Item()
-                                .Text(_texts.GrossTotal(_data.GrossTotal))
-                                .SemiBold()
-                                .FontSize(13);
+                            if (_data.Share is { } share)
+                            {
+                                // The grave's own lines print in full above; this
+                                // recipient pays a share of them, worked out per rate
+                                // from that share rather than from the 100 % figures.
+                                summary
+                                    .Item()
+                                    .PaddingTop(6)
+                                    .Text(_texts.NetSumTotal(_data.NetTotal))
+                                    .SemiBold();
+                                summary
+                                    .Item()
+                                    .Text(_texts.SharePart(share.Percent, share.NetTotal))
+                                    .SemiBold();
+                                foreach (var vat in share.VatSummaries)
+                                {
+                                    summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                }
+
+                                summary
+                                    .Item()
+                                    .Text(_texts.GrossTotal(share.GrossTotal))
+                                    .SemiBold()
+                                    .FontSize(13);
+                            }
+                            else
+                            {
+                                summary
+                                    .Item()
+                                    .PaddingTop(6)
+                                    .Text(_texts.NetTotal(_data.NetTotal))
+                                    .SemiBold();
+                                summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
+                                summary
+                                    .Item()
+                                    .Text(_texts.GrossTotal(_data.GrossTotal))
+                                    .SemiBold()
+                                    .FontSize(13);
+                            }
                         });
 
                     if (!string.IsNullOrEmpty(_data.EndingText))

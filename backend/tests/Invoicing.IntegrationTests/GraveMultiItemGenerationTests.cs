@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,9 +13,11 @@ using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
-/// <summary>A grave with several differently priced items: each recipient's
-/// invoice must keep the items in their configured proportion instead of
-/// levelling every line to the same amount.</summary>
+/// <summary>A grave with several differently priced items: every recipient's
+/// invoice carries the grave's items in their configured proportion, in full —
+/// nothing is levelled to the same amount or split across recipients any more.
+/// The recipient's own amount is what the document works out as their
+/// share.</summary>
 public class GraveMultiItemGenerationTests
 {
     private const decimal ExpensivePrice = 100.00m;
@@ -133,7 +136,7 @@ public class GraveMultiItemGenerationTests
     }
 
     [Fact]
-    public async Task Two_recipients_each_get_half_of_every_line()
+    public async Task Two_recipients_are_billed_the_full_lines_and_share_the_gross_evenly()
     {
         using var host = new ApiTestHost();
         await SeedAsync(host, recipientCount: 2);
@@ -146,25 +149,28 @@ public class GraveMultiItemGenerationTests
         var invoices = await db.Invoices.Include(i => i.Lines).ToListAsync();
         Assert.Equal(2, invoices.Count);
 
+        // 100.00 and 10.00 net cents (10000 and 1000) already divide evenly by 2,
+        // so MakeDivisible bumps neither line: every recipient is billed the
+        // grave's own prices in full.
+        var builder = new DocumentDataBuilder();
         foreach (var invoice in invoices)
         {
             Assert.Equal(50m, invoice.SharePercent);
+            Assert.Equal(2, invoice.RecipientCount);
             Assert.Equal(
-                ExpensivePrice / 2,
+                ExpensivePrice,
                 invoice.Lines.Single(l => l.ItemNumber == "M-100").UnitPrice
             );
-            Assert.Equal(
-                CheapPrice / 2,
-                invoice.Lines.Single(l => l.ItemNumber == "M-010").UnitPrice
-            );
+            Assert.Equal(CheapPrice, invoice.Lines.Single(l => l.ItemNumber == "M-010").UnitPrice);
         }
 
-        // the shares still add up to the grave's full gross: (100 + 10) * 1.07
-        Assert.Equal(11770, invoices.Sum(i => GrossCents(i)));
+        // the two recipients' shares still add up to the grave's full gross:
+        // (100.00 + 10.00) net x 1.07 = 117.70
+        Assert.Equal(117.70m, invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
     }
 
     [Fact]
-    public async Task Three_way_split_distributes_the_remainder_and_stays_exact()
+    public async Task Three_recipients_are_billed_the_bumped_grave_lines_and_share_them_evenly()
     {
         using var host = new ApiTestHost();
         await SeedAsync(host, recipientCount: 3);
@@ -177,17 +183,27 @@ public class GraveMultiItemGenerationTests
         var invoices = await db.Invoices.Include(i => i.Lines).OrderBy(i => i.Id).ToListAsync();
         Assert.Equal(3, invoices.Count);
 
-        // 10000 / 3 = 3333.33 and 1000 / 3 = 333.33: the cent remainders go to the
-        // first recipients, and the nets sum to the grave's 11000 cents exactly
-        Assert.Equal(11000, invoices.Sum(i => NetCents(i)));
+        // 100.00 + 10.00 = 110.00 net at 7 %, or 11000 cents; 11000 % 3 = 2, so
+        // MakeDivisible raises one line's price by a single cent to reach the
+        // nearest multiple of 3, 11001 (3667 cents = 36.67 per recipient) — the
+        // whole point of the bump. Every recipient is billed that same,
+        // already-divisible total; nothing is split between them.
+        Assert.All(invoices, i => Assert.Equal(11001, NetCents(i)));
+        Assert.All(invoices, i => Assert.Equal(3, i.RecipientCount));
 
-        // Each invoice rounds its own VAT, once per line, so three of them come to
-        // 117.68 where a single invoice for the same grave would show 117.70 — under
-        // a cent per line per recipient, which is the trade for documents that add up.
-        Assert.Equal(11768, invoices.Sum(i => GrossCents(i)));
-        Assert.All(invoices, i => Assert.All(i.Lines, l => Assert.True(l.UnitPrice > 0)));
+        // Each recipient's share is 36.67 net (11001 / 3, no remainder). Its VAT
+        // is round(36.67 x 7 / 100, 2) = round(2.5669, 2) = 2.57, a gross of
+        // 39.24. The three invoices round that VAT independently, so together
+        // they come to 117.72 where the grave's own 110.01 net would show
+        // 117.71 as a single invoice — under a cent across recipients, the
+        // trade for documents that each add up on their own.
+        var builder = new DocumentDataBuilder();
+        var shareGrosses = invoices.Select(i => builder.Build(i).Share!.GrossTotal).ToList();
+        Assert.All(shareGrosses, gross => Assert.Equal(39.24m, gross));
+        Assert.Equal(117.72m, shareGrosses.Sum());
 
-        // every invoice keeps the 10:1 ratio between the two items
+        // every invoice keeps the 10:1 ratio between the two items — the bump
+        // adds at most one cent to one of them
         foreach (var invoice in invoices)
         {
             var expensive = invoice.Lines.Single(l => l.ItemNumber == "M-100").UnitPrice;
@@ -201,17 +217,5 @@ public class GraveMultiItemGenerationTests
     private static long NetCents(Invoice invoice) =>
         invoice.Lines.Sum(l =>
             (long)Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)
-        );
-
-    private static long GrossCents(Invoice invoice) =>
-        invoice.Lines.Sum(l =>
-            (long)
-                Math.Round(
-                    Math.Round(l.Count * l.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero)
-                        * (100m + l.VatRate)
-                        / 100m,
-                    0,
-                    MidpointRounding.AwayFromZero
-                )
         );
 }

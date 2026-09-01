@@ -23,6 +23,8 @@ public sealed class DocumentTexts
         netTotal: "Netto gesamt: {0}",
         vatTotal: "MwSt. gesamt: {0}",
         grossTotal: "Gesamtbetrag: {0}",
+        netSumTotal: "Nettosumme gesamt: {0}",
+        sharePart: "Ihr Anteil ({0} %): {1}",
         page: "Seite",
         of: " von "
     );
@@ -41,6 +43,8 @@ public sealed class DocumentTexts
         netTotal: "Net total: {0}",
         vatTotal: "VAT total: {0}",
         grossTotal: "Amount due: {0}",
+        netSumTotal: "Net sum total: {0}",
+        sharePart: "Your share ({0} %): {1}",
         page: "Page",
         of: " of "
     );
@@ -52,6 +56,8 @@ public sealed class DocumentTexts
     private readonly string _netTotal;
     private readonly string _vatTotal;
     private readonly string _grossTotal;
+    private readonly string _netSumTotal;
+    private readonly string _sharePart;
 
     private DocumentTexts(
         CultureInfo culture,
@@ -67,6 +73,8 @@ public sealed class DocumentTexts
         string netTotal,
         string vatTotal,
         string grossTotal,
+        string netSumTotal,
+        string sharePart,
         string page,
         string of
     )
@@ -79,6 +87,8 @@ public sealed class DocumentTexts
         _netTotal = netTotal;
         _vatTotal = vatTotal;
         _grossTotal = grossTotal;
+        _netSumTotal = netSumTotal;
+        _sharePart = sharePart;
         ColumnDescription = description;
         ColumnCount = count;
         ColumnUnitPrice = unitPrice;
@@ -141,4 +151,15 @@ public sealed class DocumentTexts
 
     public string GrossTotal(decimal amount) =>
         string.Format(Culture, _grossTotal, amount.ToString("N2", Culture));
+
+    public string NetSumTotal(decimal amount) =>
+        string.Format(Culture, _netSumTotal, amount.ToString("N2", Culture));
+
+    public string SharePart(decimal percent, decimal amount) =>
+        string.Format(
+            Culture,
+            _sharePart,
+            percent.ToString("0.##", Culture),
+            amount.ToString("N2", Culture)
+        );
 }

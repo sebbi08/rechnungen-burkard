@@ -60,6 +60,49 @@ public class LetterheadTests
         };
     }
 
+    // Same as MultiPageData, but with a grave share: the extra summary rows the
+    // share block adds (the 100 % net sum, "Ihr Anteil", one VAT line per rate)
+    // are exactly the content CLAUDE.md warns can push the content band one
+    // millimetre past what page.Background() reserves, which drops the
+    // letterhead from every continuation page without complaint.
+    private static InvoiceDocumentData MultiPageShareData()
+    {
+        var data = MultiPageData();
+        data.Share = new InvoiceDocumentData.ShareData(
+            33.33m,
+            133.33m,
+            new[] { new InvoiceDocumentData.VatSummary(19.0m, 133.33m, 25.33m, 158.66m) },
+            25.33m,
+            158.66m
+        );
+        return data;
+    }
+
+    [Fact]
+    public void The_share_block_does_not_push_the_letterhead_off_continuation_pages()
+    {
+        var pdf = DocumentService.GeneratePdf(MultiPageShareData(), isCopy: false);
+
+        using var document = PdfDocument.Open(pdf);
+        var pages = document.GetPages().ToList();
+
+        Assert.True(pages.Count > 1, $"expected a multi-page invoice, got {pages.Count} page(s)");
+        Assert.All(
+            pages,
+            page =>
+            {
+                var images = page.GetImages().ToList();
+                Assert.Equal(2, images.Count);
+                Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
+                Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
+            }
+        );
+
+        // the share block itself only has to appear once, wherever the summary
+        // column lands
+        Assert.Contains("33,33", string.Join("\n", pages.Select(p => p.Text)));
+    }
+
     // Only the artwork that cannot be set as text is an image: the rose cluster with
     // the Burkard script it overlaps, and the rose beside the bank details.
     [Fact]

@@ -62,6 +62,32 @@ public sealed class DocumentDataBuilder
         var texts = DocumentTexts.For(invoice.Language);
         var shareText = invoice.SharePercent is { } percent ? texts.ShareText(percent) : null;
 
+        // A grave invoice generated since the lines became the grave's own: the
+        // recipient pays a share of them, and their VAT is worked out from that
+        // share rather than from the whole. MakeDivisible guarantees each rate's
+        // net divides exactly, so no rounding happens here.
+        InvoiceDocumentData.ShareData? share = null;
+        if (invoice.RecipientCount is { } recipients && recipients > 0)
+        {
+            var shareSummaries = summaries
+                .Select(s =>
+                {
+                    var net = s.NetTotal / recipients;
+                    var vat = Math.Round(net * s.Rate / 100m, 2, MidpointRounding.AwayFromZero);
+                    return new InvoiceDocumentData.VatSummary(s.Rate, net, vat, net + vat);
+                })
+                .ToArray();
+            var shareNet = shareSummaries.Sum(s => s.NetTotal);
+            var shareVat = shareSummaries.Sum(s => s.VatAmount);
+            share = new InvoiceDocumentData.ShareData(
+                100m / recipients,
+                shareNet,
+                shareSummaries,
+                shareVat,
+                shareNet + shareVat
+            );
+        }
+
         return new InvoiceDocumentData
         {
             InvoiceNumber = invoice.InvoiceNumber,
@@ -77,6 +103,7 @@ public sealed class DocumentDataBuilder
             NetTotal = netTotalCents / 100m,
             TotalVat = vatTotalCents / 100m,
             GrossTotal = (netTotalCents + vatTotalCents) / 100m,
+            Share = share,
         };
     }
 }
