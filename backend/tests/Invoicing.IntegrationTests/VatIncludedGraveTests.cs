@@ -28,12 +28,6 @@ public class VatIncludedGraveTests
     private const decimal ExpectedGraveNet = 100.840m;
     private const decimal ExpectedShareGross = 60.00m;
 
-    // Only the revision path (GraveInvoiceRevisionService, still on the old
-    // per-line splitter — Task 5's territory) stores a recipient's own net
-    // directly on the line: 10 084 net cents split across 2 recipients is 5 042
-    // cents each, a unit price of 50,420.
-    private const decimal ExpectedRevisionShareNet = 50.420m;
-
     private static async Task<long> SeedAsync(ApiTestHost host)
     {
         using var scope = host.Services.CreateScope();
@@ -239,8 +233,8 @@ public class VatIncludedGraveTests
             itemId = await db.InvoiceItems.Select(i => i.Id).FirstAsync();
         }
 
-        // the dialog opens on GraveUnitPrice (100,840) and shows it as 120,00;
-        // sending that back untouched must reproduce the same split
+        // the dialog opens on the grave's own line (100,840) and shows it as
+        // 120,00 gross; sending that back untouched must reproduce the same shares
         var response = await client.PostAsync(
             "/odata/CreateGraveInvoiceRevision",
             ODataJson.Body(
@@ -274,8 +268,13 @@ public class VatIncludedGraveTests
         var builder = new DocumentDataBuilder();
         foreach (var revision in revisions)
         {
-            Assert.Equal(ExpectedRevisionShareNet, Assert.Single(revision.Lines).UnitPrice);
-            Assert.Equal(ExpectedShareGross, builder.Build(revision).GrossTotal);
+            var line = Assert.Single(revision.Lines);
+            // the revision carries the grave's own net in full, exactly as
+            // generation does — nothing is split any more
+            Assert.Equal(ExpectedGraveNet, line.UnitPrice);
+            Assert.Null(line.GraveUnitPrice);
+            Assert.Equal(2, revision.RecipientCount);
+            Assert.Equal(ExpectedShareGross, builder.Build(revision).Share!.GrossTotal);
         }
     }
 }
