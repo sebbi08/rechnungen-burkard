@@ -144,7 +144,10 @@
                         <Column importance="Medium" popinDisplay="Inline">
                             <Text text="{i18n>grossTotal}" />
                         </Column>
-                        <Column width="11rem" importance="Low" popinDisplay="WithoutHeader" />
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>paidStatus}" />
+                        </Column>
+                        <Column width="13rem" importance="Low" popinDisplay="WithoutHeader" />
                     </columns>
                     <items>
                         <ColumnListItem>
@@ -163,6 +166,11 @@
                                 />
                                 <Text
                                     text="{path: 'grave>GrossTotal', formatter: '.formatAmount'}"
+                                />
+                                <ObjectStatus
+                                    text="{path: 'grave>PaidOn', formatter: '.paidStatusText'}"
+                                    state="{path: 'grave>PaidOn', formatter: '.paidStatusState'}"
+                                    stateAnnouncementText="{path: 'grave>PaidOn', formatter: '.paidStatusAnnouncement'}"
                                 />
                                 <HBox wrap="Wrap">
                                     <Button
@@ -186,8 +194,15 @@
                                     <Button
                                         icon="sap-icon://edit"
                                         type="Transparent"
-                                        tooltip="{i18n>actionEdit}"
+                                        enabled="{path: 'grave>PaidOn', formatter: '.paidEditEnabled'}"
+                                        tooltip="{path: 'grave>PaidOn', formatter: '.paidEditTooltip'}"
                                         press=".onEditGraveInvoice"
+                                    />
+                                    <Button
+                                        icon="{path: 'grave>PaidOn', formatter: '.paidActionIcon'}"
+                                        type="Transparent"
+                                        tooltip="{path: 'grave>PaidOn', formatter: '.paidActionTooltip'}"
+                                        press=".onToggleInvoicePaid"
                                     />
                                 </HBox>
                             </cells>

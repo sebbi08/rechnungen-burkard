@@ -42,6 +42,23 @@
                         <OverflowToolbarLayoutData priority="Low" group="1" />
                     </layoutData>
                 </Select>
+                <Label text="{i18n>paymentFilter}" labelFor="paymentFilter">
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="2" />
+                    </layoutData>
+                </Label>
+                <Select
+                    id="paymentFilter"
+                    width="10rem"
+                    change=".onPaymentFilterChange"
+                    selectedKey="{view>/paymentFilter}"
+                >
+                    <core:Item key="all" text="{i18n>paymentFilterAll}" />
+                    <core:Item key="unpaid" text="{i18n>paymentFilterUnpaid}" />
+                    <layoutData>
+                        <OverflowToolbarLayoutData priority="Low" group="2" />
+                    </layoutData>
+                </Select>
                 <ToolbarSpacer />
                 <Button text="{i18n>bulkGraveInvoices}" press=".onBulkGraveInvoices">
                     <layoutData>
@@ -88,6 +105,9 @@
                     <Column importance="High" popinDisplay="Inline">
                         <Text text="{i18n>invoicingStatus}" />
                     </Column>
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>paidStatus}" />
+                    </Column>
                     <Column width="7rem" importance="Low" popinDisplay="WithoutHeader" />
                 </columns>
                 <items>
@@ -101,6 +121,14 @@
                                 stateAnnouncementText="{path: 'status>Invoiced', formatter: '.statusAnnouncement'}"
                                 state="{= ${status>Invoiced} ? 'Success' : 'Error' }"
                                 icon="{= ${status>Invoiced} ? 'sap-icon://accept' : 'sap-icon://error' }"
+                            />
+                            <!-- empty while the half-year has no invoice: the
+                                 status beside it already reports that in red -->
+                            <ObjectStatus
+                                text="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentText'}"
+                                state="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentState'}"
+                                stateAnnouncementText="{parts: ['status>InvoiceCount', 'status>PaidCount'], formatter: '.paymentAnnouncement'}"
+                                visible="{= ${status>InvoiceCount} > 0}"
                             />
                             <HBox wrap="Wrap">
                                 <Button

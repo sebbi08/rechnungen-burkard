@@ -18,16 +18,19 @@ public sealed class InvoiceService
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly IClock _clock;
 
     public InvoiceService(
         AppDbContext db,
         InvoiceNumberService numbers,
-        InvoiceDocumentFactory documentFactory
+        InvoiceDocumentFactory documentFactory,
+        IClock clock
     )
     {
         _db = db;
         _numbers = numbers;
         _documentFactory = documentFactory;
+        _clock = clock;
     }
 
     public async Task<Invoice> CreateAsync(
@@ -79,6 +82,18 @@ public sealed class InvoiceService
             throw new ValidationException(
                 "GraveInvoiceRevisionRequired",
                 "A grave invoice must be revised for all of its recipients at once."
+            );
+        }
+
+        // A paid invoice is settled; revising it would move the ground under a
+        // payment that already happened. The chain is what matters, not the row
+        // that was passed: only its latest revision can carry a mark, and an
+        // older revision may well be the one handed in.
+        if (await _db.Invoices.AnyAsync(i => i.RootId == edited.RootId && i.PaidOn != null, ct))
+        {
+            throw new ValidationException(
+                "InvoicePaid",
+                "The invoice is paid and cannot be revised."
             );
         }
 
@@ -151,6 +166,39 @@ public sealed class InvoiceService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return revision;
+    }
+
+    /// <summary>Marks an invoice paid on the current local date — "today" here is
+    /// the user's day, not UTC's — or takes the mark back. Marking an invoice
+    /// that already carries a date keeps that date, so a double click cannot
+    /// move a recorded payment day.</summary>
+    public async Task<Invoice> SetPaidAsync(long invoiceId, bool paid, CancellationToken ct)
+    {
+        var invoice =
+            await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
+            ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
+
+        // Lists show latest revisions only. A superseded row can only be reached
+        // deliberately, and a mark on it would sit where nothing displays it.
+        if (!invoice.IsLatestRevision)
+        {
+            throw new ValidationException(
+                "NotLatestRevision",
+                "Only the latest revision of an invoice can be marked as paid."
+            );
+        }
+
+        if (paid)
+        {
+            invoice.PaidOn ??= DateOnly.FromDateTime(_clock.GetLocalNow());
+        }
+        else
+        {
+            invoice.PaidOn = null;
+        }
+
+        await _db.SaveChangesAsync(ct);
+        return invoice;
     }
 
     private async Task<List<InvoiceLine>> BuildLinesAsync(

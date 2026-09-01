@@ -104,6 +104,7 @@ export default abstract class InvoiceRevisions extends BaseController {
           : "",
       sharePercent: latest.SharePercent != null ? Number(latest.SharePercent) : null,
       revisions,
+      paidOn: latest.PaidOn,
     };
   }
 

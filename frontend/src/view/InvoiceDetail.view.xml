@@ -14,7 +14,23 @@
         class="sapUiResponsiveContentPadding"
     >
         <headerContent>
-            <Button icon="sap-icon://edit" tooltip="{i18n>actionEdit}" press=".onEditInvoice" />
+            <ObjectStatus
+                text="{path: 'detail>/paidOn', formatter: '.paidStatusText'}"
+                state="{path: 'detail>/paidOn', formatter: '.paidStatusState'}"
+                stateAnnouncementText="{path: 'detail>/paidOn', formatter: '.paidStatusAnnouncement'}"
+                class="sapUiSmallMarginEnd"
+            />
+            <Button
+                icon="{path: 'detail>/paidOn', formatter: '.paidActionIcon'}"
+                tooltip="{path: 'detail>/paidOn', formatter: '.paidActionTooltip'}"
+                press=".onTogglePaid"
+            />
+            <Button
+                icon="sap-icon://edit"
+                enabled="{path: 'detail>/paidOn', formatter: '.paidEditEnabled'}"
+                tooltip="{path: 'detail>/paidOn', formatter: '.paidEditTooltip'}"
+                press=".onEditInvoice"
+            />
         </headerContent>
         <content>
             <VBox class="sapUiSmallMarginTop">

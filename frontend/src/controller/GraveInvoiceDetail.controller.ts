@@ -26,7 +26,7 @@ export default class GraveInvoiceDetail extends GraveEdit {
     await this.refresh();
   }
 
-  private async refresh(): Promise<void> {
+  protected async refresh(): Promise<void> {
     try {
       const chain = await this.loadChain(this._rootId);
       if (!chain.length) {
@@ -68,6 +68,18 @@ export default class GraveInvoiceDetail extends GraveEdit {
       return;
     }
     await this.openGraveInvoiceDialog(invoiceId);
+  }
+
+  public async onTogglePaid(): Promise<void> {
+    const model = this.state<RevisionDetailView>("detail");
+    const invoiceId = model.getProperty("/latestInvoiceId");
+    if (invoiceId == null) {
+      return;
+    }
+
+    if (await this.togglePaid(invoiceId, model.getProperty("/paidOn"))) {
+      await this.refresh();
+    }
   }
 
   /** Both dialogs answer here; only the grave-invoice one is reachable from

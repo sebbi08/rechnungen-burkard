@@ -266,6 +266,71 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await expect(revisionRow.getByText("R1", { exact: true })).toBeVisible();
 });
 
+test("the list shows the invoice date, and marks revisions only (Story 9)", async ({ page }) => {
+  const ts = Date.now();
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `DAT-${ts}`,
+    Description: "E2E Datum",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const plain = await createRow(page, "/odata/Recipients", {
+    Name: `Datum Original ${ts}`,
+    Address: "Musterweg 1",
+  });
+  const revised = await createRow(page, "/odata/Recipients", {
+    Name: `Datum Revision ${ts}`,
+    Address: "Musterweg 2",
+  });
+
+  const createInvoice = async (recipientId: number): Promise<number> => {
+    const response = await page.request.post("/odata/CreateInvoice", {
+      data: { recipientId, lines: [{ itemId: item.Id, count: 1, unitPrice: 100 }] },
+    });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).Id as number;
+  };
+
+  await createInvoice(plain.Id);
+  const revisedId = await createInvoice(revised.Id);
+  const revision = await page.request.post("/odata/CreateRevision", {
+    data: {
+      invoiceId: revisedId,
+      recipientId: revised.Id,
+      lines: [{ itemId: item.Id, count: 2, unitPrice: 100 }],
+    },
+  });
+  expect(revision.ok()).toBe(true);
+
+  await page.goto("/index.html#/invoices");
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+
+  // Cells follow the column order: invoice number, recipient, date, revision,
+  // payment, actions — after one leading spacer cell the table renders itself.
+  const DATE = 3;
+  const REVISION = 4;
+
+  // Both bindings read OData-typed properties through a formatter or an
+  // expression. UI5 converts the value to the target property's type *before*
+  // the formatter runs, and a failed conversion is swallowed, leaving the
+  // control at its default — an empty date and a revision marker that is
+  // always visible. Neither symptom raises an error, so only an assertion
+  // catches it.
+  const original = invoicesTable.locator("tbody tr", { hasText: `Datum Original ${ts}` }).first();
+  await expect(original).toBeVisible();
+  await expect(original.locator("td").nth(DATE)).toHaveText(/^\d{1,2}\.\d{1,2}\.\d{4}$/);
+  // an original carries no revision marker at all
+  await expect(original.locator("td").nth(REVISION)).toHaveText("");
+
+  const revisionRow = invoicesTable
+    .locator("tbody tr", { hasText: `Datum Revision ${ts}` })
+    .first();
+  await expect(revisionRow).toBeVisible();
+  await expect(revisionRow.locator("td").nth(DATE)).toHaveText(/^\d{1,2}\.\d{1,2}\.\d{4}$/);
+  await expect(revisionRow.locator("td").nth(REVISION)).toContainText("R1");
+});
+
 /** Seeds a VAT rate, one item and one recipient, all unique to this test. */
 async function seedOwnMasterData(
   page: Page,
@@ -287,12 +352,30 @@ async function seedOwnMasterData(
   return { itemNumber, recipientName, recipientId: recipient.Id };
 }
 
-/** Invoices whose snapshotted recipient name matches, by name rather than id:
- *  the caller knows what the dialog displayed, not which row it came from. */
-async function countInvoicesFor(page: Page, recipientName: string): Promise<number> {
-  const filter = encodeURIComponent(`RecipientName eq '${recipientName.replace(/'/g, "''")}'`);
-  const response = await page.request.get(`/odata/Invoices?$filter=${filter}&$select=Id`);
-  return ((await response.json()).value as unknown[]).length;
+/**
+ * The id of the recipient the dialog currently has selected.
+ *
+ * Read off the control instead of resolved from the name it displays, because
+ * the name does not hold still: `masterdata.spec.ts` renames its recipient
+ * ("Vorher ..." to "Geaendert ...") while this spec runs beside it, and a
+ * reopened dialog starts on whichever recipient is newest -- which can be that
+ * one. An invoice snapshots the recipient's name as it is saved, so a rename
+ * landing between this read and the save leaves the new invoice carrying a name
+ * this test never saw, and counting by name then finds nothing. Ids do not move.
+ */
+async function shownRecipientId(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const registry = (
+      window as unknown as {
+        sap?: { ui?: { core?: { Element?: { registry?: { all(): object } } } } };
+      }
+    ).sap?.ui?.core?.Element?.registry;
+    const combo = Object.values(registry!.all()).find(
+      (control: any) =>
+        control.isA?.("sap.m.ComboBox") && String(control.getId()).endsWith("--recipient"),
+    ) as any;
+    return Number(combo.getSelectedKey());
+  });
 }
 
 async function countInvoices(page: Page, recipientId: number): Promise<number> {
@@ -327,13 +410,14 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // recipient field. *Which* recipient it shows is not this test's business — a
   // reopened dialog carries no draft selection, so the dialog starts on the
   // newest recipient, and a spec running beside this one may have created one
-  // since. What must hold is that the save invoices exactly the recipient on
-  // screen.
+  // since, or renamed it. What must hold is that the save invoices exactly the
+  // recipient on screen, which is why the assertion follows its id.
   await page.getByRole("button", { name: "Rechnung erstellen" }).click();
   await waitForDialogOpen(page);
   const shown = (await recipientField(page).inputValue()).trim();
   expect(shown).not.toBe("");
-  const before = await countInvoicesFor(page, shown);
+  const shownId = await shownRecipientId(page);
+  const before = await countInvoices(page, shownId);
 
   await fillLine(page, itemNumber);
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -341,7 +425,7 @@ test("the second invoice goes to the recipient the reopened dialog shows", async
   // before the fix the second save sent recipient 0 and the backend answered
   // "Der Empfänger wurde nicht gefunden", because the fresh draft never picked
   // up the shown selection
-  await expect.poll(() => countInvoicesFor(page, shown)).toBe(before + 1);
+  await expect.poll(() => countInvoices(page, shownId)).toBe(before + 1);
 });
 
 test("a double click on save creates one invoice, not two", async ({ page }) => {
@@ -428,7 +512,7 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await search.press("Enter");
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
-  // the four row actions are icon-only, named by their tooltips
+  // the five row actions are icon-only, named by their tooltips
   const row = invoicesTable.locator("tbody tr", { hasText: recipientName });
   for (const name of ["Details", "Rechnung herunterladen", "Kopie herunterladen", "Bearbeiten"]) {
     await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
@@ -437,4 +521,80 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   // details opens the revision page for that invoice
   await row.getByRole("button", { name: "Details", exact: true }).click();
   await expect(page.getByText("Original", { exact: true })).toBeVisible();
+});
+
+test("mark an invoice paid, filter by payment, and take it back (Story 4)", async ({ page }) => {
+  // its own recipient and item, unique to this run: the unpaid-filter
+  // assertion below would otherwise catch the invoice the first test in this
+  // file leaves behind for the shared RECIPIENT_NAME, which stays unpaid
+  const ts = Date.now();
+  const recipientName = `Zahlung ${ts}`;
+  const itemNumber = `9006-${ts}`;
+  await page.request.post("/odata/VatRates", {
+    data: { Rate: 7 },
+  });
+  await page.request.post("/odata/InvoiceItems", {
+    data: {
+      Number: itemNumber,
+      Description: "E2E Zahlung",
+      VatRate: 7,
+      DefaultPrice: null,
+    },
+  });
+  await page.request.post("/odata/Recipients", {
+    data: {
+      Name: recipientName,
+      Address: "Zahlungsweg 1\n12345 Zahlungsstadt",
+    },
+  });
+
+  await page.goto("/index.html#/invoices");
+  const invoicesTable = page.locator("[id$='invoicesTable-listUl']");
+
+  // a row of this run's own, so the assertions below cannot pick up an invoice
+  // another spec or an earlier run created
+  await page.getByRole("button", { name: "Rechnung erstellen" }).click();
+  await waitForDialogOpen(page);
+  await pickRecipient(page, recipientName);
+  const lineInput = page.locator(".sapMDialog input[id*='lineItem'][id$='-inner']");
+  await lineInput.click();
+  await lineInput.fill(itemNumber);
+  await suggestions(page, "lineItem").filter({ hasText: itemNumber }).click();
+  await page.getByLabel("Anzahl").fill("1");
+  await page.getByLabel("Preis").fill("50");
+  await page.getByRole("button", { name: "Speichern" }).click();
+
+  const row = invoicesTable.locator("tbody tr", { hasText: recipientName }).first();
+  await expect(row).toContainText("unbezahlt");
+
+  await row.getByRole("button", { name: "Als bezahlt markieren", exact: true }).click();
+  await expect(row).toContainText("bezahlt");
+  await expect(row).not.toContainText("unbezahlt");
+  // a paid invoice cannot be revised, so its edit button is dead — and its
+  // tooltip (the accessible name of this icon-only button) names the reason
+  // instead of staying "Bearbeiten", which is what disables it here
+  await expect(
+    row.getByRole("button", {
+      name: "Eine bezahlte Rechnung kann nicht bearbeitet werden.",
+      exact: true,
+    }),
+  ).toBeDisabled();
+
+  // the unpaid filter drops it, the paid filter keeps it
+  const paymentFilter = page.locator("[id$='paymentFilter']");
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Nur unbezahlte" }).click();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(0);
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Nur bezahlte" }).click();
+  await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toHaveCount(1);
+  await paymentFilter.click();
+  await page.getByRole("option", { name: "Alle" }).click();
+
+  // taking the payment back asks first
+  await row.getByRole("button", { name: "Zahlung zurücknehmen", exact: true }).click();
+  await waitForDialogOpen(page);
+  await page.locator(".sapMDialog.sapMMessageBox").getByRole("button", { name: "OK" }).click();
+  await expect(row).toContainText("unbezahlt");
+  await expect(row.getByRole("button", { name: "Bearbeiten", exact: true })).toBeEnabled();
 });

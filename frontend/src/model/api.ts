@@ -83,6 +83,9 @@ const CODE_TO_I18N: Record<string, string> = {
   NotAGraveInvoice: "errorNotAGraveInvoice",
   GraveInvoiceGroupInconsistent: "errorGraveInvoiceGroupInconsistent",
   GraveInvoiceRevisionRequired: "errorGraveInvoiceRevisionRequired",
+  InvoicePaid: "errorInvoicePaid",
+  GraveInvoicePaid: "errorGraveInvoicePaid",
+  NotLatestRevision: "errorNotLatestRevision",
 };
 
 /**
@@ -198,6 +201,11 @@ export async function createRevision(
   await ensureOk(await post("/odata/CreateRevision", { invoiceId, recipientId, lines }));
 }
 
+/** Marks an invoice paid — the backend stamps the day — or takes the mark back. */
+export async function setInvoicePaid(invoiceId: number, paid: boolean): Promise<void> {
+  await ensureOk(await post("/odata/SetInvoicePaid", { invoiceId, paid }));
+}
+
 export async function fetchDocuments(invoiceId: number): Promise<DocumentDto[]> {
   // only the id and file name are needed for the download links; keep the
   // PDF blobs out of the response
@@ -303,6 +311,10 @@ export interface GraveStatusRow {
   StartDate: string;
   EndDate: string;
   Invoiced: boolean;
+  /** Latest-revision invoices this grave has for the requested half-year, and
+   *  how many of them are paid. Both 0 when it was never invoiced for it. */
+  InvoiceCount: number;
+  PaidCount: number;
 }
 
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
@@ -452,6 +464,9 @@ export interface InvoiceRow {
   RecipientName: string;
   RecipientAddress: string;
   GeneratedAt: string;
+  /** An Edm.Date ("2026-08-31") when the invoice is paid, null while it is not.
+   *  Only ever read as a null check: the date is stored, never shown. */
+  PaidOn: string | null;
   GraveId: number | null;
   PeriodYear: number | null;
   PeriodHalf: number | null;
@@ -567,6 +582,7 @@ export interface GraveInvoiceRecipient {
   Id: number;
   Name: string;
   InvoiceId: number;
+  Paid: boolean;
   RootId: number;
 }
 

@@ -203,6 +203,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("PeriodHalf")
                         .HasColumnType("INTEGER");
 
@@ -243,7 +246,7 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasIndex("RootId");
 
-                    b.HasIndex("GraveId", "IsLatestRevision");
+                    b.HasIndex("GraveId", "IsLatestRevision", "PaidOn");
 
                     b.HasIndex("Year", "Sequence", "RevisionNumber")
                         .IsUnique();

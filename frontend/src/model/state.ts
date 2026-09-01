@@ -35,6 +35,12 @@ export interface ItemsView {
   searchTerm: string | null;
 }
 
+/** The invoice overview's toolbar state. */
+export interface InvoicesView {
+  /** "all" | "unpaid" | "paid" — the payment filter's key. */
+  paymentFilter: string;
+}
+
 export interface ItemDraft {
   /** null while creating, the item's id while editing. */
   id: number | null;
@@ -81,6 +87,8 @@ export interface GravesView {
   halfYearOptions: YearHalfOption[];
   /** "2026-1" — year and half, as the select's key. */
   halfYear: string;
+  /** "all" | "unpaid" — the payment filter's key. */
+  paymentFilter: string;
 }
 
 export interface GenerateDraft {
@@ -170,6 +178,8 @@ export interface RevisionDetailView {
   shareText: string;
   /** The siblings of this half-year, minus the invoice being shown. */
   others: GraveInvoiceRecipient[];
+  /** The latest revision's payment mark; null while it is unpaid. */
+  paidOn: string | null;
 }
 
 /** A detail page with nothing to show: an unknown or deleted invoice. */
@@ -189,5 +199,6 @@ export function emptyRevisionDetail(): RevisionDetailView {
     graveNumber: "",
     shareText: "",
     others: [],
+    paidOn: null,
   };
 }

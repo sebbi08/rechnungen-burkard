@@ -119,6 +119,7 @@ public class GraveInvoiceGroupController : ODataController
                 Name = s.RecipientName,
                 InvoiceId = s.Id,
                 RootId = s.RootId,
+                Paid = s.PaidOn != null,
             }),
             Lines = GraveLines(orderedLines)
                 .Select(l => new

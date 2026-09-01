@@ -2,6 +2,7 @@ import type { Button$PressEvent } from "sap/m/Button";
 import BusyDialog from "sap/m/BusyDialog";
 import type { ComboBox$SelectionChangeEvent } from "sap/m/ComboBox";
 import Dialog from "sap/m/Dialog";
+import MessageBox from "sap/m/MessageBox";
 import TypedJSONModel from "sap/ui/model/json/TypedJSONModel";
 import * as api from "../model/api";
 import type { DraftLine, GraveDraft, GraveInvoiceDraft, QuickRecipientDraft } from "../model/state";
@@ -260,6 +261,20 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       group = await api.fetchGraveInvoiceGroup(invoiceId);
     } catch (error) {
       api.showError(this, error);
+      return;
+    }
+
+    // One edit revises every recipient of the half-year, so one paid recipient
+    // blocks all of them. The group knows who they are; saying so here beats
+    // letting the user fill a dialog the backend will refuse.
+    const paid = group.Recipients.filter((recipient) => recipient.Paid);
+    if (paid.length) {
+      MessageBox.error(
+        this.i18nText("errorGraveInvoicePaidNames").replace(
+          "{0}",
+          paid.map((recipient) => recipient.Name).join(", "),
+        ),
+      );
       return;
     }
 

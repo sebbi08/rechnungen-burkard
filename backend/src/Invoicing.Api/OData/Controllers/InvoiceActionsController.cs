@@ -187,6 +187,49 @@ public class InvoiceActionsController : ODataController
         }
     }
 
+    [HttpPost("SetInvoicePaid")]
+    public async Task<IActionResult> SetInvoicePaid([FromBody] SetInvoicePaidRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
+        }
+
+        try
+        {
+            var invoice = await _service.SetPaidAsync(
+                request.InvoiceId,
+                request.Paid,
+                HttpContext.RequestAborted
+            );
+            return Ok(invoice);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "SetInvoicePaid failed");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
+        }
+    }
+
     [HttpPost("GenerateGraveInvoices")]
     public async Task<IActionResult> GenerateGraveInvoices(
         [FromBody] GenerateGraveInvoicesRequest? request
@@ -285,5 +328,11 @@ public class InvoiceActionsController : ODataController
         /// <summary>Grave-level lines: the grave's count at the grave's price,
         /// before the even split across its recipients.</summary>
         public List<InvoiceLineInput> Lines { get; set; } = new();
+    }
+
+    public sealed class SetInvoicePaidRequest
+    {
+        public long InvoiceId { get; set; }
+        public bool Paid { get; set; }
     }
 }

@@ -605,6 +605,26 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-068**: Users MUST be able to search invoices by invoice number, recipient
   name, recipient address, invoice date, and invoice total.
 
+**Payment status**
+
+- **FR-069**: Users MUST be able to mark any invoice, including a grave invoice,
+  as paid, and to take that mark back.
+- **FR-070**: The system MUST record the day an invoice was marked paid. The user
+  interface MUST show only whether an invoice is paid, never that day.
+- **FR-071**: Marking an invoice paid MUST apply to the individual invoice. Each
+  recipient of a grave's half-year MUST be markable independently.
+- **FR-072**: Taking a payment mark back MUST require a confirmation.
+- **FR-073**: The system MUST refuse to revise an invoice that is marked paid.
+- **FR-074**: The system MUST refuse to edit a grave invoice while any recipient
+  of that grave and half-year is marked paid, and MUST name those recipients.
+- **FR-075**: Only the latest revision of an invoice MUST be markable as paid.
+- **FR-076**: The invoice list MUST be filterable by payment status.
+- **FR-077**: The grave overview MUST show, for the selected half-year, whether a
+  grave's invoices are unpaid, partly paid or paid; for a half-year with no
+  invoice at all, this MUST show nothing, since the invoicing-status column
+  beside it already reports that. The overview MUST be filterable to the
+  graves that still have an unpaid invoice in that half-year.
+
 ### Key Entities _(include if feature involves data)_
 
 - **Recipient**: A person or organization; has a recipient number, a name, and an

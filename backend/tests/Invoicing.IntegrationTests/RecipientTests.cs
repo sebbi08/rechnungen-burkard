@@ -50,4 +50,47 @@ public class RecipientTests : IClassFixture<ApiTestHost>
             json.RootElement.GetProperty("error").GetProperty("code").GetString()
         );
     }
+
+    /// <summary>Several clients creating a recipient at once each read the next
+    /// free number before any of them has saved, and the unique index on
+    /// Recipients.Number rejects all but the first. Every request must still end
+    /// up with a recipient of its own: before the retry the losers of the race
+    /// came back as unhandled 500s.</summary>
+    [Fact]
+    public async Task Concurrent_creates_each_get_their_own_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var responses = await Task.WhenAll(
+            Enumerable
+                .Range(0, 8)
+                .Select(i =>
+                    client.PostAsync(
+                        "/odata/Recipients",
+                        ODataJson.Body(
+                            new { Name = $"Gleichzeitig {i}", Address = "Hauptstraße 1" }
+                        )
+                    )
+                )
+        );
+
+        Assert.All(
+            responses,
+            response => Assert.Equal(HttpStatusCode.Created, response.StatusCode)
+        );
+
+        var list = await client.GetAsync(
+            "/odata/Recipients?$filter=startswith(Name,'Gleichzeitig')&$select=Number"
+        );
+        list.EnsureSuccessStatusCode();
+        using var json = await ODataJson.ReadAsync(list);
+        var numbers = json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(entry => entry.GetProperty("Number").GetString())
+            .ToList();
+        Assert.Equal(8, numbers.Count);
+        Assert.Equal(8, numbers.Distinct().Count());
+    }
 }
