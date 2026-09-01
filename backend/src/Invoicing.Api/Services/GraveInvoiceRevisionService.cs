@@ -163,7 +163,13 @@ public sealed class GraveInvoiceRevisionService
 
     /// <summary>The grave's lines from what the dialog sent: the full count at the
     /// full price, before GraveShare.MakeDivisible raises it for divisibility
-    /// across the recipients.</summary>
+    /// across the recipients.
+    ///
+    /// The order is the request body's, preserved line for line — nothing here
+    /// re-sorts or groups. That matters because line order decides which line
+    /// takes a cent under MakeDivisible's tie-break: the dialog opens on
+    /// GraveInvoiceGroup's lines, which come back ordered by line number, so
+    /// sending them back unchanged reproduces the same split.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
         IReadOnlyList<InvoiceLineInput> inputs,
         CancellationToken ct

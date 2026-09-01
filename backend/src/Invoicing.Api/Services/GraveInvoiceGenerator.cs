@@ -43,8 +43,13 @@ public sealed class GraveInvoiceGenerator
             .Select(r => r.Recipient)
             .ToListAsync(ct);
 
+        // ordered explicitly for the same reason: line order decides which line
+        // takes a cent under GraveShare's tie-break, so leaving it to SQLite's
+        // unspecified row order would make the split depend on something outside
+        // our own code, which is exactly what the tie-break exists to avoid.
         var graveItems = await _db
             .GraveItems.Where(i => i.GraveId == grave.Id)
+            .OrderBy(i => i.Id)
             .Include(i => i.Item)
             .ToListAsync(ct);
 
