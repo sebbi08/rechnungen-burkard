@@ -727,6 +727,10 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   await page.goto(`/index.html#/graves/${graveId}`);
   // the grave's own item list shows the gross and says so
   await expect(page.getByText("inkl. MwSt.").first()).toBeVisible();
+  // this half-year (2036/2) is not today's, so the page falls back to the
+  // grave's configuration — its price is stored as typed (the gross, for a
+  // VAT-included line), no conversion needed to show 119,00 here
+  await expect(page.getByText("119,00 €")).toBeVisible();
 
   // 119,00 gross at 7 % is a net of 111,215; halved that is 55,61 net and
   // 59,50 gross each — 119,00 together, the price that was entered
@@ -749,6 +753,38 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   // saved back untouched, every share stays where it was
   await dialog.getByRole("button", { name: "Speichern" }).click();
   await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+});
+
+test("the grave detail page shows this half-year's billed price once it is today's", async ({
+  page,
+}) => {
+  const marker = `GC-${Date.now()}`;
+  const names = [`Uwe ${marker}`, `Vroni ${marker}`, `Wanda ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, [
+    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.8, count: 1 },
+    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+  ]);
+
+  // The file's first test already invoiced most graves for CURRENT_YEAR/
+  // CURRENT_HALF, but GenerateGraveInvoices only refuses a request once
+  // *every* grave has a run for that period — this grave, seeded just above,
+  // does not, so the request is accepted and the job invoices only the graves
+  // still missing a run, this one included.
+  await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  // the grave detail page has no half-year selector: it always shows what was
+  // billed for the half-year today falls in, once that exists. Here the 19%
+  // subtotal (49,90 + 47,80 = 97,70) does not divide by three, so a cent lands
+  // on the cheapest, count-1 line — Grabstein reinigen must read 47,81, not
+  // the grave's configured 47,80. This is the assertion that would have failed
+  // before GraveDetail.controller.ts read the invoice's lines instead of the
+  // grave's configuration: reverting that change back to always use
+  // details.Items would put 47,80 back here and turn this red.
+  await expect(page.getByText("47,81 €")).toBeVisible();
+  await expect(page.getByText("47,80 €")).not.toBeVisible();
 });
 
 test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {
