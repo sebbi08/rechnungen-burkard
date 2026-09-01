@@ -150,10 +150,20 @@ internal sealed class InvoiceDocument : IDocument
                         .AlignRight()
                         .Column(summary =>
                         {
-                            foreach (var vat in _data.VatSummaries)
+                            // Only the invoice's own per-rate block, never both. On a
+                            // grave invoice the 100 % rows are not what anyone is
+                            // billed, and printing them beside the share's rows put
+                            // two different amounts under one "MwSt. 7 %" label on a
+                            // tax document, with nothing saying which is the invoiced
+                            // tax. The per-rate split stays visible either way: the
+                            // share block prints its own rows.
+                            if (_data.Share is null)
                             {
-                                summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
-                                summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                foreach (var vat in _data.VatSummaries)
+                                {
+                                    summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
+                                    summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                }
                             }
 
                             if (_data.Share is { } share)
