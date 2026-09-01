@@ -30,7 +30,10 @@ mode so invoices generated before this change still reproduce exactly.
 - **Documents must stay reproducible** (constitution Principle II). An invoice
   with `RecipientCount is null` renders exactly as it does today, forever.
 - **Non-grave invoices do not change** in any way.
-- Tie-break when two lines cost the same to bump: **the lower line number wins.**
+- Tie-break when two combinations cost the same to bump: **the combination whose
+  sorted list of bumped line numbers is lexicographically smallest wins** —
+  decided by our own code, never by a library's unspecified iteration order, so
+  a revision reproduces the same split.
 - English source, identifiers and comments; i18n for user-visible strings;
   Conventional Commits.
 - **Backend tests:** `./scripts/dotnet.sh test Invoicing.sln`, narrowed with

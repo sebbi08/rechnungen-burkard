@@ -90,6 +90,45 @@ public class GraveShareTests
         Assert.True(adjusted.Zip(lines).All(p => p.First.UnitPrice >= p.Second.UnitPrice));
     }
 
+    [Fact]
+    public void Same_count_lines_break_ties_by_line_number()
+    {
+        // Both lines have count 2, so a single bump of either moves the
+        // subtotal by 2 cents — bumping either is equally cheap.
+        // Net cents: 2*10.00*100 + 2*10.00*100 = 4000; 4000 % 3 = 1, so 2 more
+        // cents are needed (the next multiple of 3 is 4002), reachable in one
+        // bump of either line. The tie-break must land on the lower line
+        // number: line 0 gets the cent, line 1 is untouched.
+        var lines = new[] { Line(2, 10.00m, 19m), Line(2, 10.00m, 19m) };
+
+        var adjusted = GraveShare.MakeDivisible(lines, 3);
+
+        Assert.Equal(10.01m, adjusted[0].UnitPrice);
+        Assert.Equal(10.00m, adjusted[1].UnitPrice);
+    }
+
+    [Fact]
+    public void Equal_cost_ties_are_broken_by_the_lexicographically_smallest_bump_set()
+    {
+        // Counts [1, 3] with 4 recipients — the counterexample that defeats a
+        // "lower line number wins" rule taken literally. Net cents:
+        // 1*10.01*100 + 3*10.00*100 = 1001 + 3000 = 4001; 4001 % 4 = 1, so 3
+        // more cents are needed to reach 4004.
+        // Two combinations reach exactly 3 cents: one bump of the count-3 line
+        // (displacement 3, path [1]), or three bumps of the count-1 line
+        // (displacement 1+1+1 = 3, path [0, 0, 0]). Both are minimal — no
+        // smaller non-negative displacement is congruent to 3 mod 4.
+        // Comparing the sorted bump lists lexicographically, [0, 0, 0] sorts
+        // before [1] (their first elements are 0 and 1), so the three bumps of
+        // the count-1 line win, not the single bump of the count-3 line.
+        var lines = new[] { Line(1, 10.01m, 19m), Line(3, 10.00m, 19m) };
+
+        var adjusted = GraveShare.MakeDivisible(lines, 4);
+
+        Assert.Equal(10.04m, adjusted[0].UnitPrice);
+        Assert.Equal(10.00m, adjusted[1].UnitPrice);
+    }
+
     [Theory]
     [InlineData(2)]
     [InlineData(3)]

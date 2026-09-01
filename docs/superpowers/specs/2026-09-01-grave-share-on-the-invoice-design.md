@@ -57,9 +57,11 @@ For one grave and half-year, with `n` recipients:
 2. Group the lines by VAT rate and total each group.
 3. For any group whose total does not divide by `n`, add whole cents to unit
    prices until it does — choosing the lines that reach divisibility for the
-   fewest cents added. Where two choices cost the same, the lower line number
-   wins; revisions must reproduce the split exactly, so the tie-break is part
-   of the rule rather than an implementation detail.
+   fewest cents added. Where two combinations cost the same, the one whose
+   sorted list of bumped line numbers is lexicographically smallest wins — a
+   rule decided entirely by our own code, not by any library's unspecified
+   iteration order. Revisions must reproduce the split exactly, so the
+   tie-break is part of the rule rather than an implementation detail.
 4. Every recipient's invoice carries those same 100 % lines. The recipient's
    share of each VAT group is that group's total divided by `n`, which is now
    exact.
