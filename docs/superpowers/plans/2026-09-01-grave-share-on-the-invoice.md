@@ -469,9 +469,6 @@ git commit -m "refactor(db): consolidate the unreleased migrations into one"
 **Files:**
 
 - Modify: `backend/src/Invoicing.Api/Services/GraveInvoiceGenerator.cs`
-- Delete: `backend/src/Invoicing.Domain/ShareCalculator.cs`, `backend/tests/Invoicing.IntegrationTests/ShareCalculatorTests.cs`
-- Modify: `backend/src/Invoicing.Domain/GraveInvoiceSplitter.cs` (remove `Split`)
-- Modify: `backend/tests/Invoicing.IntegrationTests/GraveInvoiceSplitterTests.cs`
 - Test: `backend/tests/Invoicing.IntegrationTests/GraveShareGenerationTests.cs` (create)
 
 **Interfaces:**
@@ -588,30 +585,25 @@ Inside the per-recipient loop, set `RecipientCount = recipients.Count,` on the
 
 `GraveUnitPrice` is left null: the line's own price is the grave's price now.
 
-- [ ] **Step 4: Delete what no longer has a caller**
+- [ ] **Step 4: Delete nothing**
 
-Remove `Split` from `GraveInvoiceSplitter` and delete
-`backend/src/Invoicing.Domain/ShareCalculator.cs` together with
-`backend/tests/Invoicing.IntegrationTests/ShareCalculatorTests.cs`. Keep
-`Combine` and `GraveLine`; `Combine` still reconstructs a grave's lines from
-invoices generated before this change, and its summary should say so.
-
-In `GraveInvoiceSplitterTests`, delete every test that exercises `Split` —
-`Net_shares_sum_exactly_to_the_grave_net`,
-`Split_cannot_place_every_cent_once_the_count_reaches_ten`,
-`Zero_recipients_throws`, `Every_recipient_line_remembers_how_the_grave_price_was_entered`
-and any other whose body calls it. Keep the `Combine` tests; where one builds
-its input with `Split`, replace that with a hand-written list of per-recipient
-lines so it still covers the legacy reconstruction.
+`GraveInvoiceSplitter.Split` looks unused after this task but is not:
+`GraveInvoiceRevisionService.CreateAsync` still calls it, and that file belongs
+to Task 5. Removing `Split` here fails the build with `CS1929` rather than
+leaving a tidy set of red tests. The deletions — `Split`, `ShareCalculator`,
+`ShareCalculatorTests` and the pruning of `GraveInvoiceSplitterTests` — happen
+in Task 5, once the revision service stops calling it.
 
 - [ ] **Step 5: Run the suite**
 
 Run: `./scripts/dotnet.sh test Invoicing.sln`
-Expected: the new test passes. `VatIncludedGraveTests`, `GraveMultiItemGenerationTests`,
-`GraveInvoiceRevisionTests` and `GraveInvoiceGroupTests` will fail — they assert
-per-recipient split amounts that no longer exist. **Leave them**; Tasks 4 and 5
-rewrite them once the document and the revision path are in place. Report the
-exact failure list.
+Expected: the new test passes, and **six** classes fail because they assert
+per-recipient split amounts that no longer exist — `VatIncludedGraveTests`,
+`GraveMultiItemGenerationTests`, `GraveInvoiceRevisionTests`,
+`GraveInvoiceGroupTests`, `GraveGenerationTests` and `LatestRevisionTests`.
+**Leave them**; Tasks 4 and 5 rewrite them once the document and the revision
+path are in place. Report the exact failure list, and say so prominently if
+anything outside those six is red.
 
 - [ ] **Step 6: Commit**
 
@@ -810,12 +802,25 @@ from the first sibling when `RecipientCount` is set — they are the grave's
 lines. Keep the existing `GraveUnitPrice` and `Combine` branches for the older
 invoices, and say in the summary which branch serves which.
 
-- [ ] **Step 5: Run the whole suite**
+- [ ] **Step 5: Delete what finally has no caller**
+
+With the revision service off `Split`, it has none. Remove `Split` from
+`GraveInvoiceSplitter` and delete `backend/src/Invoicing.Domain/ShareCalculator.cs`
+with `backend/tests/Invoicing.IntegrationTests/ShareCalculatorTests.cs`. Keep
+`Combine` and `GraveLine` — `Combine` still reconstructs a grave's lines from
+invoices generated before this change, and its summary should say so.
+
+In `GraveInvoiceSplitterTests`, delete every test whose body calls `Split`.
+Keep the `Combine` tests; where one builds its input with `Split`, replace that
+with a hand-written list of per-recipient lines so it still covers the legacy
+reconstruction it was written for.
+
+- [ ] **Step 6: Run the whole suite**
 
 Run: `./scripts/dotnet.sh test Invoicing.sln`
-Expected: 0 failures.
+Expected: 0 failures. All six classes left red by Task 3 are green by now.
 
-- [ ] **Step 6: Rewrite SC-004**
+- [ ] **Step 7: Rewrite SC-004**
 
 The behaviour it describes is complete once revisions are in. In
 `docs/spec.md`, replace SC-004 with the wording from the design doc's "What
@@ -830,7 +835,7 @@ Check whether any other requirement in that file describes the old split and
 update it too; `GraveInvoiceSplitterTests` cited SC-004 by name, so grep for
 `SC-004` across the repository and fix every reference.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add backend/src backend/tests docs/spec.md
