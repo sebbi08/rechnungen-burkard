@@ -68,9 +68,10 @@ public sealed class GraveInvoiceGenerator
                 item.Item.Number,
                 item.Item.Description,
                 item.Count,
-                // the splitter divides a net — that is what makes every
-                // recipient's document add up on its own — so a VAT-included
-                // price gives up its VAT here, before the split rather than after
+                // GraveShare.MakeDivisible works in net cents — the grave's
+                // subtotals are what has to divide evenly across the recipients
+                // — so a VAT-included price gives up its VAT here, before it is
+                // billed rather than after
                 VatInclusivePrice.NetOf(
                     EffectivePrice(item)!.Value,
                     item.Item.VatRate,
@@ -80,7 +81,11 @@ public sealed class GraveInvoiceGenerator
                 item.PriceIncludesVat
             ))
             .ToList();
-        var perRecipient = GraveInvoiceSplitter.Split(graveLines, recipients.Count);
+
+        // Every recipient is billed the same lines — the grave's own, raised by
+        // whole cents where a VAT subtotal would not divide. The share is applied
+        // when the document is built, not by dividing the lines.
+        var billedLines = GraveShare.MakeDivisible(graveLines, recipients.Count);
 
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / recipients.Count;
@@ -101,6 +106,7 @@ public sealed class GraveInvoiceGenerator
                 PeriodYear = year,
                 PeriodHalf = half,
                 SharePercent = sharePercent,
+                RecipientCount = recipients.Count,
                 RecipientId = recipients[r].Id,
                 RecipientName = recipients[r].Name,
                 RecipientAddress = recipients[r].Address,
@@ -110,7 +116,22 @@ public sealed class GraveInvoiceGenerator
                 GeneratedAt = now,
             };
 
-            invoice.Lines = perRecipient[r].ToList();
+            invoice.Lines = billedLines
+                .Select(
+                    (line, index) =>
+                        new InvoiceLine
+                        {
+                            ItemId = line.ItemId,
+                            ItemNumber = line.ItemNumber,
+                            Description = line.Description,
+                            Count = line.Count,
+                            UnitPrice = line.UnitPrice,
+                            VatRate = line.VatRate,
+                            PriceIncludesVat = line.PriceIncludesVat,
+                            LineNumber = index + 1,
+                        }
+                )
+                .ToList();
             _db.Invoices.Add(invoice);
             await _db.SaveChangesAsync(ct);
             invoice.RootId = invoice.Id;
