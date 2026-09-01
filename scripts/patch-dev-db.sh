@@ -52,12 +52,25 @@ if [ -z "$NEW_ID" ]; then
     exit 1
 fi
 
+# sqlite3.connect() CREATES a missing file, so a wrong path would be answered
+# with a fresh 0-byte database and a refusal blaming its contents -- while
+# leaving that file behind. Check before anything opens it.
+if [ ! -f "$DB" ]; then
+    echo "patch-dev-db.sh: no database at $DB." >&2
+    echo "Pass the path explicitly if it lives somewhere else:" >&2
+    echo "  scripts/patch-dev-db.sh /path/to/invoicing.db" >&2
+    echo "Nothing was read, created or changed." >&2
+    exit 1
+fi
+
 # The backup below is a plain `cp` of the main database file. SQLite in WAL
 # mode keeps committed pages in "$DB-wal" until a checkpoint, so with a -wal
 # present that copy is not a consistent snapshot -- and whatever is holding the
 # database open is a running app whose own migrator this would race.
-if [ -e "$DB-wal" ]; then
-    echo "patch-dev-db.sh: $DB-wal exists, so something has $DB open in WAL mode." >&2
+# Either file means a connection is open: SQLite unlinks both on the last clean
+# close, so even a 0-byte -wal is evidence of a live reader, not of an idle one.
+if [ -e "$DB-wal" ] || [ -e "$DB-shm" ]; then
+    echo "patch-dev-db.sh: $DB-wal or $DB-shm exists, so something has $DB open." >&2
     echo "A backup taken now would miss the write-ahead log, and the patch would" >&2
     echo "race the running app's migrator. Stop the dev stack first:" >&2
     echo "  docker compose stop backend" >&2
@@ -166,6 +179,13 @@ if premise_holds:
 
 print("REFUSE")
 print("This database matches neither the expected premise nor a recognised safe state.")
+if any(row == "" for row in history):
+    print(
+        "  NOTE: history contains an empty MigrationId. An earlier version of this "
+        "script could write that when its migration lookup silently produced nothing. "
+        "Restore the .backup- file this script would have taken, or delete the empty "
+        "row and re-run."
+    )
 print(f"  Invoices.PaidOn column present:      {has_paidon}  (expected True)")
 print(f"  Index {INDEX_NAME} present: {has_index}  (expected True)")
 print(f"  History has a row ending '_InvoicePaymentStatus': {has_payment_status_row}  (expected True)")
