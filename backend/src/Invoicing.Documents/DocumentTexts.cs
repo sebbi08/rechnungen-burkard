@@ -20,6 +20,7 @@ public sealed class DocumentTexts
         total: "Summe",
         netForRate: "Netto {0} %: {1}",
         vatForRate: "MwSt. {0} %: {1}",
+        vatForRateFromNet: "MwSt. {0} % aus {1}: {2}",
         netTotal: "Netto gesamt: {0}",
         vatTotal: "MwSt. gesamt: {0}",
         grossTotal: "Gesamtbetrag: {0}",
@@ -40,6 +41,7 @@ public sealed class DocumentTexts
         total: "Total",
         netForRate: "Net {0} %: {1}",
         vatForRate: "VAT {0} %: {1}",
+        vatForRateFromNet: "VAT {0} % on {1}: {2}",
         netTotal: "Net total: {0}",
         vatTotal: "VAT total: {0}",
         grossTotal: "Amount due: {0}",
@@ -53,6 +55,7 @@ public sealed class DocumentTexts
     private readonly string _title;
     private readonly string _netForRate;
     private readonly string _vatForRate;
+    private readonly string _vatForRateFromNet;
     private readonly string _netTotal;
     private readonly string _vatTotal;
     private readonly string _grossTotal;
@@ -70,6 +73,7 @@ public sealed class DocumentTexts
         string total,
         string netForRate,
         string vatForRate,
+        string vatForRateFromNet,
         string netTotal,
         string vatTotal,
         string grossTotal,
@@ -84,6 +88,7 @@ public sealed class DocumentTexts
         _title = title;
         _netForRate = netForRate;
         _vatForRate = vatForRate;
+        _vatForRateFromNet = vatForRateFromNet;
         _netTotal = netTotal;
         _vatTotal = vatTotal;
         _grossTotal = grossTotal;
@@ -140,6 +145,20 @@ public sealed class DocumentTexts
             Culture,
             _vatForRate,
             rate.ToString("0.#", Culture),
+            amount.ToString("N2", Culture)
+        );
+
+    /// <summary>The VAT for one rate, stated together with the amount it was
+    /// worked out from. The share block uses this rather than
+    /// <see cref="VatForRate"/>: a grave invoice prints its lines at 100 %, so
+    /// the recipient's own taxable base per rate appears nowhere else on the
+    /// page, and a VAT invoice has to show it.</summary>
+    public string VatForRateFromNet(decimal rate, decimal net, decimal amount) =>
+        string.Format(
+            Culture,
+            _vatForRateFromNet,
+            rate.ToString("0.#", Culture),
+            net.ToString("N2", Culture),
             amount.ToString("N2", Culture)
         );
 

@@ -145,14 +145,19 @@ public class GraveShareDocumentTests
         // from their share: 7 % of 39,50 is 2,77 and 19 % of 32,57 is 6,19. The
         // 100 % block is not printed at all — printing it too put 8,30 and 2,77
         // under one "MwSt. 7 %" on a tax document with nothing saying which of
-        // them was owed. The per-rate split survives, because the share block
-        // carries its own rows.
+        // them was owed.
         Assert.Equal(1, Occurrences(text, "MwSt. 7 %"));
         Assert.Equal(1, Occurrences(text, "MwSt. 19 %"));
-        Assert.Contains("MwSt. 7 %: 2,77", text);
-        Assert.Contains("MwSt. 19 %: 6,19", text);
         Assert.DoesNotContain("MwSt. 7 %: 8,30", text);
         Assert.DoesNotContain("MwSt. 19 %: 18,56", text);
+
+        // Each surviving row states the base it was worked out from. That is the
+        // point of dropping the 100 % rows rather than a nicety: the lines above
+        // are the whole grave, so without "aus 39,50" the recipient's own taxable
+        // amount per rate would appear nowhere on the page, and a VAT invoice has
+        // to show it.
+        Assert.Contains("MwSt. 7 % aus 39,50: 2,77", text);
+        Assert.Contains("MwSt. 19 % aus 32,57: 6,19", text);
 
         // and the 100 % net rows go with them: the net that is printed is the
         // grave's sum and the recipient's share of it, which is what the design's

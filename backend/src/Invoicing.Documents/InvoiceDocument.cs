@@ -182,7 +182,19 @@ internal sealed class InvoiceDocument : IDocument
                                     .SemiBold();
                                 foreach (var vat in share.VatSummaries)
                                 {
-                                    summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                    // with the base it was worked out from: the
+                                    // lines above are the whole grave, so this is
+                                    // the only place the recipient's own taxable
+                                    // amount per rate appears
+                                    summary
+                                        .Item()
+                                        .Text(
+                                            _texts.VatForRateFromNet(
+                                                vat.Rate,
+                                                vat.NetTotal,
+                                                vat.VatAmount
+                                            )
+                                        );
                                 }
 
                                 summary
