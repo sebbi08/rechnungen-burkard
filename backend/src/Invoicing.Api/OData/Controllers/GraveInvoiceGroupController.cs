@@ -123,7 +123,7 @@ public class GraveInvoiceGroupController : ODataController
                 RootId = s.RootId,
                 Paid = s.PaidOn != null,
             }),
-            Lines = GraveLines(siblings[0].RecipientCount, orderedLines)
+            Lines = GraveLines(siblings.All(s => s.RecipientCount is not null), orderedLines)
                 .Select(l => new
                 {
                     l.ItemId,
@@ -146,25 +146,27 @@ public class GraveInvoiceGroupController : ODataController
     /// Since this feature, a grave invoice carries the grave's own lines at
     /// 100 % and is marked by <see cref="Invoice.RecipientCount"/>, so the first
     /// sibling's lines already are the grave's lines — read directly, no
-    /// reconstruction needed.
+    /// reconstruction needed. Trusted only when every sibling carries the
+    /// column, not just the first, for the same reason GraveUnitPrice is: a
+    /// sibling revised on its own through the ordinary CreateRevision path never
+    /// sets it, and reading the first sibling's lines as the grave's when
+    /// another sibling still holds a share would bill the share as the whole.
     ///
     /// Invoices generated before that, but after InvoiceLine.GraveUnitPrice
     /// existed, stored one recipient's share and remembered the grave's
-    /// pre-split price on that column — but only trusted when every sibling has
-    /// it, not just the first, since a sibling revised on its own through the
-    /// ordinary CreateRevision path never sets it.
+    /// pre-split price on that column — again only when every sibling has it.
     ///
     /// Anything older still, or a group missing GraveUnitPrice on some sibling,
     /// falls back to <see cref="GraveInvoiceSplitter.Combine"/>, which
     /// reconstructs the grave's lines from the recipients' shares — a legacy,
     /// best-effort path.</summary>
     private static IReadOnlyList<GraveLine> GraveLines(
-        int? recipientCount,
+        bool everySiblingHasRecipientCount,
         IReadOnlyList<IReadOnlyList<InvoiceLine>> orderedLines
     )
     {
         var reference = orderedLines[0];
-        if (recipientCount is not null)
+        if (everySiblingHasRecipientCount)
         {
             return reference
                 .Select(l => new GraveLine(
