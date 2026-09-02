@@ -52,7 +52,12 @@ Settled with the user before this design:
    what that costs.
 4. **The invoice shows the whole grave, then the share.** Lines at 100 %, the
    net sum, the recipient's share, and the VAT worked out from the share.
-5. **Non-grave invoices do not change** in any way.
+5. **Non-grave invoices keep their layout and their split-free arithmetic.**
+   One thing does reach them: `VatInclusivePrice.NetOf` is shared, so a
+   VAT-included line on an ordinary invoice is now stored at two decimals and
+   raised where rounding down would undercharge, exactly as on a grave. That
+   follows from decision 3 applying to every price the application prints, not
+   only to the ones a grave produces.
 
 ## The rule
 
