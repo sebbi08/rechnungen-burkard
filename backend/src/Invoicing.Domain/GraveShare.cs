@@ -1,8 +1,17 @@
 namespace Burkard.Invoicing.Domain;
 
 /// <summary>Raises a grave's unit prices by whole cents until every VAT-rate
-/// subtotal divides evenly across the recipients, so each of them can be billed
-/// the identical share.
+/// subtotal divides evenly across the recipients and the shares together still
+/// collect the grave's own bill, so each recipient can be billed the identical
+/// share without the split costing the business a cent.
+///
+/// Divisibility alone is not enough, because the VAT is rounded once per
+/// recipient rather than once for the grave. A subtotal of 84,24 at 19 % over
+/// two recipients divides exactly — 42,12 each — but each recipient's VAT
+/// rounds 8,0028 down to 8,00, where the whole grave would have rounded 16,0056
+/// up to 16,01. Two roundings down replace one rounding up and the split
+/// collects 100,24 against a bill of 100,25. So a subtotal has to satisfy both
+/// tests, and the cheapest raise satisfying both is the one taken.
 ///
 /// Adding one cent to a line's unit price moves its subtotal by the line's
 /// count. With g = gcd(counts, recipients), g divides every count and therefore
@@ -52,7 +61,9 @@ public static class GraveShare
                 var i in CheapestBumps(
                     indices.Select(i => result[i].Count).ToList(),
                     subtotal,
-                    recipients
+                    recipients,
+                    rate,
+                    BillFor(indices.Select(i => result[i]).ToList(), rate)
                 )
             )
             {
@@ -64,82 +75,126 @@ public static class GraveShare
         return result;
     }
 
-    /// <summary>Which lines to bump by one cent, fewest cents added first. Each
-    /// bump of line i moves the subtotal by counts[i], so this is a shortest
-    /// path from the current residue to zero over the residues modulo
-    /// <paramref name="recipients"/>. Two combinations can cost the same — e.g.
-    /// counts [1, 3] with 4 recipients: one bump of the count-3 line and three
-    /// bumps of the count-1 line both cost 3. The tie is broken by comparing
-    /// each candidate's sorted list of bumped line numbers and keeping the
+    /// <summary>Which lines to bump by one cent, fewest cents added first.
+    ///
+    /// A bump of line i raises the subtotal by counts[i], so the cents a bump
+    /// set adds to the bill are exactly the subtotal it adds — cheapest and
+    /// smallest-delta are the same thing, and the search can walk the reachable
+    /// deltas in ascending order and stop at the first one that works. A delta
+    /// works when the raised subtotal both divides across the recipients and
+    /// leaves their shares collecting the grave's own bill.
+    ///
+    /// Walking deltas rather than residues is what lets the second test be
+    /// applied at all: it depends on the subtotal's value, not merely on its
+    /// residue, so a residue-only search cannot express it. Two bump sets
+    /// reaching the same delta cost the same; the tie is broken by comparing
+    /// their sorted lists of bumped line numbers and keeping the
     /// lexicographically smallest, a rule decided entirely by this method so a
     /// revision reproduces the same split regardless of any library's own,
-    /// unspecified iteration order.</summary>
+    /// unspecified iteration order. That choice propagates safely: with every
+    /// count positive, no bump set at a given delta can be a proper prefix of
+    /// another, so extending the smallest set at each delta yields the smallest
+    /// set at the next.</summary>
     private static IReadOnlyList<int> CheapestBumps(
         IReadOnlyList<int> counts,
         long subtotal,
-        int recipients
+        int recipients,
+        decimal rate,
+        long bill
     )
     {
-        var start = (int)(((subtotal % recipients) + recipients) % recipients);
-        if (start == 0)
+        if (Works(subtotal, recipients, rate, bill))
         {
             return Array.Empty<int>();
         }
 
-        var best = new long[recipients];
-        var path = new List<int>?[recipients];
-        Array.Fill(best, long.MaxValue);
-        best[start] = 0;
-        path[start] = new List<int>();
+        // Generous, and only a bound: the residue alone needs at most
+        // (recipients - 1) bumps of the largest count, and the covering test is
+        // satisfied within a few cents of that. Exceeding it means an
+        // assumption here is wrong, which should stop the bill rather than
+        // quietly mis-price it.
+        var maxCount = counts.Max();
+        var limit = (recipients + 64) * maxCount;
 
-        // Fixed-point relaxation over the `recipients` residues, rather than a
-        // priority-queue search: the graph has only `recipients` nodes, so a
-        // full pass is O(recipients * counts.Count), which is small. Relaxing
-        // residues and line indices in a fixed ascending order — and breaking
-        // cost ties by comparing sorted bump lists rather than by whichever
-        // path happens to be found first — makes the result depend only on
-        // this code, never on the dequeue order of some collection type. This
-        // terminates because every change strictly lowers either the cost, or,
-        // at equal cost, the chosen path in lexicographic order, and both are
-        // drawn from a finite set of possibilities.
-        bool changed;
-        do
+        var best = new List<int>?[limit + 1];
+        best[0] = new List<int>();
+
+        for (var delta = 0; delta <= limit; delta++)
         {
-            changed = false;
-            for (var residue = 0; residue < recipients; residue++)
+            if (best[delta] is null)
             {
-                if (best[residue] == long.MaxValue)
+                continue;
+            }
+
+            if (delta > 0 && Works(subtotal + delta, recipients, rate, bill))
+            {
+                return best[delta]!;
+            }
+
+            for (var i = 0; i < counts.Count; i++)
+            {
+                var next = delta + counts[i];
+                if (next > limit)
                 {
                     continue;
                 }
 
-                for (var i = 0; i < counts.Count; i++)
+                var candidate = new List<int>(best[delta]!) { i };
+                candidate.Sort();
+                if (best[next] is null || IsLexicographicallySmaller(candidate, best[next]!))
                 {
-                    var next = (residue + counts[i]) % recipients;
-                    var nextCost = best[residue] + counts[i];
-                    if (nextCost > best[next])
-                    {
-                        continue;
-                    }
-
-                    var candidate = new List<int>(path[residue]!) { i };
-                    candidate.Sort();
-                    if (nextCost < best[next] || IsLexicographicallySmaller(candidate, path[next]!))
-                    {
-                        best[next] = nextCost;
-                        path[next] = candidate;
-                        changed = true;
-                    }
+                    best[next] = candidate;
                 }
             }
-        } while (changed);
+        }
 
-        return path[0]
-            ?? throw new InvalidOperationException(
-                "No combination of cents makes the subtotal divisible, which the "
-                    + "gcd argument says cannot happen."
-            );
+        throw new InvalidOperationException(
+            $"No combination of cents within {limit} makes a subtotal of {subtotal} "
+                + $"divide across {recipients} recipients and still cover the bill."
+        );
     }
+
+    /// <summary>What one VAT rate's lines have to collect, in cents, fixed
+    /// before a single cent is added. A line entered as a gross has to collect
+    /// exactly that gross: measuring it instead by the gross of its rounded net
+    /// would charge again for the cent <see cref="VatInclusivePrice.NetOf"/>
+    /// may already have added to reach it. Everything else is net-priced, so
+    /// what it owes is its net plus that net's VAT.
+    ///
+    /// A target recomputed from the raised subtotal would climb with every cent
+    /// added and never be caught, which is why this is worked out once.</summary>
+    private static long BillFor(IReadOnlyList<GraveLine> lines, decimal rate)
+    {
+        var netPriced = lines.Where(l => l.EnteredGross is null).Sum(NetCents);
+        var grossPriced = lines
+            .Where(l => l.EnteredGross is not null)
+            .Sum(l =>
+                (long)decimal.Round(l.EnteredGross!.Value * 100m, 0, MidpointRounding.AwayFromZero)
+                * l.Count
+            );
+
+        return netPriced + VatCents(netPriced, rate) + grossPriced;
+    }
+
+    /// <summary>Whether a subtotal can be billed as it stands: it divides
+    /// evenly across the recipients, and the shares together — each carrying
+    /// its own rounded VAT — collect at least <paramref name="bill"/>, the
+    /// gross the grave was asked for before any cent was added.</summary>
+    private static bool Works(long subtotal, int recipients, decimal rate, long bill)
+    {
+        if (subtotal % recipients != 0)
+        {
+            return false;
+        }
+
+        var share = subtotal / recipients;
+        return recipients * (share + VatCents(share, rate)) >= bill;
+    }
+
+    /// <summary>The VAT on a net amount, in whole cents — the same rounding the
+    /// document applies, so what is checked here is what is billed.</summary>
+    private static long VatCents(long netCents, decimal rate) =>
+        (long)decimal.Round(netCents * rate / 100m, 0, MidpointRounding.AwayFromZero);
 
     /// <summary>True if <paramref name="candidate"/> sorts before <paramref
     /// name="current"/> in the usual dictionary order — compared element by

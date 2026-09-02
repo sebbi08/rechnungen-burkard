@@ -732,8 +732,10 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   // VAT-included line), no conversion needed to show 119,00 here
   await expect(page.getByText("119,00 €")).toBeVisible();
 
-  // 119,00 gross at 7 % is a net of 111,215; halved that is 55,61 net and
-  // 59,50 gross each — 119,00 together, the price that was entered
+  // 119,00 gross at 7 % is a net of 111,22 — rounded up, because 111,21 would
+  // bill 118,99 and the line may not come in under what was entered. Halved
+  // that is 55,61 net and 59,50 gross each: 119,00 together, the price that was
+  // entered.
   const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
   await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
 
@@ -743,10 +745,13 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
     .click();
   await waitForDialogOpen(page);
 
-  // the dialog opens on the grave's gross — not on the 111,215 net it stores,
-  // and not on either recipient's share
+  // the dialog opens on the grave's gross — not on the 111,22 net it stores,
+  // and not on either recipient's share. It reads 119,01 rather than the 119,00
+  // that was typed: no whole-cent net bills 119,00 at 7 %, since 111,21 gives
+  // 118,99 and 111,22 gives 119,01, and a two-decimal price has to land on one
+  // of them. It settles there — saving this back stores the same net again.
   const dialog = page.locator("[id$='graveInvoiceDialog']");
-  await expect(dialog.getByLabel("Preis")).toHaveValue("119");
+  await expect(dialog.getByLabel("Preis")).toHaveValue("119.01");
   await expect(dialog).toContainText("inkl. MwSt.");
   await expect(dialog.getByRole("checkbox")).toBeChecked();
 

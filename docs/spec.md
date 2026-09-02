@@ -681,7 +681,8 @@ non-interactive until completion, and the task runs exactly once.
 - **SC-004**: For graves with multiple recipients, every recipient is billed an
   identical amount, and their shares sum exactly to the net sum printed on the
   invoice. The grave's bill may be raised by a few cents so that its per-rate
-  subtotals divide evenly; it is never reduced.
+  subtotals divide evenly and the shares together still collect what the grave
+  was asked for; it is never reduced.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
 - **SC-006**: A bulk download of N normal grave invoices for a half-year yields

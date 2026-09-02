@@ -301,9 +301,10 @@ internal sealed class InvoiceDocument : IDocument
 
     private string Money(decimal value) => value.ToString("N2", _culture);
 
-    // at least 2, up to 3 decimals (e.g. 120,00 or 33,335) — unit prices are rounded
-    // to 3 decimals so persisted line grosses stay exact to the cent.
-    private string UnitPrice(decimal value) => value.ToString("#,0.00#", _culture);
+    // Two decimals, like every other price on the page. A VAT-included price
+    // used to keep a third so a line's gross stayed exact above count 1; it is
+    // rounded to the cent and raised instead, so nothing here has more.
+    private string UnitPrice(decimal value) => value.ToString("#,0.00", _culture);
 
     private static IContainer HeaderCell(IContainer container) =>
         container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingBottom(3);

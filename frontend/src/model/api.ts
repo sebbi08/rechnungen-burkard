@@ -519,17 +519,18 @@ export interface GraveInvoiceRunRow {
  *  It is worth being precise about which premise carries that, because the
  *  narrower one no longer holds: the nets reaching this function are not all
  *  `NetOf` output any more. A grave's line is `NetOf` output plus the whole
- *  cents `GraveShare.MakeDivisible` added to make the subtotals divide, and
- *  both the grave detail page and the grave edit dialog display those. The sign
- *  is what rules the tie out, not the provenance. */
+ *  cents `GraveShare.MakeDivisible` added so the subtotals divide and the
+ *  shares still cover the bill, and both the grave detail page and the grave
+ *  edit dialog display those. The sign is what rules the tie out, not the
+ *  provenance. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }
 
 /** What a price field shows for a line's stored net price: the gross for a line
- *  entered VAT-included, and the untouched net for every other one — including
- *  the three decimals a grave split leaves behind. The rate is the item's
- *  current one, not the line's stored one: the backend converts what the dialog
+ *  entered VAT-included, and the untouched net for every other one. Every
+ *  price has two decimals, on a grave line as anywhere else. The rate is the
+ *  item's current one, not the line's stored one: the backend converts what the dialog
  *  sends using the item as it is now, so displaying with an older rate would
  *  move the price of a line nobody touched. */
 export function priceFieldValue(net: number, priceIncludesVat: boolean, vatRate: number): number {

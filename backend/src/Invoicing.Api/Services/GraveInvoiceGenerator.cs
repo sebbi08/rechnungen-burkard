@@ -81,10 +81,12 @@ public sealed class GraveInvoiceGenerator
                 VatInclusivePrice.NetOf(
                     EffectivePrice(item)!.Value,
                     item.Item.VatRate,
-                    item.PriceIncludesVat
+                    item.PriceIncludesVat,
+                    item.Count
                 ),
                 item.Item.VatRate,
-                item.PriceIncludesVat
+                item.PriceIncludesVat,
+                item.PriceIncludesVat ? EffectivePrice(item)!.Value : null
             ))
             .ToList();
 

@@ -218,9 +218,15 @@ public sealed class GraveInvoiceRevisionService
                     // the dialog sends the grave's price as it shows it, which
                     // for a VAT-included line is the gross; MakeDivisible needs
                     // the net
-                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
+                    VatInclusivePrice.NetOf(
+                        unitPrice,
+                        item.VatRate,
+                        input.PriceIncludesVat,
+                        input.Count
+                    ),
                     item.VatRate,
-                    input.PriceIncludesVat
+                    input.PriceIncludesVat,
+                    input.PriceIncludesVat ? unitPrice : null
                 )
             );
         }

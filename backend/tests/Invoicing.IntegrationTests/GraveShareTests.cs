@@ -125,13 +125,16 @@ public class GraveShareTests
     [Fact]
     public void Same_count_lines_break_ties_by_line_number()
     {
+        // At 0 % the covering test is satisfied by anything that divides, so
+        // this isolates the tie-break; the rates above show the two working
+        // together.
         // Both lines have count 2, so a single bump of either moves the
         // subtotal by 2 cents — bumping either is equally cheap.
         // Net cents: 2*10.00*100 + 2*10.00*100 = 4000; 4000 % 3 = 1, so 2 more
         // cents are needed (the next multiple of 3 is 4002), reachable in one
         // bump of either line. The tie-break must land on the lower line
         // number: line 0 gets the cent, line 1 is untouched.
-        var lines = new[] { Line(2, 10.00m, 19m), Line(2, 10.00m, 19m) };
+        var lines = new[] { Line(2, 10.00m, 0m), Line(2, 10.00m, 0m) };
 
         var adjusted = GraveShare.MakeDivisible(lines, 3);
 
@@ -153,13 +156,61 @@ public class GraveShareTests
         // Comparing the sorted bump lists lexicographically, [0, 0, 0] sorts
         // before [1] (their first elements are 0 and 1), so the three bumps of
         // the count-1 line win, not the single bump of the count-3 line.
-        var lines = new[] { Line(1, 10.01m, 19m), Line(3, 10.00m, 19m) };
+        // At 0 %, so that the covering test does not raise past the tie.
+        var lines = new[] { Line(1, 10.01m, 0m), Line(3, 10.00m, 0m) };
 
         var adjusted = GraveShare.MakeDivisible(lines, 4);
 
         Assert.Equal(10.04m, adjusted[0].UnitPrice);
         Assert.Equal(10.00m, adjusted[1].UnitPrice);
     }
+
+    [Fact]
+    public void A_subtotal_that_divides_is_still_raised_when_the_shares_would_not_cover_it()
+    {
+        // The bug this rule was extended for. 100,25 gross at 19 % is a net of
+        // 84,24, whose 8 424 cents divide evenly by two — 42,12 each. But each
+        // recipient's VAT rounds 8,0028 down to 8,00, where the grave's own
+        // 16,0056 rounds up to 16,01, so the two of them would collect 100,24
+        // against a bill of 100,25. Dividing is not enough; the subtotal is
+        // raised to 84,26, where the shares of 42,13 collect 100,26.
+        var lines = new[] { Line(1, 84.24m, 19m) };
+
+        var adjusted = GraveShare.MakeDivisible(lines, 2);
+
+        Assert.Equal(84.26m, Assert.Single(adjusted).UnitPrice);
+    }
+
+    [Theory]
+    [InlineData(7)]
+    [InlineData(19)]
+    public void The_shares_always_collect_at_least_the_grave_s_own_bill(decimal rate)
+    {
+        for (var recipients = 1; recipients <= 8; recipients++)
+        {
+            for (var cents = 1; cents <= 1500; cents++)
+            {
+                var adjusted = GraveShare.MakeDivisible(
+                    new[] { Line(1, cents / 100m, rate) },
+                    recipients
+                );
+                var subtotal = NetCents(adjusted[0]);
+                var share = subtotal / recipients;
+                // the bill as entered, not as raised
+                var owed = cents + Vat(cents, rate);
+
+                Assert.Equal(0, subtotal % recipients);
+                Assert.True(
+                    recipients * (share + Vat(share, rate)) >= owed,
+                    $"{cents} cents at {rate} % over {recipients} recipients falls short"
+                );
+                Assert.True(adjusted[0].UnitPrice >= cents / 100m);
+            }
+        }
+    }
+
+    private static long Vat(long netCents, decimal rate) =>
+        (long)decimal.Round(netCents * rate / 100m, 0, MidpointRounding.AwayFromZero);
 
     [Theory]
     [InlineData(2)]
