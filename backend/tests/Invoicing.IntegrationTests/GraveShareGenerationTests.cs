@@ -39,7 +39,12 @@ public class GraveShareGenerationTests
             Number = "M-102",
             Description = "Grabstein",
             VatRate = 19m,
-            DefaultPrice = 47.80m,
+            // 47,81 rather than 47,80: with Blumenschmuck's 49,90 the 19 %
+            // subtotal comes to 97,71, which divides by three. At 47,80 it would
+            // be 97,70, and the grave could not be saved at all -- see
+            // GraveShareTests. The figures below are unchanged, because the rule
+            // that used to raise this price landed on the same 47,81.
+            DefaultPrice = 47.81m,
         };
         var giessdienst = new InvoiceItem
         {

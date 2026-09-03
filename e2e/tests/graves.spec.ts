@@ -697,7 +697,7 @@ test("a grave with three recipients bills every one of them the identical share 
   const { graveId } = await seedGrave(page, marker, names, [
     { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
     { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
-    { description: "Grabstein reinigen", vatRate: 19, price: 47.8, count: 1 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
     { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
   ]);
   // 2035 H2 is not used by any other test, so no duplicate-generation conflicts
@@ -720,7 +720,7 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   const marker = `GV-${Date.now()}`;
   const names = [`Vera ${marker}`, `Walter ${marker}`];
   const { graveId } = await seedGrave(page, marker, names, [
-    { vatRate: 7, price: 119, priceIncludesVat: true },
+    { vatRate: 7, price: 117.02, priceIncludesVat: true },
   ]);
   await generateFor(page, 2036, 2);
 
@@ -729,20 +729,15 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   // has its own column now rather than a hint under the price
   const careRow = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
   await expect(careRow).toContainText("Ja");
-  // This half-year (2036/2) is not today's, so no invoice names the price and
-  // the page asks the billing preview instead. 119,00 gross at 7 % is not a
-  // reachable figure — 111,21 net bills 118,99 and 111,22 bills 119,01 — so the
-  // page shows 119,01 and says what was typed, rather than showing 119,00 and
-  // letting the invoice disagree with it later.
-  await expect(careRow).toContainText("119,01 €");
-  await expect(careRow).toContainText("eingegeben: 119,00 €");
+  // 117,02 gross at 7 % is a net of 109,36, whose 10 936 cents divide evenly by
+  // two. The page shows the price exactly as it was typed: a grave whose prices
+  // could not be split could not have been saved, so nothing here is adjusted.
+  await expect(careRow).toContainText("117,02 €");
 
-  // 119,00 gross at 7 % is a net of 111,22 — rounded up, because 111,21 would
-  // bill 118,99 and the line may not come in under what was entered. Halved
-  // that is 55,61 net and 59,50 gross each: 119,00 together, the price that was
-  // entered.
+  // 54,68 net and 58,51 gross each — 117,02 together, the price that was
+  // entered
   const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
-  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "58,51 €" })).toHaveCount(2);
 
   await invoicesTable
     .locator("tbody tr", { hasText: names[0] })
@@ -750,19 +745,16 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
     .click();
   await waitForDialogOpen(page);
 
-  // the dialog opens on the grave's gross — not on the 111,22 net it stores,
-  // and not on either recipient's share. It reads 119,01 rather than the 119,00
-  // that was typed: no whole-cent net bills 119,00 at 7 %, since 111,21 gives
-  // 118,99 and 111,22 gives 119,01, and a two-decimal price has to land on one
-  // of them. It settles there — saving this back stores the same net again.
+  // the dialog opens on the grave's gross — not on the 109,36 net it stores,
+  // and not on either recipient's share
   const dialog = page.locator("[id$='graveInvoiceDialog']");
-  await expect(dialog.getByLabel("Preis")).toHaveValue("119.01");
+  await expect(dialog.getByLabel("Preis")).toHaveValue("117.02");
   await expect(dialog).toContainText("inkl. MwSt.");
   await expect(dialog.getByRole("checkbox")).toBeChecked();
 
   // saved back untouched, every share stays where it was
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "58,51 €" })).toHaveCount(2);
 });
 
 test("the grave detail page shows this half-year's billed price once it is today's", async ({
@@ -773,7 +765,7 @@ test("the grave detail page shows this half-year's billed price once it is today
   const { graveId } = await seedGrave(page, marker, names, [
     { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
     { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
-    { description: "Grabstein reinigen", vatRate: 19, price: 47.8, count: 1 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
     { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
   ]);
 
@@ -785,21 +777,13 @@ test("the grave detail page shows this half-year's billed price once it is today
   await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
 
   await page.goto(`/index.html#/graves/${graveId}`);
-  // the grave detail page has no half-year selector: it always shows what was
-  // billed for the half-year today falls in, once that exists. Here the 19%
-  // subtotal (49,90 + 47,80 = 97,70) does not divide by three, so a cent lands
-  // on the cheapest, count-1 line — Grabstein reinigen must read 47,81, not
-  // the grave's configured 47,80. This is the assertion that would have failed
-  // before GraveDetail.controller.ts read the invoice's lines instead of the
-  // grave's configuration: reverting that change back to always use
-  // details.Items would put 47,80 back here and turn this red.
-  // count 1, so the unit price and the net line sum are the same figure and
-  // appear in two columns — scope to the row rather than the page
+  // The grave detail page has no half-year selector: it always shows what was
+  // billed for the half-year today falls in. The 19 % subtotal is 49,90 + 47,81
+  // = 97,71, which divides by three; the page shows the grave's own price,
+  // unadjusted, because nothing adjusts prices any more — a grave that did not
+  // divide could not have been saved.
   const stoneRow = page.locator("tbody tr", { hasText: "Grabstein reinigen" }).first();
   await expect(stoneRow).toContainText("47,81 €");
-  // and the page says where the difference came from, rather than showing a
-  // figure that silently disagrees with what was typed
-  await expect(stoneRow).toContainText("eingegeben: 47,80 €");
 });
 
 test("the grave's item table separates net, gross, rate and the incl.-VAT flag", async ({
@@ -824,15 +808,13 @@ test("the grave's item table separates net, gross, rate and the incl.-VAT flag",
   await expect(row).toContainText("238,00 €");
   // the flag reads as a word, since a screen reader announces these cell by cell
   await expect(row).toContainText("Nein");
-  // and the gross column says why it need not add up to the printed total
-  await expect(page.getByText("je Steuersatz gerundet")).toBeVisible();
 });
 
-test("creating a grave whose price cannot be billed as typed asks first", async ({ page }) => {
+test("a grave whose prices do not divide is refused until a price is changed", async ({ page }) => {
   const marker = `GW-${Date.now()}`;
   // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,
-  // and 4 782 is the first total that both divides and still covers the bill —
-  // so the grave would be billed 47,82, not the 47,80 that is typed
+  // so the three of them cannot be billed the same amount. Nothing raises the
+  // price to make it fit — the save is refused and names what would work.
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   await createRow(page, "/odata/InvoiceItems", {
     Number: `${marker}-item`,
@@ -876,11 +858,18 @@ test("creating a grave whose price cannot be billed as typed asks first", async 
 
   await page.getByRole("button", { name: "Speichern" }).click();
 
-  // the warning names both figures and waits to be accepted
-  const confirm = page.locator(".sapMMessageBox");
-  await expect(confirm).toContainText("47,80");
-  await expect(confirm).toContainText("47,82");
-  await confirm.getByRole("button", { name: "OK" }).click();
+  // refused, naming the rate and the nearest subtotals that would divide
+  const refusal = page.locator(".sapMMessageBox");
+  await expect(refusal).toContainText("47,80");
+  await expect(refusal).toContainText("47,79");
+  await expect(refusal).toContainText("47,82");
+  // MessageBox.error closes with "Schließen", not "OK"
+  await refusal.getByRole("button").first().click();
+
+  // the dialog is still open with the draft intact, so the price can be fixed
+  await expect(graveDialog.getByLabel("Grabnummer")).toHaveValue(marker);
+  await graveDialog.getByLabel("Preis").fill("47.79");
+  await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.locator("[id$='gravesTable-listUl']")).toContainText(marker);
 });

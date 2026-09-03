@@ -471,6 +471,9 @@ export interface InvoiceRow {
   PeriodYear: number | null;
   PeriodHalf: number | null;
   SharePercent: number | string | null;
+  /** How many recipients the grave's bill was divided by; null on an ordinary
+   *  invoice, and on a grave invoice generated before the split changed. */
+  RecipientCount: number | string | null;
   /** What this invoice actually bills — the recipient's share on a grave
    *  invoice, the whole of it on every other one — computed by the backend
    *  from the same calculation the PDF uses, so a screen never disagrees with
@@ -513,18 +516,47 @@ export interface GraveInvoiceRunRow {
  *  it away from it, and a price is never negative. They can also diverge where a
  *  binary double lands just under a value the decimal arithmetic treats as a
  *  tie. Neither is reachable at the rates this application uses: over every
- *  `NetOf` output for a gross of 0,01 to 2000,00, plus the whole cents
- *  `MakeDivisible` can add, no rate in the settings produces a disagreement.
- *
- *  It is worth being precise about which premise carries that, because the
- *  narrower one no longer holds: the nets reaching this function are not all
- *  `NetOf` output any more. A grave's line is `NetOf` output plus the whole
- *  cents `GraveShare.MakeDivisible` added so the subtotals divide and the
- *  shares still cover the bill, and both the grave detail page and the grave
- *  edit dialog display those. The sign is what rules the tie out, not the
- *  provenance. */
+ *  `NetOf` output for a gross of 0,01 to 2000,00, no rate in the settings
+ *  produces a disagreement. The sign is what rules the tie out. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
+}
+
+/** Cuts `total` across lines in proportion to their nets, so the parts add up
+ *  to it exactly.
+ *
+ *  Adding VAT to each line on its own does not reach the total anyone pays: it
+ *  is rounded once per VAT rate rather than per line, and on a grave once per
+ *  recipient on top. A column built that way disagreed with the invoices listed
+ *  directly beneath it on five of seven sample graves, by up to three cents.
+ *
+ *  So the total is taken as given — it is what the recipients are charged — and
+ *  only its division across the rows happens here, largest remainder first so
+ *  the cents land on the closest calls. Ties keep the earlier line, so the same
+ *  figures always produce the same rows.
+ *
+ *  This decides no amount; the total is already fixed by the time it gets here,
+ *  which is why it can live in the browser at all. */
+export function shareOfTotal(nets: number[], total: number): number[] {
+  const netCents = nets.map((net) => Math.round(net * 100));
+  const netSum = netCents.reduce((sum, value) => sum + value, 0);
+  const totalCents = Math.round(total * 100);
+  if (nets.length === 0 || netSum === 0) {
+    return nets.map(() => 0);
+  }
+
+  const exact = netCents.map((net) => (net * totalCents) / netSum);
+  const shares = exact.map((value) => Math.floor(value));
+  const order = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+
+  let left = totalCents - shares.reduce((sum, value) => sum + value, 0);
+  for (let step = 0; left > 0; step++, left--) {
+    shares[order[step % order.length].index] += 1;
+  }
+
+  return shares.map((value) => value / 100);
 }
 
 /** What a price field shows for a line's stored net price: the gross for a line
@@ -578,49 +610,72 @@ export async function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveIn
   return (await response.json()) as GraveInvoiceGroup;
 }
 
-export interface GraveBillingPreviewInput {
+export interface GraveBillingInput {
   ItemId: number;
   Count: number;
   UnitPrice: number | null;
   PriceIncludesVat: boolean;
 }
 
-export interface GraveBillingPreviewLine {
+export interface GraveBillingLine {
   ItemId: number;
   ItemNumber: string;
   Description: string;
   Count: number;
   VatRate: number;
   PriceIncludesVat: boolean;
-  /** As typed: the gross for a VAT-included line, the net for every other one. */
-  EnteredPrice: number;
-  /** What would actually be billed, in that same unit. */
-  BilledPrice: number;
-  /** The net that would be stored, whatever unit the price was entered in. */
+  /** The net the line is billed at. */
   UnitPrice: number;
+  /** Count × UnitPrice. */
+  NetTotal: number;
 }
 
-/** What a grave's lines would be billed at, before any invoice exists.
+/** Why a grave's prices cannot be split evenly across its recipients. All
+ *  amounts are in euro. */
+export interface GraveBillingProblem {
+  VatRate: number;
+  /** `NotDivisible`: the rate's net subtotal does not divide by the recipient
+   *  count. `DoesNotAddUp`: it divides, but a price entered as a gross cannot
+   *  be billed exactly as it was typed. */
+  Kind: "NotDivisible" | "DoesNotAddUp";
+  NetSubtotal: number;
+  Collected: number;
+  Owed: number;
+  /** The nearest subtotals that would work, so the message can name a figure to
+   *  aim at rather than only saying no. */
+  NearbyValidSubtotals: number[];
+}
+
+export interface GraveBillingCheck {
+  Ok: boolean;
+  /** What the recipients would collect between them; null when it does not
+   *  come out even. */
+  GrossTotal: number | null;
+  Problems: GraveBillingProblem[];
+  Lines: GraveBillingLine[];
+}
+
+/** Whether a grave's prices can be split evenly across its recipients, and what
+ *  they would be billed.
  *
- *  Converting a VAT-included price to a net rounds it, and the split then raises
- *  unit prices by whole cents until each VAT-rate subtotal divides across the
- *  recipients and their shares still cover the bill — so what is billed is not
- *  always what was typed. The grave dialog warns about that before saving.
+ *  A grave is billed by giving every recipient the same share of each VAT-rate
+ *  subtotal, so the prices have to divide. Nothing adjusts them — the save
+ *  refuses a grave that does not come out even, and the dialog asks this first
+ *  so it can say which rate is wrong and what would work instead.
  *
- *  The backend answers this rather than the browser working it out: that rule is
- *  the one piece of money arithmetic in this feature, and a second copy of it in
- *  TypeScript would be free to drift from the one that actually bills. It is the
- *  same reason `api.invoiceTotals` gave way to totals served by the API. */
-export async function previewGraveBilling(
+ *  The backend answers it rather than the browser working it out: the same rule
+ *  decides what is actually billed, and a second copy of it in TypeScript would
+ *  be free to disagree with the one that refuses the save. */
+export async function checkGraveBilling(
   recipients: number,
-  lines: GraveBillingPreviewInput[],
-): Promise<GraveBillingPreviewLine[]> {
-  const response = await post("/odata/PreviewGraveBilling", {
+  lines: GraveBillingInput[],
+): Promise<GraveBillingCheck> {
+  const response = await post("/odata/ValidateGraveBilling", {
     Recipients: recipients,
     Lines: lines,
   });
   await ensureOk(response);
-  return ((await response.json()) as { Lines: GraveBillingPreviewLine[] }).Lines;
+  return (await response.json()) as GraveBillingCheck;
 }
 
 /** Revises every recipient invoice of the grave and half-year the given invoice

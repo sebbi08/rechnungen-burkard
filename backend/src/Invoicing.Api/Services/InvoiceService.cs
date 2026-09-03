@@ -253,8 +253,7 @@ public sealed class InvoiceService
                     UnitPrice = VatInclusivePrice.NetOf(
                         unitPrice.Value,
                         item.VatRate,
-                        input.PriceIncludesVat,
-                        input.Count
+                        input.PriceIncludesVat
                     ),
                     VatRate = item.VatRate,
                     PriceIncludesVat = input.PriceIncludesVat,

@@ -74,15 +74,14 @@ public sealed class GraveInvoiceGenerator
                 item.Item.Number,
                 item.Item.Description,
                 item.Count,
-                // GraveShare.MakeDivisible works in net cents — the grave's
-                // subtotals are what has to divide evenly across the recipients
-                // — so a VAT-included price gives up its VAT here, before it is
-                // billed rather than after
+                // the split works in net cents — the grave's subtotals are what
+                // has to divide evenly across the recipients — so a VAT-included
+                // price gives up its VAT here, before it is billed rather than
+                // after
                 VatInclusivePrice.NetOf(
                     EffectivePrice(item)!.Value,
                     item.Item.VatRate,
-                    item.PriceIncludesVat,
-                    item.Count
+                    item.PriceIncludesVat
                 ),
                 item.Item.VatRate,
                 item.PriceIncludesVat,
@@ -90,10 +89,18 @@ public sealed class GraveInvoiceGenerator
             ))
             .ToList();
 
-        // Every recipient is billed the same lines — the grave's own, raised by
-        // whole cents where a VAT subtotal would not divide. The share is applied
-        // when the document is built, not by dividing the lines.
-        var billedLines = GraveShare.MakeDivisible(graveLines, recipients.Count);
+        // Every recipient is billed the same lines — the grave's own, exactly as
+        // configured. The share is applied when the document is built, not by
+        // dividing the lines, and nothing here adjusts a price: a grave whose
+        // subtotals do not divide is refused when it is saved, and skipped here
+        // if it reaches generation anyway.
+        var problems = GraveShare.Problems(graveLines, recipients.Count);
+        if (problems.Count > 0)
+        {
+            return new GraveGenerationResult(null, "PricesDoNotDivide");
+        }
+
+        var billedLines = graveLines;
 
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / recipients.Count;

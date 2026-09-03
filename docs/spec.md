@@ -488,10 +488,13 @@ non-interactive until completion, and the task runs exactly once.
   invoice per recipient, each carrying the grave's own items and counts in full,
   billed at the same amount as every other recipient's invoice.
 - **FR-021a**: The grave's per-VAT-rate subtotals MUST divide evenly across its
-  recipients so that every recipient's share is identical; where a subtotal does
-  not divide evenly, the grave's price MUST be raised by whole cents — never
-  reduced — until it does, and every invoice's VAT MUST follow from its own share
-  of that net.
+  recipients so that every recipient's share is identical, and every invoice's
+  VAT MUST follow from its own share of that net. The system MUST NOT adjust a
+  price to achieve this: saving a grave whose subtotals do not divide MUST be
+  refused, naming the VAT rate, its subtotal and the nearest subtotals that
+  would divide. Where a rate carries a price entered as a gross, what the
+  recipients collect between them MUST come to exactly that gross, and the save
+  MUST be refused otherwise.
 - **FR-022**: Each recipient invoice MUST state which percentage of the grave's
   bill it represents, in its summary beneath the item list: the grave's net sum,
   then the recipient's share of it labelled with that percentage, then the VAT
@@ -680,9 +683,8 @@ non-interactive until completion, and the task runs exactly once.
   per recipient, with zero duplicates across a batch of 50 or more graves.
 - **SC-004**: For graves with multiple recipients, every recipient is billed an
   identical amount, and their shares sum exactly to the net sum printed on the
-  invoice. The grave's bill may be raised by a few cents so that its per-rate
-  subtotals divide evenly and the shares together still collect what the grave
-  was asked for; it is never reduced.
+  invoice. A grave whose prices cannot be split that way cannot be saved: the
+  prices are never adjusted on the user's behalf.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
 - **SC-006**: A bulk download of N normal grave invoices for a half-year yields
@@ -721,9 +723,9 @@ non-interactive until completion, and the task runs exactly once.
 - A single currency (EUR) is used for all amounts in version 1.
 - A half-year is one of two periods: January 1 – June 30 and July 1 – December 31.
 - The "current half-year" is derived from the current date.
-- When a grave's net subtotal does not divide evenly among its recipients, the
-  grave's price is raised by whole cents — never reduced — until it does, so
-  every recipient is billed an identical share.
+- A grave's prices are chosen so that its net subtotals divide evenly among its
+  recipients; a grave that does not come out even cannot be saved, and nothing
+  adjusts a price on the user's behalf.
 - For grave invoices generated before recipients were billed the grave's own
   lines directly, each line's stored price is one recipient's share; where the
   pre-split price is missing, it is reconstructed from the recipients' shares

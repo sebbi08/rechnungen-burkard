@@ -186,7 +186,7 @@ public class GraveGenerationTests
     }
 
     [Fact]
-    public async Task Odd_three_way_split_bills_the_graves_net_exactly()
+    public async Task A_grave_whose_prices_do_not_divide_is_skipped_rather_than_billed_wrong()
     {
         using var host = new ApiTestHost();
         {
@@ -261,52 +261,21 @@ public class GraveGenerationTests
         var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
         Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
 
+        // 2 x 100.00 = 200.00 net at 7 %, or 20 000 cents, and 20 000 % 3 = 2:
+        // the three recipients cannot be billed the same amount. Nothing here
+        // adjusts the price to make it fit -- saving such a grave is refused in
+        // the first place, and one that reaches generation anyway (saved before
+        // the rule existed, say) is skipped rather than billed wrong.
+        Assert.Contains("PricesDoNotDivide", job.GetRawText());
+
         {
             using var scope = host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var invoices = await db
-                .Invoices.Include(i => i.Lines)
-                .Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
-                .ToListAsync();
-
-            // 2 x 100.00 = 200.00 net at 7 %, or 20000 cents; 20000 % 3 = 2. The
-            // grave has a single count-2 line, so the only reachable additions are
-            // multiples of 2 (one cent on that line moves its net by its count);
-            // the nearest reachable multiple of 3 is +4 (2, then 2 again), giving
-            // 20004 cents = 200.04, which divides evenly by 3 (6668 cents = 66.68
-            // per recipient) — the whole point of the bump.
-            Assert.Equal(3, invoices.Count);
-            Assert.All(invoices, i => Assert.Equal(100m / 3, i.SharePercent));
-            Assert.All(invoices, i => Assert.Equal(3, i.RecipientCount));
-
-            // every recipient is billed the SAME, already-bumped grave lines —
-            // nothing is split between them any more, so every invoice's own net
-            // is the bumped grave total, not a share of it
-            var nets = invoices
-                .Select(i =>
-                    (long)
-                        i.Lines.Sum(l =>
-                            Math.Round(
-                                l.Count * l.UnitPrice * 100m,
-                                0,
-                                MidpointRounding.AwayFromZero
-                            )
-                        )
-                )
-                .Distinct()
-                .ToList();
-            Assert.Equal(new List<long> { 20004 }, nets);
-
-            // Each recipient's share is 66.68 net (20004 / 3, no remainder). Its
-            // VAT is round(66.68 x 7 / 100, 2) = round(4.6676, 2) = 4.67, a gross
-            // of 71.35. The three invoices round that VAT independently, so
-            // together they come to 214.05 where a single invoice for the bumped
-            // grave total would show 214.04 — under a cent across recipients,
-            // which is the trade for documents that each add up on their own.
-            var builder = new DocumentDataBuilder();
-            var shareGrosses = invoices.Select(i => builder.Build(i).Share!.GrossTotal).ToList();
-            Assert.All(shareGrosses, gross => Assert.Equal(71.35m, gross));
-            Assert.Equal(214.05m, shareGrosses.Sum());
+            Assert.Empty(
+                await db
+                    .Invoices.Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
+                    .ToListAsync()
+            );
         }
     }
 

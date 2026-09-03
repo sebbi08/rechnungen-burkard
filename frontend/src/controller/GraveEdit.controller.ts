@@ -185,7 +185,7 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return;
     }
 
-    if (!(await this.confirmBilledPrices(draft))) {
+    if (!(await this.checkBilling(draft))) {
       return;
     }
 
@@ -212,30 +212,29 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     }
   }
 
-  /** Warns when the grave will not be billed at the prices that were typed, and
-   *  waits for the user to accept it.
+  /** Refuses the save when the grave's prices cannot be split evenly across
+   *  its recipients, and says which rate is wrong and what would work.
    *
-   *  Two rules can move a price: converting a VAT-included price to a net
-   *  rounds it, and the split raises unit prices by whole cents until each VAT
-   *  rate's subtotal divides across the recipients and the shares still cover
-   *  the amount. Neither is visible while typing, and the first time anyone
-   *  noticed was on a finished invoice — hence a confirmation here rather than
-   *  a surprise later.
+   *  The bill is divided equally, so it has to divide: each VAT rate's net
+   *  subtotal must come out whole across the recipients, and a price entered as
+   *  a gross has to be billable exactly as it was typed. Nothing adjusts a
+   *  price to make it fit -- that was tried, and it put figures on the page
+   *  nobody had entered.
    *
-   *  Answers true when there is nothing to warn about, so the caller can treat
-   *  it as "go ahead". A draft with no recipients or no items has no billed
-   *  price yet and warns about nothing; a preview that fails does not block a
-   *  save, since refusing to save because a warning could not be computed would
-   *  be worse than saving without it. */
-  private async confirmBilledPrices(draft: GraveDraft): Promise<boolean> {
+   *  The save enforces this too; asking here is what turns a rejected request
+   *  into a message next to the field the user can act on. Answers true when
+   *  there is nothing to stop the save. A draft with no recipients has nothing
+   *  to divide by yet, and a check that could not be reached does not block the
+   *  save -- the server will refuse it anyway if it is wrong.  */
+  private async checkBilling(draft: GraveDraft): Promise<boolean> {
     const recipients = draft.Recipients.length;
     if (recipients === 0 || draft.Items.length === 0) {
       return true;
     }
 
-    let billed: api.GraveBillingPreviewLine[];
+    let check: api.GraveBillingCheck;
     try {
-      billed = await api.previewGraveBilling(
+      check = await api.checkGraveBilling(
         recipients,
         draft.Items.map((row) => ({
           ItemId: Number(row.itemId),
@@ -248,31 +247,41 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return true;
     }
 
-    const raised = billed.filter((line) => Number(line.BilledPrice) !== Number(line.EnteredPrice));
-    if (raised.length === 0) {
+    if (check.Ok) {
       return true;
     }
 
-    const lines = raised.map((line) =>
-      this.i18nText("confirmBilledPriceLine")
-        .replace("{0}", line.Description)
-        .replace("{1}", this.formatAmount(line.EnteredPrice))
-        .replace("{2}", this.formatAmount(line.BilledPrice)),
-    );
-    const message = [
-      this.i18nText("confirmBilledPriceIntro"),
-      "",
-      ...lines,
-      "",
-      this.i18nText("confirmBilledPriceWhy"),
-    ].join("\n");
-
-    return new Promise((resolve) => {
-      MessageBox.confirm(message, {
-        title: this.i18nText("confirmBilledPriceTitle"),
-        onClose: (action: string | null) => resolve(action === MessageBox.Action.OK),
-      });
+    MessageBox.error(this.billingProblemText(check.Problems, recipients), {
+      title: this.i18nText("pricesDoNotDivideTitle"),
     });
+    return false;
+  }
+
+  /** The refusal, in words: what is wrong with each VAT rate and which figures
+   *  would work instead. */
+  protected billingProblemText(problems: api.GraveBillingProblem[], recipients: number): string {
+    const lines = problems.map((problem) => {
+      const rate = this.formatVatRate(problem.VatRate);
+      if (problem.Kind === "DoesNotAddUp") {
+        return this.i18nText("pricesDoNotAddUpLine")
+          .replace("{0}", rate)
+          .replace("{1}", this.formatAmount(problem.Collected))
+          .replace("{2}", this.formatAmount(problem.Owed));
+      }
+
+      const line = this.i18nText("pricesDoNotDivideLine")
+        .replace("{0}", rate)
+        .replace("{1}", this.formatAmount(problem.NetSubtotal))
+        .replace("{2}", String(recipients));
+      return problem.NearbyValidSubtotals.length === 0
+        ? line
+        : `${line} ${this.i18nText("pricesNearbyValid").replace(
+            "{0}",
+            problem.NearbyValidSubtotals.map((value) => this.formatAmount(value)).join(" / "),
+          )}`;
+    });
+
+    return [this.i18nText("pricesDoNotDivideIntro"), "", ...lines].join("\n");
   }
 
   public onGraveDialogCancel(): void {

@@ -1,29 +1,23 @@
 namespace Burkard.Invoicing.Domain;
 
-/// <summary>Raises a grave's unit prices by whole cents until every VAT-rate
-/// subtotal divides evenly across the recipients and the shares together still
-/// collect the grave's own bill, so each recipient can be billed the identical
-/// share without the split costing the business a cent.
+/// <summary>What a grave's recipients are charged, and whether that comes out
+/// even.
 ///
-/// Divisibility alone is not enough, because the VAT is rounded once per
-/// recipient rather than once for the grave. A subtotal of 84,24 at 19 % over
-/// two recipients divides exactly — 42,12 each — but each recipient's VAT
-/// rounds 8,0028 down to 8,00, where the whole grave would have rounded 16,0056
-/// up to 16,01. Two roundings down replace one rounding up and the split
-/// collects 100,24 against a bill of 100,25. So a subtotal has to satisfy both
-/// tests, and the cheapest raise satisfying both is the one taken.
+/// A grave's bill is split equally: every recipient gets the grave's own lines
+/// and pays the same share of each VAT-rate subtotal. That only works when the
+/// numbers divide, so the prices have to be chosen for it — nothing here adjusts
+/// them. <see cref="Problems"/> reports what does not come out, and saving a
+/// grave is refused until it does.
 ///
-/// Adding one cent to a line's unit price moves its subtotal by the line's
-/// count. With g = gcd(counts, recipients), g divides every count and therefore
-/// the subtotal too, and the reachable additions are exactly the multiples of
-/// g — so the residue needed is always reachable. Adding a cent to each line in
-/// turn is not enough: with three recipients and lines of count 1 and 2, a full
-/// lap adds three cents and returns to the same residue forever. Choosing which
-/// line to bump is what makes it terminate, and a shortest path over the
-/// residues finds the fewest cents.</summary>
+/// Raising prices automatically was tried first and abandoned. It kept the
+/// arithmetic out of sight but put figures on the page that nobody had typed,
+/// and left the grave's own worth and what the recipients paid a cent or two
+/// apart with no honest way to show both.</summary>
 public static class GraveShare
 {
-    public static IReadOnlyList<GraveLine> MakeDivisible(
+    /// <summary>Everything about these lines that stops them being split evenly
+    /// across the recipients. Empty when the grave can be billed as it stands.</summary>
+    public static IReadOnlyList<GraveShareProblem> Problems(
         IReadOnlyList<GraveLine> lines,
         int recipients
     )
@@ -33,13 +27,6 @@ public static class GraveShare
             throw new ArgumentOutOfRangeException(nameof(recipients));
         }
 
-        // A non-positive count breaks the search below rather than producing a
-        // wrong answer. Count 0 gives the residue graph a zero-cost self-loop,
-        // and the lexicographic tie-break keeps accepting an ever-longer path
-        // through it, so the relaxation never settles. A negative count indexes
-        // best[next] negatively and throws. Callers reject non-positive counts
-        // already, so this only keeps that from being the sole thing between an
-        // edit here and a hang.
         if (lines.Any(l => l.Count <= 0))
         {
             throw new ArgumentOutOfRangeException(
@@ -48,125 +35,92 @@ public static class GraveShare
             );
         }
 
-        var result = lines.ToList();
-        // materialised: the loop rewrites result as it goes
-        foreach (var rate in result.Select(l => l.VatRate).Distinct().ToList())
+        var problems = new List<GraveShareProblem>();
+        foreach (var rate in lines.Select(l => l.VatRate).Distinct().OrderBy(r => r))
         {
-            var indices = Enumerable
-                .Range(0, result.Count)
-                .Where(i => result[i].VatRate == rate)
-                .ToList();
-            var subtotal = indices.Sum(i => NetCents(result[i]));
-            foreach (
-                var i in CheapestBumps(
-                    indices.Select(i => result[i].Count).ToList(),
-                    subtotal,
-                    recipients,
-                    rate,
-                    BillFor(indices.Select(i => result[i]).ToList(), rate)
-                )
-            )
+            var group = lines.Where(l => l.VatRate == rate).ToList();
+            var subtotal = group.Sum(NetCents);
+
+            if (subtotal % recipients != 0)
             {
-                var line = result[indices[i]];
-                result[indices[i]] = line with { UnitPrice = line.UnitPrice + 0.01m };
-            }
-        }
-
-        return result;
-    }
-
-    /// <summary>Which lines to bump by one cent, fewest cents added first.
-    ///
-    /// A bump of line i raises the subtotal by counts[i], so the cents a bump
-    /// set adds to the bill are exactly the subtotal it adds — cheapest and
-    /// smallest-delta are the same thing, and the search can walk the reachable
-    /// deltas in ascending order and stop at the first one that works. A delta
-    /// works when the raised subtotal both divides across the recipients and
-    /// leaves their shares collecting the grave's own bill.
-    ///
-    /// Walking deltas rather than residues is what lets the second test be
-    /// applied at all: it depends on the subtotal's value, not merely on its
-    /// residue, so a residue-only search cannot express it. Two bump sets
-    /// reaching the same delta cost the same; the tie is broken by comparing
-    /// their sorted lists of bumped line numbers and keeping the
-    /// lexicographically smallest, a rule decided entirely by this method so a
-    /// revision reproduces the same split regardless of any library's own,
-    /// unspecified iteration order. That choice propagates safely: with every
-    /// count positive, no bump set at a given delta can be a proper prefix of
-    /// another, so extending the smallest set at each delta yields the smallest
-    /// set at the next.</summary>
-    private static IReadOnlyList<int> CheapestBumps(
-        IReadOnlyList<int> counts,
-        long subtotal,
-        int recipients,
-        decimal rate,
-        long bill
-    )
-    {
-        if (Works(subtotal, recipients, rate, bill))
-        {
-            return Array.Empty<int>();
-        }
-
-        // Generous, and only a bound: the residue alone needs at most
-        // (recipients - 1) bumps of the largest count, and the covering test is
-        // satisfied within a few cents of that. Exceeding it means an
-        // assumption here is wrong, which should stop the bill rather than
-        // quietly mis-price it.
-        var maxCount = counts.Max();
-        var limit = (recipients + 64) * maxCount;
-
-        var best = new List<int>?[limit + 1];
-        best[0] = new List<int>();
-
-        for (var delta = 0; delta <= limit; delta++)
-        {
-            if (best[delta] is null)
-            {
+                problems.Add(
+                    new GraveShareProblem(
+                        rate,
+                        GraveShareProblemKind.NotDivisible,
+                        subtotal,
+                        CollectedFor(subtotal, recipients, rate),
+                        Owed(group, rate),
+                        NearbyValidSubtotals(group, subtotal, recipients, rate)
+                    )
+                );
                 continue;
             }
 
-            if (delta > 0 && Works(subtotal + delta, recipients, rate, bill))
+            // A price entered as a gross is a promise about what the customer
+            // pays, so what the recipients collect has to come to exactly that.
+            // A net-priced line makes no such promise -- its gross is derived,
+            // and what the recipients collect is simply what the grave is worth.
+            if (group.Any(l => l.EnteredGross is not null))
             {
-                return best[delta]!;
-            }
-
-            for (var i = 0; i < counts.Count; i++)
-            {
-                var next = delta + counts[i];
-                if (next > limit)
+                var collected = CollectedFor(subtotal, recipients, rate);
+                var owed = Owed(group, rate);
+                if (collected != owed)
                 {
-                    continue;
-                }
-
-                var candidate = new List<int>(best[delta]!) { i };
-                candidate.Sort();
-                if (best[next] is null || IsLexicographicallySmaller(candidate, best[next]!))
-                {
-                    best[next] = candidate;
+                    problems.Add(
+                        new GraveShareProblem(
+                            rate,
+                            GraveShareProblemKind.DoesNotAddUp,
+                            subtotal,
+                            collected,
+                            owed,
+                            NearbyValidSubtotals(group, subtotal, recipients, rate)
+                        )
+                    );
                 }
             }
         }
 
-        throw new InvalidOperationException(
-            $"No combination of cents within {limit} makes a subtotal of {subtotal} "
-                + $"divide across {recipients} recipients and still cover the bill."
-        );
+        return problems;
     }
 
-    /// <summary>What one VAT rate's lines have to collect, in cents, fixed
-    /// before a single cent is added. A line entered as a gross has to collect
-    /// exactly that gross: measuring it instead by the gross of its rounded net
-    /// would charge again for the cent <see cref="VatInclusivePrice.NetOf"/>
-    /// may already have added to reach it. Everything else is net-priced, so
-    /// what it owes is its net plus that net's VAT.
+    /// <summary>What the recipients collect between them, in cents — each of
+    /// them an equal share of every VAT-rate subtotal plus that share's own
+    /// rounded VAT.
     ///
-    /// A target recomputed from the raised subtotal would climb with every cent
-    /// added and never be caught, which is why this is worked out once.</summary>
-    private static long BillFor(IReadOnlyList<GraveLine> lines, decimal rate)
+    /// This is the grave's worth, and the only gross figure worth showing. VAT
+    /// is rounded once per recipient, so adding VAT to the whole grave instead
+    /// gives a different number: 84,26 net at 19 % is 100,27 as one bill but
+    /// 100,26 as two of 50,13. Only one of those is ever paid.
+    ///
+    /// Expects lines that <see cref="Problems"/> passes; every rate subtotal
+    /// divides exactly, so each share is a whole number of cents.</summary>
+    public static long CollectedCents(IReadOnlyList<GraveLine> lines, int recipients)
     {
-        var netPriced = lines.Where(l => l.EnteredGross is null).Sum(NetCents);
-        var grossPriced = lines
+        if (recipients <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(recipients));
+        }
+
+        return lines
+            .Select(l => l.VatRate)
+            .Distinct()
+            .Sum(rate =>
+                CollectedFor(lines.Where(l => l.VatRate == rate).Sum(NetCents), recipients, rate)
+            );
+    }
+
+    private static long CollectedFor(long subtotal, int recipients, decimal rate)
+    {
+        var share = subtotal / recipients;
+        return recipients * (share + VatCents(share, rate));
+    }
+
+    /// <summary>What one rate's lines are worth, in cents: the gross that was
+    /// typed for every line entered as one, and net plus VAT for the rest.</summary>
+    private static long Owed(IReadOnlyList<GraveLine> group, decimal rate)
+    {
+        var netPriced = group.Where(l => l.EnteredGross is null).Sum(NetCents);
+        var grossPriced = group
             .Where(l => l.EnteredGross is not null)
             .Sum(l =>
                 (long)decimal.Round(l.EnteredGross!.Value * 100m, 0, MidpointRounding.AwayFromZero)
@@ -176,47 +130,79 @@ public static class GraveShare
         return netPriced + VatCents(netPriced, rate) + grossPriced;
     }
 
-    /// <summary>Whether a subtotal can be billed as it stands: it divides
-    /// evenly across the recipients, and the shares together — each carrying
-    /// its own rounded VAT — collect at least <paramref name="bill"/>, the
-    /// gross the grave was asked for before any cent was added.</summary>
-    private static bool Works(long subtotal, int recipients, decimal rate, long bill)
-    {
-        if (subtotal % recipients != 0)
-        {
-            return false;
-        }
-
-        var share = subtotal / recipients;
-        return recipients * (share + VatCents(share, rate)) >= bill;
-    }
-
-    /// <summary>The VAT on a net amount, in whole cents — the same rounding the
-    /// document applies, so what is checked here is what is billed.</summary>
-    private static long VatCents(long netCents, decimal rate) =>
-        (long)decimal.Round(netCents * rate / 100m, 0, MidpointRounding.AwayFromZero);
-
-    /// <summary>True if <paramref name="candidate"/> sorts before <paramref
-    /// name="current"/> in the usual dictionary order — compared element by
-    /// element, with a shorter list that is a prefix of the longer one
-    /// counting as smaller.</summary>
-    private static bool IsLexicographicallySmaller(
-        IReadOnlyList<int> candidate,
-        IReadOnlyList<int> current
+    /// <summary>The nearest net subtotals, above and below, that would divide
+    /// and add up — so the message can name a figure to aim at rather than only
+    /// saying no. Empty where nothing nearby works, which the caller reports as
+    /// "adjust a price" without a number.</summary>
+    private static IReadOnlyList<long> NearbyValidSubtotals(
+        IReadOnlyList<GraveLine> group,
+        long subtotal,
+        int recipients,
+        decimal rate
     )
     {
-        var length = Math.Min(candidate.Count, current.Count);
-        for (var i = 0; i < length; i++)
+        var checksGross = group.Any(l => l.EnteredGross is not null);
+        var found = new List<long>();
+
+        for (var distance = 1; distance <= 200 && found.Count < 2; distance++)
         {
-            if (candidate[i] != current[i])
+            foreach (var candidate in new[] { subtotal - distance, subtotal + distance })
             {
-                return candidate[i] < current[i];
+                if (candidate <= 0 || candidate % recipients != 0 || found.Contains(candidate))
+                {
+                    continue;
+                }
+
+                // The gross test compares against what the lines are owed, which
+                // moves with the prices being adjusted -- so a candidate subtotal
+                // is only meaningful if the same adjustment lands on the owed
+                // figure too. Shifting both by the same amount is what adjusting
+                // a gross-entered price actually does.
+                if (checksGross)
+                {
+                    if (
+                        CollectedFor(candidate, recipients, rate)
+                        != Owed(group, rate) + (candidate - subtotal)
+                    )
+                    {
+                        continue;
+                    }
+                }
+
+                found.Add(candidate);
             }
         }
 
-        return candidate.Count < current.Count;
+        found.Sort();
+        return found;
     }
+
+    private static long VatCents(long netCents, decimal rate) =>
+        (long)decimal.Round(netCents * rate / 100m, 0, MidpointRounding.AwayFromZero);
 
     private static long NetCents(GraveLine line) =>
         (long)decimal.Round(line.Count * line.UnitPrice * 100m, 0, MidpointRounding.AwayFromZero);
 }
+
+public enum GraveShareProblemKind
+{
+    /// <summary>The rate's net subtotal does not divide evenly across the
+    /// recipients, so they cannot be billed the same amount.</summary>
+    NotDivisible,
+
+    /// <summary>It divides, but what the recipients collect between them is not
+    /// what the lines are worth — a price entered as a gross cannot be billed
+    /// exactly as it was typed.</summary>
+    DoesNotAddUp,
+}
+
+/// <summary>One reason a grave cannot be split as its prices stand. All amounts
+/// are in cents.</summary>
+public sealed record GraveShareProblem(
+    decimal VatRate,
+    GraveShareProblemKind Kind,
+    long NetSubtotal,
+    long Collected,
+    long Owed,
+    IReadOnlyList<long> NearbyValidSubtotals
+);

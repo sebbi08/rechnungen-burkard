@@ -76,11 +76,6 @@
                     </ColumnListItem>
                 </items>
             </Table>
-            <Text
-                text="{i18n>grossRoundingNote}"
-                wrapping="true"
-                class="sapUiTinyMarginTop sapUiTinyMarginBegin"
-            />
             <HBox wrap="Wrap" justifyContent="End" class="sapUiSmallMarginTop">
                 <ObjectStatus
                     title="{i18n>netTotal}"

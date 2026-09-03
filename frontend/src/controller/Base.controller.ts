@@ -144,16 +144,13 @@ export default abstract class BaseController extends Controller {
     return this.i18nText(value ? "yes" : "no");
   }
 
-  /** "eingegeben: 47,80 €" — the price as typed, next to the one that is
-   *  billed. The pattern carries the label so it stays translatable. */
-  public formatEnteredPrice(
-    pattern: string | null | undefined,
-    value: number | string | null | undefined,
-  ): string {
+  /** A VAT rate as it is written: "19", or "7,7" where a rate has a decimal —
+   *  never "19.00". */
+  public formatVatRate(value: number | string | null | undefined): string {
     if (value == null || value === "") {
       return "";
     }
-    return (pattern ?? "{0}").replace("{0}", this.formatAmount(value));
+    return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 2 });
   }
 
   /** "2026-0042-R1" -> "2026-0042": the chain, without the revision marker. */

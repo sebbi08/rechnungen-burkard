@@ -74,9 +74,8 @@ public sealed class GraveInvoiceRevisionService
 
         // A grave's recipients cannot change, so the group is always the grave's
         // full set. Every recipient is billed the same lines — the grave's own,
-        // raised by whole cents where a VAT subtotal would not divide — the same
-        // way generation bills them.
-        var billedLines = GraveShare.MakeDivisible(graveLines, siblings.Count);
+        // exactly as the dialog sent them, the same way generation bills them.
+        var billedLines = graveLines;
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / siblings.Count;
         var now = DateTime.UtcNow;
@@ -161,15 +160,12 @@ public sealed class GraveInvoiceRevisionService
         return created;
     }
 
-    /// <summary>The grave's lines from what the dialog sent: the full count at the
-    /// full price, before GraveShare.MakeDivisible raises it for divisibility
-    /// across the recipients.
+    /// <summary>The grave's lines from what the dialog sent: the full count at
+    /// the full price, which is what every recipient is billed.
     ///
     /// The order is the request body's, preserved line for line — nothing here
-    /// re-sorts or groups. That matters because line order decides which line
-    /// takes a cent under MakeDivisible's tie-break: the dialog opens on
-    /// GraveInvoiceGroup's lines, which come back ordered by line number, so
-    /// sending them back unchanged reproduces the same split.</summary>
+    /// re-sorts or groups, so the lines come back in the order they are shown
+    /// and their line numbers stay put across a revision.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
         IReadOnlyList<InvoiceLineInput> inputs,
         CancellationToken ct
@@ -216,14 +212,8 @@ public sealed class GraveInvoiceRevisionService
                     item.Description,
                     input.Count,
                     // the dialog sends the grave's price as it shows it, which
-                    // for a VAT-included line is the gross; MakeDivisible needs
-                    // the net
-                    VatInclusivePrice.NetOf(
-                        unitPrice,
-                        item.VatRate,
-                        input.PriceIncludesVat,
-                        input.Count
-                    ),
+                    // for a VAT-included line is the gross; a line is billed net
+                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
                     item.VatRate,
                     input.PriceIncludesVat,
                     input.PriceIncludesVat ? unitPrice : null

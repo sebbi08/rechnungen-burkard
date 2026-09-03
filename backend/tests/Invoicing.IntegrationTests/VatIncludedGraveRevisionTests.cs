@@ -15,32 +15,22 @@ namespace Burkard.Invoicing.IntegrationTests;
 /// nothing at all — not the stored net, not the gross the page shows, not the
 /// bill. This pins that round trip.
 ///
-/// It did not always hold. While the stored net kept three decimals and the
-/// gross shown for it two, submitting the shown gross unchanged could land on a
-/// different net than the one it was rendered from, and the displayed price
-/// moved by a cent on the first revision before settling. Two-decimal nets
-/// removed the mismatch: what the page shows converts back to exactly the net
-/// it was rendered from, so the first generation is already the fixed point.
-///
-/// Traced at 119,00 € gross, 7 %, count 1, three recipients: NetOf rounds
-/// 111,21495 down to 111,21, whose line would bill 118,99 — under the 119,00
-/// entered — so it is raised to 111,22. Those 11 122 net cents leave a
-/// remainder of 1 modulo 3, so two more cents reach 11 124 and the line is
-/// stored at 111,24. The page shows round(111,24 × 1,07) = 119,03, and
-/// submitting that back gives 111,24 again.
-///
-/// Each recipient is billed 3 708 net cents — 37,08 € net, 39,68 € gross — at
-/// every one of the three generations.</summary>
+/// 117,00 € gross at 7 % over three recipients: the net is 109,35, which
+/// divides into three shares of 36,45, each carrying 2,55 VAT for a gross of
+/// 39,00 — so the three of them collect exactly the 117,00 that was typed. A
+/// grave whose prices did not come out that evenly could not be saved in the
+/// first place, which is what makes this round trip a fixed point rather than
+/// something that drifts.</summary>
 public class VatIncludedGraveRevisionTests
 {
-    private const decimal EnteredGross = 119.00m;
+    private const decimal EnteredGross = 117.00m;
     private const decimal VatRate = 7m;
     private const int Recipients = 3;
 
-    // 11 124 net cents over three recipients: 3 708 net cents each, VAT
-    // round(37,08 × 7 / 100, 2) = 2,60, gross 39,68.
-    private const decimal ExpectedShareNet = 37.08m;
-    private const decimal ExpectedShareGross = 39.68m;
+    // 10 935 net cents over three recipients: 3 645 net cents each, VAT
+    // round(36,45 × 7 / 100, 2) = 2,55, gross 39,00.
+    private const decimal ExpectedShareNet = 36.45m;
+    private const decimal ExpectedShareGross = 39.00m;
 
     private static async Task SeedAsync(ApiTestHost host)
     {
@@ -179,8 +169,8 @@ public class VatIncludedGraveRevisionTests
 
         // nothing moves: the first generation is already the fixed point, and
         // every price has two decimals
-        Assert.Equal(new[] { 111.24m, 111.24m, 111.24m }, storedNets);
-        Assert.Equal(new[] { 119.03m, 119.03m, 119.03m }, shownGrosses);
+        Assert.Equal(new[] { 109.35m, 109.35m, 109.35m }, storedNets);
+        Assert.Equal(new[] { 117.00m, 117.00m, 117.00m }, shownGrosses);
         Assert.All(storedNets, net => Assert.Equal(net, decimal.Round(net, 2)));
 
         // and all three revisions exist, so the ones above really were three

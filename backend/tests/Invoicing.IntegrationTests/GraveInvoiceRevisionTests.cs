@@ -107,7 +107,10 @@ public class GraveInvoiceRevisionTests
                 Number = "2003",
                 Description = "Grabpflege",
                 VatRate = 7m,
-                DefaultPrice = 10.01m,
+                // 10,02 rather than 10,01: 1 002 net cents divide evenly across
+                // the two recipients. At 10,01 the grave could not be saved --
+                // nothing raises a price to make it fit any more.
+                DefaultPrice = 10.02m,
             };
             var zimmermann = new Recipient
             {
@@ -170,10 +173,9 @@ public class GraveInvoiceRevisionTests
         using var host = new ApiTestHost();
         var (graveId, itemId, invoiceId) = await SeedReverseAlphabeticalAsync(host);
 
-        // count 1 at 10.01 with 7% VAT nets 1001 cents, which does not divide
-        // evenly across two recipients: generation already raised it by one cent
-        // (GraveShare.MakeDivisible) so both recipients are billed the identical
-        // 10.02, not a genuine remainder cent handed to just one of them.
+        // count 1 at 10.02 with 7 % VAT nets 1 002 cents, which divides evenly
+        // across two recipients. Both are billed the grave's own price in full;
+        // there is no split position for a remainder cent to land on unevenly.
         Dictionary<string, decimal> before;
         using (var scope = host.Services.CreateScope())
         {
@@ -200,7 +202,7 @@ public class GraveInvoiceRevisionTests
                         {
                             itemId,
                             count = 1,
-                            unitPrice = (decimal?)10.01m,
+                            unitPrice = (decimal?)10.02m,
                         },
                     },
                 }
@@ -216,8 +218,7 @@ public class GraveInvoiceRevisionTests
             .ToListAsync();
 
         Assert.Equal(2, after.Count);
-        // every recipient is billed the identical, raised amount — there is no
-        // split position left for a remainder cent to land on unevenly
+        // and the revision leaves them on the same identical amount
         Assert.All(after, r => Assert.Equal(10.02m, r.Lines.Single().UnitPrice));
         Assert.All(after, r => Assert.Equal(2, r.RecipientCount));
     }

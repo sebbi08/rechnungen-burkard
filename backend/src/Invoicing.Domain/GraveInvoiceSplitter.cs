@@ -4,7 +4,7 @@ namespace Burkard.Invoicing.Domain;
 
 /// <summary>One line of a grave's bill: the grave's count at the grave's price,
 /// billed to every recipient in full. It is what generation and revision hand to
-/// <see cref="GraveShare.MakeDivisible"/>, and what the edit dialog opens on;
+/// <see cref="GraveShare"/>, and what the edit dialog opens on;
 /// the recipient's share of it is worked out when the document is built, not by
 /// dividing the line.</summary>
 public sealed record GraveLine(

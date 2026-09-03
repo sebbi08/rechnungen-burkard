@@ -88,19 +88,7 @@
                                 <Text text="{grave>Number}" />
                                 <Text text="{grave>Description}" wrapping="true" />
                                 <Text text="{grave>Count}" />
-                                <VBox>
-                                    <Text
-                                        text="{path: 'grave>Price', formatter: '.formatAmount'}"
-                                    />
-                                    <!-- billing raised this price: say what was
-                                         entered, so the two figures are not read
-                                         as a contradiction -->
-                                    <ObjectStatus
-                                        state="Warning"
-                                        visible="{grave>PriceWasRaised}"
-                                        text="{parts: ['i18n>enteredPrice', 'grave>EnteredPrice'], formatter: '.formatEnteredPrice'}"
-                                    />
-                                </VBox>
+                                <Text text="{path: 'grave>Price', formatter: '.formatAmount'}" />
                                 <Text
                                     text="{path: 'grave>NetTotal', formatter: '.formatAmountOrDash'}"
                                 />
@@ -115,11 +103,6 @@
                         </ColumnListItem>
                     </items>
                 </Table>
-                <Text
-                    text="{i18n>grossRoundingNote}"
-                    wrapping="true"
-                    class="sapUiTinyMarginTop sapUiTinyMarginBegin"
-                />
             </Panel>
 
             <Panel headerText="{i18n>graveRecipients}" class="sapUiSmallMarginTop">

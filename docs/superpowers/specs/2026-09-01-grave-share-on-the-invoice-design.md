@@ -42,14 +42,11 @@ Settled with the user before this design:
 
 1. **Every recipient pays exactly the same.** This is the requirement; the rest
    follows from it.
-2. **The split must never collect less than the grave's bill.** Adding a few
-   cents is acceptable, losing them is not — and "the bill" means the gross,
-   which is what a VAT-included price states directly.
-3. **Every price on the page has two decimals.** Dividing a line was what
-   produced three of them — a recipient's third of 24,95 is 8,317 — and nothing
-   is divided any more. A VAT-included item's net is rounded to the cent too,
-   and raised where rounding down would undercharge; the Limits section records
-   what that costs.
+2. **The split collects exactly the grave's bill.** Not a cent more or less.
+   Where the prices cannot do that, the grave is refused rather than adjusted.
+3. **Every price on the page has two decimals**, and every price shown is one
+   that was entered. Dividing a line was what produced three decimals — a
+   recipient's third of 24,95 is 8,317 — and nothing is divided any more.
 4. **The invoice shows the whole grave, then the share.** Lines at 100 %, the
    net sum, the recipient's share, and the VAT worked out from the share.
 5. **Non-grave invoices keep their layout and their split-free arithmetic.**
@@ -63,63 +60,46 @@ Settled with the user before this design:
 
 For one grave and half-year, with `n` recipients:
 
-1. Take every line at 100 %, exactly as configured: count and unit price
-   unchanged.
-2. Group the lines by VAT rate and total each group.
-3. Add whole cents to unit prices until the group's total both divides by `n`
-   and leaves the `n` shares — each carrying its own rounded VAT — collecting
-   at least the gross the group was asked for, measured before any cent was
-   added. The fewest cents that satisfy both win. Where two combinations cost
-   the same, the one whose sorted list of bumped line numbers is
-   lexicographically smallest wins — a rule decided entirely by our own code,
-   not by any library's unspecified iteration order. Revisions must reproduce
-   the split exactly, so the tie-break is part of the rule rather than an
-   implementation detail.
+1. Every recipient's invoice carries the grave's own lines, at the count and
+   price configured. Nothing is divided and nothing is adjusted.
+2. The recipient's share of each VAT rate is that rate's net subtotal divided by
+   `n`, and the VAT is worked out from the share.
 
-   Divisibility alone is not enough, because the VAT is rounded once per
-   recipient instead of once for the grave. A subtotal of 84,24 at 19 % over
-   two recipients divides exactly — 42,12 each — but each recipient's VAT
-   rounds 8,0028 down to 8,00 where the grave's own 16,0056 rounds up to 16,01,
-   so the two of them collect 100,24 against a bill of 100,25. The target is
-   fixed before the raising starts: recomputed from the raised subtotal it
-   would climb with every cent added and never be caught.
+That only works when the numbers divide, so **the prices have to be chosen for
+it**. Saving a grave is refused unless, for each VAT rate:
 
-4. Every recipient's invoice carries those same 100 % lines. The recipient's
-   share of each VAT group is that group's total divided by `n`, which is now
-   exact.
-5. The VAT is worked out per rate from the share, not from the 100 % figures.
+- the net subtotal in cents divides evenly by `n`; and
+- where the rate carries a price entered as a gross, what the recipients collect
+  between them comes to exactly the gross that was typed.
 
-Each recipient's total is therefore `share + VAT(share)`, identical for all of
-them, and the shares sum to the printed net sum exactly.
+The refusal names the rate, the subtotal, and the nearest subtotals that would
+work. A net-priced line is not held to the second test: a net price says what
+the net is, and the gross follows from it — only a price entered as a gross is a
+promise about what the customer pays.
 
-### Why step 3 always terminates
+### Why nothing is adjusted automatically
 
-Adding one cent to a line's unit price moves its group total by `count` cents.
-Let `g = gcd(count₁ … countₖ, n)`. Because `g` divides every count, it divides
-the group total too, and the reachable additions are exactly the multiples of
-`g`. The residue we need is therefore always reachable, and a shortest-path
-search over the `n` residues finds the cheapest way there.
+The first version of this design raised prices by whole cents until the
+subtotals divided. It was abandoned. Raising kept the arithmetic out of sight,
+but it put figures on the page that nobody had typed, and it could not resolve
+what the grave was then worth: adding VAT to the grave's own net gave one
+number, and the recipients' rounded shares another, a cent or two apart, with no
+honest way to show both. Refusing instead moves the choice to the moment a price
+is entered, where it can be changed.
 
-**Round-robin does not work**, and it is worth recording why, because it is the
-obvious first guess. With three recipients and two lines of count 1 and 2, one
-full lap adds 3 cents — which is 0 modulo 3 — so every lap returns to the same
-residue and only two of the three residues are ever reachable. Cycling through
-the lines can loop forever; _choosing_ the line cannot. Verified exhaustively:
-over the same 308 945 configurations, round-robin failed on 18 748 of them and
-choosing failed on none.
+### What it costs to satisfy
 
-### What it costs
+Measured over every price from 0,01 € to 200,00 € at 7 % and 19 %:
 
-Measured over the same exhaustive sweep, the cents added to a grave's bill:
+| recipients                | 2    | 3    | 4    | 5    | 6    | 7     |
+| ------------------------- | ---- | ---- | ---- | ---- | ---- | ----- |
+| net prices that work      | 50 % | 33 % | 25 % | 20 % | 16 % | 14 %  |
+| gross prices that work    | 24 % | 10 % | 6 %  | 3 %  | 2 %  | 1 %   |
+| nearest valid gross, mean | 1,6c | 3,4c | 5,4c | 7,4c | 9,4c | 13,4c |
 
-- 28 % of graves need none — the subtotals already divide.
-- Mean 4 cents, and that sweep deliberately included awkward counts (7, 10) and
-  prices as small as one cent.
-- The worst case found was 60 cents, on a grave whose every line had a high
-  count. A grave with any count-1 line needs at most `n − 1` cents.
-
-The addition lands on the grave's bill, never on one recipient. All `n`
-invoices move together and stay identical.
+A net price needs at most `n − 1` cents of adjustment. A gross price is rarer,
+which is why the refusal has to name the nearest figure that works — at seven
+recipients it can be 45 cents away, and nobody would find it by trying.
 
 ## The invoice
 
@@ -249,9 +229,8 @@ the same total, and check the detail pages agree with the documents.
 
 > **SC-004**: For graves with multiple recipients, every recipient is billed an
 > identical amount, and their shares sum exactly to the net sum printed on the
-> invoice. The grave's bill may be raised by a few cents so that its per-rate
-> subtotals divide evenly and the shares together still collect what the grave
-> was asked for; it is never reduced.
+> invoice. A grave whose prices cannot be split that way cannot be saved: the
+> prices are never adjusted on the user's behalf.
 
 ## Limits
 
@@ -259,29 +238,16 @@ The percentages displayed sum to 99,99 % for three recipients. The amounts are
 exact and the net sum on the page proves it, but the percentage is a rounded
 label.
 
-A grave's printed line price can be a cent above what the grave record holds —
-that is the mechanism, and the grave detail page should show the adjusted
-figures so the two agree.
+**A grave's worth is what its recipients collect**, not its net plus VAT on that
+net. VAT is rounded once per recipient, so the two differ: a grave whose net is
+84,24 at 19 % is 100,25 as a single bill and 100,24 as two of 50,12. Only the
+second is ever paid, so it is the only gross the application shows. A report
+that recomputes VAT from a grave's net will differ by a cent or two.
 
-**A VAT-included price is not always exactly reachable.** A two-decimal net
-times a count puts line totals on a lattice of `count` cents, so a gross entered
-for a line cannot always be hit exactly, and the line lands on the first value
-above it. No whole-cent net bills 119,00 € at 7 %, for instance: 111,21 bills
-118,99 and 111,22 bills 119,01, so entering 119,00 shows 119,01 afterwards.
-
-Measured over every gross from 0,01 € to 40,00 € at 7 % and 19 %: exact for 88 %
-of prices at count 1 and never more than a cent over, rising to at most eleven
-cents over at count 10, where one cent on the unit price moves the line by ten.
-The overshoot is always upward — decision 2 forbids the other direction — and it
-is the price of decision 3. Three-decimal nets would land exactly; they were
-what this application stored until it was decided that every printed price has
-two decimals.
-
-**The gross a report recomputes may differ by a cent or two.** Each invoice
-rounds its own VAT once per rate, so the `n` grosses need not sum to the VAT of
-the 100 % net. The raising rule guarantees the direction — the shares always
-collect at least the grave's bill — but not equality. No document prints that
-figure, so nothing on paper disagrees.
+**Prices saved before this rule existed may not satisfy it.** Editing such a
+grave is refused until a price is adjusted, and generation skips it with
+`PricesDoNotDivide` rather than billing it wrong. Invoices already produced are
+untouched and go on rendering exactly as they did.
 
 ## Out of scope
 

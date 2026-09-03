@@ -21,7 +21,12 @@ namespace Burkard.Invoicing.IntegrationTests;
 public class GraveMultiItemGenerationTests
 {
     private const decimal ExpensivePrice = 100.00m;
-    private const decimal CheapPrice = 10.00m;
+
+    // 10,04 rather than 10,00: with the 100,00 line the 7 % subtotal comes to
+    // 110,04, whose 11 004 cents divide by both two and three — the two
+    // recipient counts these tests use. At 110,00 the three-way grave could not
+    // be saved at all, since 11 000 leaves a remainder.
+    private const decimal CheapPrice = 10.04m;
     private const decimal VatRate = 7m;
 
     private static async Task<long> SeedAsync(ApiTestHost host, int recipientCount)
@@ -149,9 +154,8 @@ public class GraveMultiItemGenerationTests
         var invoices = await db.Invoices.Include(i => i.Lines).ToListAsync();
         Assert.Equal(2, invoices.Count);
 
-        // 100.00 and 10.00 net cents (10000 and 1000) already divide evenly by 2,
-        // so MakeDivisible bumps neither line: every recipient is billed the
-        // grave's own prices in full.
+        // 11 004 net cents divide evenly by two, so the grave saves and every
+        // recipient is billed its prices in full.
         var builder = new DocumentDataBuilder();
         foreach (var invoice in invoices)
         {
@@ -164,13 +168,13 @@ public class GraveMultiItemGenerationTests
             Assert.Equal(CheapPrice, invoice.Lines.Single(l => l.ItemNumber == "M-010").UnitPrice);
         }
 
-        // the two recipients' shares still add up to the grave's full gross:
-        // (100.00 + 10.00) net x 1.07 = 117.70
-        Assert.Equal(117.70m, invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
+        // 5 502 net cents each, VAT round(55.02 x 7 / 100, 2) = 3.85, so 58.87
+        // apiece and 117.74 between them — the grave's worth
+        Assert.Equal(117.74m, invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
     }
 
     [Fact]
-    public async Task Three_recipients_are_billed_the_bumped_grave_lines_and_share_them_evenly()
+    public async Task Three_recipients_are_billed_the_graves_lines_and_share_them_evenly()
     {
         using var host = new ApiTestHost();
         await SeedAsync(host, recipientCount: 3);
@@ -183,27 +187,23 @@ public class GraveMultiItemGenerationTests
         var invoices = await db.Invoices.Include(i => i.Lines).OrderBy(i => i.Id).ToListAsync();
         Assert.Equal(3, invoices.Count);
 
-        // 100.00 + 10.00 = 110.00 net at 7 %, or 11000 cents; 11000 % 3 = 2, so
-        // MakeDivisible raises one line's price by a single cent to reach the
-        // nearest multiple of 3, 11001 (3667 cents = 36.67 per recipient) — the
-        // whole point of the bump. Every recipient is billed that same,
-        // already-divisible total; nothing is split between them.
-        Assert.All(invoices, i => Assert.Equal(11001, NetCents(i)));
+        // 100.00 + 10.04 = 110.04 net at 7 %, or 11004 cents, which divides by
+        // three into 3668 cents each. Every recipient is billed that same total;
+        // nothing is split between them and no price is adjusted to make it fit.
+        Assert.All(invoices, i => Assert.Equal(11004, NetCents(i)));
         Assert.All(invoices, i => Assert.Equal(3, i.RecipientCount));
 
-        // Each recipient's share is 36.67 net (11001 / 3, no remainder). Its VAT
-        // is round(36.67 x 7 / 100, 2) = round(2.5669, 2) = 2.57, a gross of
-        // 39.24. The three invoices round that VAT independently, so together
-        // they come to 117.72 where the grave's own 110.01 net would show
-        // 117.71 as a single invoice — under a cent across recipients, the
-        // trade for documents that each add up on their own.
+        // Each recipient's share is 36.68 net (11004 / 3, no remainder). Its VAT
+        // is round(36.68 x 7 / 100, 2) = round(2.5676, 2) = 2.57, a gross of
+        // 39.25, and the three of them collect 117.75. That figure is the
+        // grave's worth: VAT is rounded once per recipient, so adding VAT to the
+        // grave's own 110.04 instead gives 117.74 — a number nobody is charged.
         var builder = new DocumentDataBuilder();
         var shareGrosses = invoices.Select(i => builder.Build(i).Share!.GrossTotal).ToList();
-        Assert.All(shareGrosses, gross => Assert.Equal(39.24m, gross));
-        Assert.Equal(117.72m, shareGrosses.Sum());
+        Assert.All(shareGrosses, gross => Assert.Equal(39.25m, gross));
+        Assert.Equal(117.75m, shareGrosses.Sum());
 
-        // every invoice keeps the 10:1 ratio between the two items — the bump
-        // adds at most one cent to one of them
+        // every invoice carries the grave's own prices, untouched
         foreach (var invoice in invoices)
         {
             var expensive = invoice.Lines.Single(l => l.ItemNumber == "M-100").UnitPrice;
