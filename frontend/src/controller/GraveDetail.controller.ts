@@ -8,9 +8,66 @@ interface GraveItemRow {
   Number: string;
   Description: string;
   Count: number;
+  /** The unit price, in the unit it was entered in: the gross for a
+   *  VAT-included line, the net for every other one. */
   Price: number;
+  /** Count × Price, as net and as gross. Gross is per line and therefore
+   *  informational — VAT is rounded per rate, not per line. Null on a grave
+   *  with no recipients, where no price is billed at all. */
+  NetTotal: number | null;
+  GrossTotal: number | null;
   VatRate: number;
   PriceIncludesVat: boolean;
+  /** What was entered, when billing raised the price above it; null when the
+   *  two agree. Shown so the page says why the figure differs from what was
+   *  typed. */
+  EnteredPrice: number | null;
+  /** Drives the warning colouring and the "eingegeben: …" line. */
+  PriceWasRaised: boolean;
+}
+
+/** The pieces a row is built from, whichever of the three sources it came
+ *  from: this half-year's invoices, the billing preview, or — for a grave with
+ *  no recipients — the configuration alone. */
+interface GraveItemRowInput {
+  Number: string;
+  Description: string;
+  Count: number;
+  /** The billed net, or null when nothing would be billed. */
+  NetUnitPrice: number | null;
+  VatRate: number;
+  PriceIncludesVat: boolean;
+  /** The price as it was typed, in its own unit. */
+  Entered: number | null;
+}
+
+/** One row of the grave's item table.
+ *
+ *  Net and gross are line sums. The gross is derived per line, which is not how
+ *  an invoice adds VAT — it rounds once per rate — so the column is a reading
+ *  aid rather than a figure anything is reconciled against. `grossRoundingNote`
+ *  says so under the table. */
+function itemRow(input: GraveItemRowInput): GraveItemRow {
+  const price =
+    input.NetUnitPrice === null
+      ? (input.Entered ?? 0)
+      : api.priceFieldValue(input.NetUnitPrice, input.PriceIncludesVat, input.VatRate);
+  const netTotal =
+    input.NetUnitPrice === null ? null : Math.round(input.NetUnitPrice * input.Count * 100) / 100;
+  const raised = input.Entered !== null && input.Entered !== price;
+
+  return {
+    Number: input.Number,
+    Description: input.Description,
+    Count: input.Count,
+    Price: price,
+    NetTotal: netTotal,
+    GrossTotal: netTotal === null ? null : api.grossFromNet(netTotal, input.VatRate),
+    VatRate: input.VatRate,
+    PriceIncludesVat: input.PriceIncludesVat,
+    EnteredPrice: raised ? input.Entered : null,
+    PriceWasRaised: raised,
+  };
 }
 
 interface GraveRecipientRow {
@@ -92,28 +149,41 @@ export default class GraveDetail extends GraveEdit {
       const currentInvoice = invoices.find(
         (invoice) => Number(invoice.PeriodYear) === year && Number(invoice.PeriodHalf) === half,
       );
+      // What the grave holds, by item number — the billed rows below compare
+      // themselves against it to show where billing had to raise a price.
+      //
+      // Taken as stored, with no conversion: a grave keeps the price as it was
+      // typed, which for a VAT-included line is already the gross. Running it
+      // through priceFieldValue would add the VAT a second time and report a
+      // 119,00 € line as having been entered at 127,33 €.
+      const configured = new Map(
+        details.Items.map((link) => [
+          link.Item.Number,
+          Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+        ]),
+      );
+
       const items: GraveItemRow[] = currentInvoice
-        ? (await api.fetchGraveInvoiceGroup(Number(currentInvoice.Id))).Lines.map((line) => ({
-            Number: line.ItemNumber,
-            Description: line.Description,
-            Count: Number(line.Count),
-            Price: api.priceFieldValue(
-              Number(line.UnitPrice),
-              Boolean(line.PriceIncludesVat),
-              Number(line.VatRate),
-            ),
-            VatRate: Number(line.VatRate),
-            PriceIncludesVat: Boolean(line.PriceIncludesVat),
-          }))
-        : details.Items.map((link) => ({
-            Number: link.Item.Number,
-            Description: link.Item.Description,
-            Count: link.Count,
-            // the link's own price wins; without one the item's default is billed
-            Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
-            VatRate: link.Item.VatRate,
-            PriceIncludesVat: link.PriceIncludesVat,
-          }));
+        ? (await api.fetchGraveInvoiceGroup(Number(currentInvoice.Id))).Lines.map((line) =>
+            itemRow({
+              Number: line.ItemNumber,
+              Description: line.Description,
+              Count: Number(line.Count),
+              NetUnitPrice: Number(line.UnitPrice),
+              VatRate: Number(line.VatRate),
+              PriceIncludesVat: Boolean(line.PriceIncludesVat),
+              // an item dropped from the grave since it was invoiced has nothing
+              // left to compare against
+              Entered: configured.get(line.ItemNumber) ?? null,
+            }),
+          )
+        : // Not invoiced yet, so the billed prices do not exist and cannot be
+          // worked out here: converting a VAT-included price and raising it for
+          // the split are backend rules, and how far a price is raised depends
+          // on how many recipients the grave has. The preview answers with the
+          // figures generation would produce. Without recipients there is no
+          // billed price at all, and the page says so rather than inventing one.
+          await this.previewItems(details);
 
       this.setState<GraveDetailView>("grave", {
         Id: details.Id,
@@ -152,6 +222,55 @@ export default class GraveDetail extends GraveEdit {
     } catch (error) {
       api.showError(this, error);
     }
+  }
+
+  /** The grave's items as they would be billed, for a half-year that has not
+   *  been invoiced yet.
+   *
+   *  How far a price is raised depends on the recipient count, so a grave with
+   *  none has no billed price to show: those rows carry the entered price and
+   *  leave the net and gross columns empty rather than name a figure that no
+   *  invoice would ever carry. A failing preview does the same — the page is
+   *  still readable without the derived columns, and an error strip over a
+   *  detail page the user only wanted to look at would be worse. */
+  private async previewItems(details: api.GraveDetails): Promise<GraveItemRow[]> {
+    const rows = details.Items.map((link) => ({
+      Number: link.Item.Number,
+      Description: link.Item.Description,
+      Count: link.Count,
+      VatRate: link.Item.VatRate,
+      PriceIncludesVat: link.PriceIncludesVat,
+      // the link's own price wins; without one the item's default is billed.
+      // Stored as typed — already the gross on a VAT-included line — so it is
+      // taken as it is rather than converted a second time.
+      Entered: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+      ItemId: Number(link.Item.Id),
+      RawPrice: link.UnitPrice === null ? null : Number(link.UnitPrice),
+    }));
+
+    const recipients = details.Recipients.length;
+    if (recipients === 0 || rows.length === 0) {
+      return rows.map((row) => itemRow({ ...row, NetUnitPrice: null }));
+    }
+
+    let billed: api.GraveBillingPreviewLine[];
+    try {
+      billed = await api.previewGraveBilling(
+        recipients,
+        rows.map((row) => ({
+          ItemId: row.ItemId,
+          Count: row.Count,
+          UnitPrice: row.RawPrice,
+          PriceIncludesVat: row.PriceIncludesVat,
+        })),
+      );
+    } catch {
+      return rows.map((row) => itemRow({ ...row, NetUnitPrice: null }));
+    }
+
+    return rows.map((row, index) =>
+      itemRow({ ...row, NetUnitPrice: Number(billed[index].UnitPrice) }),
+    );
   }
 
   /** Back to the list this page was opened from, not to the home screen. */

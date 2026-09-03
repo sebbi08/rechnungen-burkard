@@ -578,6 +578,51 @@ export async function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveIn
   return (await response.json()) as GraveInvoiceGroup;
 }
 
+export interface GraveBillingPreviewInput {
+  ItemId: number;
+  Count: number;
+  UnitPrice: number | null;
+  PriceIncludesVat: boolean;
+}
+
+export interface GraveBillingPreviewLine {
+  ItemId: number;
+  ItemNumber: string;
+  Description: string;
+  Count: number;
+  VatRate: number;
+  PriceIncludesVat: boolean;
+  /** As typed: the gross for a VAT-included line, the net for every other one. */
+  EnteredPrice: number;
+  /** What would actually be billed, in that same unit. */
+  BilledPrice: number;
+  /** The net that would be stored, whatever unit the price was entered in. */
+  UnitPrice: number;
+}
+
+/** What a grave's lines would be billed at, before any invoice exists.
+ *
+ *  Converting a VAT-included price to a net rounds it, and the split then raises
+ *  unit prices by whole cents until each VAT-rate subtotal divides across the
+ *  recipients and their shares still cover the bill — so what is billed is not
+ *  always what was typed. The grave dialog warns about that before saving.
+ *
+ *  The backend answers this rather than the browser working it out: that rule is
+ *  the one piece of money arithmetic in this feature, and a second copy of it in
+ *  TypeScript would be free to drift from the one that actually bills. It is the
+ *  same reason `api.invoiceTotals` gave way to totals served by the API. */
+export async function previewGraveBilling(
+  recipients: number,
+  lines: GraveBillingPreviewInput[],
+): Promise<GraveBillingPreviewLine[]> {
+  const response = await post("/odata/PreviewGraveBilling", {
+    Recipients: recipients,
+    Lines: lines,
+  });
+  await ensureOk(response);
+  return ((await response.json()) as { Lines: GraveBillingPreviewLine[] }).Lines;
+}
+
 /** Revises every recipient invoice of the grave and half-year the given invoice
  *  belongs to. `lines` are grave-level: the full count at the full price. */
 export async function createGraveInvoiceRevision(

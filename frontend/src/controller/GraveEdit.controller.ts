@@ -185,6 +185,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return;
     }
 
+    if (!(await this.confirmBilledPrices(draft))) {
+      return;
+    }
+
     try {
       await api.saveGrave({
         graveId: draft.Id != null ? Number(draft.Id) : null,
@@ -206,6 +210,69 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     } catch (error) {
       api.showError(this, error);
     }
+  }
+
+  /** Warns when the grave will not be billed at the prices that were typed, and
+   *  waits for the user to accept it.
+   *
+   *  Two rules can move a price: converting a VAT-included price to a net
+   *  rounds it, and the split raises unit prices by whole cents until each VAT
+   *  rate's subtotal divides across the recipients and the shares still cover
+   *  the amount. Neither is visible while typing, and the first time anyone
+   *  noticed was on a finished invoice — hence a confirmation here rather than
+   *  a surprise later.
+   *
+   *  Answers true when there is nothing to warn about, so the caller can treat
+   *  it as "go ahead". A draft with no recipients or no items has no billed
+   *  price yet and warns about nothing; a preview that fails does not block a
+   *  save, since refusing to save because a warning could not be computed would
+   *  be worse than saving without it. */
+  private async confirmBilledPrices(draft: GraveDraft): Promise<boolean> {
+    const recipients = draft.Recipients.length;
+    if (recipients === 0 || draft.Items.length === 0) {
+      return true;
+    }
+
+    let billed: api.GraveBillingPreviewLine[];
+    try {
+      billed = await api.previewGraveBilling(
+        recipients,
+        draft.Items.map((row) => ({
+          ItemId: Number(row.itemId),
+          Count: Number(row.count),
+          UnitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+          PriceIncludesVat: row.priceIncludesVat,
+        })),
+      );
+    } catch {
+      return true;
+    }
+
+    const raised = billed.filter((line) => Number(line.BilledPrice) !== Number(line.EnteredPrice));
+    if (raised.length === 0) {
+      return true;
+    }
+
+    const lines = raised.map((line) =>
+      this.i18nText("confirmBilledPriceLine")
+        .replace("{0}", line.Description)
+        .replace("{1}", this.formatAmount(line.EnteredPrice))
+        .replace("{2}", this.formatAmount(line.BilledPrice)),
+    );
+    const message = [
+      this.i18nText("confirmBilledPriceIntro"),
+      "",
+      ...lines,
+      "",
+      this.i18nText("confirmBilledPriceWhy"),
+    ].join("\n");
+
+    return new Promise((resolve) => {
+      MessageBox.confirm(message, {
+        title: this.i18nText("confirmBilledPriceTitle"),
+        onClose: (action: string | null) => resolve(action === MessageBox.Action.OK),
+      });
+    });
   }
 
   public onGraveDialogCancel(): void {

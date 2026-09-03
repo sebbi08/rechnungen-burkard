@@ -66,8 +66,20 @@
                         <Column importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>netAmount}" />
+                        </Column>
+                        <Column importance="High" popinDisplay="Inline">
+                            <Text text="{i18n>grossAmount}" />
+                        </Column>
+                        <!-- the rate and the incl.-VAT flag are the first to fold
+                             into the pop-in area on a narrow screen: they qualify
+                             the amounts rather than being read off directly -->
                         <Column importance="Low" popinDisplay="Inline">
                             <Text text="{i18n>vatRate}" />
+                        </Column>
+                        <Column importance="Low" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatColumn}" />
                         </Column>
                     </columns>
                     <items>
@@ -80,16 +92,34 @@
                                     <Text
                                         text="{path: 'grave>Price', formatter: '.formatAmount'}"
                                     />
-                                    <Text
-                                        text="{i18n>priceIncludesVatShort}"
-                                        visible="{grave>PriceIncludesVat}"
+                                    <!-- billing raised this price: say what was
+                                         entered, so the two figures are not read
+                                         as a contradiction -->
+                                    <ObjectStatus
+                                        state="Warning"
+                                        visible="{grave>PriceWasRaised}"
+                                        text="{parts: ['i18n>enteredPrice', 'grave>EnteredPrice'], formatter: '.formatEnteredPrice'}"
                                     />
                                 </VBox>
+                                <Text
+                                    text="{path: 'grave>NetTotal', formatter: '.formatAmountOrDash'}"
+                                />
+                                <Text
+                                    text="{path: 'grave>GrossTotal', formatter: '.formatAmountOrDash'}"
+                                />
                                 <Text text="{grave>VatRate}" />
+                                <Text
+                                    text="{path: 'grave>PriceIncludesVat', formatter: '.formatYesNo'}"
+                                />
                             </cells>
                         </ColumnListItem>
                     </items>
                 </Table>
+                <Text
+                    text="{i18n>grossRoundingNote}"
+                    wrapping="true"
+                    class="sapUiTinyMarginTop sapUiTinyMarginBegin"
+                />
             </Panel>
 
             <Panel headerText="{i18n>graveRecipients}" class="sapUiSmallMarginTop">

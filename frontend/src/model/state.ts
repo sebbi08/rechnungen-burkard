@@ -133,14 +133,20 @@ export interface GraveInvoiceDraft {
   lines: DraftLine[];
 }
 
-/** One line of a revision, with its total worked out. */
+/** One line of a revision, with its totals worked out. */
 export interface RevisionLine {
   Count: number;
   UnitPrice: number;
   VatRate: number;
   ItemNumber: string;
   Description: string;
+  /** Whether the price was entered as a gross. */
+  PriceIncludesVat: boolean;
+  /** Count × UnitPrice, net. */
   LineTotal: number;
+  /** The same line with its VAT added. Derived per line, so it need not sum to
+   *  the invoice's gross — VAT is rounded once per rate. */
+  GrossTotal: number;
 }
 
 export interface Revision {

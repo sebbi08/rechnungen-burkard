@@ -725,12 +725,17 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   await generateFor(page, 2036, 2);
 
   await page.goto(`/index.html#/graves/${graveId}`);
-  // the grave's own item list shows the gross and says so
-  await expect(page.getByText("inkl. MwSt.").first()).toBeVisible();
-  // this half-year (2036/2) is not today's, so the page falls back to the
-  // grave's configuration — its price is stored as typed (the gross, for a
-  // VAT-included line), no conversion needed to show 119,00 here
-  await expect(page.getByText("119,00 €")).toBeVisible();
+  // the grave's own item list shows the gross and says so — the incl.-VAT flag
+  // has its own column now rather than a hint under the price
+  const careRow = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
+  await expect(careRow).toContainText("Ja");
+  // This half-year (2036/2) is not today's, so no invoice names the price and
+  // the page asks the billing preview instead. 119,00 gross at 7 % is not a
+  // reachable figure — 111,21 net bills 118,99 and 111,22 bills 119,01 — so the
+  // page shows 119,01 and says what was typed, rather than showing 119,00 and
+  // letting the invoice disagree with it later.
+  await expect(careRow).toContainText("119,01 €");
+  await expect(careRow).toContainText("eingegeben: 119,00 €");
 
   // 119,00 gross at 7 % is a net of 111,22 — rounded up, because 111,21 would
   // bill 118,99 and the line may not come in under what was entered. Halved
@@ -788,8 +793,96 @@ test("the grave detail page shows this half-year's billed price once it is today
   // before GraveDetail.controller.ts read the invoice's lines instead of the
   // grave's configuration: reverting that change back to always use
   // details.Items would put 47,80 back here and turn this red.
-  await expect(page.getByText("47,81 €")).toBeVisible();
-  await expect(page.getByText("47,80 €")).not.toBeVisible();
+  // count 1, so the unit price and the net line sum are the same figure and
+  // appear in two columns — scope to the row rather than the page
+  const stoneRow = page.locator("tbody tr", { hasText: "Grabstein reinigen" }).first();
+  await expect(stoneRow).toContainText("47,81 €");
+  // and the page says where the difference came from, rather than showing a
+  // figure that silently disagrees with what was typed
+  await expect(stoneRow).toContainText("eingegeben: 47,80 €");
+});
+
+test("the grave's item table separates net, gross, rate and the incl.-VAT flag", async ({
+  page,
+}) => {
+  const marker = `GK-${Date.now()}`;
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    [`Xaver ${marker}`, `Yvonne ${marker}`],
+    // 100,00 net at 19 %, count 2: 200,00 net and 238,00 gross, and 20 000 net
+    // cents divide by two, so nothing here is raised
+    [{ description: "Grabpflege", vatRate: 19, price: 100, count: 2 }],
+  );
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const row = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
+
+  // the line sums, each in its own column, rather than one "Preis" cell with
+  // the incl.-VAT hint tucked underneath it
+  await expect(row).toContainText("200,00 €");
+  await expect(row).toContainText("238,00 €");
+  // the flag reads as a word, since a screen reader announces these cell by cell
+  await expect(row).toContainText("Nein");
+  // and the gross column says why it need not add up to the printed total
+  await expect(page.getByText("je Steuersatz gerundet")).toBeVisible();
+});
+
+test("creating a grave whose price cannot be billed as typed asks first", async ({ page }) => {
+  const marker = `GW-${Date.now()}`;
+  // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,
+  // and 4 782 is the first total that both divides and still covers the bill —
+  // so the grave would be billed 47,82, not the 47,80 that is typed
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabstein reinigen",
+    VatRate: 19,
+    DefaultPrice: 47.8,
+  });
+  const names = [`Anna ${marker}`, `Bert ${marker}`, `Cilly ${marker}`];
+  for (const name of names) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/index.html#/graves");
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForDialogOpen(page);
+
+  const graveDialog = page.locator(".sapMDialog");
+  await graveDialog.getByLabel("Grabnummer").fill(marker);
+  await graveDialog.getByLabel("Beginn").fill("2026-01-01");
+  await graveDialog.getByLabel("Ende").fill("2040-12-31");
+
+  await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
+  await itemInput.click();
+  await itemInput.fill(`${marker}-item`);
+  await suggestions(page, "graveItem")
+    .filter({ hasText: `${marker}-item` })
+    .click();
+  await expect(graveDialog.getByLabel("Preis")).toHaveValue("47.8");
+
+  for (const name of names) {
+    const recipientInput = page.locator(".sapMDialog input[id$='--linkRecipient-inner']");
+    await recipientInput.click();
+    await recipientInput.fill(name);
+    await suggestions(page, "linkRecipient").filter({ hasText: name }).click();
+    await expect(recipientInput).toHaveValue(name);
+    await expect(page.locator("[id*='linkRecipient'][id$='-popup-list']")).toBeHidden();
+    await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+    await expect(page.locator("[id$='graveRecipientsTable-listUl']")).toContainText(name);
+  }
+
+  await page.getByRole("button", { name: "Speichern" }).click();
+
+  // the warning names both figures and waits to be accepted
+  const confirm = page.locator(".sapMMessageBox");
+  await expect(confirm).toContainText("47,80");
+  await expect(confirm).toContainText("47,82");
+  await confirm.getByRole("button", { name: "OK" }).click();
+
+  await expect(page.locator("[id$='gravesTable-listUl']")).toContainText(marker);
 });
 
 test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {

@@ -58,14 +58,20 @@ export default abstract class InvoiceRevisions extends BaseController {
             UnitPrice: Number(line.UnitPrice),
             VatRate: Number(line.VatRate),
           };
+          // the line as printed — Count × UnitPrice, rounded to the cent the
+          // way the document rounds it — not affected by a grave's share,
+          // which only scales the invoice-level totals below
+          const lineTotal = Math.round(amounts.Count * amounts.UnitPrice * 100) / 100;
           return {
             ...amounts,
             ItemNumber: line.ItemNumber,
             Description: line.Description,
-            // the line as printed — Count × UnitPrice, rounded to the cent the
-            // way the document rounds it — not affected by a grave's share,
-            // which only scales the invoice-level totals below
-            LineTotal: Math.round(amounts.Count * amounts.UnitPrice * 100) / 100,
+            PriceIncludesVat: Boolean(line.PriceIncludesVat),
+            LineTotal: lineTotal,
+            // Derived per line, which is not how the invoice adds VAT: it rounds
+            // once per rate, so these need not sum to the gross below. The note
+            // under the table says as much — the summary is what reconciles.
+            GrossTotal: api.grossFromNet(lineTotal, amounts.VatRate),
           };
         });
       const revisionNumber = Number(invoice.RevisionNumber);

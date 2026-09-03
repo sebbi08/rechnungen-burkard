@@ -131,6 +131,31 @@ export default abstract class BaseController extends Controller {
     })} €`;
   }
 
+  /** An amount, or a dash where there is none to show. An empty cell reads as
+   *  "loading"; a dash says the figure does not exist — a grave without
+   *  recipients has no billed price. */
+  public formatAmountOrDash(value: number | string | null | undefined): string {
+    return value == null || value === "" ? "–" : this.formatAmount(value);
+  }
+
+  /** A boolean column, spelled out rather than shown as a tick: the tables it
+   *  appears in are read aloud by screen readers cell by cell. */
+  public formatYesNo(value: boolean | null | undefined): string {
+    return this.i18nText(value ? "yes" : "no");
+  }
+
+  /** "eingegeben: 47,80 €" — the price as typed, next to the one that is
+   *  billed. The pattern carries the label so it stays translatable. */
+  public formatEnteredPrice(
+    pattern: string | null | undefined,
+    value: number | string | null | undefined,
+  ): string {
+    if (value == null || value === "") {
+      return "";
+    }
+    return (pattern ?? "{0}").replace("{0}", this.formatAmount(value));
+  }
+
   /** "2026-0042-R1" -> "2026-0042": the chain, without the revision marker. */
   public formatInvoiceNumber(value: string | null | undefined): string {
     if (value == null) {
