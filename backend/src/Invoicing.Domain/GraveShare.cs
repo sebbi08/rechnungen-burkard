@@ -39,49 +39,58 @@ public static class GraveShare
         foreach (var rate in lines.Select(l => l.VatRate).Distinct().OrderBy(r => r))
         {
             var group = lines.Where(l => l.VatRate == rate).ToList();
-            var subtotal = group.Sum(NetCents);
-
-            if (subtotal % recipients != 0)
+            var kind = KindOf(group, recipients, rate);
+            if (kind is null)
             {
-                problems.Add(
-                    new GraveShareProblem(
-                        rate,
-                        GraveShareProblemKind.NotDivisible,
-                        subtotal,
-                        CollectedFor(subtotal, recipients, rate),
-                        Owed(group, rate),
-                        NearbyValidSubtotals(group, subtotal, recipients, rate)
-                    )
-                );
                 continue;
             }
 
-            // A price entered as a gross is a promise about what the customer
-            // pays, so what the recipients collect has to come to exactly that.
-            // A net-priced line makes no such promise -- its gross is derived,
-            // and what the recipients collect is simply what the grave is worth.
-            if (group.Any(l => l.EnteredGross is not null))
-            {
-                var collected = CollectedFor(subtotal, recipients, rate);
-                var owed = Owed(group, rate);
-                if (collected != owed)
-                {
-                    problems.Add(
-                        new GraveShareProblem(
-                            rate,
-                            GraveShareProblemKind.DoesNotAddUp,
-                            subtotal,
-                            collected,
-                            owed,
-                            NearbyValidSubtotals(group, subtotal, recipients, rate)
-                        )
-                    );
-                }
-            }
+            // The figure the message names, and the suggestions, are both in the
+            // unit the prices were entered in: a group priced gross is talked
+            // about in gross, because that is the number the user typed and the
+            // one they will change.
+            var amount = PricedGross(group) ? Owed(group, rate) : group.Sum(NetCents);
+            problems.Add(
+                new GraveShareProblem(
+                    rate,
+                    kind.Value,
+                    amount,
+                    Suggestions(group, recipients, rate)
+                )
+            );
         }
 
         return problems;
     }
+
+    /// <summary>What stops one rate's lines being split evenly, or null when
+    /// nothing does.</summary>
+    private static GraveShareProblemKind? KindOf(
+        IReadOnlyList<GraveLine> group,
+        int recipients,
+        decimal rate
+    )
+    {
+        var subtotal = group.Sum(NetCents);
+        if (subtotal % recipients != 0)
+        {
+            return GraveShareProblemKind.NotDivisible;
+        }
+
+        // A price entered as a gross is a promise about what the customer pays,
+        // so what the recipients collect has to come to exactly that. A
+        // net-priced line makes no such promise -- its gross is derived, and
+        // what the recipients collect is simply what the grave is worth.
+        if (PricedGross(group) && CollectedFor(subtotal, recipients, rate) != Owed(group, rate))
+        {
+            return GraveShareProblemKind.DoesNotAddUp;
+        }
+
+        return null;
+    }
+
+    private static bool PricedGross(IReadOnlyList<GraveLine> group) =>
+        group.Any(l => l.EnteredGross is not null);
 
     /// <summary>What the recipients collect between them, in cents — each of
     /// them an equal share of every VAT-rate subtotal plus that share's own
@@ -130,51 +139,77 @@ public static class GraveShare
         return netPriced + VatCents(netPriced, rate) + grossPriced;
     }
 
-    /// <summary>The nearest net subtotals, above and below, that would divide
-    /// and add up — so the message can name a figure to aim at rather than only
-    /// saying no. Empty where nothing nearby works, which the caller reports as
-    /// "adjust a price" without a number.</summary>
-    private static IReadOnlyList<long> NearbyValidSubtotals(
+    /// <summary>The nearest amounts, one below and one above, that would come
+    /// out even — so the message can name figures to aim at rather than only
+    /// saying no. In the same unit as the problem's own amount.
+    ///
+    /// A net-priced group is searched by moving its subtotal, which is what
+    /// changing any of its prices does. A group priced gross is searched by
+    /// moving the gross that was typed, one cent at a time, and re-testing the
+    /// whole group: a cent on a gross moves the net subtotal by about
+    /// 1/(1 + rate) of a cent, so searching the subtotal instead looks in the
+    /// wrong place and finds nothing.
+    ///
+    /// Empty where nothing within reach works, and the message then says to
+    /// adjust a price without naming one.</summary>
+    private static IReadOnlyList<long> Suggestions(
         IReadOnlyList<GraveLine> group,
-        long subtotal,
         int recipients,
         decimal rate
     )
     {
-        var checksGross = group.Any(l => l.EnteredGross is not null);
-        var found = new List<long>();
+        var below = 0L;
+        var above = 0L;
 
-        for (var distance = 1; distance <= 200 && found.Count < 2; distance++)
+        for (var distance = 1; distance <= 400 && (below == 0 || above == 0); distance++)
         {
-            foreach (var candidate in new[] { subtotal - distance, subtotal + distance })
+            if (below == 0)
             {
-                if (candidate <= 0 || candidate % recipients != 0 || found.Contains(candidate))
-                {
-                    continue;
-                }
+                below = CandidateAt(group, recipients, rate, -distance);
+            }
 
-                // The gross test compares against what the lines are owed, which
-                // moves with the prices being adjusted -- so a candidate subtotal
-                // is only meaningful if the same adjustment lands on the owed
-                // figure too. Shifting both by the same amount is what adjusting
-                // a gross-entered price actually does.
-                if (checksGross)
-                {
-                    if (
-                        CollectedFor(candidate, recipients, rate)
-                        != Owed(group, rate) + (candidate - subtotal)
-                    )
-                    {
-                        continue;
-                    }
-                }
-
-                found.Add(candidate);
+            if (above == 0)
+            {
+                above = CandidateAt(group, recipients, rate, distance);
             }
         }
 
-        found.Sort();
-        return found;
+        return new[] { below, above }.Where(value => value != 0).ToList();
+    }
+
+    /// <summary>The amount this group would come to with `offset` cents added,
+    /// if that comes out even — otherwise 0.</summary>
+    private static long CandidateAt(
+        IReadOnlyList<GraveLine> group,
+        int recipients,
+        decimal rate,
+        long offset
+    )
+    {
+        if (PricedGross(group))
+        {
+            // move the first gross-entered line's own price; its count decides
+            // how far that moves the group, so the suggestion is always a figure
+            // the prices can actually reach
+            var index = group.ToList().FindIndex(l => l.EnteredGross is not null);
+            var line = group[index];
+            var price = line.EnteredGross!.Value + offset / 100m;
+            if (price <= 0)
+            {
+                return 0;
+            }
+
+            var moved = group.ToList();
+            moved[index] = line with
+            {
+                EnteredGross = price,
+                UnitPrice = VatInclusivePrice.NetOf(price, rate, true),
+            };
+            return KindOf(moved, recipients, rate) is null ? Owed(moved, rate) : 0;
+        }
+
+        var subtotal = group.Sum(NetCents) + offset;
+        return subtotal > 0 && subtotal % recipients == 0 ? subtotal : 0;
     }
 
     private static long VatCents(long netCents, decimal rate) =>
@@ -196,13 +231,15 @@ public enum GraveShareProblemKind
     DoesNotAddUp,
 }
 
-/// <summary>One reason a grave cannot be split as its prices stand. All amounts
-/// are in cents.</summary>
+/// <summary>One reason a grave cannot be split as its prices stand.
+///
+/// <paramref name="Amount"/> and <paramref name="Suggestions"/> are in cents,
+/// and in the unit the rate's prices were entered in: net where they are net
+/// prices, gross where any of them was typed as a gross. That is the number the
+/// user sees in the field and the one they will change.</summary>
 public sealed record GraveShareProblem(
     decimal VatRate,
     GraveShareProblemKind Kind,
-    long NetSubtotal,
-    long Collected,
-    long Owed,
-    IReadOnlyList<long> NearbyValidSubtotals
+    long Amount,
+    IReadOnlyList<long> Suggestions
 );

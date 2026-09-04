@@ -72,14 +72,14 @@ public class GraveBillingValidationTests
         var problem = Assert.Single(body.GetProperty("Problems").EnumerateArray().ToArray());
         Assert.Equal(19m, problem.GetProperty("VatRate").GetDecimal());
         Assert.Equal("NotDivisible", problem.GetProperty("Kind").GetString());
-        Assert.Equal(47.80m, problem.GetProperty("NetSubtotal").GetDecimal());
+        Assert.Equal(47.80m, problem.GetProperty("Amount").GetDecimal());
 
-        var nearby = problem
-            .GetProperty("NearbyValidSubtotals")
+        var suggestions = problem
+            .GetProperty("Suggestions")
             .EnumerateArray()
             .Select(v => v.GetDecimal())
             .ToArray();
-        Assert.Equal(new[] { 47.79m, 47.82m }, nearby);
+        Assert.Equal(new[] { 47.79m, 47.82m }, suggestions);
     }
 
     [Fact]
@@ -117,8 +117,18 @@ public class GraveBillingValidationTests
         Assert.False(body.GetProperty("Ok").GetBoolean());
         var problem = Assert.Single(body.GetProperty("Problems").EnumerateArray().ToArray());
         Assert.Equal("DoesNotAddUp", problem.GetProperty("Kind").GetString());
-        Assert.Equal(100.24m, problem.GetProperty("Collected").GetDecimal());
-        Assert.Equal(100.25m, problem.GetProperty("Owed").GetDecimal());
+        // named and suggested in the unit it was typed in -- gross, not the net
+        // it converts to, so the figures match the field the user edits
+        Assert.Equal(100.25m, problem.GetProperty("Amount").GetDecimal());
+
+        var suggestions = problem
+            .GetProperty("Suggestions")
+            .EnumerateArray()
+            .Select(v => v.GetDecimal())
+            .ToArray();
+        Assert.Equal(2, suggestions.Length);
+        Assert.True(suggestions[0] < 100.25m, "no suggestion below");
+        Assert.True(suggestions[1] > 100.25m, "no suggestion above");
     }
 
     [Fact]
@@ -152,7 +162,7 @@ public class GraveBillingValidationTests
 
         // the item's default of 47,80 is what gets judged
         var problem = Assert.Single(body.GetProperty("Problems").EnumerateArray().ToArray());
-        Assert.Equal(47.80m, problem.GetProperty("NetSubtotal").GetDecimal());
+        Assert.Equal(47.80m, problem.GetProperty("Amount").GetDecimal());
     }
 
     [Theory]

@@ -84,12 +84,8 @@ public class GraveBillingValidationController : ODataController
                     {
                         p.VatRate,
                         Kind = p.Kind.ToString(),
-                        NetSubtotal = p.NetSubtotal / 100m,
-                        Collected = p.Collected / 100m,
-                        Owed = p.Owed / 100m,
-                        NearbyValidSubtotals = p
-                            .NearbyValidSubtotals.Select(c => c / 100m)
-                            .ToList(),
+                        Amount = p.Amount / 100m,
+                        Suggestions = p.Suggestions.Select(c => c / 100m).ToList(),
                     })
                     .ToList(),
                 Lines = lines

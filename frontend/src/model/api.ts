@@ -86,6 +86,7 @@ const CODE_TO_I18N: Record<string, string> = {
   InvoicePaid: "errorInvoicePaid",
   GraveInvoicePaid: "errorGraveInvoicePaid",
   NotLatestRevision: "errorNotLatestRevision",
+  PricesDoNotDivide: "errorPricesDoNotDivide",
 };
 
 /**
@@ -634,16 +635,17 @@ export interface GraveBillingLine {
  *  amounts are in euro. */
 export interface GraveBillingProblem {
   VatRate: number;
-  /** `NotDivisible`: the rate's net subtotal does not divide by the recipient
+  /** `NotDivisible`: the rate's net total does not divide by the recipient
    *  count. `DoesNotAddUp`: it divides, but a price entered as a gross cannot
-   *  be billed exactly as it was typed. */
+   *  be billed to the cent. The message reads the same either way — what the
+   *  user does about it is the same. */
   Kind: "NotDivisible" | "DoesNotAddUp";
-  NetSubtotal: number;
-  Collected: number;
-  Owed: number;
-  /** The nearest subtotals that would work, so the message can name a figure to
-   *  aim at rather than only saying no. */
-  NearbyValidSubtotals: number[];
+  /** What this rate comes to, in the unit its prices were entered in: net where
+   *  they are net prices, gross where any was typed as a gross. */
+  Amount: number;
+  /** The nearest amounts that would work, one below and one above, in that same
+   *  unit. */
+  Suggestions: number[];
 }
 
 export interface GraveBillingCheck {

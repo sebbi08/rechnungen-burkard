@@ -272,12 +272,8 @@ public class GravesController : ODataController
                             {
                                 vatRate = p.VatRate,
                                 kind = p.Kind.ToString(),
-                                netSubtotal = p.NetSubtotal / 100m,
-                                collected = p.Collected / 100m,
-                                owed = p.Owed / 100m,
-                                nearbyValidSubtotals = p
-                                    .NearbyValidSubtotals.Select(c => c / 100m)
-                                    .ToList(),
+                                amount = p.Amount / 100m,
+                                suggestions = p.Suggestions.Select(c => c / 100m).ToList(),
                             })
                             .ToList(),
                     },

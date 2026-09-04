@@ -42,9 +42,10 @@ public class GraveShareTests
 
         Assert.Equal(19m, problem.VatRate);
         Assert.Equal(GraveShareProblemKind.NotDivisible, problem.Kind);
-        Assert.Equal(4780, problem.NetSubtotal);
-        // the message names a figure to aim at rather than only saying no
-        Assert.Equal(new long[] { 4779, 4782 }, problem.NearbyValidSubtotals);
+        Assert.Equal(4780, problem.Amount);
+        // one below and one above, so the message names figures to aim at
+        // rather than only saying no
+        Assert.Equal(new long[] { 4779, 4782 }, problem.Suggestions);
     }
 
     [Fact]
@@ -61,7 +62,7 @@ public class GraveShareTests
 
         var problem = Assert.Single(GraveShare.Problems(lines, 3));
         Assert.Equal(19m, problem.VatRate);
-        Assert.Equal(9770, problem.NetSubtotal);
+        Assert.Equal(9770, problem.Amount);
     }
 
     [Fact]
@@ -75,8 +76,22 @@ public class GraveShareTests
         var problem = Assert.Single(GraveShare.Problems(new[] { Gross(1, 100.25m, 19m) }, 2));
 
         Assert.Equal(GraveShareProblemKind.DoesNotAddUp, problem.Kind);
-        Assert.Equal(10024, problem.Collected);
-        Assert.Equal(10025, problem.Owed);
+        // spoken about in the unit it was entered in: the gross that was typed,
+        // not the net it converts to
+        Assert.Equal(10025, problem.Amount);
+
+        // and the suggestions are grosses too, one below and one above. Moving
+        // the net subtotal by whole cents -- which is what the search used to do
+        // -- looks in the wrong place entirely: a cent on a gross moves the net
+        // by about 1/(1 + rate) of one, so it found nothing and the message came
+        // out with no figures at all.
+        Assert.Equal(2, problem.Suggestions.Count);
+        Assert.True(problem.Suggestions[0] < 10025, "no suggestion below");
+        Assert.True(problem.Suggestions[1] > 10025, "no suggestion above");
+        Assert.All(
+            problem.Suggestions,
+            value => Assert.Empty(GraveShare.Problems(new[] { Gross(1, value / 100m, 19m) }, 2))
+        );
     }
 
     [Fact]

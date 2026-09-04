@@ -258,27 +258,31 @@ export default abstract class GraveEdit extends InvoiceRevisions {
   }
 
   /** The refusal, in words: what is wrong with each VAT rate and which figures
-   *  would work instead. */
+   *  would work instead.
+   *
+   *  One sentence shape whatever the problem is. The two kinds differ in why
+   *  they fail — a net total that will not divide, against a gross that cannot
+   *  be billed to the cent — but not in what the user does about it, which is
+   *  to move a price to one of the amounts named. The amounts are already in
+   *  the unit the prices were entered in, so the sentence does not have to say
+   *  which. */
   protected billingProblemText(problems: api.GraveBillingProblem[], recipients: number): string {
     const lines = problems.map((problem) => {
-      const rate = this.formatVatRate(problem.VatRate);
-      if (problem.Kind === "DoesNotAddUp") {
-        return this.i18nText("pricesDoNotAddUpLine")
-          .replace("{0}", rate)
-          .replace("{1}", this.formatAmount(problem.Collected))
-          .replace("{2}", this.formatAmount(problem.Owed));
-      }
-
-      const line = this.i18nText("pricesDoNotDivideLine")
-        .replace("{0}", rate)
-        .replace("{1}", this.formatAmount(problem.NetSubtotal))
+      const sentence = this.i18nText("pricesDoNotDivideLine")
+        .replace("{0}", this.formatVatRate(problem.VatRate))
+        .replace("{1}", this.formatAmount(problem.Amount))
         .replace("{2}", String(recipients));
-      return problem.NearbyValidSubtotals.length === 0
-        ? line
-        : `${line} ${this.i18nText("pricesNearbyValid").replace(
-            "{0}",
-            problem.NearbyValidSubtotals.map((value) => this.formatAmount(value)).join(" / "),
-          )}`;
+
+      const options = problem.Suggestions.map((value) => this.formatAmount(value));
+      if (options.length >= 2) {
+        return `${sentence} ${this.i18nText("pricesNearbyValid")
+          .replace("{0}", options[0])
+          .replace("{1}", options[1])}`;
+      }
+      if (options.length === 1) {
+        return `${sentence} ${this.i18nText("pricesNearbyValidOne").replace("{0}", options[0])}`;
+      }
+      return `${sentence} ${this.i18nText("pricesAdjustAPrice")}`;
     });
 
     return [this.i18nText("pricesDoNotDivideIntro"), "", ...lines].join("\n");
