@@ -216,15 +216,5 @@ public class GraveRecipientImmutabilityTests
             "GraveRecipientsImmutable",
             addedJson.RootElement.GetProperty("error").GetProperty("code").GetString()
         );
-
-        long linkId;
-        using (var scope = host.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            linkId = (await db.GraveRecipients.SingleAsync(r => r.GraveId == graveId)).Id;
-        }
-
-        var removed = await client.DeleteAsync($"/odata/GraveRecipients({linkId})");
-        Assert.Equal(HttpStatusCode.BadRequest, removed.StatusCode);
     }
 }

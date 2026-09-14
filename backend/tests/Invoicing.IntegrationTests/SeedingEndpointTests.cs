@@ -23,6 +23,19 @@ public class SeedingEndpointTests
 
         var created = await client.PostAsync(path, ODataJson.Body(new { GraveId = 1, ItemId = 1 }));
         Assert.Equal(HttpStatusCode.NotFound, created.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/odata/GraveItems")]
+    [InlineData("/odata/GraveRecipients")]
+    public async Task Removing_a_link_is_not_offered_at_all(string path)
+    {
+        // Not gated -- gone. Nothing ever called it: the dialog sends a grave's
+        // full set of links and GraveService replaces them wholesale, so
+        // deletion happens inside the service. The GraveItems one had no check
+        // of its own either, and would have unpicked an invoiced grave.
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
 
         var deleted = await client.DeleteAsync($"{path}(1)");
         Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);

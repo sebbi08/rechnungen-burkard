@@ -78,15 +78,4 @@ public class GraveItemsController : ODataController
         _db.SaveChanges();
         return Created(link);
     }
-
-    [SeedingOnly]
-    public IActionResult Delete([FromRoute] long key)
-    {
-        var link = _db.GraveItems.Find(key);
-        if (link is null)
-            return NotFound();
-        _db.GraveItems.Remove(link);
-        _db.SaveChanges();
-        return NoContent();
-    }
 }
