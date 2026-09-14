@@ -17,7 +17,10 @@ export default class Invoices extends InvoiceEdit {
   }
 
   public async onEditInvoice(event: Button$PressEvent): Promise<void> {
-    const context = event.getSource().getBindingContext("odata") as Context;
+    const context = this.liveRow(event);
+    if (!context) {
+      return;
+    }
     await this.openInvoiceDialog(
       context.getProperty("Id") as number,
       context.getProperty("RecipientId") as number,
@@ -29,13 +32,17 @@ export default class Invoices extends InvoiceEdit {
   }
 
   public async onDownloadNormal(event: Button$PressEvent): Promise<void> {
-    const context = event.getSource().getBindingContext("odata") as Context;
-    await this.openDocument(context.getProperty("Id") as number, false);
+    const context = this.liveRow(event);
+    if (context) {
+      await this.openDocument(context.getProperty("Id") as number, false);
+    }
   }
 
   public async onDownloadCopy(event: Button$PressEvent): Promise<void> {
-    const context = event.getSource().getBindingContext("odata") as Context;
-    await this.openDocument(context.getProperty("Id") as number, true);
+    const context = this.liveRow(event);
+    if (context) {
+      await this.openDocument(context.getProperty("Id") as number, true);
+    }
   }
 
   /**
@@ -53,14 +60,34 @@ export default class Invoices extends InvoiceEdit {
   }
 
   public onShowDetails(event: Button$PressEvent): void {
-    const context = event.getSource().getBindingContext("odata") as Context;
-    this.router().navTo("invoiceDetail", {
-      rootId: String(context.getProperty("RootId")),
-    });
+    const context = this.liveRow(event);
+    if (context) {
+      this.router().navTo("invoiceDetail", {
+        rootId: String(context.getProperty("RootId")),
+      });
+    }
+  }
+
+  /**
+   * The row an action belongs to, or null when its data has gone.
+   *
+   * Searching changes parameters on the list binding, and until the response
+   * lands the old rows are still on screen with their contexts already
+   * emptied. A click in that window read `undefined` and navigated to
+   * `#/invoices/undefined`, which rendered a blank page nobody could act on —
+   * and did the same for a download or an edit. Doing nothing leaves the row
+   * one click away once the list has settled.
+   */
+  private liveRow(event: Button$PressEvent): Context | null {
+    const context = event.getSource().getBindingContext("odata") as Context | null;
+    return context?.getProperty("Id") == null ? null : context;
   }
 
   public async onTogglePaid(event: Button$PressEvent): Promise<void> {
-    const context = event.getSource().getBindingContext("odata") as Context;
+    const context = this.liveRow(event);
+    if (!context) {
+      return;
+    }
     const changed = await this.togglePaid(
       context.getProperty("Id") as number,
       context.getProperty("PaidOn") as string | null,
