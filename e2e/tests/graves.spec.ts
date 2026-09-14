@@ -810,6 +810,34 @@ test("the grave's item table separates net, gross, rate and the incl.-VAT flag",
   await expect(row).toContainText("Nein");
 });
 
+test("each rate's gross is worked out at that rate, not at a blended one", async ({ page }) => {
+  const marker = `GR-${Date.now()}`;
+  // Two rates over three recipients, both dividing: 7 % comes to 300,00 and
+  // 19 % to 99,00. A gross column that shares one blended total across every
+  // line gave both the same multiplier — 300,00 net at 7 % read 331,71 € beside
+  // its own "7 %", which is the bug this pins.
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    [`Anna ${marker}`, `Bernd ${marker}`, `Carla ${marker}`],
+    [
+      { description: "Grabpflege", vatRate: 7, price: 100, count: 3 },
+      { description: "Blumenschmuck", vatRate: 19, price: 99, count: 1 },
+    ],
+  );
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+
+  // 300,00 at 7 % is 321,00, and each recipient pays 100,00 + 7,00
+  await expect(page.locator("tbody tr", { hasText: "Grabpflege" }).first()).toContainText(
+    "321,00 €",
+  );
+  // 99,00 at 19 % is 117,81, and each pays 33,00 + 6,27
+  await expect(page.locator("tbody tr", { hasText: "Blumenschmuck" }).first()).toContainText(
+    "117,81 €",
+  );
+});
+
 test("a grave whose prices do not divide is refused until a price is changed", async ({ page }) => {
   const marker = `GW-${Date.now()}`;
   // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,

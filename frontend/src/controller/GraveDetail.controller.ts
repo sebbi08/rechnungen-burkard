@@ -24,18 +24,17 @@ interface GraveItemRow {
   PriceIncludesVat: boolean;
 }
 
-/** Fills in what each line accounts for out of `total`, the gross the
- *  recipients collect between them. Null when nothing is charged at all — a
- *  grave with no recipients — and the column then stays empty. */
-function shareGross(rows: GraveItemRow[], total: number | null): GraveItemRow[] {
+/** Fills in what each line accounts for, gross. Left empty where nothing is
+ *  charged at all — a grave with no recipients. */
+function shareGross(rows: GraveItemRow[], recipients: number | null): GraveItemRow[] {
   const priced = rows.filter((row) => row.NetTotal !== null);
-  if (total === null || priced.length === 0) {
+  if (recipients === null || recipients <= 0 || priced.length === 0) {
     return rows;
   }
 
-  const shares = api.shareOfTotal(
-    priced.map((row) => row.NetTotal!),
-    total,
+  const shares = api.grossPerLine(
+    priced.map((row) => ({ NetTotal: row.NetTotal!, VatRate: row.VatRate })),
+    recipients,
   );
   priced.forEach((row, index) => {
     row.GrossTotal = shares[index];
@@ -144,20 +143,15 @@ export default class GraveDetail extends GraveEdit {
           }))
         : this.configuredItems(details, check);
 
-      // The gross each line accounts for, out of what the recipients collect
-      // between them. Read off the invoices where they exist, so the table
-      // cannot disagree with the list below it, and off the same check the save
-      // uses where they do not.
+      // The gross each line accounts for, worked out rate by rate the way the
+      // invoices charge it. The recipient count is what the split uses: the
+      // invoices' own where they exist, the grave's recipients where they do
+      // not yet.
       const items = shareGross(
         rows,
         currentInvoice
-          ? invoices
-              .filter(
-                (invoice) =>
-                  Number(invoice.PeriodYear) === year && Number(invoice.PeriodHalf) === half,
-              )
-              .reduce((sum, invoice) => sum + Number(invoice.GrossTotal ?? 0), 0)
-          : (check?.GrossTotal ?? null),
+          ? Number(currentInvoice.RecipientCount ?? details.Recipients.length)
+          : details.Recipients.length,
       );
 
       this.setState<GraveDetailView>("grave", {

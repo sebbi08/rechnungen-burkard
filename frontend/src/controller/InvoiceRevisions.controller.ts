@@ -73,22 +73,21 @@ export default abstract class InvoiceRevisions extends BaseController {
           };
         });
 
-      // What each line accounts for, gross. Adding VAT to each line on its own
-      // would not reach the invoice's total — VAT is rounded once per rate, not
-      // per line — so the total is cut across the lines in proportion to their
-      // nets instead, and the column always sums to what is charged.
+      // What each line accounts for, gross, worked out rate by rate the way the
+      // invoice charges it rather than by adding VAT to each line on its own.
       //
-      // On a grave invoice the lines are the whole grave while the invoice's
+      // On a grave invoice the lines are the whole grave while the invoice's own
       // gross is this recipient's share, so the figure being divided up is the
-      // grave's worth: the share times the number of recipients. That keeps the
-      // gross column in the same terms as the net column beside it.
-      const shares = api.shareOfTotal(
-        lines.map((line) => line.LineTotal),
-        Number(invoice.GrossTotal ?? 0) * Number(invoice.RecipientCount ?? 1),
+      // grave's: the recipient count is what puts the gross column in the same
+      // terms as the net column beside it.
+      const shares = api.grossPerLine(
+        lines.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
+        Number(invoice.RecipientCount ?? 1),
       );
       lines.forEach((line, index) => {
         line.GrossTotal = shares[index];
       });
+
       const revisionNumber = Number(invoice.RevisionNumber);
 
       return {

@@ -523,41 +523,68 @@ export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }
 
-/** Cuts `total` across lines in proportion to their nets, so the parts add up
- *  to it exactly.
+/** One line's net and VAT rate, for `grossPerLine` below. */
+export interface GrossLine {
+  NetTotal: number;
+  VatRate: number;
+}
+
+/** What each line accounts for, gross, so the column adds up to what the
+ *  recipients are actually charged.
  *
- *  Adding VAT to each line on its own does not reach the total anyone pays: it
- *  is rounded once per VAT rate rather than per line, and on a grave once per
- *  recipient on top. A column built that way disagreed with the invoices listed
- *  directly beneath it on five of seven sample graves, by up to three cents.
+ *  Adding VAT to each line on its own does not reach that figure: it is rounded
+ *  once per VAT rate rather than per line, and on a grave once per recipient on
+ *  top. So each rate's charge is worked out the way it is billed — an equal
+ *  share per recipient, VAT rounded on the share — and then divided across that
+ *  rate's own lines, largest remainder first. Ties keep the earlier line, so the
+ *  same figures always produce the same rows.
  *
- *  So the total is taken as given — it is what the recipients are charged — and
- *  only its division across the rows happens here, largest remainder first so
- *  the cents land on the closest calls. Ties keep the earlier line, so the same
- *  figures always produce the same rows.
+ *  Rate by rate, never across the whole table. Sharing one blended total out
+ *  over every line gave a 7 % line the same multiplier as a 19 % one: 100,00 €
+ *  net showed 112,43 € gross beside its own "7 %". No line is now more than a
+ *  cent from its own net plus VAT.
  *
- *  This decides no amount; the total is already fixed by the time it gets here,
- *  which is why it can live in the browser at all. */
-export function shareOfTotal(nets: number[], total: number): number[] {
-  const netCents = nets.map((net) => Math.round(net * 100));
-  const netSum = netCents.reduce((sum, value) => sum + value, 0);
-  const totalCents = Math.round(total * 100);
-  if (nets.length === 0 || netSum === 0) {
-    return nets.map(() => 0);
+ *  This decides no amount. The prices are already fixed and already divide — a
+ *  grave that did not could not have been saved — so this only splits a figure
+ *  the backend settled, which is why it can live in the browser. */
+export function grossPerLine(lines: GrossLine[], recipients: number): number[] {
+  const result = lines.map(() => 0);
+  const divisor = Math.max(1, Math.round(recipients));
+
+  for (const rate of new Set(lines.map((line) => line.VatRate))) {
+    const indexes = lines
+      .map((line, index) => ({ line, index }))
+      .filter((entry) => entry.line.VatRate === rate)
+      .map((entry) => entry.index);
+
+    const netCents = indexes.map((index) => Math.round(lines[index].NetTotal * 100));
+    const subtotal = netCents.reduce((sum, value) => sum + value, 0);
+    if (subtotal === 0) {
+      continue;
+    }
+
+    // what this rate is charged: each recipient an equal share of the subtotal
+    // plus that share's own rounded VAT
+    const share = Math.round(subtotal / divisor);
+    const charged = divisor * (share + Math.round((share * rate) / 100));
+
+    const exact = netCents.map((net) => (net * charged) / subtotal);
+    const shares = exact.map((value) => Math.floor(value));
+    const order = exact
+      .map((value, position) => ({ position, fraction: value - Math.floor(value) }))
+      .sort((a, b) => b.fraction - a.fraction || a.position - b.position);
+
+    let left = charged - shares.reduce((sum, value) => sum + value, 0);
+    for (let step = 0; left > 0; step++, left--) {
+      shares[order[step % order.length].position] += 1;
+    }
+
+    indexes.forEach((index, position) => {
+      result[index] = shares[position] / 100;
+    });
   }
 
-  const exact = netCents.map((net) => (net * totalCents) / netSum);
-  const shares = exact.map((value) => Math.floor(value));
-  const order = exact
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
-
-  let left = totalCents - shares.reduce((sum, value) => sum + value, 0);
-  for (let step = 0; left > 0; step++, left--) {
-    shares[order[step % order.length].index] += 1;
-  }
-
-  return shares.map((value) => value / 100);
+  return result;
 }
 
 /** What a price field shows for a line's stored net price: the gross for a line
