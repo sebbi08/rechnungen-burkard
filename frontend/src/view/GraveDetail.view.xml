@@ -66,8 +66,14 @@
                         <Column importance="High" popinDisplay="Inline">
                             <Text text="{i18n>itemPrice}" />
                         </Column>
+                        <!-- the rate and the incl.-VAT flag are the first to fold
+                             into the pop-in area on a narrow screen: they qualify
+                             the price rather than being read off directly -->
                         <Column importance="Low" popinDisplay="Inline">
                             <Text text="{i18n>vatRate}" />
+                        </Column>
+                        <Column importance="Low" popinDisplay="Inline">
+                            <Text text="{i18n>priceIncludesVatColumn}" />
                         </Column>
                     </columns>
                     <items>
@@ -76,16 +82,11 @@
                                 <Text text="{grave>Number}" />
                                 <Text text="{grave>Description}" wrapping="true" />
                                 <Text text="{grave>Count}" />
-                                <VBox>
-                                    <Text
-                                        text="{path: 'grave>Price', formatter: '.formatAmount'}"
-                                    />
-                                    <Text
-                                        text="{i18n>priceIncludesVatShort}"
-                                        visible="{grave>PriceIncludesVat}"
-                                    />
-                                </VBox>
+                                <Text text="{path: 'grave>Price', formatter: '.formatAmount'}" />
                                 <Text text="{grave>VatRate}" />
+                                <Text
+                                    text="{path: 'grave>PriceIncludesVat', formatter: '.formatYesNo'}"
+                                />
                             </cells>
                         </ColumnListItem>
                     </items>

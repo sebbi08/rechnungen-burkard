@@ -17,6 +17,13 @@ public sealed class Invoice
     public int? PeriodYear { get; set; } // invoiced half-year period (grave invoices)
     public int? PeriodHalf { get; set; }
     public decimal? SharePercent { get; set; } // grave split share, e.g. 50 or 33.3333
+
+    /// <summary>How many recipients the grave's bill was divided by, on invoices
+    /// that carry the grave's lines at 100 % and apply a share. Null on every
+    /// other invoice — including grave invoices generated before that change,
+    /// whose lines are already one recipient's share. The document renderer
+    /// branches on it, so it is what keeps those older documents reproducible.</summary>
+    public int? RecipientCount { get; set; }
     public long RecipientId { get; set; }
     public string RecipientName { get; set; } = "";
     public string RecipientAddress { get; set; } = "";
@@ -32,6 +39,22 @@ public sealed class Invoice
     public DateOnly? PaidOn { get; set; }
     public List<InvoiceLine> Lines { get; set; } = new();
     public List<Document> Documents { get; set; } = new();
+
+    /// <summary>Net, VAT and gross of what this invoice actually bills — the
+    /// recipient's share on a grave invoice, the whole of it on every other one.
+    /// Derived from <see cref="Lines"/> and <see cref="RecipientCount"/> by the
+    /// same calculation the PDF uses (<c>DocumentDataBuilder</c>), so a screen
+    /// showing an invoice's total never disagrees with the document it links to.
+    /// <c>AppDbContext</c> excludes them from the model, so they are never
+    /// persisted and need no migration. Only InvoicesController's list Get()
+    /// stamps them; they default to and stay 0 on an invoice read through the
+    /// single-key Get(key) route or returned directly by CreateInvoice,
+    /// CreateRevision, CreateGraveInvoiceRevision or SetInvoicePaid — harmless
+    /// today since nothing reads totals from those paths, but worth knowing
+    /// before something starts to.</summary>
+    public decimal NetTotal { get; set; }
+    public decimal VatTotal { get; set; }
+    public decimal GrossTotal { get; set; }
 }
 
 public sealed class InvoiceLine

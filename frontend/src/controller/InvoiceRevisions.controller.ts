@@ -58,14 +58,36 @@ export default abstract class InvoiceRevisions extends BaseController {
             UnitPrice: Number(line.UnitPrice),
             VatRate: Number(line.VatRate),
           };
+          // the line as printed — Count × UnitPrice, rounded to the cent the
+          // way the document rounds it — not affected by a grave's share,
+          // which only scales the invoice-level totals below
+          const lineTotal = Math.round(amounts.Count * amounts.UnitPrice * 100) / 100;
           return {
             ...amounts,
             ItemNumber: line.ItemNumber,
             Description: line.Description,
-            LineTotal: api.lineTotal(amounts),
+            PriceIncludesVat: Boolean(line.PriceIncludesVat),
+            LineTotal: lineTotal,
+            // filled in below, out of the invoice's own gross
+            GrossTotal: 0,
           };
         });
-      const totals = api.invoiceTotals(lines);
+
+      // What each line accounts for, gross, worked out rate by rate the way the
+      // invoice charges it rather than by adding VAT to each line on its own.
+      //
+      // On a grave invoice the lines are the whole grave while the invoice's own
+      // gross is this recipient's share, so the figure being divided up is the
+      // grave's: the recipient count is what puts the gross column in the same
+      // terms as the net column beside it.
+      const shares = api.grossPerLine(
+        lines.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
+        Number(invoice.RecipientCount ?? 1),
+      );
+      lines.forEach((line, index) => {
+        line.GrossTotal = shares[index];
+      });
+
       const revisionNumber = Number(invoice.RevisionNumber);
 
       return {
@@ -80,9 +102,9 @@ export default abstract class InvoiceRevisions extends BaseController {
         // the current revision opens; the history stays collapsed
         Expanded: index === 0,
         Lines: lines,
-        NetTotal: totals.net,
-        VatTotal: totals.vat,
-        GrossTotal: totals.gross,
+        NetTotal: Number(invoice.NetTotal),
+        VatTotal: Number(invoice.VatTotal),
+        GrossTotal: Number(invoice.GrossTotal),
       };
     });
 

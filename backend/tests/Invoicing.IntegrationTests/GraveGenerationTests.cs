@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -124,7 +125,7 @@ public class GraveGenerationTests
     }
 
     [Fact]
-    public async Task Generation_creates_one_invoice_per_recipient_with_split_shares()
+    public async Task Generation_creates_one_invoice_per_recipient_with_a_document_share()
     {
         using var host = new ApiTestHost();
         var (grave2, grave1, _) = await SeedAsync(host);
@@ -149,36 +150,29 @@ public class GraveGenerationTests
             .Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 1)
             .ToListAsync();
 
-        // grave G-1: 2 recipients × share of 214.00 total (2 × 100 + 7% VAT = 214.00) → 107.00 each
-        // grave G-2: 1 recipient → full 107.00
+        // grave G-1 (variable grave2): 2 recipients, item count 2 @ 100.00 @ 7 %.
+        // Net cents 2*100*100=20000 already divide evenly by 2, so MakeDivisible
+        // bumps nothing: every recipient is billed the 2 units in full, and their
+        // share is 20000/2=10000 net cents = 100.00, VAT round(100.00 x 7 / 100, 2)
+        // = 7.00, gross 107.00 — the same amount the old per-line split produced,
+        // now worked out by the document instead of the persisted line.
+        // grave G-2 (variable grave1): 1 recipient → RecipientCount 1, so its share
+        // equals its own 100 % total: 107.00.
         Assert.Equal(3, invoices.Count);
 
         var g2Invoices = invoices.Where(i => i.GraveId == grave2).ToList();
         Assert.Equal(2, g2Invoices.Count);
         Assert.All(g2Invoices, i => Assert.Equal(50m, i.SharePercent));
+        Assert.All(g2Invoices, i => Assert.Equal(2, i.RecipientCount));
 
-        // split totals: 21400 cents / 2 = 10700 each → line gross 107.00
+        var builder = new DocumentDataBuilder();
         foreach (var invoice in g2Invoices)
         {
-            var grossCents = invoice.Lines.Sum(l =>
-                (long)
-                    Math.Round(Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m)
-            );
-            Assert.Equal(10700, grossCents);
+            Assert.Equal(107.00m, builder.Build(invoice).Share!.GrossTotal);
         }
 
-        // shares sum to the grave total: 10700 + 10700 = 21400
-        Assert.Equal(
-            21400,
-            g2Invoices.Sum(i =>
-                (long)
-                    Math.Round(
-                        i.Lines.Sum(l =>
-                            Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m
-                        )
-                    )
-            )
-        );
+        // shares sum to the grave total: 107.00 + 107.00 = 214.00
+        Assert.Equal(214.00m, g2Invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
 
         Assert.Equal(2, await db.GraveInvoiceRuns.CountAsync(r => r.Year == 2026 && r.Half == 1));
         Assert.All(
@@ -192,7 +186,7 @@ public class GraveGenerationTests
     }
 
     [Fact]
-    public async Task Odd_three_way_split_bills_the_graves_net_exactly()
+    public async Task A_grave_whose_prices_do_not_divide_is_skipped_rather_than_billed_wrong()
     {
         using var host = new ApiTestHost();
         {
@@ -267,56 +261,21 @@ public class GraveGenerationTests
         var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
         Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
 
+        // 2 x 100.00 = 200.00 net at 7 %, or 20 000 cents, and 20 000 % 3 = 2:
+        // the three recipients cannot be billed the same amount. Nothing here
+        // adjusts the price to make it fit -- saving such a grave is refused in
+        // the first place, and one that reaches generation anyway (saved before
+        // the rule existed, say) is skipped rather than billed wrong.
+        Assert.Contains("PricesDoNotDivide", job.GetRawText());
+
         {
             using var scope = host.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var invoices = await db
-                .Invoices.Include(i => i.Lines)
-                .Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
-                .ToListAsync();
-
-            // 2 × 100.00 = 200.00 net for the grave; 3 recipients → 66.67 / 66.67 / 66.66.
-            // The net is the fee being shared, so the net is what has to come out exact.
-            Assert.Equal(3, invoices.Count);
-            Assert.All(invoices, i => Assert.Equal(100m / 3, i.SharePercent));
-
-            // net per invoice recomputed from the PERSISTED lines, the way
-            // DocumentDataBuilder derives it: round(count × unitPrice × 100) per line.
-            var nets = invoices
-                .Select(i =>
-                    (long)
-                        i.Lines.Sum(l =>
-                            Math.Round(
-                                l.Count * l.UnitPrice * 100m,
-                                0,
-                                MidpointRounding.AwayFromZero
-                            )
-                        )
-                )
-                .OrderBy(n => n)
-                .ToList();
-
-            Assert.Equal(new List<long> { 6666, 6667, 6667 }, nets);
-            Assert.Equal(20000, nets.Sum());
-
-            // Each invoice then works out its own VAT from its own net, so every one of
-            // them adds up on its own. Three invoices round their VAT three times, so
-            // together they come to 214.01 where a single invoice for the same grave
-            // would show 214.00 — under a cent per recipient, which is the trade.
-            var grosses = invoices
-                .Select(i =>
-                    (long)
-                        Math.Round(
-                            i.Lines.Sum(l =>
-                                Math.Round(l.Count * l.UnitPrice * 100m) * (100m + l.VatRate) / 100m
-                            )
-                        )
-                )
-                .OrderBy(g => g)
-                .ToList();
-
-            Assert.Equal(new List<long> { 7133, 7134, 7134 }, grosses);
-            Assert.InRange(grosses.Sum(), 21400 - 3, 21400 + 3);
+            Assert.Empty(
+                await db
+                    .Invoices.Where(i => i.PeriodYear == 2026 && i.PeriodHalf == 2)
+                    .ToListAsync()
+            );
         }
     }
 

@@ -86,6 +86,7 @@ const CODE_TO_I18N: Record<string, string> = {
   InvoicePaid: "errorInvoicePaid",
   GraveInvoicePaid: "errorGraveInvoicePaid",
   NotLatestRevision: "errorNotLatestRevision",
+  PricesDoNotDivide: "errorPricesDoNotDivide",
 };
 
 /**
@@ -471,6 +472,16 @@ export interface InvoiceRow {
   PeriodYear: number | null;
   PeriodHalf: number | null;
   SharePercent: number | string | null;
+  /** How many recipients the grave's bill was divided by; null on an ordinary
+   *  invoice, and on a grave invoice generated before the split changed. */
+  RecipientCount: number | string | null;
+  /** What this invoice actually bills — the recipient's share on a grave
+   *  invoice, the whole of it on every other one — computed by the backend
+   *  from the same calculation the PDF uses, so a screen never disagrees with
+   *  the document it links to. */
+  NetTotal: number | string;
+  VatTotal: number | string;
+  GrossTotal: number | string;
   Lines?: InvoiceLineRow[];
 }
 
@@ -495,58 +506,91 @@ export interface GraveInvoiceRunRow {
   CreatedAt: string;
 }
 
-export interface InvoiceLineAmounts {
-  Count: number;
-  UnitPrice: number;
-  VatRate: number;
-}
-
-export interface InvoiceTotals {
-  net: number;
-  vat: number;
-  gross: number;
-}
-
-/** A line's net total, rounded to the cent the way the document rounds it. */
-export function lineTotal(line: InvoiceLineAmounts): number {
-  return Math.round(line.Count * line.UnitPrice * 100) / 100;
-}
-
-/** Net, VAT and gross of an invoice. Each line is rounded on its own, exactly
- *  as DocumentDataBuilder does it, so a detail page never disagrees with the
- *  PDF it links to. */
-export function invoiceTotals(lines: InvoiceLineAmounts[]): InvoiceTotals {
-  let netCents = 0;
-  let vatCents = 0;
-  for (const line of lines) {
-    const lineCents = Math.round(line.Count * line.UnitPrice * 100);
-    netCents += lineCents;
-    vatCents += Math.round((lineCents * line.VatRate) / 100);
-  }
-  return {
-    net: netCents / 100,
-    vat: vatCents / 100,
-    gross: (netCents + vatCents) / 100,
-  };
-}
-
 /** The gross a price field shows for a stored net: rounds to the cent,
- *  half-up on a double, which equals the backend's away-from-zero rounding
- *  for every net that `VatInclusivePrice.NetOf` produces. The backend has no
- *  counterpart function to mirror — the inverse rule lives only in
+ *  half-up on a double, which equals the backend's away-from-zero rounding for
+ *  every price this application deals in. The backend has no counterpart
+ *  function to mirror — the inverse rule lives only in
  *  `VatInclusivePriceTests.The_displayed_gross_converts_back_to_the_same_net`
  *  — so a future change to `NetOf`'s rounding has nothing forcing this to
- *  follow it. The two roundings do diverge on an exact half-cent tie, but only
- *  a net `NetOf` never produces reaches one — every net this function is ever
- *  called with is `NetOf` output — so that divergence is unreachable here. */
+ *  follow it. The two rules diverge on an exact half-cent tie, but only on a
+ *  negative one: `Math.round` takes a .5 towards +Infinity, away-from-zero takes
+ *  it away from it, and a price is never negative. They can also diverge where a
+ *  binary double lands just under a value the decimal arithmetic treats as a
+ *  tie. Neither is reachable at the rates this application uses: over every
+ *  `NetOf` output for a gross of 0,01 to 2000,00, no rate in the settings
+ *  produces a disagreement. The sign is what rules the tie out. */
 export function grossFromNet(net: number, vatRate: number): number {
   return Math.round(net * (1 + vatRate / 100) * 100) / 100;
 }
 
+/** One line's net and VAT rate, for `grossPerLine` below. */
+export interface GrossLine {
+  NetTotal: number;
+  VatRate: number;
+}
+
+/** What each line accounts for, gross, so the column adds up to what the
+ *  recipients are actually charged.
+ *
+ *  Adding VAT to each line on its own does not reach that figure: it is rounded
+ *  once per VAT rate rather than per line, and on a grave once per recipient on
+ *  top. So each rate's charge is worked out the way it is billed — an equal
+ *  share per recipient, VAT rounded on the share — and then divided across that
+ *  rate's own lines, largest remainder first. Ties keep the earlier line, so the
+ *  same figures always produce the same rows.
+ *
+ *  Rate by rate, never across the whole table. Sharing one blended total out
+ *  over every line gave a 7 % line the same multiplier as a 19 % one: 100,00 €
+ *  net showed 112,43 € gross beside its own "7 %". No line is now more than a
+ *  cent from its own net plus VAT.
+ *
+ *  This decides no amount. The prices are already fixed and already divide — a
+ *  grave that did not could not have been saved — so this only splits a figure
+ *  the backend settled, which is why it can live in the browser. */
+export function grossPerLine(lines: GrossLine[], recipients: number): number[] {
+  const result = lines.map(() => 0);
+  const divisor = Math.max(1, Math.round(recipients));
+
+  for (const rate of new Set(lines.map((line) => line.VatRate))) {
+    const indexes = lines
+      .map((line, index) => ({ line, index }))
+      .filter((entry) => entry.line.VatRate === rate)
+      .map((entry) => entry.index);
+
+    const netCents = indexes.map((index) => Math.round(lines[index].NetTotal * 100));
+    const subtotal = netCents.reduce((sum, value) => sum + value, 0);
+    if (subtotal === 0) {
+      continue;
+    }
+
+    // what this rate is charged: each recipient an equal share of the subtotal
+    // plus that share's own rounded VAT
+    const share = Math.round(subtotal / divisor);
+    const charged = divisor * (share + Math.round((share * rate) / 100));
+
+    const exact = netCents.map((net) => (net * charged) / subtotal);
+    const shares = exact.map((value) => Math.floor(value));
+    const order = exact
+      .map((value, position) => ({ position, fraction: value - Math.floor(value) }))
+      .sort((a, b) => b.fraction - a.fraction || a.position - b.position);
+
+    let left = charged - shares.reduce((sum, value) => sum + value, 0);
+    for (let step = 0; left > 0; step++, left--) {
+      shares[order[step % order.length].position] += 1;
+    }
+
+    indexes.forEach((index, position) => {
+      result[index] = shares[position] / 100;
+    });
+  }
+
+  return result;
+}
+
 /** What a price field shows for a line's stored net price: the gross for a line
- *  entered VAT-included, and the untouched net for every other one — including
- *  the three decimals a grave split leaves behind. The rate is the item's
- *  current one, not the line's stored one: the backend converts what the dialog
+ *  entered VAT-included, and the untouched net for every other one. Every
+ *  price has two decimals, on a grave line as anywhere else. The rate is the
+ *  item's current one, not the line's stored one: the backend converts what the dialog
  *  sends using the item as it is now, so displaying with an older rate would
  *  move the price of a line nobody touched. */
 export function priceFieldValue(net: number, priceIncludesVat: boolean, vatRate: number): number {
@@ -592,6 +636,75 @@ export async function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveIn
   const response = await fetch(`/odata/GraveInvoiceGroup?invoiceId=${invoiceId}`);
   await ensureOk(response);
   return (await response.json()) as GraveInvoiceGroup;
+}
+
+export interface GraveBillingInput {
+  ItemId: number;
+  Count: number;
+  UnitPrice: number | null;
+  PriceIncludesVat: boolean;
+}
+
+export interface GraveBillingLine {
+  ItemId: number;
+  ItemNumber: string;
+  Description: string;
+  Count: number;
+  VatRate: number;
+  PriceIncludesVat: boolean;
+  /** The net the line is billed at. */
+  UnitPrice: number;
+  /** Count × UnitPrice. */
+  NetTotal: number;
+}
+
+/** Why a grave's prices cannot be split evenly across its recipients. All
+ *  amounts are in euro. */
+export interface GraveBillingProblem {
+  VatRate: number;
+  /** `NotDivisible`: the rate's net total does not divide by the recipient
+   *  count. `DoesNotAddUp`: it divides, but a price entered as a gross cannot
+   *  be billed to the cent. The message reads the same either way — what the
+   *  user does about it is the same. */
+  Kind: "NotDivisible" | "DoesNotAddUp";
+  /** What this rate comes to, in the unit its prices were entered in: net where
+   *  they are net prices, gross where any was typed as a gross. */
+  Amount: number;
+  /** The nearest amounts that would work, one below and one above, in that same
+   *  unit. */
+  Suggestions: number[];
+}
+
+export interface GraveBillingCheck {
+  Ok: boolean;
+  /** What the recipients would collect between them; null when it does not
+   *  come out even. */
+  GrossTotal: number | null;
+  Problems: GraveBillingProblem[];
+  Lines: GraveBillingLine[];
+}
+
+/** Whether a grave's prices can be split evenly across its recipients, and what
+ *  they would be billed.
+ *
+ *  A grave is billed by giving every recipient the same share of each VAT-rate
+ *  subtotal, so the prices have to divide. Nothing adjusts them — the save
+ *  refuses a grave that does not come out even, and the dialog asks this first
+ *  so it can say which rate is wrong and what would work instead.
+ *
+ *  The backend answers it rather than the browser working it out: the same rule
+ *  decides what is actually billed, and a second copy of it in TypeScript would
+ *  be free to disagree with the one that refuses the save. */
+export async function checkGraveBilling(
+  recipients: number,
+  lines: GraveBillingInput[],
+): Promise<GraveBillingCheck> {
+  const response = await post("/odata/ValidateGraveBilling", {
+    Recipients: recipients,
+    Lines: lines,
+  });
+  await ensureOk(response);
+  return (await response.json()) as GraveBillingCheck;
 }
 
 /** Revises every recipient invoice of the grave and half-year the given invoice

@@ -254,6 +254,32 @@ public class GravesController : ODataController
             // would make this the odd one out
             return new JsonResult(new { grave.Id }, ODataJsonDefaults.PascalCase);
         }
+        // the split problems travel with the refusal: the dialog names the rate,
+        // the amounts and what would work instead, which it cannot work out for
+        // itself without a second copy of the rule
+        catch (GraveShareValidationException ex)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = ex.Code,
+                        message = ex.Message,
+                        recipients = ex.Recipients,
+                        problems = ex
+                            .Problems.Select(p => new
+                            {
+                                vatRate = p.VatRate,
+                                kind = p.Kind.ToString(),
+                                amount = p.Amount / 100m,
+                                suggestions = p.Suggestions.Select(c => c / 100m).ToList(),
+                            })
+                            .ToList(),
+                    },
+                }
+            );
+        }
         catch (ValidationException ex)
         {
             return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });

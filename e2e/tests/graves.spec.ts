@@ -445,33 +445,47 @@ async function generateFor(page: Page, year: number, half: number): Promise<void
     .toBe("Succeeded");
 }
 
-/** A grave with one item at 100.00 net and the given recipients, unique per run.
- *  `pricing` overrides the item's rate, price and VAT-included flag. */
+/** One item line `seedGrave` links to the grave. Every field defaults to what
+ *  every caller needed before `seedGrave` took a list of these rather than one. */
+interface SeedGraveItem {
+  description?: string;
+  vatRate?: number;
+  price?: number;
+  priceIncludesVat?: boolean;
+  count?: number;
+}
+
+/** A grave with the given items and recipients, unique per run. Defaults to
+ *  one 100.00 net item, count 1, at 7 %, matching every caller from before
+ *  `seedGrave` took a list of items rather than one. */
 async function seedGrave(
   page: Page,
   marker: string,
   recipientNames: string[],
-  pricing: { vatRate?: number; price?: number; priceIncludesVat?: boolean } = {},
+  items: SeedGraveItem[] = [{}],
 ): Promise<{ graveId: number; recipientNames: string[] }> {
-  const vatRate = pricing.vatRate ?? 7;
-  await ensureRow(page, "/odata/VatRates", { Rate: vatRate });
-  const item = await createRow(page, "/odata/InvoiceItems", {
-    Number: `${marker}-item`,
-    Description: "Grabpflege",
-    VatRate: vatRate,
-    DefaultPrice: pricing.price ?? 100,
-  });
   const grave = await createRow(page, "/odata/Graves", {
     GraveNumber: marker,
     StartDate: "2026-01-01",
     EndDate: "2040-12-31",
   });
-  await createRow(page, "/odata/GraveItems", {
-    GraveId: grave.Id,
-    ItemId: item.Id,
-    Count: 1,
-    PriceIncludesVat: pricing.priceIncludesVat ?? false,
-  });
+  for (const [index, spec] of items.entries()) {
+    const vatRate = spec.vatRate ?? 7;
+    await ensureRow(page, "/odata/VatRates", { Rate: vatRate });
+    // a single item keeps the old, suffix-free number; several get one each
+    const item = await createRow(page, "/odata/InvoiceItems", {
+      Number: items.length > 1 ? `${marker}-item${index + 1}` : `${marker}-item`,
+      Description: spec.description ?? "Grabpflege",
+      VatRate: vatRate,
+      DefaultPrice: spec.price ?? 100,
+    });
+    await createRow(page, "/odata/GraveItems", {
+      GraveId: grave.Id,
+      ItemId: item.Id,
+      Count: spec.count ?? 1,
+      PriceIncludesVat: spec.priceIncludesVat ?? false,
+    });
+  }
   for (const name of recipientNames) {
     const recipient = await createRow(page, "/odata/Recipients", {
       Name: name,
@@ -675,24 +689,55 @@ test("overview and generate dialog open on the half-year today falls in", async 
   await page.getByRole("button", { name: "Abbrechen" }).click();
 });
 
+test("a grave with three recipients bills every one of them the identical share (2035/2)", async ({
+  page,
+}) => {
+  const marker = `GT-${Date.now()}`;
+  const names = [`Erna ${marker}`, `Otto ${marker}`, `Rosa ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, [
+    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
+    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+  ]);
+  // 2035 H2 is not used by any other test, so no duplicate-generation conflicts
+  await generateFor(page, 2035, 2);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
+  await expect(invoicesTable.locator("tbody tr")).toHaveCount(3);
+
+  // the 7 % subtotal (100,00 + 18,50 = 118,50) divides evenly by three, but the
+  // 19 % one (49,90 + 47,80 = 97,70) does not — a cent goes onto the cheapest,
+  // count-1 line (Grabstein reinigen) to make it 97,71. Each recipient then
+  // pays 39,50 net at 7 % and 32,57 net at 19 %: 72,07 net, VAT 2,77 + 6,19 =
+  // 8,96, total 81,03 — asserted per row, not just "at least one", so a split
+  // that shortchanged even one recipient would fail this
+  await expect(invoicesTable.locator("tbody tr", { hasText: "81,03 €" })).toHaveCount(3);
+});
+
 test("a grave splits a VAT-included price without taking its VAT out twice", async ({ page }) => {
   const marker = `GV-${Date.now()}`;
   const names = [`Vera ${marker}`, `Walter ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names, {
-    vatRate: 7,
-    price: 119,
-    priceIncludesVat: true,
-  });
+  const { graveId } = await seedGrave(page, marker, names, [
+    { vatRate: 7, price: 117.02, priceIncludesVat: true },
+  ]);
   await generateFor(page, 2036, 2);
 
   await page.goto(`/index.html#/graves/${graveId}`);
-  // the grave's own item list shows the gross and says so
-  await expect(page.getByText("inkl. MwSt.").first()).toBeVisible();
+  // the grave's own item list shows the gross and says so — the incl.-VAT flag
+  // has its own column now rather than a hint under the price
+  const careRow = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
+  await expect(careRow).toContainText("Ja");
+  // 117,02 gross at 7 % is a net of 109,36, whose 10 936 cents divide evenly by
+  // two. The page shows the price exactly as it was typed: a grave whose prices
+  // could not be split could not have been saved, so nothing here is adjusted.
+  await expect(careRow).toContainText("117,02 €");
 
-  // 119,00 gross at 7 % is a net of 111,215; halved that is 55,61 net and
-  // 59,50 gross each — 119,00 together, the price that was entered
+  // 54,68 net and 58,51 gross each — 117,02 together, the price that was
+  // entered
   const invoicesTable = page.locator("[id$='graveInvoicesTable-listUl']");
-  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "58,51 €" })).toHaveCount(2);
 
   await invoicesTable
     .locator("tbody tr", { hasText: names[0] })
@@ -700,16 +745,168 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
     .click();
   await waitForDialogOpen(page);
 
-  // the dialog opens on the grave's gross — not on the 111,215 net it stores,
+  // the dialog opens on the grave's gross — not on the 109,36 net it stores,
   // and not on either recipient's share
   const dialog = page.locator("[id$='graveInvoiceDialog']");
-  await expect(dialog.getByLabel("Preis")).toHaveValue("119");
+  await expect(dialog.getByLabel("Preis")).toHaveValue("117.02");
   await expect(dialog).toContainText("inkl. MwSt.");
   await expect(dialog.getByRole("checkbox")).toBeChecked();
 
   // saved back untouched, every share stays where it was
   await dialog.getByRole("button", { name: "Speichern" }).click();
-  await expect(invoicesTable.locator("tbody tr", { hasText: "59,50 €" })).toHaveCount(2);
+  await expect(invoicesTable.locator("tbody tr", { hasText: "58,51 €" })).toHaveCount(2);
+});
+
+test("the grave detail page shows this half-year's billed price once it is today's", async ({
+  page,
+}) => {
+  const marker = `GC-${Date.now()}`;
+  const names = [`Uwe ${marker}`, `Vroni ${marker}`, `Wanda ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, [
+    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
+    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+  ]);
+
+  // The file's first test already invoiced most graves for CURRENT_YEAR/
+  // CURRENT_HALF, but GenerateGraveInvoices only refuses a request once
+  // *every* grave has a run for that period — this grave, seeded just above,
+  // does not, so the request is accepted and the job invoices only the graves
+  // still missing a run, this one included.
+  await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  // The grave detail page has no half-year selector: it always shows what was
+  // billed for the half-year today falls in. The 19 % subtotal is 49,90 + 47,81
+  // = 97,71, which divides by three; the page shows the grave's own price,
+  // unadjusted, because nothing adjusts prices any more — a grave that did not
+  // divide could not have been saved.
+  const stoneRow = page.locator("tbody tr", { hasText: "Grabstein reinigen" }).first();
+  await expect(stoneRow).toContainText("47,81 €");
+});
+
+test("the grave's item table shows the price as entered, its rate and the flag", async ({
+  page,
+}) => {
+  const marker = `GK-${Date.now()}`;
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    [`Xaver ${marker}`, `Yvonne ${marker}`],
+    [{ description: "Grabpflege", vatRate: 19, price: 100, count: 2 }],
+  );
+
+  await page.goto(`/index.html#/graves/${graveId}`);
+  const row = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
+
+  // the price exactly as it was typed, with what qualifies it beside it. No net
+  // or gross totals: a grave's page is about what was agreed, and those figures
+  // belong to the invoices listed beneath it.
+  await expect(row).toContainText("100,00 €");
+  await expect(row).toContainText("19");
+  // the flag reads as a word, since a screen reader announces these cell by cell
+  await expect(row).toContainText("Nein");
+  await expect(row).not.toContainText("200,00 €");
+  await expect(row).not.toContainText("238,00 €");
+});
+
+test("an invoice works each rate's gross out at that rate, not at a blended one", async ({
+  page,
+}) => {
+  const marker = `GR-${Date.now()}`;
+  // Two rates over three recipients, both dividing: 7 % comes to 300,00 net and
+  // 19 % to 99,00. A gross column that shares one blended total across every
+  // line gives both the same multiplier — 300,00 at 7 % then read 331,71 €
+  // beside its own "7 %", which is the bug this pins.
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    [`Anna ${marker}`, `Bernd ${marker}`, `Carla ${marker}`],
+    [
+      { description: "Grabpflege", vatRate: 7, price: 100, count: 3 },
+      { description: "Blumenschmuck", vatRate: 19, price: 99, count: 1 },
+    ],
+  );
+  await generateFor(page, 2037, 1);
+
+  const invoices = await (
+    await page.request.get(`/odata/Invoices?$filter=GraveId eq ${graveId}&$select=Id,RootId`)
+  ).json();
+  await page.goto(`/index.html#/graves/${graveId}/invoices/${invoices.value[0].RootId}`);
+
+  // the lines are the whole grave, so the gross column is the grave's: 300,00
+  // at 7 % is 321,00, and 99,00 at 19 % is 117,81
+  await expect(page.locator("tbody tr", { hasText: "Grabpflege" }).first()).toContainText(
+    "321,00 €",
+  );
+  await expect(page.locator("tbody tr", { hasText: "Blumenschmuck" }).first()).toContainText(
+    "117,81 €",
+  );
+});
+
+test("a grave whose prices do not divide is refused until a price is changed", async ({ page }) => {
+  const marker = `GW-${Date.now()}`;
+  // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,
+  // so the three of them cannot be billed the same amount. Nothing raises the
+  // price to make it fit — the save is refused and names what would work.
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabstein reinigen",
+    VatRate: 19,
+    DefaultPrice: 47.8,
+  });
+  const names = [`Anna ${marker}`, `Bert ${marker}`, `Cilly ${marker}`];
+  for (const name of names) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/index.html#/graves");
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForDialogOpen(page);
+
+  const graveDialog = page.locator(".sapMDialog");
+  await graveDialog.getByLabel("Grabnummer").fill(marker);
+  await graveDialog.getByLabel("Beginn").fill("2026-01-01");
+  await graveDialog.getByLabel("Ende").fill("2040-12-31");
+
+  await page.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  const itemInput = page.locator(".sapMDialog input[id*='graveItem-'][id$='-inner']");
+  await itemInput.click();
+  await itemInput.fill(`${marker}-item`);
+  await suggestions(page, "graveItem")
+    .filter({ hasText: `${marker}-item` })
+    .click();
+  await expect(graveDialog.getByLabel("Preis")).toHaveValue("47.8");
+
+  for (const name of names) {
+    const recipientInput = page.locator(".sapMDialog input[id$='--linkRecipient-inner']");
+    await recipientInput.click();
+    await recipientInput.fill(name);
+    await suggestions(page, "linkRecipient").filter({ hasText: name }).click();
+    await expect(recipientInput).toHaveValue(name);
+    await expect(page.locator("[id*='linkRecipient'][id$='-popup-list']")).toBeHidden();
+    await page.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+    await expect(page.locator("[id$='graveRecipientsTable-listUl']")).toContainText(name);
+  }
+
+  await page.getByRole("button", { name: "Speichern" }).click();
+
+  // refused, naming the rate and the nearest subtotals that would divide
+  const refusal = page.locator(".sapMMessageBox");
+  await expect(refusal).toContainText("47,80");
+  await expect(refusal).toContainText("47,79");
+  await expect(refusal).toContainText("47,82");
+  // MessageBox.error closes with "Schließen", not "OK"
+  await refusal.getByRole("button").first().click();
+
+  // the dialog is still open with the draft intact, so the price can be fixed
+  await expect(graveDialog.getByLabel("Grabnummer")).toHaveValue(marker);
+  await graveDialog.getByLabel("Preis").fill("47.79");
+  await page.getByRole("button", { name: "Speichern" }).click();
+
+  await expect(page.locator("[id$='gravesTable-listUl']")).toContainText(marker);
 });
 
 test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {

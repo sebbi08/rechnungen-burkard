@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -176,5 +177,49 @@ public sealed class GraveService
         {
             throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
         }
+
+        // The bill is split equally, so it has to divide. Nothing is adjusted to
+        // make it: a grave that does not come out even is refused here, while
+        // the dialog is still open and a price can be changed, rather than
+        // producing invoices that disagree with each other or with the grave.
+        //
+        // Only checked once there are recipients -- until then there is nothing
+        // to divide by, and a grave is often saved with its items before its
+        // recipients are known.
+        if (recipientIds.Count > 0 && items.Count > 0)
+        {
+            var lines = items
+                .Select(input =>
+                    GraveBilling.LineFor(
+                        invoiceItems[input.ItemId],
+                        input.Count,
+                        input.UnitPrice,
+                        input.PriceIncludesVat
+                    )
+                )
+                .ToList();
+
+            var problems = GraveShare.Problems(lines, recipientIds.Count);
+            if (problems.Count > 0)
+            {
+                throw new GraveShareValidationException(problems, recipientIds.Count);
+            }
+        }
     }
+}
+
+/// <summary>A grave whose prices cannot be split evenly across its recipients.
+/// Carries the problems so the dialog can name the rate, the amounts and what
+/// would work instead, rather than only saying no.</summary>
+public sealed class GraveShareValidationException : ValidationException
+{
+    public GraveShareValidationException(IReadOnlyList<GraveShareProblem> problems, int recipients)
+        : base("PricesDoNotDivide", "The prices cannot be split evenly across the recipients.")
+    {
+        Problems = problems;
+        Recipients = recipients;
+    }
+
+    public IReadOnlyList<GraveShareProblem> Problems { get; }
+    public int Recipients { get; }
 }

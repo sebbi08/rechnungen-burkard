@@ -12,4 +12,5 @@ dist/
 .playwright/
 .playwright-mcp/
 test-results/
+playwright-report/
 data/

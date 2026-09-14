@@ -163,8 +163,9 @@ one invoicing item, and two recipients, then listing and searching it.
 ### User Story 6 - Generate Grave Invoices per Half-Year (Priority: P2)
 
 A user generates invoices for graves for a given half-year. Each recipient gets
-their own invoice with their evenly split share, and the system records each
-generation so the same grave cannot be invoiced twice for the same half-year.
+their own invoice for the grave's full bill, billed at an identical amount, and
+the system records each generation so the same grave cannot be invoiced twice
+for the same half-year.
 
 **Why this priority**: Half-year grave invoicing with duplicate protection is the
 central recurring business process.
@@ -177,11 +178,13 @@ appears twice.
 
 1. **Given** graves with invoicing items and recipients exist, **When** the user
    generates invoices for a selected half-year, **Then** one invoice per recipient
-   is created, each with the configured items, counts, and that recipient's share
-   of the evenly split total.
+   is created, each with the grave's configured items and counts billed in full,
+   at the same amount as every other recipient's invoice.
 2. **Given** a grave has multiple recipients, **When** its invoice is generated,
-   **Then** each recipient receives their own invoice stating above the item list
-   which percentage of the total it represents (e.g., 50% for two, 33.3% for three).
+   **Then** each recipient receives their own invoice listing the grave's items in
+   full and summarising, beneath them, the grave's net sum and the recipient's
+   share of it labelled with the percentage it represents (e.g., 50 % for two,
+   33,33 % for three).
 3. **Given** an invoice has already been generated for a grave and half-year,
    **When** the user attempts to generate again for the same half-year, **Then** the
    system prevents duplicates and shows that the grave is already invoiced.
@@ -192,8 +195,8 @@ appears twice.
    updates, **Then** the invoicing status for the selected half-year is displayed.
 6. **Given** a grave with two recipients has been invoiced for a half-year,
    **When** the user edits one of those recipients' invoices, **Then** both
-   recipients receive a new revision carrying their share of the edited
-   amounts, and the previous invoices are preserved unchanged.
+   recipients receive an identical new revision of the grave's edited lines,
+   and the previous invoices are preserved unchanged.
 
 ---
 
@@ -387,9 +390,10 @@ non-interactive until completion, and the task runs exactly once.
   with a clear message.
 - What happens when an invoice is generated twice for the same grave and
   half-year? The second attempt must be prevented.
-- How are rounding differences handled when a total is split evenly among three
-  or more recipients? The remainder in the smallest currency unit must be
-  distributed so the sum of shares always equals the total.
+- How are rounding differences handled when a grave's per-rate subtotal does not
+  divide evenly among three or more recipients? The grave's price is raised by
+  whole cents — never reduced — until every subtotal divides evenly, so every
+  recipient is billed the identical share.
 - What happens when a recipient's address is changed after invoices were
   generated? Historical invoices must remain unchanged.
 - What happens when a grave's end date lies before the selected half-year?
@@ -481,14 +485,21 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-020b**: A grave's set of recipients MUST be fixed when the grave is
   created and MUST NOT change afterwards.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
-  invoice per recipient, each containing only that recipient's share of the
-  evenly split total.
-- **FR-021a**: The split MUST divide the net total, so that the recipients' net
-  shares sum to the grave's net exactly and every invoice's VAT follows from its
-  own net. An invoice MUST NOT carry a VAT amount that its own net does not
-  produce.
-- **FR-022**: Each recipient invoice MUST state, above the item list, which
-  percentage of the total grave invoice it represents.
+  invoice per recipient, each carrying the grave's own items and counts in full,
+  billed at the same amount as every other recipient's invoice.
+- **FR-021a**: The grave's per-VAT-rate subtotals MUST divide evenly across its
+  recipients so that every recipient's share is identical, and every invoice's
+  VAT MUST follow from its own share of that net. The system MUST NOT adjust a
+  price to achieve this: saving a grave whose subtotals do not divide MUST be
+  refused, naming the VAT rate, its subtotal and the nearest subtotals that
+  would divide. Where a rate carries a price entered as a gross, what the
+  recipients collect between them MUST come to exactly that gross, and the save
+  MUST be refused otherwise.
+- **FR-022**: Each recipient invoice MUST state which percentage of the grave's
+  bill it represents, in its summary beneath the item list: the grave's net sum,
+  then the recipient's share of it labelled with that percentage, then the VAT
+  worked out per rate from that share. The percentage MUST be shown to at most
+  two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
 - **FR-024**: Users MUST be able to search graves.
 
@@ -519,8 +530,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-034**: Editing a non-grave invoice MUST create a new revision; the
   previously generated version MUST be preserved unchanged.
 - **FR-034a**: Editing a grave invoice MUST create a new revision for every
-  recipient of that grave and half-year, splitting the edited amounts the same
-  way generation splits them.
+  recipient of that grave and half-year, billing each of them the edited lines
+  in full, the same way generation bills them.
 - **FR-034b**: The edit MUST start from the amounts as they were invoiced for
   that half-year, not from the grave's current configuration.
 - **FR-035**: The invoice number of a revision MUST clearly indicate that it is a
@@ -636,16 +647,19 @@ non-interactive until completion, and the task runs exactly once.
   date, one or more invoicing items (with counts), and one or more recipients,
   fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
-  invoice per recipient carrying that recipient's share and a percentage note) or
-  to a single recipient (non-grave). Carries invoice lines, VAT, ending text,
-  generation date, and a unique invoice number. Edits create new revisions;
-  previous revisions are preserved and invoices cannot be deleted.
+  invoice per recipient carrying the grave's own lines in full, at the same
+  amount for every recipient, together with a percentage note stating their
+  share) or to a single recipient (non-grave). Carries invoice lines, VAT,
+  ending text, generation date, and a unique invoice number. Edits create new
+  revisions; previous revisions are preserved and invoices cannot be deleted.
 - **Invoice Line**: A single item on an invoice; has a count, a price per item,
-  and a line total. On a grave invoice, a line also carries the price it was
-  split from before the even split across recipients; this is null on
-  non-grave invoices and on grave invoices generated before this was recorded,
-  in which case the price is reconstructed from the recipients' shares — a
-  best-effort calculation that can be a cent or two off for very small amounts.
+  and a line total. On a grave invoice generated before recipients were billed
+  the grave's lines directly, the stored price is one recipient's share, and
+  the line also carries the price it was split from before that split; both
+  are null on non-grave invoices and on grave invoices billed in the grave's
+  own lines directly. Where that pre-split price is missing, the grave's line
+  is instead reconstructed from the recipients' shares — a best-effort
+  calculation that can be a cent or two off for very small amounts.
 - **Invoice Document**: The generated PDF for an invoice revision; each revision
   has two documents — a normal document and a stamped copy.
 - **VAT Rate**: A globally configured percentage, assigned to invoice items and
@@ -667,10 +681,10 @@ non-interactive until completion, and the task runs exactly once.
   per item) and correctly applied per-item VAT rates.
 - **SC-003**: Generating grave invoices for a half-year yields exactly one invoice
   per recipient, with zero duplicates across a batch of 50 or more graves.
-- **SC-004**: For graves with multiple recipients, the recipients' net shares sum
-  to the grave's net total exactly. Their gross totals may exceed or fall short of
-  a single invoice for the same grave by less than one currency unit per recipient,
-  because each invoice works out its own VAT.
+- **SC-004**: For graves with multiple recipients, every recipient is billed an
+  identical amount, and their shares sum exactly to the net sum printed on the
+  invoice. A grave whose prices cannot be split that way cannot be saved: the
+  prices are never adjusted on the user's behalf.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
 - **SC-006**: A bulk download of N normal grave invoices for a half-year yields
@@ -709,12 +723,13 @@ non-interactive until completion, and the task runs exactly once.
 - A single currency (EUR) is used for all amounts in version 1.
 - A half-year is one of two periods: January 1 – June 30 and July 1 – December 31.
 - The "current half-year" is derived from the current date.
-- When a net amount is split evenly among recipients, any remainder in the
-  smallest currency unit is handed to the first recipients, so the net shares
-  always sum to the grave's net total.
-- For grave invoices generated before their pre-split price was recorded on
-  each line, that price is reconstructed from the recipients' shares, which can
-  be a cent or two off for very small amounts.
+- A grave's prices are chosen so that its net subtotals divide evenly among its
+  recipients; a grave that does not come out even cannot be saved, and nothing
+  adjusts a price on the user's behalf.
+- For grave invoices generated before recipients were billed the grave's own
+  lines directly, each line's stored price is one recipient's share; where the
+  pre-split price is missing, it is reconstructed from the recipients' shares
+  instead, which can be a cent or two off for very small amounts.
 - Generated documents are PDFs.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.

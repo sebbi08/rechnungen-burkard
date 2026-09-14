@@ -43,11 +43,20 @@
                     <Column importance="High" popinDisplay="Inline">
                         <Text text="{i18n>itemPrice}" />
                     </Column>
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>netAmount}" />
+                    </Column>
+                    <Column importance="High" popinDisplay="Inline">
+                        <Text text="{i18n>grossAmount}" />
+                    </Column>
+                    <!-- the rate and the incl.-VAT flag fold into the pop-in area
+                         first on a narrow screen: they qualify the amounts rather
+                         than being read off directly -->
                     <Column importance="Low" popinDisplay="Inline">
                         <Text text="{i18n>vatRate}" />
                     </Column>
-                    <Column importance="Medium" popinDisplay="Inline">
-                        <Text text="{i18n>lineTotal}" />
+                    <Column importance="Low" popinDisplay="Inline">
+                        <Text text="{i18n>priceIncludesVatColumn}" />
                     </Column>
                 </columns>
                 <items>
@@ -57,8 +66,12 @@
                             <Text text="{detail>Description}" wrapping="true" />
                             <Text text="{detail>Count}" />
                             <Text text="{path: 'detail>UnitPrice', formatter: '.formatAmount'}" />
-                            <Text text="{detail>VatRate}" />
                             <Text text="{path: 'detail>LineTotal', formatter: '.formatAmount'}" />
+                            <Text text="{path: 'detail>GrossTotal', formatter: '.formatAmount'}" />
+                            <Text text="{detail>VatRate}" />
+                            <Text
+                                text="{path: 'detail>PriceIncludesVat', formatter: '.formatYesNo'}"
+                            />
                         </cells>
                     </ColumnListItem>
                 </items>

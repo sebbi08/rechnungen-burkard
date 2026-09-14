@@ -11,19 +11,21 @@ using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
-/// <summary>A grave whose item is priced VAT-included. The split divides a net —
-/// that is what lets each recipient's document work out its own VAT and add up —
-/// so the entered gross has to give up its VAT before the split, not after.
+/// <summary>A grave whose item is priced VAT-included. Every recipient is billed
+/// the grave's own net in full, so it is that net which has to give up its VAT —
+/// before generation, not after — and the recipient's share is worked out by the
+/// document, not by dividing the line.
 ///
-/// 120,00 € gross at 19 % is a net of 100,840, or 10 084 cents. Split across two
-/// recipients that is 5 042 cents each, a unit price of 50,420, and a document
-/// total of 50,42 € + 9,58 € = 60,00 € — twice 60,00 € being the 120,00 € that
-/// was entered.</summary>
+/// 120,00 € gross at 19 % is a net of 100,840, or 10 084 cents. That net already
+/// divides evenly across two recipients (10 084 / 2 = 5 042), so MakeDivisible
+/// bumps nothing and each recipient's line stays at 100,840. Each document's
+/// share is then 5 042 cents net, VAT round(50,42 × 19 / 100, 2) = 9,58, for a
+/// share gross of 60,00 € — twice 60,00 € being the 120,00 € that was
+/// entered.</summary>
 public class VatIncludedGraveTests
 {
     private const decimal EnteredGross = 120.00m;
     private const decimal ExpectedGraveNet = 100.840m;
-    private const decimal ExpectedShareNet = 50.420m;
     private const decimal ExpectedShareGross = 60.00m;
 
     private static async Task<long> SeedAsync(ApiTestHost host)
@@ -99,37 +101,38 @@ public class VatIncludedGraveTests
         foreach (var invoice in invoices)
         {
             var line = Assert.Single(invoice.Lines);
-            Assert.Equal(ExpectedShareNet, line.UnitPrice);
-            // the grave's own price, before the split, is a net too
-            Assert.Equal(ExpectedGraveNet, line.GraveUnitPrice);
-            Assert.Equal(ExpectedShareGross, builder.Build(invoice).GrossTotal);
+            // the line carries the grave's own net in full; nothing is split
+            // any more, so there is no separate "before the split" price to record
+            Assert.Equal(ExpectedGraveNet, line.UnitPrice);
+            Assert.Null(line.GraveUnitPrice);
+            Assert.Equal(2, invoice.RecipientCount);
+            Assert.Equal(ExpectedShareGross, builder.Build(invoice).Share!.GrossTotal);
         }
 
-        Assert.Equal(EnteredGross, invoices.Sum(i => builder.Build(i).GrossTotal));
+        Assert.Equal(EnteredGross, invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
     }
 
     /// <summary>A grave whose link overrides the item's default price
     /// (<see cref="GraveItem.UnitPrice"/>) on a flagged item: the override, not
-    /// the item's default, is what gives up its VAT and gets split.
+    /// the item's default, is what gives up its VAT and is billed to every
+    /// recipient in full.
     ///
     /// Derivation: the override is entered as 238,00 € gross at 19 %.
     /// <c>NetOf(238.00, 19, true)</c> rounds the gross to the cent (already
     /// exact), then divides by 1,19 — 238,00 / 1,19 = 200,000 exactly, so no
-    /// rounding bites. At count 1 that is 20 000 net cents, split evenly by
-    /// <c>ShareCalculator.SplitCents(20000, 2)</c> into 10 000 cents each (no
-    /// remainder). Each recipient's stored unit price is
-    /// <c>round(10000 / 100 / 1, 3)</c> = 100,000. DocumentDataBuilder's
-    /// per-line VAT is <c>round(10000 × 19 / 100)</c> = 1 900 cents = 19,00 €,
-    /// so each recipient's document is 100,00 € net + 19,00 € VAT = 119,00 €
-    /// gross, and the two recipients' gross totals sum back to the 238,00 €
-    /// that was entered — not the 120,00 € the item's own default price would
-    /// have produced, which is what proves the override is what was billed.</summary>
+    /// rounding bites. At count 1 that is 20 000 net cents, which already
+    /// divides evenly by 2 recipients, so <c>MakeDivisible</c> bumps nothing and
+    /// every recipient's line keeps the full 200,000. Each recipient's share is
+    /// then 20 000 / 2 = 10 000 cents net = 100,00 €, and its VAT is
+    /// <c>round(100.00 × 19 / 100, 2)</c> = 19,00 €, for a share gross of
+    /// 119,00 €. The two recipients' share grosses sum back to the 238,00 € that
+    /// was entered — not the 120,00 € the item's own default price would have
+    /// produced, which is what proves the override is what was billed.</summary>
     [Fact]
     public async Task A_grave_price_override_on_a_flagged_item_gives_up_its_own_vat()
     {
         const decimal EnteredOverrideGross = 238.00m;
         const decimal ExpectedOverrideNet = 200.000m;
-        const decimal ExpectedOverrideShareNet = 100.000m;
         const decimal ExpectedOverrideShareGross = 119.00m;
 
         using var host = new ApiTestHost();
@@ -204,12 +207,13 @@ public class VatIncludedGraveTests
         foreach (var invoice in invoices)
         {
             var line = Assert.Single(invoice.Lines);
-            Assert.Equal(ExpectedOverrideShareNet, line.UnitPrice);
-            Assert.Equal(ExpectedOverrideNet, line.GraveUnitPrice);
-            Assert.Equal(ExpectedOverrideShareGross, builder.Build(invoice).GrossTotal);
+            Assert.Equal(ExpectedOverrideNet, line.UnitPrice);
+            Assert.Null(line.GraveUnitPrice);
+            Assert.Equal(2, invoice.RecipientCount);
+            Assert.Equal(ExpectedOverrideShareGross, builder.Build(invoice).Share!.GrossTotal);
         }
 
-        Assert.Equal(EnteredOverrideGross, invoices.Sum(i => builder.Build(i).GrossTotal));
+        Assert.Equal(EnteredOverrideGross, invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
     }
 
     [Fact]
@@ -229,8 +233,8 @@ public class VatIncludedGraveTests
             itemId = await db.InvoiceItems.Select(i => i.Id).FirstAsync();
         }
 
-        // the dialog opens on GraveUnitPrice (100,840) and shows it as 120,00;
-        // sending that back untouched must reproduce the same split
+        // the dialog opens on the grave's own line (100,840) and shows it as
+        // 120,00 gross; sending that back untouched must reproduce the same shares
         var response = await client.PostAsync(
             "/odata/CreateGraveInvoiceRevision",
             ODataJson.Body(
@@ -264,8 +268,13 @@ public class VatIncludedGraveTests
         var builder = new DocumentDataBuilder();
         foreach (var revision in revisions)
         {
-            Assert.Equal(ExpectedShareNet, Assert.Single(revision.Lines).UnitPrice);
-            Assert.Equal(ExpectedShareGross, builder.Build(revision).GrossTotal);
+            var line = Assert.Single(revision.Lines);
+            // the revision carries the grave's own net in full, exactly as
+            // generation does — nothing is split any more
+            Assert.Equal(ExpectedGraveNet, line.UnitPrice);
+            Assert.Null(line.GraveUnitPrice);
+            Assert.Equal(2, revision.RecipientCount);
+            Assert.Equal(ExpectedShareGross, builder.Build(revision).Share!.GrossTotal);
         }
     }
 }

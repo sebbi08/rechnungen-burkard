@@ -35,6 +35,11 @@ public sealed class AppDbContext : DbContext
             })
             .IsUnique();
         mb.Entity<Invoice>().HasIndex(i => i.RootId);
+        // derived at read time by InvoicesController from the lines and
+        // RecipientCount below; never persisted, so no migration for them
+        mb.Entity<Invoice>().Ignore(i => i.NetTotal);
+        mb.Entity<Invoice>().Ignore(i => i.VatTotal);
+        mb.Entity<Invoice>().Ignore(i => i.GrossTotal);
         // the invoice list filters on all three at once; the grave detail page's
         // (GraveId, IsLatestRevision) query still matches the leading columns,
         // so one index serves both

@@ -70,11 +70,13 @@ public class GraveInvoiceGroupController : ODataController
             .Select(s => (IReadOnlyList<InvoiceLine>)s.Lines.OrderBy(l => l.LineNumber).ToList())
             .ToList();
 
-        // GraveUnitPrice is only uniform across the group because generation writes
-        // it for every recipient in one batch. A sibling revised on its own through
-        // CreateRevision never sets it and can also gain or lose lines, which would
-        // make GraveInvoiceSplitter.Combine throw below — so a line-count mismatch
-        // is reported instead of risking a wrong or crashing reconstruction.
+        // RecipientCount and GraveUnitPrice are only uniform across the group
+        // because generation (or a grave-aware revision) writes every recipient's
+        // invoice in one batch. A sibling revised on its own through the ordinary
+        // CreateRevision path never sets them and can also gain or lose lines,
+        // which would make GraveInvoiceSplitter.Combine throw below — so a
+        // line-count mismatch is reported instead of risking a wrong or crashing
+        // reconstruction.
         if (orderedLines.Select(lines => lines.Count).Distinct().Count() > 1)
         {
             return BadRequest(
@@ -121,7 +123,7 @@ public class GraveInvoiceGroupController : ODataController
                 RootId = s.RootId,
                 Paid = s.PaidOn != null,
             }),
-            Lines = GraveLines(orderedLines)
+            Lines = GraveLines(siblings.All(s => s.RecipientCount is not null), orderedLines)
                 .Select(l => new
                 {
                     l.ItemId,
@@ -138,17 +140,47 @@ public class GraveInvoiceGroupController : ODataController
     }
 
     /// <summary>The grave's lines as invoiced, given every sibling's lines already
-    /// ordered by line number and confirmed to carry the same count. Invoices
-    /// generated after InvoiceLine.GraveUnitPrice exists carry the price directly
-    /// — but only when every sibling has it, not just the first, since a sibling
-    /// revised on its own through the ordinary CreateRevision path never sets it.
-    /// Any sibling missing it, and pre-migration rows in general, are reconstructed
-    /// from the recipients' shares, which is best-effort.</summary>
+    /// ordered by line number and confirmed to carry the same count. Three
+    /// branches, newest first:
+    ///
+    /// Since this feature, a grave invoice carries the grave's own lines at
+    /// 100 % and is marked by <see cref="Invoice.RecipientCount"/>, so the first
+    /// sibling's lines already are the grave's lines — read directly, no
+    /// reconstruction needed. Trusted only when every sibling carries the
+    /// column, not just the first, for the same reason GraveUnitPrice is: a
+    /// sibling revised on its own through the ordinary CreateRevision path never
+    /// sets it, and reading the first sibling's lines as the grave's when
+    /// another sibling still holds a share would bill the share as the whole.
+    ///
+    /// Invoices generated before that, but after InvoiceLine.GraveUnitPrice
+    /// existed, stored one recipient's share and remembered the grave's
+    /// pre-split price on that column — again only when every sibling has it.
+    ///
+    /// Anything older still, or a group missing GraveUnitPrice on some sibling,
+    /// falls back to <see cref="GraveInvoiceSplitter.Combine"/>, which
+    /// reconstructs the grave's lines from the recipients' shares — a legacy,
+    /// best-effort path.</summary>
     private static IReadOnlyList<GraveLine> GraveLines(
+        bool everySiblingHasRecipientCount,
         IReadOnlyList<IReadOnlyList<InvoiceLine>> orderedLines
     )
     {
         var reference = orderedLines[0];
+        if (everySiblingHasRecipientCount)
+        {
+            return reference
+                .Select(l => new GraveLine(
+                    l.ItemId ?? 0,
+                    l.ItemNumber,
+                    l.Description,
+                    l.Count,
+                    l.UnitPrice,
+                    l.VatRate,
+                    l.PriceIncludesVat
+                ))
+                .ToList();
+        }
+
         if (orderedLines.All(lines => lines.All(l => l.GraveUnitPrice is not null)))
         {
             return reference

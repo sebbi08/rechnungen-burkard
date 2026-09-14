@@ -185,6 +185,10 @@ export default abstract class GraveEdit extends InvoiceRevisions {
       return;
     }
 
+    if (!(await this.checkBilling(draft))) {
+      return;
+    }
+
     try {
       await api.saveGrave({
         graveId: draft.Id != null ? Number(draft.Id) : null,
@@ -206,6 +210,82 @@ export default abstract class GraveEdit extends InvoiceRevisions {
     } catch (error) {
       api.showError(this, error);
     }
+  }
+
+  /** Refuses the save when the grave's prices cannot be split evenly across
+   *  its recipients, and says which rate is wrong and what would work.
+   *
+   *  The bill is divided equally, so it has to divide: each VAT rate's net
+   *  subtotal must come out whole across the recipients, and a price entered as
+   *  a gross has to be billable exactly as it was typed. Nothing adjusts a
+   *  price to make it fit -- that was tried, and it put figures on the page
+   *  nobody had entered.
+   *
+   *  The save enforces this too; asking here is what turns a rejected request
+   *  into a message next to the field the user can act on. Answers true when
+   *  there is nothing to stop the save. A draft with no recipients has nothing
+   *  to divide by yet, and a check that could not be reached does not block the
+   *  save -- the server will refuse it anyway if it is wrong.  */
+  private async checkBilling(draft: GraveDraft): Promise<boolean> {
+    const recipients = draft.Recipients.length;
+    if (recipients === 0 || draft.Items.length === 0) {
+      return true;
+    }
+
+    let check: api.GraveBillingCheck;
+    try {
+      check = await api.checkGraveBilling(
+        recipients,
+        draft.Items.map((row) => ({
+          ItemId: Number(row.itemId),
+          Count: Number(row.count),
+          UnitPrice: row.unitPrice == null || row.unitPrice === "" ? null : Number(row.unitPrice),
+          PriceIncludesVat: row.priceIncludesVat,
+        })),
+      );
+    } catch {
+      return true;
+    }
+
+    if (check.Ok) {
+      return true;
+    }
+
+    MessageBox.error(this.billingProblemText(check.Problems, recipients), {
+      title: this.i18nText("pricesDoNotDivideTitle"),
+    });
+    return false;
+  }
+
+  /** The refusal, in words: what is wrong with each VAT rate and which figures
+   *  would work instead.
+   *
+   *  One sentence shape whatever the problem is. The two kinds differ in why
+   *  they fail — a net total that will not divide, against a gross that cannot
+   *  be billed to the cent — but not in what the user does about it, which is
+   *  to move a price to one of the amounts named. The amounts are already in
+   *  the unit the prices were entered in, so the sentence does not have to say
+   *  which. */
+  protected billingProblemText(problems: api.GraveBillingProblem[], recipients: number): string {
+    const lines = problems.map((problem) => {
+      const sentence = this.i18nText("pricesDoNotDivideLine")
+        .replace("{0}", this.formatVatRate(problem.VatRate))
+        .replace("{1}", this.formatAmount(problem.Amount))
+        .replace("{2}", String(recipients));
+
+      const options = problem.Suggestions.map((value) => this.formatAmount(value));
+      if (options.length >= 2) {
+        return `${sentence} ${this.i18nText("pricesNearbyValid")
+          .replace("{0}", options[0])
+          .replace("{1}", options[1])}`;
+      }
+      if (options.length === 1) {
+        return `${sentence} ${this.i18nText("pricesNearbyValidOne").replace("{0}", options[0])}`;
+      }
+      return `${sentence} ${this.i18nText("pricesAdjustAPrice")}`;
+    });
+
+    return [this.i18nText("pricesDoNotDivideIntro"), "", ...lines].join("\n");
   }
 
   public onGraveDialogCancel(): void {

@@ -126,7 +126,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
         Assert.Equal(1, revision.RevisionNumber);
         Assert.Equal("Altstraße 1\n11111 Altstadt", original.RecipientAddress);
         Assert.Equal("Neustraße 2\n22222 Neustadt", revision.RecipientAddress);
-        Assert.Equal(1, original.Lines.Count);
+        Assert.Single(original.Lines);
         Assert.Equal(2, revision.Lines.Count);
 
         // original documents unchanged (byte-identical)

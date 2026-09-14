@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Burkard.Invoicing.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260831194226_VatIncludedLinePrices")]
-    partial class VatIncludedLinePrices
+    [Migration("20260901134020_PaymentVatAndGraveShare")]
+    partial class PaymentVatAndGraveShare
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -206,6 +206,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("PeriodHalf")
                         .HasColumnType("INTEGER");
 
@@ -215,6 +218,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<string>("RecipientAddress")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("RecipientCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("RecipientId")
                         .HasColumnType("INTEGER");
@@ -246,7 +252,7 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.HasIndex("RootId");
 
-                    b.HasIndex("GraveId", "IsLatestRevision");
+                    b.HasIndex("GraveId", "IsLatestRevision", "PaidOn");
 
                     b.HasIndex("Year", "Sequence", "RevisionNumber")
                         .IsUnique();

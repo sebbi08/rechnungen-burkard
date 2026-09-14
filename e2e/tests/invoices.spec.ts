@@ -332,6 +332,28 @@ test("the list shows the invoice date, and marks revisions only (Story 9)", asyn
 });
 
 /** Seeds a VAT rate, one item and one recipient, all unique to this test. */
+/**
+ * Searches the invoice list and waits for the answer, not just for the request.
+ *
+ * The search changes parameters on the list binding: the old rows stay on
+ * screen with their contexts already emptied until the response lands. A row
+ * count alone is satisfied by those stale rows, so a click that follows it
+ * reads `undefined` off the row and opens `#/invoices/undefined`. That is what
+ * turned CI red while every local run passed — CI's list request took 581 ms
+ * where a dev machine answers in tens, which is the whole window.
+ */
+async function searchInvoices(page: Page, term: string): Promise<void> {
+  const answered = page.waitForResponse(
+    (response) =>
+      response.url().includes("/odata/Invoices") &&
+      decodeURIComponent(response.url()).includes(`search=${term}`),
+  );
+  const search = page.locator("[id$='invoiceSearch'] input");
+  await search.fill(term);
+  await search.press("Enter");
+  await answered;
+}
+
 async function seedOwnMasterData(
   page: Page,
   marker: string,
@@ -491,25 +513,16 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // the search reaches the backend as the custom query option
-  const search = page.locator("[id$='invoiceSearch'] input");
-  const searchRequest = page.waitForRequest(
-    (request) => request.url().includes("/odata/Invoices") && request.url().includes("search="),
-  );
-  await search.fill(recipientName);
-  await search.press("Enter");
-  await searchRequest;
-
+  await searchInvoices(page, recipientName);
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
   // clearing the field restores the list
-  await search.fill("");
-  await search.press("Enter");
+  await searchInvoices(page, "");
   await expect(invoicesTable.locator("tbody tr", { hasText: recipientName })).toBeVisible();
 
   // narrow it again for the row assertions below
-  await search.fill(recipientName);
-  await search.press("Enter");
+  await searchInvoices(page, recipientName);
   await expect(invoicesTable.locator("tbody tr")).toHaveCount(1);
 
   // the five row actions are icon-only, named by their tooltips

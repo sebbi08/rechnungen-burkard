@@ -82,7 +82,11 @@ internal sealed class InvoiceDocument : IDocument
             page.Content()
                 .Column(column =>
                 {
-                    if (!string.IsNullOrEmpty(_data.ShareText))
+                    // The old share note above the table only ever applied when the
+                    // lines were already the share (Share is null); the summary
+                    // column prints the share block itself once Share is set, so the
+                    // note would be redundant there.
+                    if (_data.Share is null && !string.IsNullOrEmpty(_data.ShareText))
                     {
                         column.Item().PaddingBottom(8).Text(_data.ShareText).SemiBold();
                     }
@@ -146,23 +150,73 @@ internal sealed class InvoiceDocument : IDocument
                         .AlignRight()
                         .Column(summary =>
                         {
-                            foreach (var vat in _data.VatSummaries)
+                            // Only the invoice's own per-rate block, never both. On a
+                            // grave invoice the 100 % rows are not what anyone is
+                            // billed, and printing them beside the share's rows put
+                            // two different amounts under one "MwSt. 7 %" label on a
+                            // tax document, with nothing saying which is the invoiced
+                            // tax. The per-rate split stays visible either way: the
+                            // share block prints its own rows.
+                            if (_data.Share is null)
                             {
-                                summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
-                                summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                foreach (var vat in _data.VatSummaries)
+                                {
+                                    summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
+                                    summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                }
                             }
 
-                            summary
-                                .Item()
-                                .PaddingTop(6)
-                                .Text(_texts.NetTotal(_data.NetTotal))
-                                .SemiBold();
-                            summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
-                            summary
-                                .Item()
-                                .Text(_texts.GrossTotal(_data.GrossTotal))
-                                .SemiBold()
-                                .FontSize(13);
+                            if (_data.Share is { } share)
+                            {
+                                // The grave's own lines print in full above; this
+                                // recipient pays a share of them, worked out per rate
+                                // from that share rather than from the 100 % figures.
+                                summary
+                                    .Item()
+                                    .PaddingTop(6)
+                                    .Text(_texts.NetSumTotal(_data.NetTotal))
+                                    .SemiBold();
+                                summary
+                                    .Item()
+                                    .Text(_texts.SharePart(share.Percent, share.NetTotal))
+                                    .SemiBold();
+                                foreach (var vat in share.VatSummaries)
+                                {
+                                    // with the base it was worked out from: the
+                                    // lines above are the whole grave, so this is
+                                    // the only place the recipient's own taxable
+                                    // amount per rate appears
+                                    summary
+                                        .Item()
+                                        .Text(
+                                            _texts.VatForRateFromNet(
+                                                vat.Rate,
+                                                vat.NetTotal,
+                                                vat.VatAmount
+                                            )
+                                        );
+                                }
+
+                                summary
+                                    .Item()
+                                    .Text(_texts.GrossTotal(share.GrossTotal))
+                                    .SemiBold()
+                                    .FontSize(13);
+                            }
+                            else
+                            {
+                                summary
+                                    .Item()
+                                    .PaddingTop(6)
+                                    .Text(_texts.NetTotal(_data.NetTotal))
+                                    .SemiBold();
+                                summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
+                                summary
+                                    .Item()
+                                    .Text(_texts.GrossTotal(_data.GrossTotal))
+                                    .SemiBold()
+                                    .FontSize(13);
+                            }
                         });
 
                     if (!string.IsNullOrEmpty(_data.EndingText))
@@ -247,9 +301,10 @@ internal sealed class InvoiceDocument : IDocument
 
     private string Money(decimal value) => value.ToString("N2", _culture);
 
-    // at least 2, up to 3 decimals (e.g. 120,00 or 33,335) — unit prices are rounded
-    // to 3 decimals so persisted line grosses stay exact to the cent.
-    private string UnitPrice(decimal value) => value.ToString("#,0.00#", _culture);
+    // Two decimals, like every other price on the page. A VAT-included price
+    // used to keep a third so a line's gross stayed exact above count 1; it is
+    // rounded to the cent and raised instead, so nothing here has more.
+    private string UnitPrice(decimal value) => value.ToString("#,0.00", _culture);
 
     private static IContainer HeaderCell(IContainer container) =>
         container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingBottom(3);

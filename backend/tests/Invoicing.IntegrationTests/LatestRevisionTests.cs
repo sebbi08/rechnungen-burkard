@@ -240,7 +240,7 @@ public class LatestRevisionTests
     }
 
     [Fact]
-    public async Task A_grave_invoice_line_keeps_the_grave_price_it_was_split_from()
+    public async Task A_grave_invoice_line_carries_the_graves_own_price_in_full()
     {
         using var host = new ApiTestHost();
         long graveId;
@@ -301,14 +301,20 @@ public class LatestRevisionTests
 
         using var verify = host.Services.CreateScope();
         var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoices = await verifyDb.Invoices.Where(i => i.GraveId == graveId).ToListAsync();
         var lines = await verifyDb
             .InvoiceLines.Where(l =>
                 verifyDb.Invoices.Any(i => i.Id == l.InvoiceId && i.GraveId == graveId)
             )
             .ToListAsync();
         Assert.Equal(2, lines.Count);
-        // each recipient pays half, but the line remembers the grave's price
-        Assert.All(lines, l => Assert.Equal(50m, l.UnitPrice));
-        Assert.All(lines, l => Assert.Equal(100m, l.GraveUnitPrice));
+        // 1 x 100.00 net cents (10000) already divides evenly by 2 recipients, so
+        // MakeDivisible bumps nothing: every recipient is billed the grave's own
+        // price in full, not a split of it. RecipientCount is what marks these as
+        // share invoices instead — the line itself no longer records where it
+        // came from.
+        Assert.All(lines, l => Assert.Equal(100m, l.UnitPrice));
+        Assert.All(lines, l => Assert.Null(l.GraveUnitPrice));
+        Assert.All(invoices, i => Assert.Equal(2, i.RecipientCount));
     }
 }

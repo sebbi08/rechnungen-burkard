@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +81,118 @@ public class GraveInvoiceGroupTests
         var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
         var invoiceId = (await verifyDb.Invoices.FirstAsync(i => i.GraveId == graveId)).Id;
         return (graveId, invoiceId, itemId);
+    }
+
+    /// <summary>A grave with two recipients, hand-built in the legacy,
+    /// pre-feature form: <c>RecipientCount</c> left null and each recipient's
+    /// line already their own share of the grave's single line — the way every
+    /// grave invoice looked before this feature, bypassing the generator
+    /// entirely since it only ever produces the new form now. Both invoices
+    /// carry <paramref name="graveUnitPrice"/> on <c>GraveUnitPrice</c>; a test
+    /// wanting the <c>Combine</c> fallback instead of the uniform branch must
+    /// null it out on one sibling itself. The two <paramref
+    /// name="recipientUnitPrices"/> land on the two invoices in the order
+    /// given.</summary>
+    private static async Task<(long GraveId, long[] InvoiceIds, long ItemId)> SeedOldFormGraveAsync(
+        ApiTestHost host,
+        string graveNumber,
+        int lineCount,
+        decimal graveUnitPrice,
+        decimal[] recipientUnitPrices
+    )
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.VatRates.Add(new VatRate { Rate = 7m });
+        var item = new InvoiceItem
+        {
+            Number = $"OLD-{graveNumber}",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = graveUnitPrice,
+        };
+        var anna = new Recipient
+        {
+            Number = $"E-{graveNumber}-1",
+            Name = "Anna Legacy",
+            Address = "A 1",
+        };
+        var bernd = new Recipient
+        {
+            Number = $"E-{graveNumber}-2",
+            Name = "Bernd Legacy",
+            Address = "B 2",
+        };
+        db.InvoiceItems.Add(item);
+        db.Recipients.AddRange(anna, bernd);
+        var grave = new Grave
+        {
+            GraveNumber = graveNumber,
+            StartDate = new DateOnly(2020, 1, 1),
+            EndDate = new DateOnly(2040, 12, 31),
+            CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        db.Graves.Add(grave);
+        await db.SaveChangesAsync();
+        db.GraveItems.Add(
+            new GraveItem
+            {
+                GraveId = grave.Id,
+                ItemId = item.Id,
+                Count = lineCount,
+            }
+        );
+        db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = anna.Id });
+        db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = bernd.Id });
+        await db.SaveChangesAsync();
+
+        var invoiceIds = new List<long>();
+        var seq = 1;
+        var recipients = new[] { anna, bernd };
+        for (var r = 0; r < recipients.Length; r++)
+        {
+            var invoice = new Invoice
+            {
+                RevisionNumber = 0,
+                Year = 2040,
+                Sequence = seq,
+                InvoiceNumber = InvoiceNumberFormatter.ForOriginal(2040, seq),
+                GraveId = grave.Id,
+                PeriodYear = 2040,
+                PeriodHalf = 1,
+                SharePercent = 50m,
+                RecipientCount = null,
+                RecipientId = recipients[r].Id,
+                RecipientName = recipients[r].Name,
+                RecipientAddress = recipients[r].Address,
+                EndingText = "Danke",
+                StampWord = "Kopie",
+                Language = "de",
+                GeneratedAt = DateTime.UtcNow,
+                Lines = new List<InvoiceLine>
+                {
+                    new()
+                    {
+                        ItemId = item.Id,
+                        ItemNumber = item.Number,
+                        Description = item.Description,
+                        Count = lineCount,
+                        UnitPrice = recipientUnitPrices[r],
+                        GraveUnitPrice = graveUnitPrice,
+                        VatRate = 7m,
+                        LineNumber = 1,
+                    },
+                },
+            };
+            db.Invoices.Add(invoice);
+            await db.SaveChangesAsync();
+            invoice.RootId = invoice.Id;
+            await db.SaveChangesAsync();
+            invoiceIds.Add(invoice.Id);
+            seq++;
+        }
+
+        return (grave.Id, invoiceIds.ToArray(), item.Id);
     }
 
     [Fact]
@@ -250,10 +364,48 @@ public class GraveInvoiceGroupTests
     }
 
     [Fact]
+    public async Task Reads_the_grave_line_directly_from_a_uniform_grave_unit_price()
+    {
+        using var host = new ApiTestHost();
+        // A group hand-built in the legacy form, before RecipientCount existed:
+        // both siblings still carry GraveUnitPrice, so the group is trusted and
+        // the grave's pre-split price is read straight off it, with no
+        // reconstruction from the recipients' shares.
+        var (_, invoiceIds, _) = await SeedOldFormGraveAsync(
+            host,
+            graveNumber: "G-700",
+            lineCount: 2,
+            graveUnitPrice: 100m,
+            recipientUnitPrices: new[] { 50m, 50m }
+        );
+
+        using var client = host.CreateClient();
+        var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceIds[0]}");
+        response.EnsureSuccessStatusCode();
+        using var json = await ODataJson.ReadAsync(response);
+
+        var line = Assert.Single(json.RootElement.GetProperty("Lines").EnumerateArray().ToList());
+        Assert.Equal(2, line.GetProperty("Count").GetInt32());
+        Assert.Equal(100m, line.GetProperty("UnitPrice").GetDecimal());
+        Assert.Equal("OLD-G-700", line.GetProperty("ItemNumber").GetString());
+    }
+
+    [Fact]
     public async Task Falls_back_to_reconstruction_when_one_sibling_lacks_a_grave_unit_price()
     {
         using var host = new ApiTestHost();
-        var (graveId, invoiceId, _) = await SeedInvoicedGraveAsync(host);
+        // count 1 at 100.01 net (7% VAT) splits unevenly across two recipients —
+        // SplitCents(10001, 2) = [5001, 5000], a genuine remainder cent — chosen
+        // so a reconstruction that actually re-derives the grave's price from
+        // the recipients' 50.01 + 50.00 shares (100.01) cannot be confused with
+        // one that merely echoed a stray GraveUnitPrice value.
+        var (_, invoiceIds, _) = await SeedOldFormGraveAsync(
+            host,
+            graveNumber: "G-701",
+            lineCount: 1,
+            graveUnitPrice: 100.01m,
+            recipientUnitPrices: new[] { 50.01m, 50.00m }
+        );
 
         // Simulates a sibling revised on its own through the ordinary CreateRevision
         // path, which never sets GraveUnitPrice: line counts still agree, so the
@@ -262,23 +414,20 @@ public class GraveInvoiceGroupTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var siblingInvoiceId = await db
-                .Invoices.Where(i => i.GraveId == graveId && i.Id != invoiceId)
-                .Select(i => i.Id)
-                .FirstAsync();
-            var line = await db.InvoiceLines.SingleAsync(l => l.InvoiceId == siblingInvoiceId);
+            var line = await db.InvoiceLines.SingleAsync(l => l.InvoiceId == invoiceIds[1]);
             line.GraveUnitPrice = null;
             await db.SaveChangesAsync();
         }
 
         using var client = host.CreateClient();
-        var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceId}");
+        var response = await client.GetAsync($"/odata/GraveInvoiceGroup?invoiceId={invoiceIds[0]}");
         response.EnsureSuccessStatusCode();
         using var json = await ODataJson.ReadAsync(response);
 
         var line2 = Assert.Single(json.RootElement.GetProperty("Lines").EnumerateArray().ToList());
-        Assert.Equal(2, line2.GetProperty("Count").GetInt32());
-        Assert.Equal(100m, line2.GetProperty("UnitPrice").GetDecimal());
+        Assert.Equal(1, line2.GetProperty("Count").GetInt32());
+        Assert.Equal(100.01m, line2.GetProperty("UnitPrice").GetDecimal());
+        Assert.Equal("OLD-G-701", line2.GetProperty("ItemNumber").GetString());
     }
 
     [Fact]

@@ -8,16 +8,19 @@ public class VatInclusivePriceTests
     [Fact]
     public void An_unflagged_price_is_already_net_and_is_returned_untouched()
     {
-        // three decimals survive: a grave split stores prices at that precision
-        Assert.Equal(50.425m, VatInclusivePrice.NetOf(50.425m, 19m, false));
+        Assert.Equal(50.42m, VatInclusivePrice.NetOf(50.42m, 19m, false));
     }
 
     [Theory]
-    [InlineData(120.00, 19, 100.840)]
-    [InlineData(100.00, 19, 84.034)]
-    [InlineData(107.00, 7, 100.000)]
-    [InlineData(119.00, 7, 111.215)]
-    public void A_flagged_price_gives_up_its_vat(decimal gross, decimal rate, decimal net)
+    [InlineData(120.00, 19, 100.84)]
+    [InlineData(100.00, 19, 84.03)]
+    [InlineData(107.00, 7, 100.00)]
+    [InlineData(119.00, 7, 111.21)]
+    public void A_flagged_price_gives_up_its_vat_at_two_decimals(
+        decimal gross,
+        decimal rate,
+        decimal net
+    )
     {
         Assert.Equal(net, VatInclusivePrice.NetOf(gross, rate, true));
     }
@@ -39,6 +42,28 @@ public class VatInclusivePriceTests
         );
     }
 
+    [Theory]
+    [InlineData(7)]
+    [InlineData(19)]
+    public void Nothing_is_added_to_the_net_here(decimal rate)
+    {
+        // A gross that cannot be billed exactly is refused when the grave is
+        // saved -- see GraveShareTests -- rather than rounded into something
+        // else here. So this only ever divides and rounds, and the result is
+        // always the plain two-decimal quotient.
+        for (var cents = 1; cents <= 4000; cents++)
+        {
+            var gross = cents / 100m;
+            var net = VatInclusivePrice.NetOf(gross, rate, true);
+
+            Assert.Equal(net, decimal.Round(net, 2));
+            Assert.Equal(
+                decimal.Round(gross / (1m + rate / 100m), 2, MidpointRounding.AwayFromZero),
+                net
+            );
+        }
+    }
+
     // The round trip the revision dialogs depend on: the dialog shows
     // round(net × (1 + rate/100), 2) and sends it back, and the same net must
     // come out — otherwise every save subtracts the VAT again.
@@ -57,7 +82,6 @@ public class VatInclusivePriceTests
         var net = VatInclusivePrice.NetOf(gross, rate, true);
         var displayed = decimal.Round(net * (1m + rate / 100m), 2, MidpointRounding.AwayFromZero);
 
-        Assert.Equal(gross, displayed);
         Assert.Equal(net, VatInclusivePrice.NetOf(displayed, rate, true));
     }
 }

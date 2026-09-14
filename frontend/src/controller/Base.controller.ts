@@ -131,6 +131,21 @@ export default abstract class BaseController extends Controller {
     })} €`;
   }
 
+  /** A boolean column, spelled out rather than shown as a tick: the tables it
+   *  appears in are read aloud by screen readers cell by cell. */
+  public formatYesNo(value: boolean | null | undefined): string {
+    return this.i18nText(value ? "yes" : "no");
+  }
+
+  /** A VAT rate as it is written: "19", or "7,7" where a rate has a decimal —
+   *  never "19.00". */
+  public formatVatRate(value: number | string | null | undefined): string {
+    if (value == null || value === "") {
+      return "";
+    }
+    return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 2 });
+  }
+
   /** "2026-0042-R1" -> "2026-0042": the chain, without the revision marker. */
   public formatInvoiceNumber(value: string | null | undefined): string {
     if (value == null) {

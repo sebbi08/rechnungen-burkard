@@ -3,11 +3,17 @@ import type { Route$PatternMatchedEvent } from "sap/ui/core/routing/Route";
 import * as api from "../model/api";
 import GraveEdit from "./GraveEdit.controller";
 
-/** One of the grave's item links, as the page lists them. */
+/** One of the grave's item links, as the page lists them.
+ *
+ *  The price as entered, and what qualifies it. No net or gross totals: a
+ *  grave's page is about what was agreed, and those figures belong to the
+ *  invoices, which are listed beneath it and carry them per recipient. */
 interface GraveItemRow {
   Number: string;
   Description: string;
   Count: number;
+  /** The unit price in the unit it was entered in: the gross for a VAT-included
+   *  line, the net for every other one. */
   Price: number;
   VatRate: number;
   PriceIncludesVat: boolean;
@@ -76,12 +82,50 @@ export default class GraveDetail extends GraveEdit {
         this.readList<api.InvoiceRow>("/Invoices", {
           $filter: `GraveId eq ${this._graveId} and IsLatestRevision eq true`,
           $orderby: "PeriodYear desc,PeriodHalf desc,RecipientName",
-          $expand: "Lines",
         }),
       ]);
 
       const [year, half] = api.currentHalfYear();
       const invoiced = runs.some((run) => Number(run.Year) === year && Number(run.Half) === half);
+
+      // the grave's own lines as this half-year actually billed them, when it
+      // has been invoiced — a per-VAT-rate subtotal that did not divide evenly
+      // among recipients can carry a price a cent higher than the grave's
+      // configuration, and the page should show the same figure the invoices
+      // do rather than the unadjusted one. Any of this half-year's invoices
+      // names the same group, since they all carry the grave's own lines at
+      // 100 %; falling back to the grave's configuration when none exists yet.
+      const currentInvoice = invoices.find(
+        (invoice) => Number(invoice.PeriodYear) === year && Number(invoice.PeriodHalf) === half,
+      );
+      // Rows come from this half-year's invoices where it has been billed, and
+      // from the grave's own configuration where it has not. Both are the price
+      // as entered: a grave whose prices could not be split evenly could not
+      // have been saved, so nothing is adjusted between the two.
+      const items: GraveItemRow[] = currentInvoice
+        ? (await api.fetchGraveInvoiceGroup(Number(currentInvoice.Id))).Lines.map((line) => ({
+            Number: line.ItemNumber,
+            Description: line.Description,
+            Count: Number(line.Count),
+            Price: api.priceFieldValue(
+              Number(line.UnitPrice),
+              Boolean(line.PriceIncludesVat),
+              Number(line.VatRate),
+            ),
+            VatRate: Number(line.VatRate),
+            PriceIncludesVat: Boolean(line.PriceIncludesVat),
+          }))
+        : details.Items.map((link) => ({
+            Number: link.Item.Number,
+            Description: link.Item.Description,
+            Count: link.Count,
+            // the link's own price wins; without one the item's default is
+            // billed. Stored as typed -- already the gross on a VAT-included
+            // line -- so it is shown as it is rather than converted again.
+            Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+            VatRate: link.Item.VatRate,
+            PriceIncludesVat: link.PriceIncludesVat,
+          }));
 
       this.setState<GraveDetailView>("grave", {
         Id: details.Id,
@@ -99,38 +143,23 @@ export default class GraveDetail extends GraveEdit {
           invoiced ? "statusInvoicedAnnouncement" : "statusOpenAnnouncement",
         ),
         currentInvoiced: invoiced,
-        Items: details.Items.map((link) => ({
-          Number: link.Item.Number,
-          Description: link.Item.Description,
-          Count: link.Count,
-          // the link's own price wins; without one the item's default is billed
-          Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
-          VatRate: link.Item.VatRate,
-          PriceIncludesVat: link.PriceIncludesVat,
-        })),
+        Items: items,
         Recipients: details.Recipients.map((link) => ({
           Name: link.Recipient.Name,
           Address: link.Recipient.Address,
         })),
-        Invoices: invoices.map((invoice) => {
-          const lines = (invoice.Lines ?? []).map((line) => ({
-            // the OData V4 model serialises Edm.Decimal as a string
-            Count: Number(line.Count),
-            UnitPrice: Number(line.UnitPrice),
-            VatRate: Number(line.VatRate),
-          }));
-          return {
-            Id: Number(invoice.Id),
-            RootId: Number(invoice.RootId),
-            HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
-            RecipientName: invoice.RecipientName,
-            InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
-            RevisionNumber: Number(invoice.RevisionNumber),
-            GeneratedAt: invoice.GeneratedAt,
-            GrossTotal: api.invoiceTotals(lines).gross,
-            PaidOn: invoice.PaidOn,
-          };
-        }),
+        Invoices: invoices.map((invoice) => ({
+          Id: Number(invoice.Id),
+          RootId: Number(invoice.RootId),
+          HalfYear: api.halfYearText(Number(invoice.PeriodYear), Number(invoice.PeriodHalf)),
+          RecipientName: invoice.RecipientName,
+          InvoiceNumber: this.formatInvoiceNumber(invoice.InvoiceNumber),
+          RevisionNumber: Number(invoice.RevisionNumber),
+          GeneratedAt: invoice.GeneratedAt,
+          // the OData V4 model serialises Edm.Decimal as a string
+          GrossTotal: Number(invoice.GrossTotal),
+          PaidOn: invoice.PaidOn,
+        })),
       });
     } catch (error) {
       api.showError(this, error);

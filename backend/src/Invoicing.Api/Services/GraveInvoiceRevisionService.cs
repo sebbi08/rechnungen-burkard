@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services;
 
-/// <summary>Revises a grave's invoices for one half-year. A grave invoice is one
-/// recipient's share of one grave bill, so editing it edits the bill: every
-/// recipient of that grave and half-year gets a new revision, split the same way
-/// generation splits it.</summary>
+/// <summary>Revises a grave's invoices for one half-year. A grave invoice bills
+/// one grave's own lines, so editing it edits the bill: every recipient of that
+/// grave and half-year gets a new revision carrying the grave's edited lines in
+/// full, raised for divisibility the same way generation raises them.</summary>
 public sealed class GraveInvoiceRevisionService
 {
     private readonly AppDbContext _db;
@@ -47,13 +47,9 @@ public sealed class GraveInvoiceRevisionService
                 && i.PeriodHalf == edited.PeriodHalf
                 && i.IsLatestRevision
             )
-            // generation assigned these ids in the order it split the grave's
-            // lines (one SaveChangesAsync per recipient, in recipient-list
-            // order), so ordering by id puts every recipient back at the same
-            // GraveInvoiceSplitter position generation gave them — ordering by
-            // name instead would hand SplitCents' remainder cent to whichever
-            // recipient sorts first alphabetically, silently moving it away
-            // from the recipient generation gave it to.
+            // Every recipient gets the same lines, so processing order no longer
+            // changes what any of them is billed; ordering by id just keeps the
+            // order deterministic across runs.
             .OrderBy(i => i.Id)
             .ToListAsync(ct);
         if (siblings.Count == 0)
@@ -77,8 +73,9 @@ public sealed class GraveInvoiceRevisionService
         }
 
         // A grave's recipients cannot change, so the group is always the grave's
-        // full set and the split matches the one generation used.
-        var perRecipient = GraveInvoiceSplitter.Split(graveLines, siblings.Count);
+        // full set. Every recipient is billed the same lines — the grave's own,
+        // exactly as the dialog sent them, the same way generation bills them.
+        var billedLines = graveLines;
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / siblings.Count;
         var now = DateTime.UtcNow;
@@ -122,6 +119,7 @@ public sealed class GraveInvoiceRevisionService
                 PeriodYear = sibling.PeriodYear,
                 PeriodHalf = sibling.PeriodHalf,
                 SharePercent = sharePercent,
+                RecipientCount = siblings.Count,
                 RecipientId = recipient.Id,
                 // a revision is newly generated, so it uses the recipient's
                 // current name and address (FR-017)
@@ -131,7 +129,22 @@ public sealed class GraveInvoiceRevisionService
                 StampWord = settings.StampWord,
                 Language = settings.Language,
                 GeneratedAt = now,
-                Lines = perRecipient[r].ToList(),
+                Lines = billedLines
+                    .Select(
+                        (line, index) =>
+                            new InvoiceLine
+                            {
+                                ItemId = line.ItemId,
+                                ItemNumber = line.ItemNumber,
+                                Description = line.Description,
+                                Count = line.Count,
+                                UnitPrice = line.UnitPrice,
+                                VatRate = line.VatRate,
+                                PriceIncludesVat = line.PriceIncludesVat,
+                                LineNumber = index + 1,
+                            }
+                    )
+                    .ToList(),
             };
 
             sibling.IsLatestRevision = false;
@@ -147,8 +160,12 @@ public sealed class GraveInvoiceRevisionService
         return created;
     }
 
-    /// <summary>The grave's lines from what the dialog sent: the full count at the
-    /// full price, before any split.</summary>
+    /// <summary>The grave's lines from what the dialog sent: the full count at
+    /// the full price, which is what every recipient is billed.
+    ///
+    /// The order is the request body's, preserved line for line — nothing here
+    /// re-sorts or groups, so the lines come back in the order they are shown
+    /// and their line numbers stay put across a revision.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
         IReadOnlyList<InvoiceLineInput> inputs,
         CancellationToken ct
@@ -195,10 +212,11 @@ public sealed class GraveInvoiceRevisionService
                     item.Description,
                     input.Count,
                     // the dialog sends the grave's price as it shows it, which
-                    // for a VAT-included line is the gross; the split needs the net
+                    // for a VAT-included line is the gross; a line is billed net
                     VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
                     item.VatRate,
-                    input.PriceIncludesVat
+                    input.PriceIncludesVat,
+                    input.PriceIncludesVat ? unitPrice : null
                 )
             );
         }

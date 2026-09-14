@@ -16,6 +16,21 @@ public sealed class InvoiceDocumentData
     public decimal TotalVat { get; set; }
     public decimal GrossTotal { get; set; }
 
+    /// <summary>Set when the lines are the whole grave's and the recipient pays a
+    /// share of them. Null on every other invoice, including grave invoices
+    /// generated before that change, whose lines are already the share.</summary>
+    public ShareData? Share { get; set; }
+
+    /// <summary>One recipient's part of a grave bill: the share of the net, the
+    /// VAT worked out from that share per rate, and what they owe.</summary>
+    public sealed record ShareData(
+        decimal Percent,
+        decimal NetTotal,
+        IReadOnlyList<VatSummary> VatSummaries,
+        decimal VatTotal,
+        decimal GrossTotal
+    );
+
     public sealed record LineData(
         int Position,
         string ItemNumber,
