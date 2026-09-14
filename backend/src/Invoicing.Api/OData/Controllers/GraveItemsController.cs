@@ -16,6 +16,7 @@ public class GraveItemsController : ODataController
     [EnableQuery]
     public IQueryable<GraveItem> Get() => _db.GraveItems.AsNoTracking();
 
+    [SeedingOnly]
     public IActionResult Post([FromBody] GraveItem? link)
     {
         if (link is null)
@@ -78,6 +79,7 @@ public class GraveItemsController : ODataController
         return Created(link);
     }
 
+    [SeedingOnly]
     public IActionResult Delete([FromRoute] long key)
     {
         var link = _db.GraveItems.Find(key);

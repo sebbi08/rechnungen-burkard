@@ -36,6 +36,7 @@ public class GraveRecipientsController : ODataController
             StatusCode = StatusCodes.Status400BadRequest,
         };
 
+    [SeedingOnly]
     public IActionResult Post([FromBody] GraveRecipient? link)
     {
         if (link is null)
@@ -104,6 +105,7 @@ public class GraveRecipientsController : ODataController
         return Created(link);
     }
 
+    [SeedingOnly]
     public IActionResult Delete([FromRoute] long key)
     {
         var link = _db.GraveRecipients.Find(key);
