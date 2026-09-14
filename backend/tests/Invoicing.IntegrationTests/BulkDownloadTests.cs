@@ -79,7 +79,7 @@ public class BulkDownloadTests
         );
         var names = zip.Entries.Select(e => e.Name).ToList();
         Assert.Equal(2, names.Count);
-        Assert.All(names, n => Assert.False(n.Contains("Kopie")));
+        Assert.All(names, n => Assert.DoesNotContain("Kopie", n));
     }
 
     [Fact]

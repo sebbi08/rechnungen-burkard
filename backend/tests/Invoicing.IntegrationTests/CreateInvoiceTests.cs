@@ -234,7 +234,9 @@ public class CreateInvoiceTests
         foreach (var r in responses)
         {
             using var json = await ODataJson.ReadAsync(r);
-            numbers.Add(json.RootElement.GetProperty("InvoiceNumber").GetString());
+            var number = json.RootElement.GetProperty("InvoiceNumber").GetString();
+            Assert.NotNull(number);
+            numbers.Add(number);
         }
 
         Assert.Equal(5, numbers.Distinct().Count());
