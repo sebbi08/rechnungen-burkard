@@ -131,13 +131,6 @@ export default abstract class BaseController extends Controller {
     })} €`;
   }
 
-  /** An amount, or a dash where there is none to show. An empty cell reads as
-   *  "loading"; a dash says the figure does not exist — a grave without
-   *  recipients has no billed price. */
-  public formatAmountOrDash(value: number | string | null | undefined): string {
-    return value == null || value === "" ? "–" : this.formatAmount(value);
-  }
-
   /** A boolean column, spelled out rather than shown as a tick: the tables it
    *  appears in are read aloud by screen readers cell by cell. */
   public formatYesNo(value: boolean | null | undefined): string {

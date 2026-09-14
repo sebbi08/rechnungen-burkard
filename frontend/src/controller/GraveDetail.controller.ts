@@ -5,9 +5,9 @@ import GraveEdit from "./GraveEdit.controller";
 
 /** One of the grave's item links, as the page lists them.
  *
- *  Every figure here is what the grave is actually billed. A grave whose prices
- *  did not divide evenly across its recipients could not have been saved, so
- *  nothing shown is an approximation of something else. */
+ *  The price as entered, and what qualifies it. No net or gross totals: a
+ *  grave's page is about what was agreed, and those figures belong to the
+ *  invoices, which are listed beneath it and carry them per recipient. */
 interface GraveItemRow {
   Number: string;
   Description: string;
@@ -15,31 +15,8 @@ interface GraveItemRow {
   /** The unit price in the unit it was entered in: the gross for a VAT-included
    *  line, the net for every other one. */
   Price: number;
-  /** Count × the billed net. */
-  NetTotal: number | null;
-  /** The share of what the recipients collect that this line accounts for.
-   *  Null on a grave with no recipients, where nothing is billed at all. */
-  GrossTotal: number | null;
   VatRate: number;
   PriceIncludesVat: boolean;
-}
-
-/** Fills in what each line accounts for, gross. Left empty where nothing is
- *  charged at all — a grave with no recipients. */
-function shareGross(rows: GraveItemRow[], recipients: number | null): GraveItemRow[] {
-  const priced = rows.filter((row) => row.NetTotal !== null);
-  if (recipients === null || recipients <= 0 || priced.length === 0) {
-    return rows;
-  }
-
-  const shares = api.grossPerLine(
-    priced.map((row) => ({ NetTotal: row.NetTotal!, VatRate: row.VatRate })),
-    recipients,
-  );
-  priced.forEach((row, index) => {
-    row.GrossTotal = shares[index];
-  });
-  return rows;
 }
 
 interface GraveRecipientRow {
@@ -122,11 +99,10 @@ export default class GraveDetail extends GraveEdit {
         (invoice) => Number(invoice.PeriodYear) === year && Number(invoice.PeriodHalf) === half,
       );
       // Rows come from this half-year's invoices where it has been billed, and
-      // from the grave's own configuration where it has not. Both are exact: a
-      // grave whose prices could not be split evenly across its recipients
-      // could not have been saved, so the configuration bills as it stands.
-      const check = currentInvoice ? null : await this.billedLines(details);
-      const rows: GraveItemRow[] = currentInvoice
+      // from the grave's own configuration where it has not. Both are the price
+      // as entered: a grave whose prices could not be split evenly could not
+      // have been saved, so nothing is adjusted between the two.
+      const items: GraveItemRow[] = currentInvoice
         ? (await api.fetchGraveInvoiceGroup(Number(currentInvoice.Id))).Lines.map((line) => ({
             Number: line.ItemNumber,
             Description: line.Description,
@@ -136,23 +112,20 @@ export default class GraveDetail extends GraveEdit {
               Boolean(line.PriceIncludesVat),
               Number(line.VatRate),
             ),
-            NetTotal: Math.round(Number(line.UnitPrice) * Number(line.Count) * 100) / 100,
-            GrossTotal: null,
             VatRate: Number(line.VatRate),
             PriceIncludesVat: Boolean(line.PriceIncludesVat),
           }))
-        : this.configuredItems(details, check);
-
-      // The gross each line accounts for, worked out rate by rate the way the
-      // invoices charge it. The recipient count is what the split uses: the
-      // invoices' own where they exist, the grave's recipients where they do
-      // not yet.
-      const items = shareGross(
-        rows,
-        currentInvoice
-          ? Number(currentInvoice.RecipientCount ?? details.Recipients.length)
-          : details.Recipients.length,
-      );
+        : details.Items.map((link) => ({
+            Number: link.Item.Number,
+            Description: link.Item.Description,
+            Count: link.Count,
+            // the link's own price wins; without one the item's default is
+            // billed. Stored as typed -- already the gross on a VAT-included
+            // line -- so it is shown as it is rather than converted again.
+            Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
+            VatRate: link.Item.VatRate,
+            PriceIncludesVat: link.PriceIncludesVat,
+          }));
 
       this.setState<GraveDetailView>("grave", {
         Id: details.Id,
@@ -191,56 +164,6 @@ export default class GraveDetail extends GraveEdit {
     } catch (error) {
       api.showError(this, error);
     }
-  }
-
-  /** What this grave would be billed, for a half-year that has not been billed
-   *  yet. Null when there is nothing to bill — no recipients, no items — or
-   *  when the check could not be reached; the page then leaves the derived
-   *  columns empty rather than naming a figure nobody is charged.
-   *
-   *  It is asked of the backend rather than worked out here: the same rule
-   *  decides what the save accepts, and a second copy of it would be free to
-   *  disagree with the one that refuses. */
-  private async billedLines(details: api.GraveDetails): Promise<api.GraveBillingCheck | null> {
-    if (details.Recipients.length === 0 || details.Items.length === 0) {
-      return null;
-    }
-
-    try {
-      return await api.checkGraveBilling(
-        details.Recipients.length,
-        details.Items.map((link) => ({
-          ItemId: Number(link.Item.Id),
-          Count: link.Count,
-          UnitPrice: link.UnitPrice === null ? null : Number(link.UnitPrice),
-          PriceIncludesVat: link.PriceIncludesVat,
-        })),
-      );
-    } catch {
-      return null;
-    }
-  }
-
-  /** The grave's items as configured, for a half-year that has not been billed
-   *  yet. Exact by construction: a grave whose prices could not be split evenly
-   *  could not have been saved. */
-  private configuredItems(
-    details: api.GraveDetails,
-    check: api.GraveBillingCheck | null,
-  ): GraveItemRow[] {
-    return details.Items.map((link, index) => ({
-      Number: link.Item.Number,
-      Description: link.Item.Description,
-      Count: link.Count,
-      // the link's own price wins; without one the item's default is billed.
-      // Stored as typed -- already the gross on a VAT-included line -- so it is
-      // shown as it is rather than converted a second time.
-      Price: Number(link.UnitPrice ?? link.Item.DefaultPrice ?? 0),
-      NetTotal: check ? Number(check.Lines[index].NetTotal) : null,
-      GrossTotal: null,
-      VatRate: link.Item.VatRate,
-      PriceIncludesVat: link.PriceIncludesVat,
-    }));
   }
 
   /** Back to the list this page was opened from, not to the home screen. */

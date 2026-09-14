@@ -786,7 +786,7 @@ test("the grave detail page shows this half-year's billed price once it is today
   await expect(stoneRow).toContainText("47,81 €");
 });
 
-test("the grave's item table separates net, gross, rate and the incl.-VAT flag", async ({
+test("the grave's item table shows the price as entered, its rate and the flag", async ({
   page,
 }) => {
   const marker = `GK-${Date.now()}`;
@@ -794,28 +794,31 @@ test("the grave's item table separates net, gross, rate and the incl.-VAT flag",
     page,
     marker,
     [`Xaver ${marker}`, `Yvonne ${marker}`],
-    // 100,00 net at 19 %, count 2: 200,00 net and 238,00 gross, and 20 000 net
-    // cents divide by two, so nothing here is raised
     [{ description: "Grabpflege", vatRate: 19, price: 100, count: 2 }],
   );
 
   await page.goto(`/index.html#/graves/${graveId}`);
   const row = page.locator("tbody tr", { hasText: "Grabpflege" }).first();
 
-  // the line sums, each in its own column, rather than one "Preis" cell with
-  // the incl.-VAT hint tucked underneath it
-  await expect(row).toContainText("200,00 €");
-  await expect(row).toContainText("238,00 €");
+  // the price exactly as it was typed, with what qualifies it beside it. No net
+  // or gross totals: a grave's page is about what was agreed, and those figures
+  // belong to the invoices listed beneath it.
+  await expect(row).toContainText("100,00 €");
+  await expect(row).toContainText("19");
   // the flag reads as a word, since a screen reader announces these cell by cell
   await expect(row).toContainText("Nein");
+  await expect(row).not.toContainText("200,00 €");
+  await expect(row).not.toContainText("238,00 €");
 });
 
-test("each rate's gross is worked out at that rate, not at a blended one", async ({ page }) => {
+test("an invoice works each rate's gross out at that rate, not at a blended one", async ({
+  page,
+}) => {
   const marker = `GR-${Date.now()}`;
-  // Two rates over three recipients, both dividing: 7 % comes to 300,00 and
+  // Two rates over three recipients, both dividing: 7 % comes to 300,00 net and
   // 19 % to 99,00. A gross column that shares one blended total across every
-  // line gave both the same multiplier — 300,00 net at 7 % read 331,71 € beside
-  // its own "7 %", which is the bug this pins.
+  // line gives both the same multiplier — 300,00 at 7 % then read 331,71 €
+  // beside its own "7 %", which is the bug this pins.
   const { graveId } = await seedGrave(
     page,
     marker,
@@ -825,14 +828,18 @@ test("each rate's gross is worked out at that rate, not at a blended one", async
       { description: "Blumenschmuck", vatRate: 19, price: 99, count: 1 },
     ],
   );
+  await generateFor(page, 2037, 1);
 
-  await page.goto(`/index.html#/graves/${graveId}`);
+  const invoices = await (
+    await page.request.get(`/odata/Invoices?$filter=GraveId eq ${graveId}&$select=Id,RootId`)
+  ).json();
+  await page.goto(`/index.html#/graves/${graveId}/invoices/${invoices.value[0].RootId}`);
 
-  // 300,00 at 7 % is 321,00, and each recipient pays 100,00 + 7,00
+  // the lines are the whole grave, so the gross column is the grave's: 300,00
+  // at 7 % is 321,00, and 99,00 at 19 % is 117,81
   await expect(page.locator("tbody tr", { hasText: "Grabpflege" }).first()).toContainText(
     "321,00 €",
   );
-  // 99,00 at 19 % is 117,81, and each pays 33,00 + 6,27
   await expect(page.locator("tbody tr", { hasText: "Blumenschmuck" }).first()).toContainText(
     "117,81 €",
   );
