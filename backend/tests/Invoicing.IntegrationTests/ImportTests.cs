@@ -609,4 +609,105 @@ public class ImportTests
             json.RootElement.GetProperty("error").GetProperty("code").GetString()
         );
     }
+
+    /// <summary>A grave whose prices cannot be split evenly across its
+    /// recipients blocks the whole import.
+    ///
+    /// The dialog refuses such a grave; an archive carrying one used to import
+    /// quietly and then never bill it, because generation skips a grave that
+    /// does not divide. Refusing the archive keeps the two paths saying the
+    /// same thing.</summary>
+    [Fact]
+    public async Task A_grave_whose_prices_do_not_divide_blocks_the_import()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        // 120,01 at 19 % over two recipients: 12 001 net cents are odd
+        var archive = Zip(
+            (
+                "recipients.csv",
+                RecipientsHeader
+                    + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"
+                    + "E-1001,Bert Beispiel,Nebenweg 2\r\n"
+            ),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9001,1,\r\n"
+                    + "Recipient,IMP-1,E-1000,,\r\n"
+                    + "Recipient,IMP-1,E-1001,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "PricesDoNotDivide"
+        );
+
+        // and nothing at all was written -- the refusal has to be the whole
+        // archive, not the graves that happened to come out even
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(await db.Graves.ToListAsync());
+        Assert.Empty(await db.Recipients.ToListAsync());
+        Assert.Empty(await db.InvoiceItems.ToListAsync());
+    }
+
+    /// <summary>The message names what would work, the way the dialog's does —
+    /// without it, an archive of any size leaves the reader guessing which cent
+    /// to move.</summary>
+    [Fact]
+    public async Task The_refusal_names_the_rate_and_the_amounts_that_would_work()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna,Weg 1\r\nE-1001,Bert,Weg 2\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9001,1,\r\n"
+                    + "Recipient,IMP-1,E-1000,,\r\n"
+                    + "Recipient,IMP-1,E-1001,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("120.01", body);
+        Assert.Contains("120.00", body);
+        Assert.Contains("120.02", body);
+    }
+
+    /// <summary>A grave with no recipients has no divisor, so there is nothing
+    /// to check -- the same rule the dialog applies when a grave is saved with
+    /// its items before its recipients are known.</summary>
+    [Fact]
+    public async Task A_grave_without_recipients_is_imported_unchecked()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n")
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

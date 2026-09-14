@@ -2,6 +2,8 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services.Import;
@@ -92,6 +94,14 @@ public sealed class ImportValidator
 
         CheckReferences(data, problems);
         await CheckAgainstStoredDataAsync(data, problems, ct);
+
+        // Last, and only on rows that are otherwise sound: it reads counts,
+        // prices and recipients across three files, and none of that means
+        // anything while one of them is still wrong.
+        if (problems.Count == 0)
+        {
+            CheckGraveSplits(data, problems);
+        }
 
         problems.Sort(ByFileThenRow);
         return new ImportValidationResult(problems, problems.Count == 0 ? data : null);
@@ -481,6 +491,105 @@ public sealed class ImportValidator
 
     /// <summary>FR-058: every reference in the mapping file must be defined in
     /// one of the other files.</summary>
+    /// <summary>Whether every grave in the archive can be billed at all.
+    ///
+    /// A grave's bill is split equally, so each VAT rate's net subtotal has to
+    /// divide across its recipients, and a price entered as a gross has to be
+    /// collectable to the cent. The dialog refuses a grave that cannot; an
+    /// archive that carried one would import quietly and then never bill it —
+    /// generation skips such a grave — so the whole import is refused instead,
+    /// with the rate and the amounts that would work.
+    ///
+    /// The import never sets a link's own price, so what is billed is the
+    /// item's default price from items.csv. The problem is reported against the
+    /// grave's row, because the grave is what does not add up; which price to
+    /// move is the reader's choice.</summary>
+    private static void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
+    {
+        var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
+        var recipients = data
+            .RecipientLinks.GroupBy(link => link.GraveNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        foreach (var grave in data.Graves)
+        {
+            // no recipients yet means no divisor, exactly as when a grave is
+            // saved with its items before its recipients are known
+            if (!recipients.TryGetValue(grave.Number, out var count) || count == 0)
+            {
+                continue;
+            }
+
+            var lines = data
+                .ItemLinks.Where(link =>
+                    string.Equals(
+                        link.GraveNumber,
+                        grave.Number,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                .Select(link =>
+                {
+                    var item = items[link.ItemNumber];
+                    return GraveBilling.LineFor(
+                        new InvoiceItem
+                        {
+                            Number = item.Number,
+                            Description = item.Description,
+                            VatRate = item.VatRate,
+                            DefaultPrice = item.Price,
+                        },
+                        link.Count,
+                        null,
+                        link.PriceIncludesVat
+                    );
+                })
+                .ToList();
+
+            if (lines.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var problem in GraveShare.Problems(lines, count))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.GravesFile,
+                        grave.Row,
+                        "PricesDoNotDivide",
+                        Describe(problem, count)
+                    )
+                );
+            }
+        }
+    }
+
+    private static string Describe(GraveShareProblem problem, int recipients)
+    {
+        var amount = (problem.Amount / 100m).ToString("0.00", CultureInfo.InvariantCulture);
+        var message =
+            $"VAT {problem.VatRate:0.##} %: {amount} does not split evenly across "
+            + $"{recipients} recipients.";
+
+        if (problem.Suggestions.Count == 0)
+        {
+            return $"{message} Adjust a price at this VAT rate.";
+        }
+
+        var options = string.Join(
+            " or ",
+            problem.Suggestions.Select(cents =>
+                (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture)
+            )
+        );
+        return $"{message} {options} would work.";
+    }
+
     private static void CheckReferences(ImportData data, List<ImportProblem> problems)
     {
         const string file = ImportArchiveLayout.MappingFile;
