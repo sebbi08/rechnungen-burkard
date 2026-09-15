@@ -1,6 +1,10 @@
+using System;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
+using Burkard.Invoicing.Api.OData;
+using Microsoft.AspNetCore.Hosting;
 using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
@@ -72,6 +76,44 @@ public class SeedingEndpointTests
             ODataJson.Body(new { GraveId = 1, ItemId = 1 })
         );
         Assert.NotEqual(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_hidden_route_answers_404_whatever_the_request_looks_like()
+    {
+        // gone from routing, not merely refused after the body was read: a
+        // charset the formatters do not speak would otherwise be told 415
+        using var host = ApiTestHost.WithoutSeedingEndpoints();
+        using var client = host.CreateClient();
+
+        var body = new StringContent(
+            "{\"GraveId\":1,\"ItemId\":1}",
+            Encoding.Latin1,
+            "application/json"
+        );
+        var created = await client.PostAsync("/odata/GraveItems", body);
+
+        Assert.Equal(HttpStatusCode.NotFound, created.StatusCode);
+    }
+
+    /// <summary>A host whose flag is set to something that is not a boolean.</summary>
+    private sealed class MistypedFlagHost : ApiTestHost
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+            builder.UseSetting(SeedingOnlyAttribute.ConfigurationKey, "yes");
+        }
+    }
+
+    [Fact]
+    public void A_flag_that_is_not_a_boolean_stops_the_host_from_starting()
+    {
+        // read once at startup, so a mistyped value fails the boot rather than
+        // every seeding write after it
+        using var host = new MistypedFlagHost();
+
+        Assert.ThrowsAny<Exception>(() => host.CreateClient());
     }
 
     [Fact]
