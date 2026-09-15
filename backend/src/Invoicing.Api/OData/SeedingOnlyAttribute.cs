@@ -5,11 +5,12 @@ namespace Burkard.Invoicing.Api.OData;
 
 /// <summary>Hides an action unless the instance is one that exists to be seeded.
 ///
-/// The grave link collections can be written to directly, which puts a grave
-/// together without going through SaveGrave — and so without the check that its
-/// prices divide evenly across its recipients. Such a grave saves, then never
-/// bills: generation skips it. Nothing in the application uses these routes; the
-/// E2E suite does, to build its fixtures faster than the dialog can.
+/// The grave link collections can be written to directly, and POST /odata/Graves
+/// takes nested links along with the grave. Either puts a grave together without
+/// going through SaveGrave — and so without the check that its prices divide
+/// evenly across its recipients. Such a grave saves, then never bills:
+/// generation skips it. Nothing in the application uses these routes; the E2E
+/// suite does, to build its fixtures faster than the dialog can.
 ///
 /// So they are offered only where that is the point. `Invoicing:SeedingEndpoints`
 /// is set in docker-compose.e2e.yml and in the workflow's `docker run`, nowhere

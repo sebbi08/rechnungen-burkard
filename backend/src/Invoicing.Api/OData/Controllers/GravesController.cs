@@ -82,6 +82,10 @@ public class GravesController : ODataController
         return new JsonResult(result, ODataJsonDefaults.PascalCase);
     }
 
+    // Seeding only, like the link collections: the body is the whole graph, so
+    // nested Items and Recipients are written along with the grave without any
+    // of SaveGrave's checks.
+    [SeedingOnly]
     public IActionResult Post([FromBody] Grave? grave)
     {
         if (grave is null)
@@ -118,56 +122,11 @@ public class GravesController : ODataController
         return Created(grave);
     }
 
-    public IActionResult Patch(
-        [FromRoute] long key,
-        [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave>? delta
-    )
-    {
-        if (delta is null)
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "InvalidRequest",
-                        message = "The request body is required.",
-                    },
-                }
-            );
-        }
-
-        var grave = _db.Graves.Find(key);
-        if (grave is null)
-            return NotFound();
-        delta.Patch(grave);
-        if (string.IsNullOrWhiteSpace(grave.GraveNumber))
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "GraveNumberRequired",
-                        message = "The grave number is required.",
-                    },
-                }
-            );
-        }
-
-        _db.SaveChanges();
-        return Updated(grave);
-    }
-
-    public IActionResult Delete([FromRoute] long key)
-    {
-        var grave = _db.Graves.Find(key);
-        if (grave is null)
-            return NotFound();
-        _db.Graves.Remove(grave); // cascades to GraveItems/GraveRecipients
-        _db.SaveChanges();
-        return NoContent();
-    }
+    // No PATCH and no DELETE on the set. The dialog changes a grave through
+    // SaveGrave, which is where the checks live; a Delta with a nested Items
+    // or Recipients set would write links past every one of them, even on an
+    // invoiced grave. Deleting a grave would leave its invoices and runs
+    // pointing at nothing — those hold the id without a foreign key.
 
     [ODataAttributeRouting]
     [HttpGet("odata/SearchGraves")]

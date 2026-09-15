@@ -1,12 +1,14 @@
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
-/// <summary>The grave link collections can be written to directly, which builds
-/// a grave without the check that its prices divide evenly across its
-/// recipients. Such a grave saves and then never bills — generation skips it.
+/// <summary>The grave link collections can be written to directly, and POST
+/// /odata/Graves takes nested links along with the grave. Either builds a grave
+/// without the check that its prices divide evenly across its recipients. Such a
+/// grave saves and then never bills — generation skips it.
 ///
 /// Nothing in the application writes through them; the E2E suite does, for
 /// fixtures. So they are offered only where an instance says it exists to be
@@ -70,5 +72,78 @@ public class SeedingEndpointTests
             ODataJson.Body(new { GraveId = 1, ItemId = 1 })
         );
         Assert.NotEqual(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Writing_a_grave_is_not_offered_without_the_seeding_flag()
+    {
+        // POST /odata/Graves takes the whole graph: nested Items and Recipients
+        // are written along with the grave, which puts one together without
+        // the split check exactly as the link collections do.
+        using var host = ApiTestHost.WithoutSeedingEndpoints();
+        using var client = host.CreateClient();
+
+        var created = await client.PostAsync("/odata/Graves", GraveBody("G-1"));
+        Assert.Equal(HttpStatusCode.NotFound, created.StatusCode);
+    }
+
+    [Fact]
+    public async Task Changing_a_grave_directly_is_not_offered_at_all()
+    {
+        // Nothing calls PATCH on /odata/Graves: the dialog goes through
+        // SaveGrave. A nested Items or Recipients set would be written without
+        // any check, even on an invoiced grave. Gone, like the link deletes.
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var id = await SeedGraveAsync(client);
+
+        var patched = await client.PatchAsync(
+            $"/odata/Graves({id})",
+            ODataJson.Body(new { GraveNumber = "G-2" })
+        );
+
+        Assert.Equal(HttpStatusCode.NotFound, patched.StatusCode);
+        Assert.Equal("G-1", await GraveNumberAsync(client, id));
+    }
+
+    [Fact]
+    public async Task Removing_a_grave_is_not_offered_at_all()
+    {
+        // Nothing calls DELETE on /odata/Graves either, and it would leave the
+        // grave's invoices and runs pointing at nothing.
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var id = await SeedGraveAsync(client);
+
+        var deleted = await client.DeleteAsync($"/odata/Graves({id})");
+
+        Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);
+        Assert.Equal("G-1", await GraveNumberAsync(client, id));
+    }
+
+    private static StringContent GraveBody(string number) =>
+        ODataJson.Body(
+            new
+            {
+                GraveNumber = number,
+                StartDate = "2026-01-01",
+                EndDate = "2040-12-31",
+            }
+        );
+
+    private static async Task<long> SeedGraveAsync(HttpClient client)
+    {
+        var created = await client.PostAsync("/odata/Graves", GraveBody("G-1"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using var json = await ODataJson.ReadAsync(created);
+        return json.RootElement.GetProperty("Id").GetInt64();
+    }
+
+    private static async Task<string?> GraveNumberAsync(HttpClient client, long id)
+    {
+        var response = await client.GetAsync($"/odata/Graves({id})");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("GraveNumber").GetString();
     }
 }
