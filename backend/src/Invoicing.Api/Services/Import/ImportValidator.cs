@@ -506,9 +506,8 @@ public sealed class ImportValidator
         }
     }
 
-    /// <summary>FR-058: every reference in the mapping file must be defined in
-    /// one of the other files.</summary>
-    /// <summary>Whether every grave in the archive can be billed at all.
+    /// <summary>Whether every grave in the archive can be split across its
+    /// recipients.
     ///
     /// A grave's bill is split equally, so each VAT rate's net subtotal has to
     /// divide across its recipients, and a price entered as a gross has to be
@@ -655,6 +654,8 @@ public sealed class ImportValidator
         }
     }
 
+    /// <summary>FR-058: every reference in the mapping file must be defined in
+    /// one of the other files.</summary>
     private static void CheckReferences(ImportData data, List<ImportProblem> problems)
     {
         const string file = ImportArchiveLayout.MappingFile;
