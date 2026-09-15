@@ -82,51 +82,12 @@ public class GravesController : ODataController
         return new JsonResult(result, ODataJsonDefaults.PascalCase);
     }
 
-    // Seeding only, like the link collections: the body is the whole graph, so
-    // nested Items and Recipients are written along with the grave without any
-    // of SaveGrave's checks.
-    [SeedingOnly]
-    public IActionResult Post([FromBody] Grave? grave)
-    {
-        if (grave is null)
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "InvalidRequest",
-                        message = "The request body is required.",
-                    },
-                }
-            );
-        }
-
-        if (string.IsNullOrWhiteSpace(grave.GraveNumber))
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "GraveNumberRequired",
-                        message = "The grave number is required.",
-                    },
-                }
-            );
-        }
-
-        grave.CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow);
-        _db.Graves.Add(grave);
-        _db.SaveChanges();
-        return Created(grave);
-    }
-
-    // No PATCH and no DELETE on the set. The dialog changes a grave through
-    // SaveGrave, which is where the checks live; a Delta with a nested Items
-    // or Recipients set would write links past every one of them, even on an
-    // invoiced grave. Deleting a grave would leave its invoices and runs
-    // pointing at nothing — those hold the id without a foreign key.
+    // The set is read-only. A grave is written through SaveGrave, in one request
+    // with its links, which is where the checks live: a POST with nested Items
+    // and Recipients, or a PATCH with a Delta carrying them, would write links
+    // past every one of them, even on an invoiced grave. Deleting a grave would
+    // leave its invoices and runs pointing at nothing — those hold the id
+    // without a foreign key.
 
     [ODataAttributeRouting]
     [HttpGet("odata/SearchGraves")]

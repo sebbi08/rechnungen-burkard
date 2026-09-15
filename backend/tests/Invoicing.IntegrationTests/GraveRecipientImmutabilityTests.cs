@@ -183,38 +183,47 @@ public class GraveRecipientImmutabilityTests
     }
 
     [Fact]
-    public async Task Linking_a_recipient_to_a_never_invoiced_grave_still_works()
+    public async Task Saving_a_grave_after_it_was_invoiced_keeps_its_recipients()
     {
+        // the split across the recipients is baked into the invoices already
+        // generated, so the set stays what it was when they were sent out
         using var host = new ApiTestHost();
-        var (graveId, _, _, berndId) = await SeedAsync(host);
-
-        using var client = host.CreateClient();
-        var response = await client.PostAsync(
-            "/odata/GraveRecipients",
-            ODataJson.Body(new { GraveId = graveId, RecipientId = berndId })
-        );
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Linking_or_unlinking_after_the_grave_was_invoiced_is_rejected()
-    {
-        using var host = new ApiTestHost();
-        var (graveId, _, _, berndId) = await SeedAsync(host);
+        var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
 
         using var client = host.CreateClient();
         await GraveGenerationHelper.RunAsync(client, 2033, 1);
-
-        var added = await client.PostAsync(
-            "/odata/GraveRecipients",
-            ODataJson.Body(new { GraveId = graveId, RecipientId = berndId })
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId,
+                    graveNumber = "G-400",
+                    startDate = "2020-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { annaId, berndId },
+                }
+            )
         );
-        Assert.Equal(HttpStatusCode.BadRequest, added.StatusCode);
-        using var addedJson = await ODataJson.ReadAsync(added);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
         Assert.Equal(
             "GraveRecipientsImmutable",
-            addedJson.RootElement.GetProperty("error").GetProperty("code").GetString()
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
         );
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.GraveRecipients.CountAsync(r => r.GraveId == graveId));
     }
 }

@@ -12,11 +12,6 @@ using Microsoft.Extensions.FileProviders.Physical;
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Read once: a value that is not a boolean stops the host here rather than
-// failing every seeding write later.
-var seedingEndpoints = builder.Configuration.GetValue<bool>(SeedingOnlyAttribute.ConfigurationKey);
-builder.Services.AddSingleton(new SeedingEndpoints(seedingEndpoints));
 builder
     .Services.AddControllers()
     .AddOData(o =>

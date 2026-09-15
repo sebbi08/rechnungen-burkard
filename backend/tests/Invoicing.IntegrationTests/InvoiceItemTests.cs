@@ -35,7 +35,8 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         return await GetCreatedIdAsync(created);
     }
 
-    /// <summary>A grave that bills the item, built through the seeding routes.</summary>
+    /// <summary>A grave that bills the item to one recipient, saved the way the
+    /// dialog saves it. Answers the grave's id.</summary>
     private async Task<long> LinkGraveAsync(
         HttpClient client,
         long itemId,
@@ -43,33 +44,62 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         decimal? unitPrice
     )
     {
-        var grave = await client.PostAsync(
-            "/odata/Graves",
+        var recipient = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(new { Name = $"Empfänger {graveNumber}", Address = "Weg 1" })
+        );
+        Assert.Equal(HttpStatusCode.Created, recipient.StatusCode);
+        var saved = await client.PostAsync(
+            "/odata/SaveGrave",
             ODataJson.Body(
                 new
                 {
-                    GraveNumber = graveNumber,
-                    StartDate = "2026-01-01",
-                    EndDate = "2040-12-31",
+                    graveId = (long?)null,
+                    graveNumber,
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice,
+                        },
+                    },
+                    recipientIds = new[] { await GetCreatedIdAsync(recipient) },
                 }
             )
         );
-        Assert.Equal(HttpStatusCode.Created, grave.StatusCode);
-        var graveId = await GetCreatedIdAsync(grave);
-        var link = await client.PostAsync(
-            "/odata/GraveItems",
-            ODataJson.Body(
-                new
-                {
-                    GraveId = graveId,
-                    ItemId = itemId,
-                    Count = 1,
-                    UnitPrice = unitPrice,
-                }
-            )
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        return await GetCreatedIdAsync(saved);
+    }
+
+    /// <summary>A grave billing an item that has no price at all: nothing can
+    /// build one any more, so the one this test needs is written directly.</summary>
+    private async Task<long> LinkGraveDirectlyAsync(long itemId, string graveNumber)
+    {
+        using var scope = _host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var grave = new Burkard.Invoicing.Domain.Entities.Grave
+        {
+            GraveNumber = graveNumber,
+            StartDate = new DateOnly(2026, 1, 1),
+            EndDate = new DateOnly(2040, 12, 31),
+            CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        db.Graves.Add(grave);
+        await db.SaveChangesAsync();
+        db.GraveItems.Add(
+            new Burkard.Invoicing.Domain.Entities.GraveItem
+            {
+                GraveId = grave.Id,
+                ItemId = itemId,
+                Count = 1,
+            }
         );
-        Assert.Equal(HttpStatusCode.Created, link.StatusCode);
-        return graveId;
+        await db.SaveChangesAsync();
+        return grave.Id;
     }
 
     private static async Task<HttpResponseMessage> PatchAsync(
@@ -385,7 +415,7 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         using var client = _host.CreateClient();
         await SeedVatRateAsync(client);
         var itemId = await CreateItemAsync(client, "3009", null);
-        var unpriced = await LinkGraveAsync(client, itemId, "I-3009", null);
+        var unpriced = await LinkGraveDirectlyAsync(itemId, "I-3009");
 
         var response = await PatchAsync(client, itemId, new { DefaultPrice = 50.00m });
 

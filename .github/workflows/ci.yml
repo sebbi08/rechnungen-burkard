@@ -48,11 +48,7 @@ jobs:
         run: docker build -t invoicing:e2e .
       - name: Start the app
         run: |
-          # the suite seeds through /odata/GraveItems and /odata/GraveRecipients,
-          # which answer 404 unless an instance says it exists to be seeded;
-          # docker-compose.e2e.yml sets the same flag for a local run
-          docker run -d --name invoicing-e2e -p 8080:8080 \
-            -e Invoicing__SeedingEndpoints=true invoicing:e2e
+          docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:8080/healthz > /dev/null; then exit 0; fi
             sleep 2

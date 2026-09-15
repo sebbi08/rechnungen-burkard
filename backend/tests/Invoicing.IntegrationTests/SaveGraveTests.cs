@@ -214,19 +214,23 @@ public class SaveGraveTests
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
         var (pricedItem, _, _, _) = await SeedAsync(client);
-        var graveId = await ReadIdAsync(
-            client.PostAsync(
-                "/odata/Graves",
-                ODataJson.Body(
-                    new
-                    {
-                        GraveNumber = "S-003",
-                        StartDate = "2026-01-01",
-                        EndDate = "2040-12-31",
-                    }
-                )
-            )
-        );
+        long graveId;
+        using (var scope = host.Services.CreateScope())
+        {
+            // nothing can create such a grave any more; this one is written as
+            // the data of an older version would have left it
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = new Burkard.Invoicing.Domain.Entities.Grave
+            {
+                GraveNumber = "S-003",
+                StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            graveId = grave.Id;
+        }
 
         var response = await client.PostAsync(
             "/odata/SaveGrave",

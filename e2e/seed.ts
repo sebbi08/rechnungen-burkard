@@ -57,3 +57,50 @@ export async function ensureRow(
   }
   throw new Error(`POST ${path} failed: ${failure}`);
 }
+
+/** One item line of a grave `seedGrave` saves. A `unitPrice` left out (or null)
+ *  bills the item's default price, as the dialog does when the pre-filled price
+ *  is left alone; `priceIncludesVat` says the price is a gross one. */
+export interface SeedGraveLine {
+  itemId: number;
+  count?: number;
+  unitPrice?: number | null;
+  priceIncludesVat?: boolean;
+}
+
+export interface SeedGraveInput {
+  graveNumber: string;
+  startDate?: string;
+  endDate?: string;
+  items: SeedGraveLine[];
+  recipientIds: number[];
+}
+
+/**
+ * Creates a grave the way the app does — one POST to SaveGrave carrying the
+ * grave, its items and its recipients — and returns the new grave's id.
+ *
+ * The Graves, GraveItems and GraveRecipients sets take no writes any more, so
+ * a spec's grave passes the same checks as the dialog's: at least one
+ * recipient, a price on every line (the link's own or the item's default, with
+ * at most two decimals), and per VAT rate a net subtotal that divides evenly
+ * across the recipients. A fixture that breaks one of these is refused as a
+ * whole rather than written half-way, and createRow's retry-and-throw names
+ * the code.
+ */
+export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<number> {
+  const created = await createRow(page, "/odata/SaveGrave", {
+    graveId: null,
+    graveNumber: grave.graveNumber,
+    startDate: grave.startDate ?? "2026-01-01",
+    endDate: grave.endDate ?? "2040-12-31",
+    items: grave.items.map((line) => ({
+      itemId: line.itemId,
+      count: line.count ?? 1,
+      unitPrice: line.unitPrice ?? null,
+      priceIncludesVat: line.priceIncludesVat ?? false,
+    })),
+    recipientIds: grave.recipientIds,
+  });
+  return created.Id;
+}

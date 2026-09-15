@@ -35,6 +35,8 @@ public class ItemGravesTests
         );
     }
 
+    /// <summary>A grave billing the item to one recipient at the given price,
+    /// saved the way the dialog saves it.</summary>
     private static async Task LinkAsync(
         HttpClient client,
         long itemId,
@@ -43,28 +45,35 @@ public class ItemGravesTests
         bool gross = false
     )
     {
-        var graveId = await CreateAsync(
+        var recipientId = await CreateAsync(
             client,
-            "/odata/Graves",
-            new
-            {
-                GraveNumber = graveNumber,
-                StartDate = "2026-01-01",
-                EndDate = "2040-12-31",
-            }
+            "/odata/Recipients",
+            new { Name = $"Empfänger {graveNumber}", Address = "Weg 1" }
         );
-        await CreateAsync(
-            client,
-            "/odata/GraveItems",
-            new
-            {
-                GraveId = graveId,
-                ItemId = itemId,
-                Count = 1,
-                UnitPrice = unitPrice,
-                PriceIncludesVat = gross,
-            }
+        var saved = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber,
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice,
+                            priceIncludesVat = gross,
+                        },
+                    },
+                    recipientIds = new[] { recipientId },
+                }
+            )
         );
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
     }
 
     [Fact]

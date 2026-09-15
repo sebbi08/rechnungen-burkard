@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
-import { createRow } from "../seed";
+import { createRow, seedGrave } from "../seed";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/index.html#/settings");
@@ -109,12 +109,16 @@ test("items: the edit dialog lists the graves billing the item under their price
     VatRate: 7,
     DefaultPrice: 100,
   });
-  const grave = await createRow(page, "/odata/Graves", {
-    GraveNumber: graveNumber,
-    StartDate: "2026-01-01",
-    EndDate: "2040-12-31",
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Nutzer ${ts}`,
+    Address: "Musterweg 1",
   });
-  await createRow(page, "/odata/GraveItems", { GraveId: grave.Id, ItemId: item.Id, Count: 1 });
+  // no price on the line, so the grave bills the item's default
+  await seedGrave(page, {
+    graveNumber,
+    items: [{ itemId: item.Id, count: 1, unitPrice: null }],
+    recipientIds: [recipient.Id],
+  });
 
   await page.goto("/index.html#/items");
   const itemsTable = page.locator("[id$='itemsTable-listUl']");
@@ -191,13 +195,14 @@ test("graves: search by number narrows the list and empty search shows nothing (
 }) => {
   const ts = Date.now();
   const graveNumber = `SUCHE-${ts}`;
-  await page.request.post("/odata/Graves", {
-    data: {
-      GraveNumber: graveNumber,
-      StartDate: "2026-01-01",
-      EndDate: "2040-12-31",
-    },
+  // a grave cannot be saved without a recipient. The search matches recipient
+  // names as well as numbers, so this one shares nothing with the terms below;
+  // and with no items, no generation running alongside can invoice the grave
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Erika Beispiel ${ts}`,
+    Address: "Musterweg 1",
   });
+  await seedGrave(page, { graveNumber, items: [], recipientIds: [recipient.Id] });
 
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");
