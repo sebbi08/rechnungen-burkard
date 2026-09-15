@@ -94,6 +94,7 @@ public sealed class ImportValidator
 
         CheckReferences(data, problems);
         CheckGraveRecipients(data, problems);
+        CheckLinkedItemPrices(data, problems);
         await CheckAgainstStoredDataAsync(data, problems, ct);
 
         // Last, and only on rows that are otherwise sound: it reads counts,
@@ -609,6 +610,30 @@ public sealed class ImportValidator
                         grave.Row,
                         "NoRecipients",
                         "The grave needs at least one recipient."
+                    )
+                );
+            }
+        }
+    }
+
+    /// <summary>An item may come without a price (FR-051), but a grave cannot be
+    /// billed for one: SaveGrave refuses such a link, and generation would skip
+    /// the grave. Refused on the mapping row, so the item itself still imports as
+    /// long as no grave links it. A link to an item row that was rejected on its
+    /// own carries that problem already and is left alone here.</summary>
+    private static void CheckLinkedItemPrices(ImportData data, List<ImportProblem> problems)
+    {
+        var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
+        foreach (var link in data.ItemLinks)
+        {
+            if (items.TryGetValue(link.ItemNumber, out var item) && item.Price is null)
+            {
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.MappingFile,
+                        link.Row,
+                        "PriceRequired",
+                        $"A price is required for item '{item.Number}': a grave links it."
                     )
                 );
             }

@@ -52,8 +52,9 @@ public class ImportTests
         return memory.ToArray();
     }
 
-    /// <summary>A consistent archive: two recipients, two items, one grave with
-    /// both link kinds.</summary>
+    /// <summary>A consistent archive: two recipients, three items (one of them
+    /// without a price, which no grave links), one grave with both link kinds.
+    /// The gross-priced 107.00 is 100.00 net at 7 %, so the grave divides.</summary>
     private static byte[] ValidArchive() =>
         Zip(
             (
@@ -64,7 +65,10 @@ public class ImportTests
             ),
             (
                 "items.csv",
-                ItemsHeader + "9001,Grabpflege,7,120.00\r\n" + "9002,Sonderleistung,7,\r\n"
+                ItemsHeader
+                    + "9001,Grabpflege,7,120.00\r\n"
+                    + "9002,Sonderleistung,7,107.00\r\n"
+                    + "9003,Extra,7,\r\n"
             ),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
             (
@@ -183,7 +187,7 @@ public class ImportTests
         using var json = await ODataJson.ReadAsync(response);
         var summary = json.RootElement.GetProperty("summary");
         Assert.Equal(2, summary.GetProperty("recipients").GetInt32());
-        Assert.Equal(2, summary.GetProperty("items").GetInt32());
+        Assert.Equal(3, summary.GetProperty("items").GetInt32());
         Assert.Equal(1, summary.GetProperty("graves").GetInt32());
         Assert.Equal(2, summary.GetProperty("itemLinks").GetInt32());
         Assert.Equal(2, summary.GetProperty("recipientLinks").GetInt32());
@@ -207,7 +211,10 @@ public class ImportTests
         Assert.Equal("Grabpflege", pricedLink.Item.Description);
         Assert.Equal(7m, pricedLink.Item.VatRate);
         Assert.Equal(120.00m, pricedLink.Item.DefaultPrice);
-        Assert.Null(grave.Items.Single(i => i.Item.Number == "9002").Item.DefaultPrice);
+        Assert.Equal(107.00m, grave.Items.Single(i => i.Item.Number == "9002").Item.DefaultPrice);
+
+        // an item without a price is imported as it is, as long as no grave links it
+        Assert.Null((await db.InvoiceItems.SingleAsync(i => i.Number == "9003")).DefaultPrice);
 
         // the address keeps the line break the quoted CSV field carried
         var anna = grave.Recipients.Select(r => r.Recipient).Single(r => r.Number == "E-1000");
@@ -738,5 +745,36 @@ public class ImportTests
         var problems = await ProblemsAsync(response);
         Assert.Contains(problems, p => p.File == "mapping.csv" && p.Code == "ItemNotDefined");
         Assert.Contains(problems, p => p.File == "graves.csv" && p.Code == "NoRecipients");
+    }
+
+    /// <summary>An item may come without a price (FR-051), but a grave that links
+    /// it cannot be billed: the dialog refuses to save one, and generation would
+    /// skip it. The import refuses the link, on the mapping row, so the item
+    /// itself stays importable.</summary>
+    [Fact]
+    public async Task A_link_to_an_item_without_a_price_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
+            ("items.csv", ItemsHeader + "9002,Sonderleistung,7,\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader + "Item,IMP-1,9002,1,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceRequired"
+        );
+        await AssertNothingImportedAsync(host);
     }
 }

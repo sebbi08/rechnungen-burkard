@@ -62,6 +62,21 @@ public class GraveBillingValidationController : ODataController
             );
         }
 
+        // the save refuses a line with no price at all; a check that said yes to
+        // one would be judging a 0.00 nobody entered
+        var unpriced = request.Lines.FirstOrDefault(l =>
+            (l.UnitPrice ?? items[l.ItemId].DefaultPrice) is null
+        );
+        if (unpriced is not null)
+        {
+            return BadRequest(
+                Error(
+                    "PriceRequired",
+                    $"A price is required for item '{items[unpriced.ItemId].Number}'."
+                )
+            );
+        }
+
         var lines = request
             .Lines.Select(l =>
                 GraveBilling.LineFor(items[l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
