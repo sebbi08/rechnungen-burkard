@@ -178,6 +178,20 @@ public class InvoiceItemsController : ODataController
             };
         }
 
+        // prices are cents: a third decimal would be judged rounded by the
+        // grave split check and billed unrounded by generation
+        if (item.DefaultPrice is { } price && !GraveBilling.IsWholeCents(price))
+        {
+            return new
+            {
+                error = new
+                {
+                    code = "InvalidPrice",
+                    message = "The price has more than two decimals.",
+                },
+            };
+        }
+
         return null;
     }
 }

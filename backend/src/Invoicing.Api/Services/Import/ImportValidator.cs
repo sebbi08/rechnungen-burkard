@@ -257,6 +257,21 @@ public sealed class ImportValidator
                     continue;
                 }
 
+                // prices are cents: a third decimal would be judged rounded by
+                // the split check and billed unrounded by generation
+                if (!GraveBilling.IsWholeCents(parsedPrice))
+                {
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "PriceInvalid",
+                            $"'{rawPrice}' has more than two decimals."
+                        )
+                    );
+                    continue;
+                }
+
                 price = parsedPrice;
             }
 

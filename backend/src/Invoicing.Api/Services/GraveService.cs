@@ -181,6 +181,16 @@ public sealed class GraveService
                     $"A price is required for item '{item.Number}'."
                 );
             }
+
+            // prices are cents: a third decimal would pass the split check
+            // rounded and be billed unrounded
+            if (input.UnitPrice is { } unitPrice && !GraveBilling.IsWholeCents(unitPrice))
+            {
+                throw new ValidationException(
+                    "InvalidPrice",
+                    $"The price for item '{item.Number}' has more than two decimals."
+                );
+            }
         }
 
         var known = await _db.Recipients.Where(r => recipientIds.Contains(r.Id)).CountAsync(ct);

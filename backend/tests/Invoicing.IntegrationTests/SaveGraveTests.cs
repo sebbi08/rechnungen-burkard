@@ -167,6 +167,46 @@ public class SaveGraveTests
     }
 
     [Fact]
+    public async Task Save_rejects_a_unit_price_with_more_than_two_decimals()
+    {
+        // prices are cents: a third decimal would pass the split check rounded
+        // and be billed unrounded
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (pricedItem, _, recipient, _) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "S-004",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)120.004m,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
     public async Task Save_still_edits_an_existing_grave_that_has_no_recipients()
     {
         // a grave that predates the rule keeps its recipient set, empty as it

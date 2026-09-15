@@ -12,6 +12,12 @@ namespace Burkard.Invoicing.Api.Services;
 /// cannot be invoiced.</summary>
 public static class GraveBilling
 {
+    /// <summary>Whether a price is a whole number of cents. Prices are entered,
+    /// stored and billed in cents; a third decimal would be judged rounded here
+    /// and billed unrounded by generation, so every write refuses one.</summary>
+    public static bool IsWholeCents(decimal price) =>
+        price == decimal.Round(price, 2, MidpointRounding.AwayFromZero);
+
     /// <summary>The billed line for one item link. The link's own price wins;
     /// without one the item's default is billed.</summary>
     public static GraveLine LineFor(

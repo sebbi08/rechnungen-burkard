@@ -77,6 +77,17 @@ public class GraveBillingValidationController : ODataController
             );
         }
 
+        var beyondCents = request.Lines.FirstOrDefault(l =>
+            l.UnitPrice is { } price && !GraveBilling.IsWholeCents(price)
+        );
+        if (beyondCents is not null)
+        {
+            var number = items[beyondCents.ItemId].Number;
+            return BadRequest(
+                Error("InvalidPrice", $"The price for item '{number}' has more than two decimals.")
+            );
+        }
+
         var lines = request
             .Lines.Select(l =>
                 GraveBilling.LineFor(items[l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)

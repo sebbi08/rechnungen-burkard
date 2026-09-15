@@ -233,6 +233,22 @@ public class GraveBillingValidationTests
     }
 
     [Fact]
+    public async Task A_price_with_more_than_two_decimals_is_refused_like_the_save()
+    {
+        using var host = new ApiTestHost();
+        var (netItem, _) = await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/odata/ValidateGraveBilling",
+            new { Recipients = 2, Lines = new[] { Line(netItem, 120.004m) } }
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("InvalidPrice", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task The_check_agrees_with_the_save()
     {
         // The dialog would be lying if it said yes to something the save then

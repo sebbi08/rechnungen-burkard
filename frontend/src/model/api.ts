@@ -64,6 +64,7 @@ const CODE_TO_I18N: Record<string, string> = {
   GraveNumberRequired: "errorGraveNumberRequired",
   InvalidDate: "errorInvalidDate",
   InvalidCount: "errorInvalidCount",
+  InvalidPrice: "errorInvalidPrice",
   ItemRequired: "errorItemRequired",
   GraveItemLinkExists: "errorGraveItemLinkExists",
   GraveRecipientLinkExists: "errorGraveRecipientLinkExists",

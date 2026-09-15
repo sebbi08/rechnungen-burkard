@@ -777,4 +777,34 @@ public class ImportTests
         );
         await AssertNothingImportedAsync(host);
     }
+
+    /// <summary>Prices are cents. A third decimal would be judged rounded by the
+    /// split check and billed unrounded by generation, so it is refused where it
+    /// comes in, as the dialogs refuse it.</summary>
+    [Fact]
+    public async Task A_price_with_more_than_two_decimals_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.004\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader + "Item,IMP-1,9001,3,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
+        );
+        await AssertNothingImportedAsync(host);
+    }
 }

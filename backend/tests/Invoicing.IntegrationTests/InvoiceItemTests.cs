@@ -161,6 +161,68 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         );
     }
 
+    // Prices are cents. A third decimal would be judged rounded by the grave
+    // split check and billed unrounded by generation.
+    [Fact]
+    public async Task Create_item_with_a_price_beyond_cents_is_rejected()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/InvoiceItems",
+            ODataJson.Body(
+                new
+                {
+                    Number = "3003",
+                    Description = "Grabpflege",
+                    VatRate = 7.0m,
+                    DefaultPrice = 120.004m,
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Patch_item_with_a_price_beyond_cents_is_rejected()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var created = await client.PostAsync(
+            "/odata/InvoiceItems",
+            ODataJson.Body(
+                new
+                {
+                    Number = "3004",
+                    Description = "Grabpflege",
+                    VatRate = 7.0m,
+                    DefaultPrice = 120.00m,
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var id = await GetCreatedIdAsync(created);
+        var patch = new HttpRequestMessage(HttpMethod.Patch, $"/odata/InvoiceItems({id})")
+        {
+            Content = ODataJson.Body(new { DefaultPrice = 120.004m }),
+        };
+        var response = await client.SendAsync(patch);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
     [Fact]
     public async Task Create_item_with_scale_equivalent_vat_rate_is_accepted()
     {
