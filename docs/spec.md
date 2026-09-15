@@ -596,6 +596,10 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-058**: Validation MUST check cross-file consistency: every invoice item
   and recipient referenced in the mapping CSV MUST be defined in the items or
   recipients CSV file.
+- **FR-058a**: Validation MUST refuse a grave that could not be billed: a grave
+  without a recipient, a link to an item without a price, or prices that do not
+  divide across the grave's recipients (FR-021a). The archive is refused as a
+  whole, so nothing imports that the dialog would have refused to save.
 - **FR-059**: Validation MUST report each problem with the affected file, the row,
   and a human-readable reason.
 - **FR-060**: The system MUST NOT import any data when validation reports one or

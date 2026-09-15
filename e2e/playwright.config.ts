@@ -2,9 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 import { BASE_URL, OWN_STACK } from "./stack";
 
 // Without E2E_BASE_URL the suite starts its own stack (docker-compose.e2e.yml)
-// and runs against that, so a local run never writes into the dev database. Set
-// E2E_BASE_URL to target something already running instead — the dev stack via
-// `npm run test:dev`, or the release image in CI.
+// and runs against that, so a local run never writes into the dev database. CI
+// sets E2E_BASE_URL to target the release image it has already started. The dev
+// stack is not a target: the specs write graves, recipients and invoices that
+// nothing deletes again, into the database that holds the user's own data.
 export default defineConfig({
   testDir: "./tests",
   timeout: 60000,

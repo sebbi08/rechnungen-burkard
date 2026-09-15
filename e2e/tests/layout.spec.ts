@@ -56,7 +56,7 @@ const LIST_SCREENS: ListScreen[] = [
 
 // The rows only have to exist — these assertions are about layout, not about
 // the data — but their numbers are unique per run so that seeding never
-// collides with rows a previous run left in the dev stack's database.
+// collides with rows an earlier attempt left in a stack that kept its data.
 let seeding: Promise<void> | undefined;
 
 function seed(page: Page): Promise<void> {

@@ -11,14 +11,17 @@ The E2E suite must run against its **own** stack:
 cd e2e && npm test          # builds and starts docker-compose.e2e.yml on port 8081
 ```
 
-`E2E_BASE_URL=http://localhost:8080` (`npm run test:dev`) points the suite at
-the running dev stack instead. Do not use it: the specs create recipients,
-items and invoices, and the API has no DELETE endpoints for them, so whatever a
-run leaves behind stays in `data/invoicing.db`. The dev database belongs to the
-user and holds their data.
+`E2E_BASE_URL` points the suite at something already running instead; CI uses
+it for the release image it has started. Do not point it at the dev stack on
+port 8080: the specs create recipients, items, graves and invoices, and the API
+has no DELETE endpoints for them, so whatever a run leaves behind stays in
+`data/invoicing.db`. The dev database belongs to the user and holds their data.
 
 The same goes for ad-hoc probing: seed and click through `docker-compose.e2e.yml`,
-not through the dev stack.
+not through the dev stack. Seeding means writing the way the app writes: a grave
+goes through `POST /odata/SaveGrave` with its items and recipients (`seedGrave`
+in `e2e/seed.ts`), since the Graves, GraveItems and GraveRecipients sets take no
+writes.
 
 To start over on the dev database — an explicitly destructive step, so ask
 first and commit before it: `scripts/reset-dev-db.sh`.

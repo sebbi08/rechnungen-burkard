@@ -2,9 +2,9 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { pickSelectOption, waitForDialogOpen } from "../dialog";
 import { createRow, ensureRow, seedGrave as saveGrave, type SeedGraveLine } from "../seed";
 
-// Unique per test run. `npm test` starts with an empty database, but
-// `npm run test:dev` runs against the dev stack, where fixed numbers would
-// collide with pre-existing rows or make assertions vacuous.
+// Unique per test run. `npm test` starts with an empty database, but CI runs the
+// suite against an image it started once, and a rerun there must not collide
+// with the rows the first attempt left or make assertions vacuous.
 const RUN = Date.now();
 
 // The overview toolbar and the generate dialog both open on the half-year today
