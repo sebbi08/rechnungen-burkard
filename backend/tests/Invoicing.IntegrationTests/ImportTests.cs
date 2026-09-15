@@ -791,4 +791,32 @@ public class ImportTests
         );
         await AssertNothingImportedAsync(host);
     }
+
+    [Fact]
+    public async Task The_refusal_says_recipient_for_a_single_one()
+    {
+        // one recipient can still fail: a gross of 10.01 at 7 % is 9.36 net,
+        // whose VAT rounds to 0.66, and 10.02 is not what was typed
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,10.01\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader + "Item,IMP-1,9001,1,true\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = Assert.Single(await ProblemsAsync(response));
+        Assert.Equal(
+            "VAT 7 %: 10.01 does not split evenly across 1 recipient. 10.00 or 10.02 would work.",
+            problem.Message
+        );
+    }
 }

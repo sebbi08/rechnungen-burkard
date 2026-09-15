@@ -268,7 +268,9 @@ export default abstract class GraveEdit extends InvoiceRevisions {
    *  which. */
   protected billingProblemText(problems: api.GraveBillingProblem[], recipients: number): string {
     const lines = problems.map((problem) => {
-      const sentence = this.i18nText("pricesDoNotDivideLine")
+      const sentence = this.i18nText(
+        recipients === 1 ? "pricesDoNotDivideLineOne" : "pricesDoNotDivideLine",
+      )
         .replace("{0}", this.formatVatRate(problem.VatRate))
         .replace("{1}", this.formatAmount(problem.Amount))
         .replace("{2}", String(recipients));

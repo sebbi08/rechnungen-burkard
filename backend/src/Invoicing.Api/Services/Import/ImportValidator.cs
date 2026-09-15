@@ -582,26 +582,28 @@ public sealed class ImportValidator
         }
     }
 
+    /// <summary>The dialog's sentence, in the language every import problem is
+    /// written in. One shape whatever the kind of problem: a net total that
+    /// will not divide and a gross that cannot be billed to the cent differ in
+    /// why they fail, not in what the reader does about it.</summary>
     private static string Describe(GraveShareProblem problem, int recipients)
     {
-        var amount = (problem.Amount / 100m).ToString("0.00", CultureInfo.InvariantCulture);
+        var rate = problem.VatRate.ToString("0.##", CultureInfo.InvariantCulture);
+        var across = recipients == 1 ? "1 recipient" : $"{recipients} recipients";
         var message =
-            $"VAT {problem.VatRate:0.##} %: {amount} does not split evenly across "
-            + $"{recipients} recipients.";
+            $"VAT {rate} %: {Euros(problem.Amount)} does not split evenly across {across}.";
 
         if (problem.Suggestions.Count == 0)
         {
             return $"{message} Adjust a price at this VAT rate.";
         }
 
-        var options = string.Join(
-            " or ",
-            problem.Suggestions.Select(cents =>
-                (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture)
-            )
-        );
+        var options = string.Join(" or ", problem.Suggestions.Select(Euros));
         return $"{message} {options} would work.";
     }
+
+    private static string Euros(long cents) =>
+        (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture);
 
     /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
     /// imported without one could never be billed: generation would skip it and
