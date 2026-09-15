@@ -81,6 +81,27 @@ public class ImportTests
             )
         );
 
+    /// <summary>An archive whose one grave cannot be split: 120.01 net at 19 % over
+    /// two recipients is 12 001 cents, which is odd.</summary>
+    private static byte[] UnsplittableArchive() =>
+        Zip(
+            (
+                "recipients.csv",
+                RecipientsHeader
+                    + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"
+                    + "E-1001,Bert Beispiel,Nebenweg 2\r\n"
+            ),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9001,1,\r\n"
+                    + "Recipient,IMP-1,E-1000,,\r\n"
+                    + "Recipient,IMP-1,E-1001,,\r\n"
+            )
+        );
+
     private static MultipartFormDataContent Upload(byte[] archive)
     {
         var content = new MultipartFormDataContent();
@@ -92,9 +113,9 @@ public class ImportTests
         return content;
     }
 
-    private static async Task<List<(string File, int? Row, string Code)>> ProblemsAsync(
-        HttpResponseMessage response
-    )
+    private static async Task<
+        List<(string File, int? Row, string Code, string Message)>
+    > ProblemsAsync(HttpResponseMessage response)
     {
         using var json = await ODataJson.ReadAsync(response);
         return json
@@ -106,16 +127,21 @@ public class ImportTests
                     p.GetProperty("row").ValueKind == JsonValueKind.Null
                         ? (int?)null
                         : p.GetProperty("row").GetInt32(),
-                    p.GetProperty("code").GetString()!
+                    p.GetProperty("code").GetString()!,
+                    p.GetProperty("message").GetString()!
                 )
             )
             .ToList();
     }
 
+    /// <summary>The refusal has to be the whole archive: recipients and items are
+    /// written before graves, so they are what a partial write would leave.</summary>
     private static async Task AssertNothingImportedAsync(ApiTestHost host)
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(await db.Recipients.ToListAsync());
+        Assert.Empty(await db.InvoiceItems.ToListAsync());
         Assert.Empty(await db.Graves.ToListAsync());
         Assert.Empty(await db.GraveItems.ToListAsync());
         Assert.Empty(await db.GraveRecipients.ToListAsync());
@@ -625,76 +651,34 @@ public class ImportTests
     /// does not divide. Refusing the archive keeps the two paths saying the
     /// same thing.</summary>
     [Fact]
-    public async Task A_grave_whose_prices_do_not_divide_blocks_the_import()
+    public async Task A_grave_whose_prices_do_not_divide_is_refused_naming_what_would_work()
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 19m);
         using var client = host.CreateClient();
 
-        // 120,01 at 19 % over two recipients: 12 001 net cents are odd
-        var archive = Zip(
-            (
-                "recipients.csv",
-                RecipientsHeader
-                    + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"
-                    + "E-1001,Bert Beispiel,Nebenweg 2\r\n"
-            ),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            (
-                "mapping.csv",
-                MappingHeader
-                    + "Item,IMP-1,9001,1,\r\n"
-                    + "Recipient,IMP-1,E-1000,,\r\n"
-                    + "Recipient,IMP-1,E-1001,,\r\n"
-            )
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(UnsplittableArchive())
         );
-        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "PricesDoNotDivide"
+        var problem = Assert.Single(await ProblemsAsync(response));
+        Assert.Equal("graves.csv", problem.File);
+        Assert.Equal(2, problem.Row);
+        Assert.Equal("PricesDoNotDivide", problem.Code);
+        // the message names the rate and what would work, the way the dialog's
+        // does -- without it, an archive of any size leaves the reader guessing
+        // which cent to move
+        Assert.Equal(
+            "VAT 19 %: 120.01 does not split evenly across 2 recipients. "
+                + "120.00 or 120.02 would work.",
+            problem.Message
         );
 
         // and nothing at all was written -- the refusal has to be the whole
         // archive, not the graves that happened to come out even
-        using var scope = host.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Empty(await db.Graves.ToListAsync());
-        Assert.Empty(await db.Recipients.ToListAsync());
-        Assert.Empty(await db.InvoiceItems.ToListAsync());
-    }
-
-    /// <summary>The message names what would work, the way the dialog's does —
-    /// without it, an archive of any size leaves the reader guessing which cent
-    /// to move.</summary>
-    [Fact]
-    public async Task The_refusal_names_the_rate_and_the_amounts_that_would_work()
-    {
-        using var host = new ApiTestHost();
-        await ConfigureVatAsync(host, 19m);
-        using var client = host.CreateClient();
-
-        var archive = Zip(
-            ("recipients.csv", RecipientsHeader + "E-1000,Anna,Weg 1\r\nE-1001,Bert,Weg 2\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
-            (
-                "mapping.csv",
-                MappingHeader
-                    + "Item,IMP-1,9001,1,\r\n"
-                    + "Recipient,IMP-1,E-1000,,\r\n"
-                    + "Recipient,IMP-1,E-1001,,\r\n"
-            )
-        );
-        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
-        var body = await response.Content.ReadAsStringAsync();
-
-        Assert.Contains("120.01", body);
-        Assert.Contains("120.00", body);
-        Assert.Contains("120.02", body);
+        await AssertNothingImportedAsync(host);
     }
 
     /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
