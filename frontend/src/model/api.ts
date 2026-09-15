@@ -81,6 +81,7 @@ const CODE_TO_I18N: Record<string, string> = {
   LanguageNotSupported: "errorLanguageNotSupported",
   ArchiveRequired: "errorArchiveRequired",
   GraveRecipientsImmutable: "errorGraveRecipientsImmutable",
+  VatRateImmutable: "errorVatRateImmutable",
   NotAGraveInvoice: "errorNotAGraveInvoice",
   GraveInvoiceGroupInconsistent: "errorGraveInvoiceGroupInconsistent",
   GraveInvoiceRevisionRequired: "errorGraveInvoiceRevisionRequired",
@@ -154,6 +155,31 @@ export async function updateItem(
   },
 ): Promise<void> {
   await ensureOk(await patch(`/odata/InvoiceItems(${id})`, fields));
+}
+
+/** The graves billing an item at one price: the link's own, or the item's
+ *  default standing in for it. */
+export interface ItemGraveGroup {
+  UnitPrice: number | null;
+  PriceIncludesVat: boolean;
+  /** The price is the item's default, or a link price equal to it. */
+  IsDefault: boolean;
+  Graves: { Id: number; GraveNumber: string }[];
+}
+
+export interface ItemGraves {
+  /** Whether any grave bills the item, which fixes its VAT rate. */
+  Linked: boolean;
+  DefaultPrice: number | null;
+  /** Default groups first, then by price. */
+  Groups: ItemGraveGroup[];
+}
+
+/** Which graves bill the item, grouped by the price they bill. */
+export async function getItemGraves(id: number): Promise<ItemGraves> {
+  const response = await fetch(`/odata/ItemGraves?itemId=${id}`);
+  await ensureOk(response);
+  return (await response.json()) as ItemGraves;
 }
 
 export async function createRecipient(recipient: {

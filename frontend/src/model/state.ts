@@ -1,4 +1,10 @@
-import type { GraveInvoiceRecipient, GraveStatusRow, ImportProblem, YearHalfOption } from "./api";
+import type {
+  GraveInvoiceRecipient,
+  GraveStatusRow,
+  ImportProblem,
+  ItemGraveGroup,
+  YearHalfOption,
+} from "./api";
 
 /**
  * What a view or a dialog holds while the user works in it.
@@ -49,6 +55,10 @@ export interface ItemDraft {
   vatRate: string;
   /** Kept as typed: "" means no default price, which is not the same as 0. */
   defaultPrice: string;
+  /** While editing: whether any grave bills the item, which fixes its VAT rate. */
+  linked: boolean;
+  /** While editing: the graves billing the item, grouped by price. */
+  groups: ItemGraveGroup[];
 }
 
 export interface RecipientsView {

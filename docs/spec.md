@@ -452,6 +452,14 @@ non-interactive until completion, and the task runs exactly once.
   a price when the item is used.
 - **FR-009**: Users MUST be able to create and edit invoice items in a dedicated
   section.
+- **FR-009a**: An invoice item's VAT rate MUST NOT change once a grave bills the
+  item: the rate is billed per grave, and a change would move every linked
+  grave's split at once.
+- **FR-009b**: A changed default price MUST apply only to graves linked from then
+  on. A grave that was billing the old default MUST keep it, written onto the
+  link as its own price; a link price equal to the default counts as billing the
+  default. The item section MUST show which graves bill an item, grouped by the
+  price they bill.
 - **FR-010**: Users MUST be able to select invoice items by their number when
   composing invoices.
 

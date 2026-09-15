@@ -96,6 +96,42 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({ page 
   await expect(page.locator(".sapMDialog")).toBeHidden();
 });
 
+test("items: the edit dialog lists the graves billing the item under their price (Story 2)", async ({
+  page,
+}) => {
+  const ts = Date.now();
+  const number = `E2E-USED-${ts}`;
+  const graveNumber = `E2E-USED-G-${ts}`;
+  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: number,
+    Description: `Verwendet ${ts}`,
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const grave = await createRow(page, "/odata/Graves", {
+    GraveNumber: graveNumber,
+    StartDate: "2026-01-01",
+    EndDate: "2040-12-31",
+  });
+  await createRow(page, "/odata/GraveItems", { GraveId: grave.Id, ItemId: item.Id, Count: 1 });
+
+  await page.goto("/index.html#/items");
+  const itemsTable = page.locator("[id$='itemsTable-listUl']");
+  await itemsTable
+    .locator("tbody tr", { hasText: number })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForDialogOpen(page);
+
+  // the grave bills the item's default price, so it is listed under it, and
+  // the rate is fixed while a grave bills the item
+  const dialog = page.locator(".sapMDialog");
+  await expect(dialog).toContainText("Standardpreis 100,00 €");
+  await expect(dialog).toContainText(graveNumber);
+  await expect(dialog).toContainText("MwSt.-Satz ist festgelegt");
+});
+
 test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
   await page.goto("/index.html#/recipients");
 
