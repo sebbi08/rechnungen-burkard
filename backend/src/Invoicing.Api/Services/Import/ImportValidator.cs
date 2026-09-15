@@ -93,6 +93,7 @@ public sealed class ImportValidator
         ReadMapping(tables[ImportArchiveLayout.MappingFile], data, problems);
 
         CheckReferences(data, problems);
+        CheckGraveRecipients(data, problems);
         await CheckAgainstStoredDataAsync(data, problems, ct);
 
         // Last, and only on rows that are otherwise sound: it reads counts,
@@ -517,12 +518,9 @@ public sealed class ImportValidator
 
         foreach (var grave in data.Graves)
         {
-            // no recipients yet means no divisor, exactly as when a grave is
-            // saved with its items before its recipients are known
-            if (!recipients.TryGetValue(grave.Number, out var count) || count == 0)
-            {
-                continue;
-            }
+            // every grave has at least one: CheckGraveRecipients reported any
+            // without, and this runs only on a report with nothing in it
+            var count = recipients[grave.Number];
 
             var lines = data
                 .ItemLinks.Where(link =>
@@ -588,6 +586,33 @@ public sealed class ImportValidator
             )
         );
         return $"{message} {options} would work.";
+    }
+
+    /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
+    /// imported without one could never be billed: generation would skip it and
+    /// nothing could add a recipient afterwards. SaveGrave refuses the same. This
+    /// runs with the other cross-file checks, so the report names it in the same
+    /// pass as everything else.</summary>
+    private static void CheckGraveRecipients(ImportData data, List<ImportProblem> problems)
+    {
+        var linked = new HashSet<string>(
+            data.RecipientLinks.Select(link => link.GraveNumber),
+            StringComparer.OrdinalIgnoreCase
+        );
+        foreach (var grave in data.Graves)
+        {
+            if (!linked.Contains(grave.Number))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.GravesFile,
+                        grave.Row,
+                        "NoRecipients",
+                        "The grave needs at least one recipient."
+                    )
+                );
+            }
+        }
     }
 
     private static void CheckReferences(ImportData data, List<ImportProblem> problems)

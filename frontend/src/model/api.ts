@@ -87,6 +87,7 @@ const CODE_TO_I18N: Record<string, string> = {
   GraveInvoicePaid: "errorGraveInvoicePaid",
   NotLatestRevision: "errorNotLatestRevision",
   PricesDoNotDivide: "errorPricesDoNotDivide",
+  NoRecipients: "errorNoRecipients",
 };
 
 /**

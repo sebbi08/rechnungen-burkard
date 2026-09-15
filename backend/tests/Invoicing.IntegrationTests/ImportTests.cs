@@ -690,11 +690,11 @@ public class ImportTests
         Assert.Contains("120.02", body);
     }
 
-    /// <summary>A grave with no recipients has no divisor, so there is nothing
-    /// to check -- the same rule the dialog applies when a grave is saved with
-    /// its items before its recipients are known.</summary>
+    /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
+    /// imported without one could never be billed: generation would skip it and
+    /// nothing could add a recipient afterwards. The dialog refuses the same.</summary>
     [Fact]
-    public async Task A_grave_without_recipients_is_imported_unchecked()
+    public async Task A_grave_without_recipients_is_refused()
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 19m);
@@ -702,12 +702,41 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
             ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "NoRecipients"
+        );
+        await AssertNothingImportedAsync(host);
+    }
+
+    [Fact]
+    public async Task A_missing_recipient_is_reported_alongside_the_other_problems()
+    {
+        // one pass: the grave's missing recipient must not wait until every
+        // other problem in the archive has been fixed and it is uploaded again
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            ("mapping.csv", MappingHeader + "Item,IMP-1,9999,1,\r\n")
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Code == "ItemNotDefined");
+        Assert.Contains(problems, p => p.File == "graves.csv" && p.Code == "NoRecipients");
     }
 }

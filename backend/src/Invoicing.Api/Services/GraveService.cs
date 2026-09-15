@@ -34,6 +34,17 @@ public sealed class GraveService
     {
         await ValidateAsync(graveNumber, items, recipientIds, ct);
 
+        // A grave created without recipients could never be billed: generation
+        // would skip it, and once created its recipient set cannot change. A
+        // grave that predates this rule keeps its empty set and stays editable.
+        if (graveId is null && recipientIds.Count == 0)
+        {
+            throw new ValidationException(
+                "NoRecipients",
+                "The grave needs at least one recipient."
+            );
+        }
+
         // A grave's recipients are fixed at creation: the even split across them is
         // baked into every invoice already generated, and changing the set would
         // make a later revision disagree with what was sent out.
