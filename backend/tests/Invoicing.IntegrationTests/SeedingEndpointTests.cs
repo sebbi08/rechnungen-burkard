@@ -40,11 +40,66 @@ public class SeedingEndpointTests
         // full set of links and GraveService replaces them wholesale, so
         // deletion happens inside the service. The GraveItems one had no check
         // of its own either, and would have unpicked an invoiced grave.
+        //
+        // On a link that exists: a missing row was 404 from the old action too,
+        // so only a surviving row shows the route itself is gone.
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
+        var linkId = await SeedLinkAsync(client, path);
 
-        var deleted = await client.DeleteAsync($"{path}(1)");
+        var deleted = await client.DeleteAsync($"{path}({linkId})");
+
         Assert.Equal(HttpStatusCode.NotFound, deleted.StatusCode);
+        var remaining = await client.GetAsync($"{path}?$filter=Id eq {linkId}");
+        using var json = await ODataJson.ReadAsync(remaining);
+        Assert.Single(json.RootElement.GetProperty("value").EnumerateArray());
+    }
+
+    /// <summary>A grave with one link of the kind the path names, built through
+    /// the seeding routes; answers the link's id.</summary>
+    private static async Task<long> SeedLinkAsync(HttpClient client, string path)
+    {
+        await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 7.0m }));
+        var graveId = await SeedGraveAsync(client);
+        object link;
+        if (path == "/odata/GraveItems")
+        {
+            var item = await client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "9001",
+                        Description = "Grabpflege",
+                        VatRate = 7.0m,
+                        DefaultPrice = 100.00m,
+                    }
+                )
+            );
+            link = new
+            {
+                GraveId = graveId,
+                ItemId = await IdAsync(item),
+                Count = 1,
+            };
+        }
+        else
+        {
+            var recipient = await client.PostAsync(
+                "/odata/Recipients",
+                ODataJson.Body(new { Name = "Anna Beispiel", Address = "Hauptstraße 1" })
+            );
+            link = new { GraveId = graveId, RecipientId = await IdAsync(recipient) };
+        }
+        var created = await client.PostAsync(path, ODataJson.Body(link));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return await IdAsync(created);
+    }
+
+    private static async Task<long> IdAsync(HttpResponseMessage response)
+    {
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("Id").GetInt64();
     }
 
     [Theory]
