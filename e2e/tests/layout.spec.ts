@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
-import { createRow, ensureRow } from "../seed";
+import { createRow, ensureRow, seedGrave } from "../seed";
 
 // Layout regressions on small screens: every list screen must fit the viewport
 // without sideways scrolling, its actions must stay reachable (directly or
@@ -56,7 +56,7 @@ const LIST_SCREENS: ListScreen[] = [
 
 // The rows only have to exist — these assertions are about layout, not about
 // the data — but their numbers are unique per run so that seeding never
-// collides with rows a previous run left in the dev stack's database.
+// collides with rows an earlier attempt left in a stack that kept its data.
 let seeding: Promise<void> | undefined;
 
 function seed(page: Page): Promise<void> {
@@ -76,19 +76,10 @@ async function seedRows(page: Page): Promise<void> {
     Name: RECIPIENT_NAME,
     Address: "Musterstraße 1\n12345 Musterstadt",
   });
-  const grave = await createRow(page, "/odata/Graves", {
-    GraveNumber: GRAVE_NUMBER,
-    StartDate: "2026-01-01",
-    EndDate: "2040-12-31",
-  });
-  await createRow(page, "/odata/GraveItems", {
-    GraveId: grave.Id,
-    ItemId: item.Id,
-    Count: 1,
-  });
-  await createRow(page, "/odata/GraveRecipients", {
-    GraveId: grave.Id,
-    RecipientId: recipient.Id,
+  await seedGrave(page, {
+    graveNumber: GRAVE_NUMBER,
+    items: [{ itemId: item.Id, count: 1 }],
+    recipientIds: [recipient.Id],
   });
   await createRow(page, "/odata/CreateInvoice", {
     recipientId: recipient.Id,

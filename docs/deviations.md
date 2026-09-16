@@ -10,16 +10,17 @@ follow the constitution as written.
 interface).
 
 **Deviation**: `SaveGrave`, `SearchGraves`, `GraveInvoicingStatus`,
-`BulkDownloadDocuments`, `ImportTemplate`, `ImportArchive` and
-`GraveInvoiceGroup` are plain MVC routes mounted under the `/odata` prefix.
-They do not appear in `$metadata`.
+`BulkDownloadDocuments`, `ImportTemplate`, `ImportArchive`, `GraveInvoiceGroup`
+and `ItemGraves` are plain MVC routes mounted under the `/odata` prefix. They do
+not appear in `$metadata`.
 
 **Why**: Their payloads are not entity graphs — a ZIP download, a multipart
 upload, a validation report, a half-year status projection. Modelling them as
 EDM operations would force artificial entity types on responses that are files
 or reports, without making them any easier to consume. `GraveInvoiceGroup`
 reports the grave-level amounts behind a group of invoices, which is a report
-about several entities rather than any one of them.
+about several entities rather than any one of them; `ItemGraves` likewise
+reports which graves bill an item, grouped by the price they bill.
 
 **Containment**: They answer with the same PascalCase property names the EDM
 serializer produces (`ODataJsonDefaults.PascalCase`), so a client sees one

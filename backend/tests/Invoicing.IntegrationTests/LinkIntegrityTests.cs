@@ -8,7 +8,7 @@ namespace Burkard.Invoicing.IntegrationTests;
 // collide with earlier tests in a shared database (see GraveTests).
 public class LinkIntegrityTests
 {
-    private async Task<(long GraveId, long ItemId, long RecipientId)> SeedAsync(HttpClient client)
+    private async Task<(long ItemId, long RecipientId)> SeedAsync(HttpClient client)
     {
         await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 7.0m }));
         var item = await client.PostAsync(
@@ -29,44 +29,50 @@ public class LinkIntegrityTests
             ODataJson.Body(new { Name = "Familie Mahr", Address = "Altstraße 1\n11111 Altstadt" })
         );
         using var recipientJson = await ODataJson.ReadAsync(recipient);
-        var grave = await client.PostAsync(
-            "/odata/Graves",
-            ODataJson.Body(
-                new
-                {
-                    GraveNumber = "L-001",
-                    StartDate = "2026-01-01",
-                    EndDate = "2040-12-31",
-                }
-            )
-        );
-        using var graveJson = await ODataJson.ReadAsync(grave);
         return (
-            graveJson.RootElement.GetProperty("Id").GetInt64(),
             itemJson.RootElement.GetProperty("Id").GetInt64(),
             recipientJson.RootElement.GetProperty("Id").GetInt64()
         );
     }
+
+    /// <summary>A grave billing the item to the recipients, saved the way the
+    /// dialog saves it.</summary>
+    private static Task<HttpResponseMessage> SaveGraveAsync(
+        HttpClient client,
+        long itemId,
+        params long[] recipientIds
+    ) =>
+        client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "L-001",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds,
+                }
+            )
+        );
 
     [Fact]
     public async Task Deleting_item_linked_to_grave_is_rejected_with_ItemInUse()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        var (graveId, itemId, _) = await SeedAsync(client);
-
-        var link = await client.PostAsync(
-            "/odata/GraveItems",
-            ODataJson.Body(
-                new
-                {
-                    GraveId = graveId,
-                    ItemId = itemId,
-                    Count = 1,
-                }
-            )
-        );
-        Assert.Equal(HttpStatusCode.Created, link.StatusCode);
+        var (itemId, recipientId) = await SeedAsync(client);
+        var saved = await SaveGraveAsync(client, itemId, recipientId);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
 
         var delete = await client.DeleteAsync($"/odata/InvoiceItems({itemId})");
         Assert.Equal(HttpStatusCode.BadRequest, delete.StatusCode);
@@ -82,13 +88,9 @@ public class LinkIntegrityTests
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        var (graveId, _, recipientId) = await SeedAsync(client);
-
-        var link = await client.PostAsync(
-            "/odata/GraveRecipients",
-            ODataJson.Body(new { GraveId = graveId, RecipientId = recipientId })
-        );
-        Assert.Equal(HttpStatusCode.Created, link.StatusCode);
+        var (itemId, recipientId) = await SeedAsync(client);
+        var saved = await SaveGraveAsync(client, itemId, recipientId);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
 
         var delete = await client.DeleteAsync($"/odata/Recipients({recipientId})");
         Assert.Equal(HttpStatusCode.BadRequest, delete.StatusCode);
@@ -100,44 +102,16 @@ public class LinkIntegrityTests
     }
 
     [Fact]
-    public async Task Duplicate_grave_item_link_is_rejected()
+    public async Task Saving_a_grave_with_the_same_recipient_twice_is_rejected()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        var (graveId, itemId, _) = await SeedAsync(client);
+        var (itemId, recipientId) = await SeedAsync(client);
 
-        var payload = new
-        {
-            GraveId = graveId,
-            ItemId = itemId,
-            Count = 1,
-        };
-        var first = await client.PostAsync("/odata/GraveItems", ODataJson.Body(payload));
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var saved = await SaveGraveAsync(client, itemId, recipientId, recipientId);
 
-        var duplicate = await client.PostAsync("/odata/GraveItems", ODataJson.Body(payload));
-        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
-        using var json = await ODataJson.ReadAsync(duplicate);
-        Assert.Equal(
-            "GraveItemLinkExists",
-            json.RootElement.GetProperty("error").GetProperty("code").GetString()
-        );
-    }
-
-    [Fact]
-    public async Task Duplicate_grave_recipient_link_is_rejected()
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var (graveId, _, recipientId) = await SeedAsync(client);
-
-        var payload = new { GraveId = graveId, RecipientId = recipientId };
-        var first = await client.PostAsync("/odata/GraveRecipients", ODataJson.Body(payload));
-        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
-
-        var duplicate = await client.PostAsync("/odata/GraveRecipients", ODataJson.Body(payload));
-        Assert.Equal(HttpStatusCode.BadRequest, duplicate.StatusCode);
-        using var json = await ODataJson.ReadAsync(duplicate);
+        Assert.Equal(HttpStatusCode.BadRequest, saved.StatusCode);
+        using var json = await ODataJson.ReadAsync(saved);
         Assert.Equal(
             "GraveRecipientLinkExists",
             json.RootElement.GetProperty("error").GetProperty("code").GetString()

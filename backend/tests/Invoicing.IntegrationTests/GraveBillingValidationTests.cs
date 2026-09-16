@@ -200,6 +200,55 @@ public class GraveBillingValidationTests
     }
 
     [Fact]
+    public async Task An_item_without_a_price_is_refused_like_the_save()
+    {
+        // a missing price is not a 0.00 that happens to divide: the save refuses
+        // it, so the check must not say yes to it first
+        using var host = new ApiTestHost();
+        await SeedAsync(host);
+        long unpriced;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var item = new InvoiceItem
+            {
+                Number = "P-102",
+                Description = "Sonderleistung",
+                VatRate = 19m,
+                DefaultPrice = null,
+            };
+            db.InvoiceItems.Add(item);
+            await db.SaveChangesAsync();
+            unpriced = item.Id;
+        }
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/odata/ValidateGraveBilling",
+            new { Recipients = 2, Lines = new[] { Line(unpriced, null, gross: true) } }
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("PriceRequired", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_price_with_more_than_two_decimals_is_refused_like_the_save()
+    {
+        using var host = new ApiTestHost();
+        var (netItem, _) = await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/odata/ValidateGraveBilling",
+            new { Recipients = 2, Lines = new[] { Line(netItem, 120.004m) } }
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("InvalidPrice", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task The_check_agrees_with_the_save()
     {
         // The dialog would be lying if it said yes to something the save then

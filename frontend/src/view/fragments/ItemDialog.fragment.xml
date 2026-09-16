@@ -2,7 +2,7 @@
     <Dialog
         title="{= ${itemDraft>/id} === null ? ${i18n>createItem} : ${i18n>editItem} }"
         stretch="{device>/system/phone}"
-        contentWidth="20rem"
+        contentWidth="24rem"
     >
         <content>
             <VBox class="sapUiMediumMargin">
@@ -15,11 +15,15 @@
                     id="itemVatRate"
                     width="100%"
                     forceSelection="false"
+                    editable="{= !${itemDraft>/linked} }"
                     selectedKey="{itemDraft>/vatRate}"
                     items="{path: 'odata>/VatRates', parameters: {$orderby: 'Rate asc'}}"
                 >
                     <core:Item key="{odata>Rate}" text="{odata>Rate}" />
                 </Select>
+                <!-- the rate is billed per grave and never copied onto a link, so a
+                     change would move every linked grave's split at once -->
+                <Text text="{i18n>itemVatRateFixed}" visible="{itemDraft>/linked}" />
                 <Label text="{i18n>itemDefaultPrice}" labelFor="itemDefaultPrice" />
                 <Input
                     id="itemDefaultPrice"
@@ -27,6 +31,42 @@
                     width="100%"
                     value="{itemDraft>/defaultPrice}"
                 />
+                <!-- which graves bill the item, grouped by the price they bill: a
+                     changed default applies to graves linked from now on, the ones
+                     listed keep what they bill today -->
+                <VBox visible="{= ${itemDraft>/id} !== null }" class="sapUiSmallMarginTop">
+                    <Title text="{i18n>itemGravesTitle}" titleStyle="H6" />
+                    <Text text="{i18n>itemGravesNone}" visible="{= !${itemDraft>/linked} }" />
+                    <List
+                        id="itemGravesList"
+                        items="{itemDraft>/groups}"
+                        showSeparators="None"
+                        visible="{itemDraft>/linked}"
+                    >
+                        <CustomListItem>
+                            <VBox class="sapUiTinyMarginTopBottom">
+                                <Label
+                                    design="Bold"
+                                    text="{
+                                        parts: [
+                                            'itemDraft>UnitPrice',
+                                            'itemDraft>PriceIncludesVat',
+                                            'itemDraft>IsDefault'
+                                        ],
+                                        formatter: '.formatPriceGroup'
+                                    }"
+                                />
+                                <HBox wrap="Wrap" items="{itemDraft>Graves}">
+                                    <Link
+                                        text="{itemDraft>GraveNumber}"
+                                        press=".onOpenGrave"
+                                        class="sapUiTinyMarginEnd"
+                                    />
+                                </HBox>
+                            </VBox>
+                        </CustomListItem>
+                    </List>
+                </VBox>
             </VBox>
         </content>
         <beginButton>

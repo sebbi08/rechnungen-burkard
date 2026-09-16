@@ -93,6 +93,8 @@ public sealed class ImportValidator
         ReadMapping(tables[ImportArchiveLayout.MappingFile], data, problems);
 
         CheckReferences(data, problems);
+        CheckGraveRecipients(data, problems);
+        CheckLinkedItemPrices(data, problems);
         await CheckAgainstStoredDataAsync(data, problems, ct);
 
         // Last, and only on rows that are otherwise sound: it reads counts,
@@ -250,6 +252,21 @@ public sealed class ImportValidator
                             line,
                             "PriceInvalid",
                             $"'{rawPrice}' is not a valid price."
+                        )
+                    );
+                    continue;
+                }
+
+                // prices are cents: a third decimal would be judged rounded by
+                // the split check and billed unrounded by generation
+                if (!GraveBilling.IsWholeCents(parsedPrice))
+                {
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "PriceInvalid",
+                            $"'{rawPrice}' has more than two decimals."
                         )
                     );
                     continue;
@@ -489,9 +506,8 @@ public sealed class ImportValidator
         }
     }
 
-    /// <summary>FR-058: every reference in the mapping file must be defined in
-    /// one of the other files.</summary>
-    /// <summary>Whether every grave in the archive can be billed at all.
+    /// <summary>Whether every grave in the archive can be split across its
+    /// recipients.
     ///
     /// A grave's bill is split equally, so each VAT rate's net subtotal has to
     /// divide across its recipients, and a price entered as a gross has to be
@@ -517,12 +533,9 @@ public sealed class ImportValidator
 
         foreach (var grave in data.Graves)
         {
-            // no recipients yet means no divisor, exactly as when a grave is
-            // saved with its items before its recipients are known
-            if (!recipients.TryGetValue(grave.Number, out var count) || count == 0)
-            {
-                continue;
-            }
+            // every grave has at least one: CheckGraveRecipients reported any
+            // without, and this runs only on a report with nothing in it
+            var count = recipients[grave.Number];
 
             var lines = data
                 .ItemLinks.Where(link =>
@@ -569,27 +582,82 @@ public sealed class ImportValidator
         }
     }
 
+    /// <summary>The dialog's sentence, in the language every import problem is
+    /// written in. One shape whatever the kind of problem: a net total that
+    /// will not divide and a gross that cannot be billed to the cent differ in
+    /// why they fail, not in what the reader does about it.</summary>
     private static string Describe(GraveShareProblem problem, int recipients)
     {
-        var amount = (problem.Amount / 100m).ToString("0.00", CultureInfo.InvariantCulture);
+        var rate = problem.VatRate.ToString("0.##", CultureInfo.InvariantCulture);
+        var across = recipients == 1 ? "1 recipient" : $"{recipients} recipients";
         var message =
-            $"VAT {problem.VatRate:0.##} %: {amount} does not split evenly across "
-            + $"{recipients} recipients.";
+            $"VAT {rate} %: {Euros(problem.Amount)} does not split evenly across {across}.";
 
         if (problem.Suggestions.Count == 0)
         {
             return $"{message} Adjust a price at this VAT rate.";
         }
 
-        var options = string.Join(
-            " or ",
-            problem.Suggestions.Select(cents =>
-                (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture)
-            )
-        );
+        var options = string.Join(" or ", problem.Suggestions.Select(Euros));
         return $"{message} {options} would work.";
     }
 
+    private static string Euros(long cents) =>
+        (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture);
+
+    /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
+    /// imported without one could never be billed: generation would skip it and
+    /// nothing could add a recipient afterwards. SaveGrave refuses the same. This
+    /// runs with the other cross-file checks, so the report names it in the same
+    /// pass as everything else.</summary>
+    private static void CheckGraveRecipients(ImportData data, List<ImportProblem> problems)
+    {
+        var linked = new HashSet<string>(
+            data.RecipientLinks.Select(link => link.GraveNumber),
+            StringComparer.OrdinalIgnoreCase
+        );
+        foreach (var grave in data.Graves)
+        {
+            if (!linked.Contains(grave.Number))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.GravesFile,
+                        grave.Row,
+                        "NoRecipients",
+                        "The grave needs at least one recipient."
+                    )
+                );
+            }
+        }
+    }
+
+    /// <summary>An item may come without a price (FR-051), but a grave cannot be
+    /// billed for one: SaveGrave refuses such a link, and generation would skip
+    /// the grave. Refused on the mapping row, so the item itself still imports as
+    /// long as no grave links it. A link to an item row that was rejected on its
+    /// own carries that problem already and is left alone here.</summary>
+    private static void CheckLinkedItemPrices(ImportData data, List<ImportProblem> problems)
+    {
+        var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
+        foreach (var link in data.ItemLinks)
+        {
+            if (items.TryGetValue(link.ItemNumber, out var item) && item.Price is null)
+            {
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.MappingFile,
+                        link.Row,
+                        "PriceRequired",
+                        $"A price is required for item '{item.Number}': a grave links it."
+                    )
+                );
+            }
+        }
+    }
+
+    /// <summary>FR-058: every reference in the mapping file must be defined in
+    /// one of the other files.</summary>
     private static void CheckReferences(ImportData data, List<ImportProblem> problems)
     {
         const string file = ImportArchiveLayout.MappingFile;

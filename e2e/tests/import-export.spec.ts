@@ -1,8 +1,8 @@
 import AdmZip from "adm-zip";
 import { expect, test } from "@playwright/test";
 
-// Unique per run: the import is create-only, so against the dev stack
-// (`npm run test:dev`) fixed numbers would collide with rows from earlier runs.
+// Unique per run: the import is create-only, so in a stack that kept its data
+// fixed numbers would collide with rows from an earlier attempt.
 const RUN = Date.now();
 
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";

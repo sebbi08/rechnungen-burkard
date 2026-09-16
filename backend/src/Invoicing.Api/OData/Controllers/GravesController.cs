@@ -82,92 +82,12 @@ public class GravesController : ODataController
         return new JsonResult(result, ODataJsonDefaults.PascalCase);
     }
 
-    public IActionResult Post([FromBody] Grave? grave)
-    {
-        if (grave is null)
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "InvalidRequest",
-                        message = "The request body is required.",
-                    },
-                }
-            );
-        }
-
-        if (string.IsNullOrWhiteSpace(grave.GraveNumber))
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "GraveNumberRequired",
-                        message = "The grave number is required.",
-                    },
-                }
-            );
-        }
-
-        grave.CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow);
-        _db.Graves.Add(grave);
-        _db.SaveChanges();
-        return Created(grave);
-    }
-
-    public IActionResult Patch(
-        [FromRoute] long key,
-        [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<Grave>? delta
-    )
-    {
-        if (delta is null)
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "InvalidRequest",
-                        message = "The request body is required.",
-                    },
-                }
-            );
-        }
-
-        var grave = _db.Graves.Find(key);
-        if (grave is null)
-            return NotFound();
-        delta.Patch(grave);
-        if (string.IsNullOrWhiteSpace(grave.GraveNumber))
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "GraveNumberRequired",
-                        message = "The grave number is required.",
-                    },
-                }
-            );
-        }
-
-        _db.SaveChanges();
-        return Updated(grave);
-    }
-
-    public IActionResult Delete([FromRoute] long key)
-    {
-        var grave = _db.Graves.Find(key);
-        if (grave is null)
-            return NotFound();
-        _db.Graves.Remove(grave); // cascades to GraveItems/GraveRecipients
-        _db.SaveChanges();
-        return NoContent();
-    }
+    // The set is read-only. A grave is written through SaveGrave, in one request
+    // with its links, which is where the checks live: a POST with nested Items
+    // and Recipients, or a PATCH with a Delta carrying them, would write links
+    // past every one of them, even on an invoiced grave. Deleting a grave would
+    // leave its invoices and runs pointing at nothing — those hold the id
+    // without a foreign key.
 
     [ODataAttributeRouting]
     [HttpGet("odata/SearchGraves")]

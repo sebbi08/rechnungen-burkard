@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { waitForDialogOpen } from "../dialog";
-import { createRow } from "../seed";
+import { createRow, seedGrave } from "../seed";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/index.html#/settings");
@@ -96,6 +96,46 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({ page 
   await expect(page.locator(".sapMDialog")).toBeHidden();
 });
 
+test("items: the edit dialog lists the graves billing the item under their price (Story 2)", async ({
+  page,
+}) => {
+  const ts = Date.now();
+  const number = `E2E-USED-${ts}`;
+  const graveNumber = `E2E-USED-G-${ts}`;
+  await page.request.post("/odata/VatRates", { data: { Rate: 7 } });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: number,
+    Description: `Verwendet ${ts}`,
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Nutzer ${ts}`,
+    Address: "Musterweg 1",
+  });
+  // no price on the line, so the grave bills the item's default
+  await seedGrave(page, {
+    graveNumber,
+    items: [{ itemId: item.Id, count: 1, unitPrice: null }],
+    recipientIds: [recipient.Id],
+  });
+
+  await page.goto("/index.html#/items");
+  const itemsTable = page.locator("[id$='itemsTable-listUl']");
+  await itemsTable
+    .locator("tbody tr", { hasText: number })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForDialogOpen(page);
+
+  // the grave bills the item's default price, so it is listed under it, and
+  // the rate is fixed while a grave bills the item
+  const dialog = page.locator(".sapMDialog");
+  await expect(dialog).toContainText("Standardpreis 100,00 €");
+  await expect(dialog).toContainText(graveNumber);
+  await expect(dialog).toContainText("MwSt.-Satz ist festgelegt");
+});
+
 test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
   await page.goto("/index.html#/recipients");
 
@@ -155,13 +195,14 @@ test("graves: search by number narrows the list and empty search shows nothing (
 }) => {
   const ts = Date.now();
   const graveNumber = `SUCHE-${ts}`;
-  await page.request.post("/odata/Graves", {
-    data: {
-      GraveNumber: graveNumber,
-      StartDate: "2026-01-01",
-      EndDate: "2040-12-31",
-    },
+  // a grave cannot be saved without a recipient. The search matches recipient
+  // names as well as numbers, so this one shares nothing with the terms below;
+  // and with no items, no generation running alongside can invoice the grave
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Erika Beispiel ${ts}`,
+    Address: "Musterweg 1",
   });
+  await seedGrave(page, { graveNumber, items: [], recipientIds: [recipient.Id] });
 
   await page.goto("/index.html#/graves");
   const gravesTable = page.locator("[id$='gravesTable-listUl']");

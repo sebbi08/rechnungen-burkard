@@ -87,6 +87,8 @@ public class InvoiceItemsController : ODataController
         if (item is null)
             return NotFound();
 
+        var previousRate = item.VatRate;
+        var previousDefault = item.DefaultPrice;
         delta.Patch(item);
         item.VatRate = VatRateNormalizer.Normalize(item.VatRate);
 
@@ -106,6 +108,37 @@ public class InvoiceItemsController : ODataController
                     },
                 }
             );
+        }
+
+        // The rate is read from the item at generation and never copied onto a
+        // link, so changing it would move every linked grave's split at once.
+        // Fixed, therefore, once a grave bills the item.
+        var linked = _db.GraveItems.Any(l => l.ItemId == item.Id);
+        if (linked && item.VatRate != previousRate)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "VatRateImmutable",
+                        message = "The VAT rate of an item that graves bill cannot be changed.",
+                    },
+                }
+            );
+        }
+
+        // A changed default applies to graves linked from now on. A grave that
+        // was billing the old default keeps it, written onto the link as its
+        // own price, so nothing already set up changes what it bills. A link
+        // that already carries the old default as its own price needs nothing.
+        if (previousDefault is { } oldDefault && item.DefaultPrice != oldDefault)
+        {
+            var onDefault = _db.GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null);
+            foreach (var link in onDefault)
+            {
+                link.UnitPrice = oldDefault;
+            }
         }
 
         _db.SaveChanges();
@@ -174,6 +207,20 @@ public class InvoiceItemsController : ODataController
                 {
                     code = "VatRateNotConfigured",
                     message = "The VAT rate is not configured.",
+                },
+            };
+        }
+
+        // prices are cents: a third decimal would be judged rounded by the
+        // grave split check and billed unrounded by generation
+        if (item.DefaultPrice is { } price && !GraveBilling.IsWholeCents(price))
+        {
+            return new
+            {
+                error = new
+                {
+                    code = "InvalidPrice",
+                    message = "The price has more than two decimals.",
                 },
             };
         }

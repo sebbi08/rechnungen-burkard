@@ -39,16 +39,8 @@ public class NullBodyTests : IClassFixture<ApiTestHost>
         AssertInvalidRequestAsync("/odata/Recipients", NullBody());
 
     [Fact]
-    public Task Post_grave_with_null_body_is_rejected() =>
-        AssertInvalidRequestAsync("/odata/Graves", NullBody());
-
-    [Fact]
-    public Task Post_grave_item_with_null_body_is_rejected() =>
-        AssertInvalidRequestAsync("/odata/GraveItems", NullBody());
-
-    [Fact]
-    public Task Post_grave_recipient_with_null_body_is_rejected() =>
-        AssertInvalidRequestAsync("/odata/GraveRecipients", NullBody());
+    public Task Save_grave_with_null_body_is_rejected() =>
+        AssertInvalidRequestAsync("/odata/SaveGrave", NullBody());
 
     [Fact]
     public Task Post_bulk_download_with_null_body_is_rejected() =>

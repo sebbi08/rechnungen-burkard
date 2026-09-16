@@ -14,6 +14,12 @@
 > `ShareCalculator` are gone. The body below is left as it was, as the record of
 > what was believed on 2026-08-29.
 
+> **Note added 2026-09-15**: the link routes described below no longer take
+> writes. `GraveItems` and `GraveRecipients` are read-only sets, and so is
+> `Graves`; a grave and its links are written only through `SaveGrave`, which
+> fixes the recipient set at creation (FR-020b) and refuses a grave that could
+> not be billed. The E2E suite seeds graves the same way.
+
 **Input**: Rework the invoice overview around non-grave invoices and a search,
 move grave invoicing entirely behind the grave pages, and add detail pages for
 invoices, graves and grave invoices — including editing a grave invoice for all

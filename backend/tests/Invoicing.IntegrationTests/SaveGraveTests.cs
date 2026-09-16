@@ -127,6 +127,138 @@ public class SaveGraveTests
     }
 
     [Fact]
+    public async Task Save_rejects_a_new_grave_without_recipients()
+    {
+        // recipients are fixed at creation, so a grave created without any could
+        // never be billed: generation would skip it and none could be added later
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (pricedItem, _, _, _) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "S-002",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new List<long>(),
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "NoRecipients",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Save_rejects_a_unit_price_with_more_than_two_decimals()
+    {
+        // prices are cents: a third decimal would pass the split check rounded
+        // and be billed unrounded
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (pricedItem, _, recipient, _) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "S-004",
+                    startDate = "2026-01-01",
+                    endDate = "2040-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)120.004m,
+                        },
+                    },
+                    recipientIds = new[] { recipient },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Save_still_edits_an_existing_grave_that_has_no_recipients()
+    {
+        // a grave that predates the rule keeps its recipient set, empty as it
+        // is; refusing the save would leave it uneditable
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (pricedItem, _, _, _) = await SeedAsync(client);
+        long graveId;
+        using (var scope = host.Services.CreateScope())
+        {
+            // nothing can create such a grave any more; this one is written as
+            // the data of an older version would have left it
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = new Burkard.Invoicing.Domain.Entities.Grave
+            {
+                GraveNumber = "S-003",
+                StartDate = new DateOnly(2026, 1, 1),
+                EndDate = new DateOnly(2040, 12, 31),
+                CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            graveId = grave.Id;
+        }
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId,
+                    graveNumber = "S-003",
+                    startDate = "2026-01-01",
+                    endDate = "2041-12-31",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new List<long>(),
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Save_replaces_the_items_of_an_existing_grave()
     {
         using var host = new ApiTestHost();
