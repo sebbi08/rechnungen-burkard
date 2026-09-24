@@ -65,16 +65,12 @@
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
                 </Button>
-                <Button text="{i18n>createGrave}" press=".onCreateGrave">
+                <Button text="{i18n>generateInvoices}" press=".onGenerateInvoices">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="Low" />
                     </layoutData>
                 </Button>
-                <Button
-                    text="{i18n>generateInvoices}"
-                    press=".onGenerateInvoices"
-                    type="Emphasized"
-                >
+                <Button text="{i18n>createGrave}" press=".onCreateGrave" type="Emphasized">
                     <layoutData>
                         <OverflowToolbarLayoutData priority="High" />
                     </layoutData>
