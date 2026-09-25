@@ -1,5 +1,8 @@
 import { type QueryClient, useQuery } from "@tanstack/vue-query";
 import type { Ref } from "vue";
+import { currentHalfYear } from "@/lib/halfYear";
+import { priceFieldValue } from "@/lib/money";
+import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
 import type { Invoice, InvoiceItem, Recipient } from "./generated";
 import { odata } from "./odata";
 
@@ -130,4 +133,78 @@ export async function loadChain(rootId: number): Promise<Invoice[]> {
       .execute()
   ).data.value;
   return single.length ? byRoot(single[0].RootId) : [];
+}
+
+export interface GraveLineView {
+  Number: string;
+  Description: string;
+  Count: number;
+  Price: number;
+  VatRate: number;
+  PriceIncludesVat: boolean;
+}
+
+export interface GraveDetailView {
+  grave: GraveDetails;
+  /** Whether the current half-year has been invoiced for this grave. */
+  currentInvoiced: boolean;
+  lines: GraveLineView[];
+  /** Latest revisions, newest half-year first, then by recipient. */
+  invoices: Invoice[];
+}
+
+/** Port of GraveDetail.controller.ts refresh(). The lines are the current
+ *  half-year's as invoiced when it has been, else the grave's configuration
+ *  (link price, else the item's default, else 0 -- shown as stored). */
+export async function loadGraveDetail(graveId: number): Promise<GraveDetailView> {
+  const [grave, runs, invoices] = await Promise.all([
+    fetchGraveDetails(graveId),
+    readAll(async (skip, top) => {
+      const response = await odata
+        .GraveInvoiceRuns()
+        .query((b, q) => {
+          b.filter(q.GraveId.eq(graveId)).skip(skip).top(top);
+        })
+        .execute();
+      return response.data.value;
+    }),
+    readAll(async (skip, top) => {
+      const response = await odata
+        .Invoices()
+        .query((b, q) => {
+          b.filter(q.GraveId.eq(graveId).and(q.IsLatestRevision.isTrue()))
+            .orderBy(q.PeriodYear.desc(), q.PeriodHalf.desc(), q.RecipientName.asc())
+            .skip(skip)
+            .top(top);
+        })
+        .execute();
+      return response.data.value;
+    }),
+  ]);
+
+  const [year, half] = currentHalfYear();
+  const currentInvoiced = runs.some((run) => run.Year === year && run.Half === half);
+  const current = invoices.find(
+    (invoice) => invoice.PeriodYear === year && invoice.PeriodHalf === half,
+  );
+
+  const lines: GraveLineView[] = current
+    ? (await fetchGraveInvoiceGroup(current.Id)).Lines.map((line) => ({
+        Number: line.ItemNumber,
+        Description: line.Description,
+        Count: line.Count,
+        Price: priceFieldValue(line.UnitPrice, line.PriceIncludesVat, line.VatRate),
+        VatRate: line.VatRate,
+        PriceIncludesVat: line.PriceIncludesVat,
+      }))
+    : grave.Items.map((link) => ({
+        Number: link.Item.Number,
+        Description: link.Item.Description,
+        Count: link.Count,
+        Price: link.UnitPrice ?? link.Item.DefaultPrice ?? 0,
+        VatRate: link.Item.VatRate,
+        PriceIncludesVat: link.PriceIncludesVat,
+      }));
+
+  return { grave, currentInvoiced, lines, invoices };
 }
