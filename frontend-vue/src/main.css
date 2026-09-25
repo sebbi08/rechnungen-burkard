@@ -1,0 +1,25 @@
+/* Declared before Tailwind so PrimeVue's layer sits below Tailwind's utilities:
+   a utility class on a PrimeVue component (w-full, gap-2 ...) must win. */
+@layer theme, base, primevue, components, utilities;
+@import "tailwindcss";
+@import "tailwindcss-primeui";
+
+/* dark: utilities follow the same class PrimeVue's darkModeSelector uses */
+@custom-variant dark (&:where(.app-dark, .app-dark *));
+
+body {
+  margin: 0;
+  background: var(--p-surface-50);
+  color: var(--p-text-color);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+.app-dark body {
+  background: var(--p-surface-950);
+}

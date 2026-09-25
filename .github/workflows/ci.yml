@@ -34,6 +34,23 @@ jobs:
       - run: npm run ui5lint
       - run: npm run build
 
+  # The Vue evaluation frontend (D-003). No tests by decision; this keeps it
+  # compiling and lint-clean while it is being evaluated.
+  frontend-vue:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-vue
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
   # The constitution puts integration and E2E tests ahead of unit tests, so the
   # Playwright suite runs on every change, against the image that gets released
   # — which also makes this the job that proves the image still builds.

@@ -6,6 +6,6 @@
 // when C# is actually staged. A docs-only or frontend-only commit never reaches
 // it and never needs Docker running.
 module.exports = {
-  "*.{ts,js,mjs,cjs,json,md,yml,yaml,html,xml}": "prettier --write",
+  "*.{ts,js,mjs,cjs,json,md,yml,yaml,html,xml,vue,css}": "prettier --write",
   "*.cs": "scripts/csharpier-staged.sh",
 };
