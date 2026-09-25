@@ -4,6 +4,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router"
 const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/invoices" },
   { path: "/settings", component: () => import("@/pages/SettingsPage.vue") },
+  { path: "/items", component: () => import("@/pages/ItemsPage.vue") },
   // pages: add new routes above this line
 ];
 
