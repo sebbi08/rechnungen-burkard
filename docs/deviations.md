@@ -43,3 +43,24 @@ above (D-001) are not model-addressable at all.
 **Containment**: All write endpoints are in one module with a single error
 mapping, so the client-side contract stays in one place. The E2E suite covers
 each write path end to end.
+
+## D-003: A second frontend in Vue, for evaluation only
+
+**Principle**: VI — OpenUI5 Frontend; and the Technology Constraints line
+"consumed by the UI5 frontend's OData V4 model".
+
+**Deviation**: `frontend-vue/` is a second frontend, built with Vue 3 and
+PrimeVue 4 (MIT). It covers the same features as the OpenUI5 frontend and talks
+to the same backend through a client generated from `$metadata` (odata2ts),
+plus a hand-typed module for the D-001 endpoints and the actions whose
+parameters `$metadata` leaves out.
+
+**Why**: To decide whether to replace the OpenUI5 frontend on the strength of a
+like-for-like build rather than a sketch. Replacing it would amend Principle VI;
+this entry does not.
+
+**Containment**: It runs in development only (`docker-compose.yml`, port 8082)
+and is not part of the release image, which serves the OpenUI5 frontend alone.
+It uses the documented OData interface unchanged, keeps the UI multilingual
+(VII) and blocks the UI during long-running tasks (VIII). It has no automated
+tests by decision; CI type-checks, lints and builds it.

@@ -83,6 +83,13 @@ page one.
   (ESLint with type-aware rules) and `npm run ui5lint` (deprecated APIs,
   accessibility, manifest). All three must be clean; both linters are scoped to
   `src`, since `dist/` holds the whole OpenUI5 runtime.
+- **Vue evaluation frontend** (`frontend-vue/`, D-003): the dev stack also
+  serves it on 8082, against the dev backend. For probing, run it on the host
+  against the E2E stack instead:
+  `cd frontend-vue && VITE_PROXY_TARGET=http://localhost:8081 npm run dev`.
+  Checks: `npm run typecheck`, `npm run lint`, `npm run build`. After an EDM
+  change, `npm run gen:odata` (reads `$metadata` from the E2E stack) and commit
+  `src/api/metadata.xml` together with `src/api/generated/`.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
   tablet projects only run `tests/layout.spec.ts`.
 - **Release scripts**: `scripts/test-release-scripts.sh`.
