@@ -1,4 +1,4 @@
 export enum DocumentKind {
-    Normal = "Normal",
-    Copy = "Copy"
+  Normal = "Normal",
+  Copy = "Copy",
 }

@@ -1,1 +1,293 @@
-<?xml version="1.0" encoding="utf-8"?><edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"><edmx:DataServices><Schema Namespace="Burkard.Invoicing.Domain.Entities" xmlns="http://docs.oasis-open.org/odata/ns/edm"><EntityType Name="VatRate"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="Rate" Type="Edm.Decimal" Nullable="false" Scale="Variable" /></EntityType><EntityType Name="InvoiceItem"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="Number" Type="Edm.String" Nullable="false" /><Property Name="Description" Type="Edm.String" Nullable="false" /><Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><Property Name="DefaultPrice" Type="Edm.Decimal" Scale="Variable" /></EntityType><EntityType Name="Recipient"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="Number" Type="Edm.String" Nullable="false" /><Property Name="Name" Type="Edm.String" Nullable="false" /><Property Name="Address" Type="Edm.String" Nullable="false" /></EntityType><EntityType Name="Grave"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="GraveNumber" Type="Edm.String" Nullable="false" /><Property Name="StartDate" Type="Edm.Date" Nullable="false" /><Property Name="EndDate" Type="Edm.Date" Nullable="false" /><Property Name="CreatedAt" Type="Edm.Date" Nullable="false" /><NavigationProperty Name="Items" Type="Collection(Burkard.Invoicing.Domain.Entities.GraveItem)" /><NavigationProperty Name="Recipients" Type="Collection(Burkard.Invoicing.Domain.Entities.GraveRecipient)" /></EntityType><EntityType Name="GraveItem"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="GraveId" Type="Edm.Int64" Nullable="false" /><Property Name="ItemId" Type="Edm.Int64" Nullable="false" /><Property Name="Count" Type="Edm.Int32" Nullable="false" /><Property Name="UnitPrice" Type="Edm.Decimal" Scale="Variable" /><Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" /><NavigationProperty Name="Item" Type="Burkard.Invoicing.Domain.Entities.InvoiceItem" Nullable="false" /></EntityType><EntityType Name="GraveRecipient"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="GraveId" Type="Edm.Int64" Nullable="false" /><Property Name="RecipientId" Type="Edm.Int64" Nullable="false" /><NavigationProperty Name="Recipient" Type="Burkard.Invoicing.Domain.Entities.Recipient" Nullable="false"><ReferentialConstraint Property="RecipientId" ReferencedProperty="Id" /></NavigationProperty></EntityType><EntityType Name="GraveInvoiceRun"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="GraveId" Type="Edm.Int64" Nullable="false" /><Property Name="Year" Type="Edm.Int32" Nullable="false" /><Property Name="Half" Type="Edm.Int32" Nullable="false" /><Property Name="JobId" Type="Edm.Int64" /><Property Name="CreatedAt" Type="Edm.DateTimeOffset" Nullable="false" /></EntityType><EntityType Name="Invoice"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="RootId" Type="Edm.Int64" Nullable="false" /><Property Name="RevisionNumber" Type="Edm.Int32" Nullable="false" /><Property Name="IsLatestRevision" Type="Edm.Boolean" Nullable="false" /><Property Name="Year" Type="Edm.Int32" Nullable="false" /><Property Name="Sequence" Type="Edm.Int32" Nullable="false" /><Property Name="InvoiceNumber" Type="Edm.String" Nullable="false" /><Property Name="GraveId" Type="Edm.Int64" /><Property Name="PeriodYear" Type="Edm.Int32" /><Property Name="PeriodHalf" Type="Edm.Int32" /><Property Name="SharePercent" Type="Edm.Decimal" Scale="Variable" /><Property Name="RecipientCount" Type="Edm.Int32" /><Property Name="RecipientId" Type="Edm.Int64" Nullable="false" /><Property Name="RecipientName" Type="Edm.String" Nullable="false" /><Property Name="RecipientAddress" Type="Edm.String" Nullable="false" /><Property Name="EndingText" Type="Edm.String" Nullable="false" /><Property Name="StampWord" Type="Edm.String" Nullable="false" /><Property Name="Language" Type="Edm.String" Nullable="false" /><Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" /><Property Name="PaidOn" Type="Edm.Date" /><Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><Property Name="VatTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><Property Name="GrossTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><NavigationProperty Name="Lines" Type="Collection(Burkard.Invoicing.Domain.Entities.InvoiceLine)" /><NavigationProperty Name="Documents" Type="Collection(Burkard.Invoicing.Domain.Entities.Document)" /></EntityType><EntityType Name="Document"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="InvoiceId" Type="Edm.Int64" Nullable="false" /><Property Name="Kind" Type="Burkard.Invoicing.Domain.Entities.DocumentKind" Nullable="false" /><Property Name="FileName" Type="Edm.String" Nullable="false" /><Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" /><NavigationProperty Name="Invoice" Type="Burkard.Invoicing.Domain.Entities.Invoice" Nullable="false"><ReferentialConstraint Property="InvoiceId" ReferencedProperty="Id" /></NavigationProperty></EntityType><EntityType Name="Job"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="Type" Type="Edm.String" Nullable="false" /><Property Name="Status" Type="Burkard.Invoicing.Domain.Entities.JobStatus" Nullable="false" /><Property Name="ProgressPercent" Type="Edm.Int32" Nullable="false" /><Property Name="TotalCount" Type="Edm.Int32" Nullable="false" /><Property Name="ProcessedCount" Type="Edm.Int32" Nullable="false" /><Property Name="PayloadJson" Type="Edm.String" /><Property Name="ResultJson" Type="Edm.String" /><Property Name="Error" Type="Edm.String" /><Property Name="CreatedAt" Type="Edm.DateTimeOffset" Nullable="false" /><Property Name="StartedAt" Type="Edm.DateTimeOffset" /><Property Name="FinishedAt" Type="Edm.DateTimeOffset" /></EntityType><EntityType Name="GlobalSettings"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="EndingText" Type="Edm.String" Nullable="false" /><Property Name="StampWord" Type="Edm.String" Nullable="false" /><Property Name="Language" Type="Edm.String" Nullable="false" /></EntityType><EntityType Name="InvoiceLine"><Key><PropertyRef Name="Id" /></Key><Property Name="Id" Type="Edm.Int64" Nullable="false" /><Property Name="InvoiceId" Type="Edm.Int64" Nullable="false" /><Property Name="ItemId" Type="Edm.Int64" /><Property Name="ItemNumber" Type="Edm.String" Nullable="false" /><Property Name="Description" Type="Edm.String" Nullable="false" /><Property Name="Count" Type="Edm.Int32" Nullable="false" /><Property Name="UnitPrice" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><Property Name="GraveUnitPrice" Type="Edm.Decimal" Scale="Variable" /><Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="Variable" /><Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" /><Property Name="LineNumber" Type="Edm.Int32" Nullable="false" /></EntityType><EnumType Name="DocumentKind"><Member Name="Normal" Value="0" /><Member Name="Copy" Value="1" /></EnumType><EnumType Name="JobStatus"><Member Name="Queued" Value="0" /><Member Name="Running" Value="1" /><Member Name="Succeeded" Value="2" /><Member Name="Failed" Value="3" /></EnumType></Schema><Schema Namespace="Default" xmlns="http://docs.oasis-open.org/odata/ns/edm"><Action Name="CreateInvoice"><ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" /></Action><Action Name="CreateRevision"><ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" /></Action><Action Name="CreateGraveInvoiceRevision"><ReturnType Type="Collection(Burkard.Invoicing.Domain.Entities.Invoice)" /></Action><Action Name="GenerateGraveInvoices"><ReturnType Type="Burkard.Invoicing.Domain.Entities.Job" /></Action><Action Name="SetInvoicePaid"><ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" /></Action><EntityContainer Name="Container"><EntitySet Name="VatRates" EntityType="Burkard.Invoicing.Domain.Entities.VatRate" /><EntitySet Name="InvoiceItems" EntityType="Burkard.Invoicing.Domain.Entities.InvoiceItem" /><EntitySet Name="Recipients" EntityType="Burkard.Invoicing.Domain.Entities.Recipient" /><EntitySet Name="Graves" EntityType="Burkard.Invoicing.Domain.Entities.Grave"><NavigationPropertyBinding Path="Items" Target="GraveItems" /><NavigationPropertyBinding Path="Recipients" Target="GraveRecipients" /></EntitySet><EntitySet Name="GraveItems" EntityType="Burkard.Invoicing.Domain.Entities.GraveItem"><NavigationPropertyBinding Path="Item" Target="InvoiceItems" /></EntitySet><EntitySet Name="GraveRecipients" EntityType="Burkard.Invoicing.Domain.Entities.GraveRecipient"><NavigationPropertyBinding Path="Recipient" Target="Recipients" /></EntitySet><EntitySet Name="GraveInvoiceRuns" EntityType="Burkard.Invoicing.Domain.Entities.GraveInvoiceRun" /><EntitySet Name="Invoices" EntityType="Burkard.Invoicing.Domain.Entities.Invoice"><NavigationPropertyBinding Path="Documents" Target="Documents" /></EntitySet><EntitySet Name="Documents" EntityType="Burkard.Invoicing.Domain.Entities.Document"><NavigationPropertyBinding Path="Invoice" Target="Invoices" /></EntitySet><EntitySet Name="Jobs" EntityType="Burkard.Invoicing.Domain.Entities.Job" /><Singleton Name="Settings" Type="Burkard.Invoicing.Domain.Entities.GlobalSettings" /><ActionImport Name="CreateInvoice" Action="Default.CreateInvoice" EntitySet="Invoices" /><ActionImport Name="CreateRevision" Action="Default.CreateRevision" EntitySet="Invoices" /><ActionImport Name="CreateGraveInvoiceRevision" Action="Default.CreateGraveInvoiceRevision" EntitySet="Invoices" /><ActionImport Name="GenerateGraveInvoices" Action="Default.GenerateGraveInvoices" EntitySet="Jobs" /><ActionImport Name="SetInvoicePaid" Action="Default.SetInvoicePaid" EntitySet="Invoices" /></EntityContainer></Schema></edmx:DataServices></edmx:Edmx>
+<?xml version="1.0" encoding="utf-8" ?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+    <edmx:DataServices>
+        <Schema
+            Namespace="Burkard.Invoicing.Domain.Entities"
+            xmlns="http://docs.oasis-open.org/odata/ns/edm"
+        >
+            <EntityType Name="VatRate">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Rate" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+            </EntityType>
+            <EntityType Name="InvoiceItem">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Number" Type="Edm.String" Nullable="false" />
+                <Property Name="Description" Type="Edm.String" Nullable="false" />
+                <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <Property Name="DefaultPrice" Type="Edm.Decimal" Scale="Variable" />
+            </EntityType>
+            <EntityType Name="Recipient">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Number" Type="Edm.String" Nullable="false" />
+                <Property Name="Name" Type="Edm.String" Nullable="false" />
+                <Property Name="Address" Type="Edm.String" Nullable="false" />
+            </EntityType>
+            <EntityType Name="Grave">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="GraveNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="StartDate" Type="Edm.Date" Nullable="false" />
+                <Property Name="EndDate" Type="Edm.Date" Nullable="false" />
+                <Property Name="CreatedAt" Type="Edm.Date" Nullable="false" />
+                <NavigationProperty
+                    Name="Items"
+                    Type="Collection(Burkard.Invoicing.Domain.Entities.GraveItem)"
+                />
+                <NavigationProperty
+                    Name="Recipients"
+                    Type="Collection(Burkard.Invoicing.Domain.Entities.GraveRecipient)"
+                />
+            </EntityType>
+            <EntityType Name="GraveItem">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="GraveId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="ItemId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Count" Type="Edm.Int32" Nullable="false" />
+                <Property Name="UnitPrice" Type="Edm.Decimal" Scale="Variable" />
+                <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
+                <NavigationProperty
+                    Name="Item"
+                    Type="Burkard.Invoicing.Domain.Entities.InvoiceItem"
+                    Nullable="false"
+                />
+            </EntityType>
+            <EntityType Name="GraveRecipient">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="GraveId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RecipientId" Type="Edm.Int64" Nullable="false" />
+                <NavigationProperty
+                    Name="Recipient"
+                    Type="Burkard.Invoicing.Domain.Entities.Recipient"
+                    Nullable="false"
+                >
+                    <ReferentialConstraint Property="RecipientId" ReferencedProperty="Id" />
+                </NavigationProperty>
+            </EntityType>
+            <EntityType Name="GraveInvoiceRun">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="GraveId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Year" Type="Edm.Int32" Nullable="false" />
+                <Property Name="Half" Type="Edm.Int32" Nullable="false" />
+                <Property Name="JobId" Type="Edm.Int64" />
+                <Property Name="CreatedAt" Type="Edm.DateTimeOffset" Nullable="false" />
+            </EntityType>
+            <EntityType Name="Invoice">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RootId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RevisionNumber" Type="Edm.Int32" Nullable="false" />
+                <Property Name="IsLatestRevision" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="Year" Type="Edm.Int32" Nullable="false" />
+                <Property Name="Sequence" Type="Edm.Int32" Nullable="false" />
+                <Property Name="InvoiceNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="GraveId" Type="Edm.Int64" />
+                <Property Name="PeriodYear" Type="Edm.Int32" />
+                <Property Name="PeriodHalf" Type="Edm.Int32" />
+                <Property Name="SharePercent" Type="Edm.Decimal" Scale="Variable" />
+                <Property Name="RecipientCount" Type="Edm.Int32" />
+                <Property Name="RecipientId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RecipientName" Type="Edm.String" Nullable="false" />
+                <Property Name="RecipientAddress" Type="Edm.String" Nullable="false" />
+                <Property Name="EndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="StampWord" Type="Edm.String" Nullable="false" />
+                <Property Name="Language" Type="Edm.String" Nullable="false" />
+                <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
+                <Property Name="PaidOn" Type="Edm.Date" />
+                <Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <Property Name="VatTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <Property Name="GrossTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <NavigationProperty
+                    Name="Lines"
+                    Type="Collection(Burkard.Invoicing.Domain.Entities.InvoiceLine)"
+                />
+                <NavigationProperty
+                    Name="Documents"
+                    Type="Collection(Burkard.Invoicing.Domain.Entities.Document)"
+                />
+            </EntityType>
+            <EntityType Name="Document">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="InvoiceId" Type="Edm.Int64" Nullable="false" />
+                <Property
+                    Name="Kind"
+                    Type="Burkard.Invoicing.Domain.Entities.DocumentKind"
+                    Nullable="false"
+                />
+                <Property Name="FileName" Type="Edm.String" Nullable="false" />
+                <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
+                <NavigationProperty
+                    Name="Invoice"
+                    Type="Burkard.Invoicing.Domain.Entities.Invoice"
+                    Nullable="false"
+                >
+                    <ReferentialConstraint Property="InvoiceId" ReferencedProperty="Id" />
+                </NavigationProperty>
+            </EntityType>
+            <EntityType Name="Job">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Type" Type="Edm.String" Nullable="false" />
+                <Property
+                    Name="Status"
+                    Type="Burkard.Invoicing.Domain.Entities.JobStatus"
+                    Nullable="false"
+                />
+                <Property Name="ProgressPercent" Type="Edm.Int32" Nullable="false" />
+                <Property Name="TotalCount" Type="Edm.Int32" Nullable="false" />
+                <Property Name="ProcessedCount" Type="Edm.Int32" Nullable="false" />
+                <Property Name="PayloadJson" Type="Edm.String" />
+                <Property Name="ResultJson" Type="Edm.String" />
+                <Property Name="Error" Type="Edm.String" />
+                <Property Name="CreatedAt" Type="Edm.DateTimeOffset" Nullable="false" />
+                <Property Name="StartedAt" Type="Edm.DateTimeOffset" />
+                <Property Name="FinishedAt" Type="Edm.DateTimeOffset" />
+            </EntityType>
+            <EntityType Name="GlobalSettings">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="EndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="StampWord" Type="Edm.String" Nullable="false" />
+                <Property Name="Language" Type="Edm.String" Nullable="false" />
+            </EntityType>
+            <EntityType Name="InvoiceLine">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="InvoiceId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="ItemId" Type="Edm.Int64" />
+                <Property Name="ItemNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="Description" Type="Edm.String" Nullable="false" />
+                <Property Name="Count" Type="Edm.Int32" Nullable="false" />
+                <Property Name="UnitPrice" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <Property Name="GraveUnitPrice" Type="Edm.Decimal" Scale="Variable" />
+                <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
+                <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
+            </EntityType>
+            <EnumType Name="DocumentKind">
+                <Member Name="Normal" Value="0" />
+                <Member Name="Copy" Value="1" />
+            </EnumType>
+            <EnumType Name="JobStatus">
+                <Member Name="Queued" Value="0" />
+                <Member Name="Running" Value="1" />
+                <Member Name="Succeeded" Value="2" />
+                <Member Name="Failed" Value="3" />
+            </EnumType>
+        </Schema>
+        <Schema Namespace="Default" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+            <Action Name="CreateInvoice">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" />
+            </Action>
+            <Action Name="CreateRevision">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" />
+            </Action>
+            <Action Name="CreateGraveInvoiceRevision">
+                <ReturnType Type="Collection(Burkard.Invoicing.Domain.Entities.Invoice)" />
+            </Action>
+            <Action Name="GenerateGraveInvoices">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Job" />
+            </Action>
+            <Action Name="SetInvoicePaid">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" />
+            </Action>
+            <EntityContainer Name="Container">
+                <EntitySet Name="VatRates" EntityType="Burkard.Invoicing.Domain.Entities.VatRate" />
+                <EntitySet
+                    Name="InvoiceItems"
+                    EntityType="Burkard.Invoicing.Domain.Entities.InvoiceItem"
+                />
+                <EntitySet
+                    Name="Recipients"
+                    EntityType="Burkard.Invoicing.Domain.Entities.Recipient"
+                />
+                <EntitySet Name="Graves" EntityType="Burkard.Invoicing.Domain.Entities.Grave">
+                    <NavigationPropertyBinding Path="Items" Target="GraveItems" />
+                    <NavigationPropertyBinding Path="Recipients" Target="GraveRecipients" />
+                </EntitySet>
+                <EntitySet
+                    Name="GraveItems"
+                    EntityType="Burkard.Invoicing.Domain.Entities.GraveItem"
+                >
+                    <NavigationPropertyBinding Path="Item" Target="InvoiceItems" />
+                </EntitySet>
+                <EntitySet
+                    Name="GraveRecipients"
+                    EntityType="Burkard.Invoicing.Domain.Entities.GraveRecipient"
+                >
+                    <NavigationPropertyBinding Path="Recipient" Target="Recipients" />
+                </EntitySet>
+                <EntitySet
+                    Name="GraveInvoiceRuns"
+                    EntityType="Burkard.Invoicing.Domain.Entities.GraveInvoiceRun"
+                />
+                <EntitySet Name="Invoices" EntityType="Burkard.Invoicing.Domain.Entities.Invoice">
+                    <NavigationPropertyBinding Path="Documents" Target="Documents" />
+                </EntitySet>
+                <EntitySet Name="Documents" EntityType="Burkard.Invoicing.Domain.Entities.Document">
+                    <NavigationPropertyBinding Path="Invoice" Target="Invoices" />
+                </EntitySet>
+                <EntitySet Name="Jobs" EntityType="Burkard.Invoicing.Domain.Entities.Job" />
+                <Singleton
+                    Name="Settings"
+                    Type="Burkard.Invoicing.Domain.Entities.GlobalSettings"
+                />
+                <ActionImport
+                    Name="CreateInvoice"
+                    Action="Default.CreateInvoice"
+                    EntitySet="Invoices"
+                />
+                <ActionImport
+                    Name="CreateRevision"
+                    Action="Default.CreateRevision"
+                    EntitySet="Invoices"
+                />
+                <ActionImport
+                    Name="CreateGraveInvoiceRevision"
+                    Action="Default.CreateGraveInvoiceRevision"
+                    EntitySet="Invoices"
+                />
+                <ActionImport
+                    Name="GenerateGraveInvoices"
+                    Action="Default.GenerateGraveInvoices"
+                    EntitySet="Jobs"
+                />
+                <ActionImport
+                    Name="SetInvoicePaid"
+                    Action="Default.SetInvoicePaid"
+                    EntitySet="Invoices"
+                />
+            </EntityContainer>
+        </Schema>
+    </edmx:DataServices>
+</edmx:Edmx>

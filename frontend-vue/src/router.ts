@@ -6,7 +6,9 @@ const routes: RouteRecordRaw[] = [
   { path: "/settings", component: () => import("@/pages/SettingsPage.vue") },
   { path: "/items", component: () => import("@/pages/ItemsPage.vue") },
   { path: "/recipients", component: () => import("@/pages/RecipientsPage.vue") },
+  { path: "/invoices", component: () => import("@/pages/InvoicesPage.vue") },
   // pages: add new routes above this line
+  { path: "/:pathMatch(.*)*", redirect: "/invoices" },
 ];
 
 export const router = createRouter({ history: createWebHistory(), routes });
