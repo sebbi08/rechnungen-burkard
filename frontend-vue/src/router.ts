@@ -5,6 +5,7 @@ const routes: RouteRecordRaw[] = [
   { path: "/", redirect: "/invoices" },
   { path: "/settings", component: () => import("@/pages/SettingsPage.vue") },
   { path: "/items", component: () => import("@/pages/ItemsPage.vue") },
+  { path: "/recipients", component: () => import("@/pages/RecipientsPage.vue") },
   // pages: add new routes above this line
 ];
 
