@@ -19,7 +19,7 @@ function open(kind: DocumentKindName): void {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex min-w-0 flex-col gap-4">
     <div class="flex flex-wrap gap-2">
       <Button
         :label="t('actionDownloadNormal')"
@@ -37,7 +37,7 @@ function open(kind: DocumentKindName): void {
       />
     </div>
 
-    <DataTable :value="revision.Lines" size="small">
+    <DataTable :value="revision.Lines" size="small" class="min-w-0 overflow-x-auto">
       <Column field="ItemNumber" :header="t('itemNumber')" />
       <Column
         field="Description"
@@ -46,7 +46,11 @@ function open(kind: DocumentKindName): void {
         body-class="hidden sm:table-cell"
       />
       <Column field="Count" :header="t('itemCount')" body-class="text-right tabular-nums" />
-      <Column :header="t('itemPrice')" body-class="text-right tabular-nums whitespace-nowrap">
+      <Column
+        :header="t('itemPrice')"
+        header-class="hidden sm:table-cell"
+        body-class="hidden sm:table-cell text-right tabular-nums whitespace-nowrap"
+      >
         <template #body="{ data }">{{ formatAmount(data.UnitPrice) }}</template>
       </Column>
       <Column :header="t('netAmount')" body-class="text-right tabular-nums whitespace-nowrap">

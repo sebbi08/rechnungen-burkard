@@ -226,9 +226,21 @@ function openEditor(graveId: number | null): void {
                 data.Invoiced ? t('statusInvoicedAnnouncement') : t('statusOpenAnnouncement')
               "
             />
+            <!-- on a phone the payment state sits under the status instead of in its own column -->
+            <div v-if="paymentTag(data)" class="mt-1 sm:hidden">
+              <Tag
+                :value="paymentTag(data)?.value"
+                :severity="paymentTag(data)?.severity"
+                :aria-label="paymentTag(data)?.label"
+              />
+            </div>
           </template>
         </Column>
-        <Column :header="t('paidStatus')">
+        <Column
+          :header="t('paidStatus')"
+          header-class="hidden sm:table-cell"
+          body-class="hidden sm:table-cell"
+        >
           <template #body="{ data }">
             <Tag
               v-if="paymentTag(data)"
@@ -241,8 +253,10 @@ function openEditor(graveId: number | null): void {
         <Column class="w-0 whitespace-nowrap">
           <template #body="{ data }">
             <div class="flex justify-end">
+              <!-- the grave number already links here; on a phone that is enough -->
               <Button
                 v-tooltip.top="t('actionDetails')"
+                class="hidden sm:inline-flex"
                 icon="pi pi-eye"
                 text
                 rounded

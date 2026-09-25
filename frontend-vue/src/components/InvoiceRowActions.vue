@@ -29,6 +29,11 @@ function open(kind: DocumentKindName): void {
 }
 
 const menuItems = computed<MenuItem[]>(() => [
+  {
+    label: t("actionDetails"),
+    icon: "pi pi-eye",
+    command: () => void router.push(props.detailsTo),
+  },
   { label: t("actionDownloadNormal"), icon: "pi pi-file-pdf", command: () => open("Normal") },
   { label: t("actionDownloadCopy"), icon: "pi pi-copy", command: () => open("Copy") },
   {
@@ -47,15 +52,15 @@ const menuItems = computed<MenuItem[]>(() => [
 
 <template>
   <div class="flex items-center justify-end gap-0.5">
-    <Button
-      v-tooltip.top="t('actionDetails')"
-      icon="pi pi-eye"
-      text
-      rounded
-      :aria-label="t('actionDetails')"
-      @click="router.push(detailsTo)"
-    />
     <div class="hidden items-center gap-0.5 md:flex">
+      <Button
+        v-tooltip.top="t('actionDetails')"
+        icon="pi pi-eye"
+        text
+        rounded
+        :aria-label="t('actionDetails')"
+        @click="router.push(detailsTo)"
+      />
       <Button
         v-tooltip.top="t('actionDownloadNormal')"
         icon="pi pi-file-pdf"
