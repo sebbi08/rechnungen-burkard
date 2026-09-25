@@ -26,6 +26,7 @@ const routes: RouteRecordRaw[] = [
       rootId: Number(route.params.rootId),
     }),
   },
+  { path: "/import-export", component: () => import("@/pages/ImportExportPage.vue") },
   // pages: add new routes above this line
   { path: "/:pathMatch(.*)*", redirect: "/invoices" },
 ];
