@@ -7,6 +7,11 @@ const routes: RouteRecordRaw[] = [
   { path: "/items", component: () => import("@/pages/ItemsPage.vue") },
   { path: "/recipients", component: () => import("@/pages/RecipientsPage.vue") },
   { path: "/invoices", component: () => import("@/pages/InvoicesPage.vue") },
+  {
+    path: "/invoices/:rootId",
+    component: () => import("@/pages/InvoiceDetailPage.vue"),
+    props: (route) => ({ rootId: Number(route.params.rootId) }),
+  },
   // pages: add new routes above this line
   { path: "/:pathMatch(.*)*", redirect: "/invoices" },
 ];
