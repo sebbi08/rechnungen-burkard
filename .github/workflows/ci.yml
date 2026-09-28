@@ -65,7 +65,7 @@ jobs:
         run: docker build -t invoicing:e2e .
       - name: Start the app
         run: |
-          docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
+          docker run -d --name invoicing-e2e -p 8080:8080 -p 8082:8082 invoicing:e2e
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:8080/healthz > /dev/null; then exit 0; fi
             sleep 2
@@ -84,6 +84,7 @@ jobs:
         working-directory: e2e
         env:
           E2E_BASE_URL: http://localhost:8080
+          E2E_VUE_BASE_URL: http://localhost:8082
         run: npx playwright test
       - name: Backend logs on failure
         if: failure()

@@ -2,6 +2,8 @@
 
 # The release image: the UI5 build is served from the API's wwwroot, so frontend
 # and backend ship as one container on one port and need no proxy between them.
+# The Vue evaluation frontend (docs/deviations.md D-003) rides along on a second
+# port, served by the same process from wwwroot-vue.
 FROM node:22 AS frontend
 ARG VERSION=0.0.0
 WORKDIR /app/frontend
@@ -21,6 +23,13 @@ RUN rm -rf dist/test-resources \
 RUN cp "$(find /root/.ui5/framework/packages/@openui5/sap.ui.core -maxdepth 2 -name LICENSE.txt | head -1)" \
       dist/OPENUI5-LICENSE.txt
 
+FROM node:22 AS frontend-vue
+WORKDIR /app/frontend-vue
+COPY frontend-vue/package.json frontend-vue/package-lock.json ./
+RUN npm ci
+COPY frontend-vue/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 ARG VERSION=0.0.0
 WORKDIR /src
@@ -31,9 +40,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=backend /out ./
 COPY --from=frontend /app/frontend/dist ./wwwroot
+COPY --from=frontend-vue /app/frontend-vue/dist ./wwwroot-vue
 ENV ConnectionStrings__Invoicing="Data Source=/data/invoicing.db"
-ENV ASPNETCORE_URLS="http://0.0.0.0:8080"
+# 8080 serves the OpenUI5 frontend, 8082 the Vue one; the API answers on both
+ENV ASPNETCORE_URLS="http://0.0.0.0:8080;http://0.0.0.0:8082"
+ENV VueFrontend__Port=8082
 ENV TZ=Europe/Berlin
 VOLUME ["/data"]
-EXPOSE 8080
+EXPOSE 8080 8082
 ENTRYPOINT ["dotnet", "Invoicing.Api.dll"]

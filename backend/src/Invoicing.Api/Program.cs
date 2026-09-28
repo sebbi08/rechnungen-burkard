@@ -95,8 +95,60 @@ if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
     );
 }
 
-app.UseDefaultFiles();
-app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = ui5ContentTypes });
+// The Vue evaluation frontend (docs/deviations.md D-003) ships in the release
+// image as well, on a port of its own: the image sets VueFrontend:Port and has
+// Kestrel listen there next to the UI5 port. The port a request arrived on picks
+// the frontend. The Host header would not do, since behind a port mapping it
+// names the outside port, which the app cannot know. Both ports reach the same
+// API, so neither frontend needs a proxy. Without the setting, or without the
+// build, nothing changes: the dev stack and the tests only ever see UI5.
+var vuePort = app.Configuration.GetValue<int?>("VueFrontend:Port");
+var vueRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot-vue");
+var vueFiles =
+    vuePort is not null && Directory.Exists(vueRoot) ? new PhysicalFileProvider(vueRoot) : null;
+bool IsVueRequest(HttpContext context) =>
+    vueFiles is not null && context.Connection.LocalPort == vuePort;
+
+app.UseWhen(
+    context => !IsVueRequest(context),
+    ui5 =>
+    {
+        ui5.UseDefaultFiles();
+        ui5.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = ui5ContentTypes });
+    }
+);
+
+if (vueFiles is not null)
+{
+    app.UseWhen(
+        IsVueRequest,
+        vue =>
+        {
+            // Vue Router uses HTML5 history, so /invoices/42 is a page rather than
+            // a file, and a reload or a bookmark asks the server for it. A request
+            // that matched no endpoint and names no file gets index.html, and the
+            // router takes it from there. /odata stays out of it, so a wrong API
+            // URL still answers 404 instead of a page.
+            vue.Use(
+                (context, next) =>
+                {
+                    var request = context.Request;
+                    if (
+                        (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+                        && context.GetEndpoint() is null
+                        && !Path.HasExtension(request.Path.Value)
+                        && !request.Path.StartsWithSegments("/odata")
+                    )
+                    {
+                        request.Path = "/index.html";
+                    }
+                    return next(context);
+                }
+            );
+            vue.UseStaticFiles(new StaticFileOptions { FileProvider = vueFiles });
+        }
+    );
+}
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();

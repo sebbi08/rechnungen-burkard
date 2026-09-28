@@ -84,8 +84,9 @@ page one.
   accessibility, manifest). All three must be clean; both linters are scoped to
   `src`, since `dist/` holds the whole OpenUI5 runtime.
 - **Vue evaluation frontend** (`frontend-vue/`, D-003): the dev stack also
-  serves it on 8082, against the dev backend. For probing, run it on the host
-  against the E2E stack instead:
+  serves it on 8082, against the dev backend, and the release image serves its
+  build on its own port 8082 — so the E2E stack has it on 8083. For probing with
+  hot reload, run it on the host against the E2E stack instead:
   `cd frontend-vue && VITE_PROXY_TARGET=http://localhost:8081 npm run dev`.
   Checks: `npm run typecheck`, `npm run lint`, `npm run build`. After an EDM
   change, `npm run gen:odata` (reads `$metadata` from the E2E stack) and commit

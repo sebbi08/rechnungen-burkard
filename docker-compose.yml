@@ -36,9 +36,10 @@ services:
     command: ["sh", "-c", "npm install && npx ui5 serve --port 8080 --accept-remote-connections"]
     ports:
       - "8080:8080"
-  # The Vue evaluation frontend (docs/deviations.md D-003). Dev only: the
-  # release image ships the OpenUI5 frontend. Proxies /odata to the backend
-  # container like the UI5 dev server does.
+  # The Vue evaluation frontend (docs/deviations.md D-003). The release image
+  # serves its build on port 8082 next to UI5 on 8080; here it runs from the
+  # Vite dev server and proxies /odata to the backend container like the UI5
+  # dev server does.
   frontend-vue:
     image: node:22
     user: "${UID:-1000}:${GID:-1000}"

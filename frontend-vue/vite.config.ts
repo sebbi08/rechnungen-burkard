@@ -20,6 +20,12 @@ export default defineConfig({
     __VUE_I18N_LEGACY_API__: false,
     __INTLIFY_PROD_DEVTOOLS__: false,
   },
+  build: {
+    // The release image redistributes the bundled dependencies (Vue, PrimeVue
+    // and the rest, MIT almost throughout), so their licenses travel with the
+    // build, as OpenUI5's does with the UI5 one.
+    license: { fileName: "THIRD-PARTY-LICENSES.md" },
+  },
   server: {
     port: 8082,
     strictPort: true,

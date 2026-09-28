@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Evaluation frontend in Vue (deviation D-003). Dev only; the release image ships the OpenUI5 frontend.",
+  "description": "Evaluation frontend in Vue (deviation D-003). The release image serves it on port 8082, next to the OpenUI5 frontend on 8080.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

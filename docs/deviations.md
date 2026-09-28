@@ -59,8 +59,11 @@ parameters `$metadata` leaves out.
 like-for-like build rather than a sketch. Replacing it would amend Principle VI;
 this entry does not.
 
-**Containment**: It runs in development only (`docker-compose.yml`, port 8082)
-and is not part of the release image, which serves the OpenUI5 frontend alone.
-It uses the documented OData interface unchanged, keeps the UI multilingual
+**Containment**: The OpenUI5 frontend stays the application's frontend: the
+release image serves it on port 8080 as before. The image also carries the Vue
+build and serves it on a second port, 8082, from the same process and against
+the same API, so the two can be compared on real data; in development it runs
+from `docker-compose.yml` on 8082 as well. Nothing on the UI5 port changes, and
+the bundled dependencies' licenses ship with the Vue build. It uses the documented OData interface unchanged, keeps the UI multilingual
 (VII) and blocks the UI during long-running tasks (VIII). It has no automated
 tests by decision; CI type-checks, lints and builds it.
