@@ -1,0 +1,176 @@
+<script setup lang="ts">
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import Button from "primevue/button";
+import Dialog from "primevue/dialog";
+import InputNumber from "primevue/inputnumber";
+import InputText from "primevue/inputtext";
+import Message from "primevue/message";
+import Select from "primevue/select";
+import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
+import { getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
+import type { InvoiceItem } from "@/api/generated";
+import { odata } from "@/api/odata";
+import { useVatRatesQuery } from "@/api/queries";
+import { useErrorToast } from "@/composables/useErrorToast";
+import { formatAmount, formatVatRate } from "@/lib/format";
+
+const props = defineProps<{ item: InvoiceItem | null }>();
+const visible = defineModel<boolean>("visible", { required: true });
+
+const { t } = useI18n();
+const { showError } = useErrorToast();
+const queryClient = useQueryClient();
+const vatRates = useVatRatesQuery();
+
+const rateOptions = computed(() =>
+  (vatRates.data.value ?? []).map((rate) => ({
+    value: rate.Rate,
+    label: `${formatVatRate(rate.Rate)} %`,
+  })),
+);
+
+const form = reactive({
+  Number: "",
+  Description: "",
+  VatRate: null as number | null,
+  DefaultPrice: null as number | null,
+});
+
+watch(visible, (open) => {
+  if (open) {
+    Object.assign(form, {
+      Number: props.item?.Number ?? "",
+      Description: props.item?.Description ?? "",
+      VatRate: props.item?.VatRate ?? null,
+      // empty means "no default price"; 0 is a real price
+      DefaultPrice: props.item?.DefaultPrice ?? null,
+    });
+    void vatRates.refetch();
+  }
+});
+
+const itemId = computed(() => props.item?.Id ?? null);
+const graves = useQuery({
+  queryKey: ["items", "graves", itemId],
+  queryFn: () => getItemGraves(itemId.value!),
+  enabled: computed(() => visible.value && itemId.value != null),
+});
+const linked = computed(() => graves.data.value?.Linked ?? false);
+
+function groupLabel(group: ItemGraveGroup): string {
+  const price =
+    group.UnitPrice == null
+      ? t("itemPriceNone")
+      : t(group.IsDefault ? "itemPriceDefault" : "itemPriceOwn", [formatAmount(group.UnitPrice)]);
+  return group.PriceIncludesVat ? `${price} (${t("priceIncludesVatShort")})` : price;
+}
+
+const saving = ref(false);
+async function save(): Promise<void> {
+  saving.value = true;
+  const payload = {
+    Number: form.Number,
+    Description: form.Description,
+    VatRate: form.VatRate ?? 0,
+    DefaultPrice: form.DefaultPrice,
+  };
+  try {
+    if (props.item) {
+      await odata.InvoiceItems(props.item.Id).patch(payload).execute();
+    } else {
+      await odata.InvoiceItems().create(payload).execute();
+    }
+    await queryClient.invalidateQueries();
+    visible.value = false;
+  } catch (error) {
+    showError(error);
+  } finally {
+    saving.value = false;
+  }
+}
+</script>
+
+<template>
+  <Dialog
+    v-model:visible="visible"
+    modal
+    :header="item ? t('editItem') : t('createItem')"
+    :style="{ width: '30rem' }"
+    :breakpoints="{ '640px': '100vw' }"
+  >
+    <form id="itemForm" class="flex flex-col gap-4" @submit.prevent="save">
+      <div class="flex flex-col gap-2">
+        <label for="itemNumber" class="font-medium">{{ t("itemNumber") }}</label>
+        <InputText id="itemNumber" v-model="form.Number" autofocus />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="itemDescription" class="font-medium">{{ t("itemDescription") }}</label>
+        <InputText id="itemDescription" v-model="form.Description" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="itemVatRate" class="font-medium">{{ t("vatRate") }}</label>
+        <Select
+          v-model="form.VatRate"
+          input-id="itemVatRate"
+          :options="rateOptions"
+          option-value="value"
+          option-label="label"
+          :disabled="linked"
+        />
+        <small v-if="linked" class="text-muted-color">{{ t("itemVatRateFixed") }}</small>
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="itemDefaultPrice" class="font-medium">{{ t("itemDefaultPrice") }}</label>
+        <InputNumber
+          v-model="form.DefaultPrice"
+          input-id="itemDefaultPrice"
+          locale="de-DE"
+          :min-fraction-digits="2"
+          :max-fraction-digits="2"
+          suffix=" €"
+        />
+      </div>
+
+      <section v-if="item" class="flex flex-col gap-2">
+        <h3 class="m-0 text-base font-semibold">{{ t("itemGravesTitle") }}</h3>
+        <Message
+          v-if="graves.data.value && !graves.data.value.Linked"
+          severity="secondary"
+          size="small"
+        >
+          {{ t("itemGravesNone") }}
+        </Message>
+        <div
+          v-for="(group, index) in graves.data.value?.Groups ?? []"
+          :key="index"
+          class="flex flex-col gap-1"
+        >
+          <span class="text-sm font-medium">{{ groupLabel(group) }}</span>
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <RouterLink
+              v-for="grave in group.Graves"
+              :key="grave.Id"
+              :to="`/graves/${grave.Id}`"
+              class="text-primary hover:underline"
+              @click="visible = false"
+            >
+              {{ grave.GraveNumber }}
+            </RouterLink>
+          </div>
+        </div>
+      </section>
+    </form>
+    <template #footer>
+      <Button :label="t('cancel')" severity="secondary" text @click="visible = false" />
+      <Button
+        type="submit"
+        form="itemForm"
+        :label="t('save')"
+        icon="pi pi-check"
+        :loading="saving"
+      />
+    </template>
+  </Dialog>
+</template>

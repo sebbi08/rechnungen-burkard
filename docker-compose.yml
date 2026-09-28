@@ -11,9 +11,24 @@ services:
       - ConnectionStrings__Invoicing=Data Source=/data/invoicing.db
       - ASPNETCORE_ENVIRONMENT=Development
       - TZ=Europe/Berlin
+  # A new named volume takes its ownership from the image at the mount point.
+  # node:22 has no node_modules there, so the volume starts out root-owned and
+  # npm install, running as UID:GID, fails with EACCES. That happens whenever
+  # the volumes are created afresh: a new worktree (a new project name), or
+  # `docker compose down -v`. Hand them to UID:GID before the frontends start.
+  node-modules-owner:
+    image: node:22
+    user: root
+    volumes:
+      - frontend-node-modules:/volumes/frontend
+      - frontend-vue-node-modules:/volumes/frontend-vue
+    command: ["chown", "${UID:-1000}:${GID:-1000}", "/volumes/frontend", "/volumes/frontend-vue"]
   frontend:
     image: node:22
     user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      node-modules-owner:
+        condition: service_completed_successfully
     working_dir: /app/frontend
     volumes:
       - ./frontend:/app/frontend
@@ -21,5 +36,22 @@ services:
     command: ["sh", "-c", "npm install && npx ui5 serve --port 8080 --accept-remote-connections"]
     ports:
       - "8080:8080"
+  # The Vue evaluation frontend (docs/deviations.md D-003). Dev only: the
+  # release image ships the OpenUI5 frontend. Proxies /odata to the backend
+  # container like the UI5 dev server does.
+  frontend-vue:
+    image: node:22
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      node-modules-owner:
+        condition: service_completed_successfully
+    working_dir: /app/frontend-vue
+    volumes:
+      - ./frontend-vue:/app/frontend-vue
+      - frontend-vue-node-modules:/app/frontend-vue/node_modules
+    command: ["sh", "-c", "npm install && npm run dev -- --host"]
+    ports:
+      - "8082:8082"
 volumes:
   frontend-node-modules:
+  frontend-vue-node-modules:
