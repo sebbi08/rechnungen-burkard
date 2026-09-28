@@ -5,6 +5,18 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v2.1.0 — 2026-09-28
+
+### Features
+- serve the Vue evaluation frontend from the release image on port 8082 (9f1e53f)
+- **graves**: make creating a grave the list's main action (9b36077)
+
+### Fixes
+- **dev**: hand the node_modules volumes to the container user (b024ee5)
+
+### Other changes
+- Merge pull request #12 from sebbi08/vue-evaluation-frontend (576c63a)
+
 ## v2.0.0 — 2026-09-16
 
 ### Breaking changes
