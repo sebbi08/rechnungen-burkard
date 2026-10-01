@@ -18,8 +18,10 @@ import { useBlocking } from "@/composables/useBlocking";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
+import { formatAmount, formatVatRate } from "@/lib/format";
 
-const { t } = useI18n();
+const i18n = useI18n();
+const { t } = i18n;
 const { showError } = useErrorToast();
 const { run } = useBlocking();
 const queryClient = useQueryClient();
@@ -41,6 +43,25 @@ function chooseFile(): void {
     fileInput.value.value = "";
     fileInput.value.click();
   }
+}
+
+/** The problem in the UI's language, from its key and values; the backend's
+ *  English sentence where the key is unknown. The rate and amounts of a split
+ *  problem come as invariant numbers and are shown the German way. */
+function problemText(problem: ImportProblem): string {
+  const key = `importProblem${problem.messageKey ?? ""}`;
+  if (!problem.messageKey || !i18n.te(key)) {
+    return problem.message;
+  }
+  let args = problem.messageArgs ?? [];
+  if (problem.messageKey.startsWith("PricesDoNotDivide")) {
+    args = args.map((arg, index) =>
+      index === 0 ? formatVatRate(Number(arg)) : index === 2 ? arg : formatAmount(Number(arg)),
+    );
+  } else if (problem.messageKey === "VatRateNotConfigured") {
+    args = args.map((arg) => formatVatRate(Number(arg)));
+  }
+  return t(key, args);
 }
 
 async function downloadTemplate(): Promise<void> {
@@ -118,7 +139,8 @@ async function startImport(): Promise<void> {
             type="file"
             accept=".zip,application/zip"
             class="sr-only"
-            :aria-label="t('importSelectFile')"
+            tabindex="-1"
+            aria-hidden="true"
             @change="onFileChosen"
           />
           <Button
@@ -142,7 +164,9 @@ async function startImport(): Promise<void> {
         <DataTable :value="problems" size="small">
           <Column field="file" :header="t('importProblemFile')" />
           <Column field="row" :header="t('importProblemRow')" class="w-24" />
-          <Column field="message" :header="t('importProblemMessage')" />
+          <Column :header="t('importProblemMessage')">
+            <template #body="{ data }">{{ problemText(data) }}</template>
+          </Column>
         </DataTable>
       </template>
     </Card>

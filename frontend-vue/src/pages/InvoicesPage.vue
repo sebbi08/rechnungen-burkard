@@ -164,6 +164,7 @@ function openEditor(invoice: Invoice | null): void {
               :invoice-id="data.Id"
               :paid-on="data.PaidOn"
               :details-to="`/invoices/${data.RootId}`"
+              :row-label="formatInvoiceNumber(data.InvoiceNumber)"
               @edit="openEditor(data)"
             />
           </template>

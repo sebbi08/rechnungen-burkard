@@ -45,23 +45,36 @@ function open(kind: DocumentKindName): void {
         header-class="hidden sm:table-cell"
         body-class="hidden sm:table-cell"
       />
-      <Column field="Count" :header="t('itemCount')" body-class="text-right tabular-nums" />
+      <Column
+        field="Count"
+        :header="t('itemCount')"
+        header-class="col-num"
+        body-class="text-right tabular-nums"
+      />
       <Column
         :header="t('itemPrice')"
-        header-class="hidden sm:table-cell"
+        header-class="hidden sm:table-cell col-num"
         body-class="hidden sm:table-cell text-right tabular-nums whitespace-nowrap"
       >
         <template #body="{ data }">{{ formatAmount(data.UnitPrice) }}</template>
       </Column>
-      <Column :header="t('netAmount')" body-class="text-right tabular-nums whitespace-nowrap">
+      <Column
+        :header="t('netAmount')"
+        header-class="col-num"
+        body-class="text-right tabular-nums whitespace-nowrap"
+      >
         <template #body="{ data }">{{ formatAmount(data.LineTotal) }}</template>
       </Column>
-      <Column :header="t('grossAmount')" body-class="text-right tabular-nums whitespace-nowrap">
+      <Column
+        :header="t('grossAmount')"
+        header-class="col-num"
+        body-class="text-right tabular-nums whitespace-nowrap"
+      >
         <template #body="{ data }">{{ formatAmount(data.GrossTotal) }}</template>
       </Column>
       <Column
         :header="t('vatRate')"
-        header-class="hidden xl:table-cell"
+        header-class="hidden xl:table-cell col-num"
         body-class="hidden xl:table-cell text-right"
       >
         <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>

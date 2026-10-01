@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
+import { useToast } from "primevue/usetoast";
 import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { createRecipient } from "@/api/endpoints";
@@ -16,6 +17,7 @@ const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
 const { showError } = useErrorToast();
+const toast = useToast();
 const queryClient = useQueryClient();
 const form = reactive({ Number: "", Name: "", Address: "" });
 
@@ -49,6 +51,7 @@ async function save(): Promise<void> {
     }
     await queryClient.invalidateQueries();
     visible.value = false;
+    toast.add({ severity: "success", summary: t("saved"), life: 3000 });
   } catch (error) {
     showError(error);
   } finally {

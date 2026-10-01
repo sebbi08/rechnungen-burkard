@@ -110,13 +110,22 @@ const {
             header-class="hidden sm:table-cell"
             body-class="hidden sm:table-cell"
           />
-          <Column field="Count" :header="t('itemCount')" body-class="text-right tabular-nums" />
-          <Column :header="t('itemPrice')" body-class="text-right tabular-nums whitespace-nowrap">
+          <Column
+            field="Count"
+            :header="t('itemCount')"
+            header-class="col-num"
+            body-class="text-right tabular-nums"
+          />
+          <Column
+            :header="t('itemPrice')"
+            header-class="col-num"
+            body-class="text-right tabular-nums whitespace-nowrap"
+          >
             <template #body="{ data }">{{ formatAmount(data.Price) }}</template>
           </Column>
           <Column
             :header="t('vatRate')"
-            header-class="hidden md:table-cell"
+            header-class="hidden md:table-cell col-num"
             body-class="hidden md:table-cell text-right"
           >
             <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
@@ -185,7 +194,7 @@ const {
           </Column>
           <Column
             :header="t('grossTotal')"
-            header-class="hidden sm:table-cell"
+            header-class="hidden sm:table-cell col-num"
             body-class="hidden sm:table-cell text-right tabular-nums whitespace-nowrap"
           >
             <template #body="{ data }">{{ formatAmount(data.GrossTotal) }}</template>
@@ -203,6 +212,7 @@ const {
                 :invoice-id="data.Id"
                 :paid-on="data.PaidOn"
                 :details-to="`/graves/${graveId}/invoices/${data.RootId}`"
+                :row-label="`${halfYearText(data.PeriodYear, data.PeriodHalf)} ${data.RecipientName}`"
                 @edit="openGraveInvoice(data.Id)"
               />
             </template>

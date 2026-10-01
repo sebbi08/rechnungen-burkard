@@ -17,6 +17,7 @@ import {
 } from "@/api/endpoints";
 import { ApiError } from "@/api/http";
 import { useRecipientsQuery } from "@/api/queries";
+import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { billingProblemText } from "@/lib/billing";
@@ -31,6 +32,8 @@ const visible = defineModel<boolean>("visible", { required: true });
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
 const { showError } = useErrorToast();
+const drawerFocus = useDrawerFocus();
+const formEl = ref<HTMLFormElement | null>(null);
 const queryClient = useQueryClient();
 const allRecipients = useRecipientsQuery(ref(""));
 
@@ -51,6 +54,9 @@ let opening = 0;
 
 watch(visible, async (open) => {
   const current = ++opening;
+  if (open) {
+    drawerFocus.remember();
+  }
   if (!open) {
     loading.value = false;
     return;
@@ -94,6 +100,7 @@ watch(visible, async (open) => {
   } finally {
     if (current === opening) {
       loading.value = false;
+      void drawerFocus.focusFirst(formEl.value);
     }
   }
 });
@@ -173,10 +180,14 @@ async function save(): Promise<void> {
     v-model:visible="visible"
     position="right"
     :header="graveId == null ? t('createGrave') : t('editGrave')"
+    :aria-label="graveId == null ? t('createGrave') : t('editGrave')"
     :style="{ width: 'min(100vw, 60rem)' }"
+    @after-show="drawerFocus.focusFirst(formEl)"
+    @after-hide="drawerFocus.restore()"
+    @keydown.capture="drawerFocus.onKeydown($event, () => (visible = false))"
   >
     <div v-if="loading" class="flex justify-center p-10"><ProgressSpinner /></div>
-    <form v-else id="graveForm" class="flex flex-col gap-6" @submit.prevent="save">
+    <form ref="formEl" v-else id="graveForm" class="flex flex-col gap-6" @submit.prevent="save">
       <Message v-if="graveId != null" severity="warn">{{ t("graveEditWarning") }}</Message>
 
       <div class="grid gap-4 sm:grid-cols-3">

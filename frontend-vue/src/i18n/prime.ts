@@ -44,3 +44,26 @@ export const primeLocaleDe = {
   reject: "Nein",
   choose: "Auswählen",
 };
+
+/** PrimeVue's screen-reader texts in German: drawer and dialog close buttons,
+ *  the paginator, the select lists. Merged into its own `aria` object, so the
+ *  keys left out here keep their English defaults. */
+export const primeAriaDe = {
+  close: "Schließen",
+  previous: "Zurück",
+  next: "Weiter",
+  navigation: "Navigation",
+  scrollTop: "Nach oben",
+  trueLabel: "Ja",
+  falseLabel: "Nein",
+  nullLabel: "Nicht ausgewählt",
+  selectAll: "Alle ausgewählt",
+  unselectAll: "Keine ausgewählt",
+  pageLabel: "Seite {page}",
+  firstPageLabel: "Erste Seite",
+  lastPageLabel: "Letzte Seite",
+  nextPageLabel: "Nächste Seite",
+  prevPageLabel: "Vorherige Seite",
+  rowsPerPageLabel: "Zeilen pro Seite",
+  listLabel: "Auswahlliste",
+};

@@ -178,7 +178,7 @@ function openEditor(graveId: number | null): void {
   <Card>
     <template #content>
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <IconField class="w-full md:w-96">
+        <IconField class="w-full md:w-[26rem]">
           <InputIcon class="pi pi-search" />
           <InputText
             v-model="search"
@@ -281,7 +281,7 @@ function openEditor(graveId: number | null): void {
                 icon="pi pi-eye"
                 text
                 rounded
-                :aria-label="t('actionDetails')"
+                :aria-label="`${t('actionDetails')}: ${data.GraveNumber}`"
                 @click="router.push(`/graves/${data.Id}`)"
               />
               <Button
@@ -289,7 +289,7 @@ function openEditor(graveId: number | null): void {
                 icon="pi pi-pencil"
                 text
                 rounded
-                :aria-label="t('edit')"
+                :aria-label="`${t('edit')}: ${data.GraveNumber}`"
                 @click="openEditor(data.Id)"
               />
             </div>

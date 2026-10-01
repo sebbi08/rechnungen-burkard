@@ -120,7 +120,7 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
 
   <div class="grid gap-6 lg:grid-cols-[2fr_1fr]">
     <Card>
-      <template #title>{{ t("menuSettings") }}</template>
+      <template #title>{{ t("settingsDocumentsTitle") }}</template>
       <template #content>
         <form class="flex flex-col gap-5" @submit.prevent="save">
           <div class="flex flex-col gap-2">

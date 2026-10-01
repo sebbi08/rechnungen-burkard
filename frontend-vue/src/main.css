@@ -34,3 +34,9 @@ body {
     --p-card-body-padding: 1rem;
   }
 }
+
+/* A numeric column's header sits over its right-aligned figures. PrimeVue
+   wraps the header text in a flex box, which text-right does not move. */
+.col-num .p-datatable-column-header-content {
+  justify-content: flex-end;
+}

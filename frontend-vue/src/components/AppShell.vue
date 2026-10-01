@@ -4,6 +4,7 @@ import Drawer from "primevue/drawer";
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
+import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useTheme } from "@/composables/useTheme";
 import NavLinks from "./NavLinks.vue";
 
@@ -11,6 +12,13 @@ const { t } = useI18n();
 const route = useRoute();
 const { dark, toggle } = useTheme();
 const drawerOpen = ref(false);
+const navEl = ref<HTMLElement | null>(null);
+const drawerFocus = useDrawerFocus();
+watch(drawerOpen, (open) => {
+  if (open) {
+    drawerFocus.remember();
+  }
+});
 
 watch(
   () => route.fullPath,
@@ -32,19 +40,29 @@ watch(
         {{ t("appTitle") }}
       </div>
       <NavLinks />
+      <!-- start-aligned and small: centred at full size, the label broke onto
+           two lines away from its icon -->
       <Button
-        class="mt-auto"
+        class="mt-auto justify-start text-left whitespace-nowrap"
+        size="small"
         :icon="dark ? 'pi pi-sun' : 'pi pi-moon'"
         :label="t('themeToggle')"
+        :aria-pressed="dark"
         severity="secondary"
         text
         @click="toggle"
       />
     </aside>
 
-    <Drawer v-model:visible="drawerOpen" :header="t('appTitle')">
+    <Drawer
+      v-model:visible="drawerOpen"
+      :header="t('appTitle')"
+      :aria-label="t('menu')"
+      @after-show="drawerFocus.focusFirst(navEl)"
+      @after-hide="drawerFocus.restore()"
+    >
       <!-- a tap on the current page's link changes no route, so it closes here -->
-      <NavLinks @click="drawerOpen = false" />
+      <div ref="navEl"><NavLinks @click="drawerOpen = false" /></div>
     </Drawer>
 
     <div class="flex min-w-0 flex-1 flex-col">
@@ -58,6 +76,7 @@ watch(
           text
           rounded
           :aria-label="t('themeToggle')"
+          :aria-pressed="dark"
           @click="toggle"
         />
       </header>

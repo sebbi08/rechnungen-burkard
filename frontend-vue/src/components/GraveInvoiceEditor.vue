@@ -11,6 +11,7 @@ import {
   type InvoiceLineInput,
 } from "@/api/endpoints";
 import { useBlocking } from "@/composables/useBlocking";
+import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import type { GraveInvoiceDraft } from "@/composables/useGraveInvoiceEdit";
 import { showMessage } from "@/composables/useMessage";
@@ -25,12 +26,15 @@ const visible = defineModel<boolean>("visible", { required: true });
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
 const { showError } = useErrorToast();
+const drawerFocus = useDrawerFocus();
+const formEl = ref<HTMLFormElement | null>(null);
 const { run } = useBlocking();
 const queryClient = useQueryClient();
 const lines = ref<DraftLine[]>([]);
 
 watch(visible, (open) => {
   if (open) {
+    drawerFocus.remember();
     lines.value = props.draft?.lines ?? [];
   }
 });
@@ -79,9 +83,13 @@ async function save(): Promise<void> {
     v-model:visible="visible"
     position="right"
     :header="t('graveInvoiceEditTitle')"
+    :aria-label="t('graveInvoiceEditTitle')"
     :style="{ width: 'min(100vw, 60rem)' }"
+    @after-show="drawerFocus.focusFirst(formEl)"
+    @after-hide="drawerFocus.restore()"
+    @keydown.capture="drawerFocus.onKeydown($event, () => (visible = false))"
   >
-    <form id="graveInvoiceForm" class="flex flex-col gap-6" @submit.prevent="save">
+    <form ref="formEl" id="graveInvoiceForm" class="flex flex-col gap-6" @submit.prevent="save">
       <Message v-if="draft" severity="warn">{{ draft.warning }}</Message>
       <LineEditor v-model="lines" />
     </form>

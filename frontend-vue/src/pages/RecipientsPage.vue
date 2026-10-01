@@ -81,7 +81,7 @@ function open(recipient: Recipient | null): void {
               icon="pi pi-pencil"
               text
               rounded
-              :aria-label="t('edit')"
+              :aria-label="`${t('edit')}: ${data.Name}`"
               @click="open(data)"
             />
           </template>
