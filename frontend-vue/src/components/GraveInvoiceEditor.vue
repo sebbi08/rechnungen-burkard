@@ -30,7 +30,8 @@ watch(visible, (open) => {
 // No billing pre-check here, as in the UI5 app: the backend validates the revision.
 async function save(): Promise<void> {
   const draft = props.draft;
-  if (!draft) {
+  // a click landing while the drawer slides out after a save
+  if (!draft || !visible.value) {
     return;
   }
   let inputs: InvoiceLineInput[];
@@ -41,8 +42,11 @@ async function save(): Promise<void> {
     return;
   }
   try {
-    await run(t("invoiceRunning"), () => createGraveInvoiceRevision(draft.invoiceId, inputs));
-    await queryClient.invalidateQueries();
+    // refetch under the overlay as well, so a second Save cannot slip in (InvoiceEditor)
+    await run(t("invoiceRunning"), async () => {
+      await createGraveInvoiceRevision(draft.invoiceId, inputs);
+      await queryClient.invalidateQueries();
+    });
     visible.value = false;
   } catch (error) {
     showError(error);

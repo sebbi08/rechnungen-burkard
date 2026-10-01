@@ -72,6 +72,10 @@ watch(visible, async (open) => {
 });
 
 async function save(): Promise<void> {
+  // a click landing while the drawer slides out after a save
+  if (!visible.value) {
+    return;
+  }
   let inputs: InvoiceLineInput[];
   try {
     inputs = toLineInputs(lines.value);
@@ -82,12 +86,15 @@ async function save(): Promise<void> {
   const target = props.target;
   const recipient = recipientId.value ?? 0;
   try {
-    await run(t("invoiceRunning"), () =>
-      target
+    // The refetch runs under the overlay too: a drawer left open while the lists
+    // reload, with the busy guard already released, takes a second Save and
+    // creates the invoice twice.
+    await run(t("invoiceRunning"), async () => {
+      await (target
         ? createRevision(target.invoiceId, recipient, inputs)
-        : createInvoice(recipient, inputs),
-    );
-    await queryClient.invalidateQueries();
+        : createInvoice(recipient, inputs));
+      await queryClient.invalidateQueries();
+    });
     visible.value = false;
   } catch (error) {
     showError(error);
