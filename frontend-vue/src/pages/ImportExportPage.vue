@@ -34,6 +34,15 @@ function onFileChosen(event: Event): void {
   problems.value = [];
 }
 
+/** Clears the input first: picking the same file again -- fixed after a
+ *  rejection -- fires no change event otherwise, and the stale File went up. */
+function chooseFile(): void {
+  if (fileInput.value) {
+    fileInput.value.value = "";
+    fileInput.value.click();
+  }
+}
+
 async function downloadTemplate(): Promise<void> {
   downloading.value = true;
   try {
@@ -54,6 +63,7 @@ async function startImport(): Promise<void> {
   try {
     const summary = await run(t("importRunning"), () => importArchive(chosen));
     file.value = null;
+    problems.value = [];
     if (fileInput.value) {
       fileInput.value.value = "";
     }
@@ -116,7 +126,7 @@ async function startImport(): Promise<void> {
             icon="pi pi-folder-open"
             severity="secondary"
             outlined
-            @click="fileInput?.click()"
+            @click="chooseFile"
           />
           <span class="text-sm" :class="file ? '' : 'text-muted-color'">{{
             file?.name ?? t("noFileChosen")
