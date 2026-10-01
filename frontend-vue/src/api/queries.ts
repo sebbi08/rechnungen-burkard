@@ -36,14 +36,19 @@ export function useVatRatesQuery() {
   });
 }
 
-/** A search term as the inside of an OData string literal. odata2ts only wraps
- *  a value in quotes, so a quote in the term ("O'Brien") would end the literal
- *  and the backend would answer 400; OData escapes it by doubling. */
+/** A search term as the inside of an OData string literal, for comparing
+ *  against tolower(field). odata2ts only wraps a value in quotes, so a quote in
+ *  the term ("O'Brien") would end the literal and the backend would answer 400;
+ *  OData escapes it by doubling. Only A-Z is lowered: SQLite's lower() leaves
+ *  every other letter alone, so a lowered "Ä" would no longer match its own. */
 function searchLiteral(term: string): string {
-  return term.trim().replaceAll("'", "''");
+  return term
+    .trim()
+    .replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+    .replaceAll("'", "''");
 }
 
-/** Items, newest first; a term filters on number or description. */
+/** Items, newest first; a term filters on number or description, ignoring case. */
 export function fetchItems(term: string): Promise<InvoiceItem[]> {
   const literal = searchLiteral(term);
   return readAll(async (skip, top) => {
@@ -51,7 +56,9 @@ export function fetchItems(term: string): Promise<InvoiceItem[]> {
       .InvoiceItems()
       .query((b, q) => {
         if (literal) {
-          b.filter(q.Number.contains(literal).or(q.Description.contains(literal)));
+          b.filter(
+            q.Number.toLower().contains(literal).or(q.Description.toLower().contains(literal)),
+          );
         }
         b.orderBy(q.Id.desc()).skip(skip).top(top);
       })
@@ -78,7 +85,7 @@ export async function loadItemVatRates(queryClient: QueryClient): Promise<Map<nu
   return new Map(items.map((item) => [item.Id, item.VatRate]));
 }
 
-/** Recipients, newest first; a term filters on the name. */
+/** Recipients, newest first; a term filters on the name or the number. */
 export function fetchRecipients(term: string): Promise<Recipient[]> {
   const literal = searchLiteral(term);
   return readAll(async (skip, top) => {
@@ -86,7 +93,7 @@ export function fetchRecipients(term: string): Promise<Recipient[]> {
       .Recipients()
       .query((b, q) => {
         if (literal) {
-          b.filter(q.Name.contains(literal));
+          b.filter(q.Name.toLower().contains(literal).or(q.Number.toLower().contains(literal)));
         }
         b.orderBy(q.Id.desc()).skip(skip).top(top);
       })

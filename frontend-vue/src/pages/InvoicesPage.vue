@@ -62,6 +62,11 @@ const invoices = useQuery({
   placeholderData: keepPreviousData,
 });
 
+// "1–50 von 63": PrimeVue fills in its own placeholders, so they pass through
+const pageReport = computed(() =>
+  t("pageReport", { first: "{first}", last: "{last}", total: "{totalRecords}" }),
+);
+
 const editorOpen = ref(false);
 const editorTarget = ref<{ invoiceId: number; recipientId: number } | null>(null);
 
@@ -108,6 +113,8 @@ function openEditor(invoice: Invoice | null): void {
         :rows="PAGE_SIZE"
         :first="first"
         :total-records="invoices.data.value?.total ?? 0"
+        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+        :current-page-report-template="pageReport"
         :loading="invoices.isFetching.value"
         striped-rows
         @page="first = $event.first"

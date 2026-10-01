@@ -31,7 +31,13 @@ import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
 import { formatDate, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
-import { currentHalfYear, halfYearKey, halfYearOptions, parseHalfYearKey } from "@/lib/halfYear";
+import {
+  currentHalfYear,
+  halfYearKey,
+  halfYearOptions,
+  halfYearText,
+  parseHalfYearKey,
+} from "@/lib/halfYear";
 
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
@@ -97,6 +103,15 @@ function paymentTag(
 
 const zipping = ref(false);
 async function downloadZip(): Promise<void> {
+  // the server answers an empty archive, which was saved without a word
+  if (status.data.value && !status.data.value.some((row) => row.InvoiceCount > 0)) {
+    showMessage(
+      t("bulkGraveInvoices"),
+      t("bulkNothingToDownload", [halfYearText(period.value[0], period.value[1])]),
+      "info",
+    );
+    return;
+  }
   zipping.value = true;
   try {
     downloadBlob(await bulkDownload("Normal", period.value[0], period.value[1]), "rechnungen.zip");
