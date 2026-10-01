@@ -190,7 +190,13 @@ function openEditor(graveId: number | null): void {
         />
       </div>
 
-      <DataTable :value="rows" data-key="Id" :loading="status.isFetching.value" striped-rows>
+      <!-- the search narrows the status list, so its own fetch is loading too -->
+      <DataTable
+        :value="rows"
+        data-key="Id"
+        :loading="status.isFetching.value || searchResult.isFetching.value"
+        striped-rows
+      >
         <template #empty>{{ t("noData") }}</template>
         <Column :header="t('graveNumber')">
           <template #body="{ data }">
