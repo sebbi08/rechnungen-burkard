@@ -10,13 +10,6 @@ export const PORT = process.env.E2E_PORT ?? "8081";
 
 export const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
-/**
- * The Vue frontend (D-003): the second port of a second deployment of the same
- * image, which the Vue specs have to themselves (see playwright.config.ts).
- */
-export const VUE_BASE_URL =
-  process.env.E2E_VUE_BASE_URL ?? `http://localhost:${process.env.E2E_VUE_PORT ?? "8083"}`;
-
 const PROJECT = "invoicing-e2e";
 
 const COMPOSE_ARGS = ["compose", "-f", "../docker-compose.e2e.yml", "-p", PROJECT];
@@ -58,19 +51,13 @@ export function compose(...args: string[]): void {
   });
 }
 
-/** Polls until both deployments serve and their OData endpoints answer. */
+/** Polls until the app serves and its OData endpoints answer. */
 export async function waitUntilReady(timeoutMs = 5 * 60 * 1000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  for (const url of [BASE_URL, VUE_BASE_URL]) {
-    await waitForDeployment(url, deadline);
-  }
-}
-
-async function waitForDeployment(url: string, deadline: number): Promise<void> {
   let lastError = "not started";
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${url}/odata/Settings`);
+      const response = await fetch(`${BASE_URL}/odata/Settings`);
       if (response.ok) {
         return;
       }
@@ -81,5 +68,5 @@ async function waitForDeployment(url: string, deadline: number): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
-  throw new Error(`${url} did not become ready: ${lastError}`);
+  throw new Error(`${BASE_URL} did not become ready: ${lastError}`);
 }

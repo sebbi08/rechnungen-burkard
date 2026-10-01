@@ -27,45 +27,29 @@ serializer produces (`ODataJsonDefaults.PascalCase`), so a client sees one
 casing across the whole API. All entity data — everything the UI lists, filters
 and sorts — goes through the EDM.
 
-## D-002: The frontend writes through `fetch`, not the OData V4 model
+## D-002: The frontend writes partly through a hand-typed module
 
-**Principle**: I — "consumed by the UI5 frontend's OData V4 model".
+**Principle**: Technology Constraints — "consumed by the frontend through a
+client generated from `$metadata`".
 
-**Deviation**: Every read (list bindings, filters, sorting, `$select`,
-`$expand`) uses `sap.ui.model.odata.v4.ODataModel`. Writes go through `fetch`
-in `frontend/src/model/api.ts`.
+**Deviation**: Every read and most entity writes (items, VAT rates, the
+settings, editing a recipient) go through the client odata2ts generates from
+`$metadata`. The D-001 endpoints, the actions whose parameters `$metadata`
+leaves out, and creating a recipient go through `fetch`, in the hand-typed
+module `frontend/src/api/endpoints.ts`.
 
-**Why**: The write paths are actions and file transfers rather than entity
-updates, and the backend exposes no `$batch` endpoint. Routing them through the
-model would add a deferred-change layer the app never uses, while the actions
-above (D-001) are not model-addressable at all.
+**Why**: The D-001 endpoints are not part of the EDM, so nothing can be
+generated for them, and an action whose parameters the EDM does not declare
+would be generated without them. A new recipient may leave its number out for
+the backend to assign, which the generated create type, with the number
+required, cannot express.
 
-**Containment**: All write endpoints are in one module with a single error
-mapping, so the client-side contract stays in one place. The E2E suite covers
-each write path end to end.
+**Containment**: All of these calls are in one module with a single error
+mapping (`frontend/src/api/http.ts`), so the client-side contract stays in one
+place. The E2E suite covers each of them end to end.
 
-## D-003: A second frontend in Vue, for evaluation only
+## D-003: Withdrawn
 
-**Principle**: VI — OpenUI5 Frontend; and the Technology Constraints line
-"consumed by the UI5 frontend's OData V4 model".
-
-**Deviation**: `frontend-vue/` is a second frontend, built with Vue 3 and
-PrimeVue 4 (MIT). It covers the same features as the OpenUI5 frontend and talks
-to the same backend through a client generated from `$metadata` (odata2ts),
-plus a hand-typed module for the D-001 endpoints and the actions whose
-parameters `$metadata` leaves out.
-
-**Why**: To decide whether to replace the OpenUI5 frontend on the strength of a
-like-for-like build rather than a sketch. Replacing it would amend Principle VI;
-this entry does not.
-
-**Containment**: The OpenUI5 frontend stays the application's frontend: the
-release image serves it on port 8080 as before. The image also carries the Vue
-build and serves it on a second port, 8082, from the same process and against
-the same API, so the two can be compared on real data; in development it runs
-from `docker-compose.yml` on 8082 as well. Nothing on the UI5 port changes, and
-the bundled dependencies' licenses ship with the Vue build. It uses the documented OData interface unchanged, keeps the UI multilingual
-(VII) and blocks the UI during long-running tasks (VIII). CI type-checks, lints
-and builds it, and the E2E suite covers it like the UI5 frontend: `e2e/tests/vue`
-holds a counterpart of every UI5 spec, run against a second container of the
-release image so that the two suites keep separate databases.
+A second frontend in Vue, built to decide whether to replace the OpenUI5 one.
+It did: constitution 4.0.0 makes Vue and PrimeVue the frontend (Principle VI),
+and the OpenUI5 frontend has been removed.

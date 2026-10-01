@@ -1,25 +1,68 @@
 import { expect, test } from "@playwright/test";
+import { createRow, seedGrave } from "../seed";
 
-const tileTitles = ["Einstellungen", "Leistungen", "Empfänger", "Rechnungen", "Gräber"];
+// A navigation bar lists the sections, the invoice list is the start page, and
+// a detail page leads back through its breadcrumb.
 
-test("home shows the launchpad tiles and tiles navigate to the sub-views", async ({ page }) => {
-  await page.goto("/index.html");
+const sections = [
+  { label: "Rechnungen", path: "/invoices" },
+  { label: "Gräber", path: "/graves" },
+  { label: "Leistungen", path: "/items" },
+  { label: "Empfänger", path: "/recipients" },
+  { label: "Import/Export", path: "/import-export" },
+  { label: "Einstellungen", path: "/settings" },
+];
 
-  // the home route is the default: all five launchpad tiles are visible
-  for (const title of tileTitles) {
-    await expect(page.locator(".sapMGT", { hasText: title })).toBeVisible();
+test("the start page is the invoice list and the navigation reaches every section", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/invoices$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Rechnungen" })).toBeVisible();
+
+  const nav = page.getByRole("navigation", { name: "Navigation" });
+  for (const section of sections) {
+    const link = nav.getByRole("link", { name: section.label, exact: true });
+    await link.click();
+    await expect(page).toHaveURL(new RegExp(`${section.path}$`));
+    await expect(page.getByRole("heading", { level: 1, name: section.label })).toBeVisible();
+    // the section the page belongs to is the one marked as current
+    await expect(link).toHaveAttribute("aria-current", "page");
   }
+});
 
-  // clicking a tile navigates to its route
-  await page.locator(".sapMGT", { hasText: "Rechnungen" }).click();
-  await expect(page).toHaveURL(/#\/invoices\/?$/);
+test("an unknown path leads to the start page", async ({ page }) => {
+  await page.goto("/gibt-es-nicht");
+  await expect(page).toHaveURL(/\/invoices$/);
+});
 
-  // the page back button returns to the launchpad
-  await page.locator("button[id$='-navButton']").click();
-  await expect(page).toHaveURL(/#\/?$/);
-  await expect(page.locator(".sapMGT", { hasText: "Rechnungen" })).toBeVisible();
+test("a detail page keeps its section marked and leads back through its breadcrumb", async ({
+  page,
+}) => {
+  const ts = Date.now();
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Navigation ${ts}`,
+    Address: "Musterweg 1",
+  });
+  const graveId = await seedGrave(page, {
+    graveNumber: `NAV-${ts}`,
+    items: [],
+    recipientIds: [recipient.Id],
+  });
 
-  // a second tile leads to its route
-  await page.locator(".sapMGT", { hasText: "Gräber" }).click();
-  await expect(page).toHaveURL(/#\/graves\/?$/);
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByRole("heading", { level: 1, name: `NAV-${ts}` })).toBeVisible();
+  // a detail route is no child of its list's route, so this is not RouterLink's own marking
+  const nav = page.getByRole("navigation", { name: "Navigation" });
+  await expect(nav.getByRole("link", { name: "Gräber", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await page
+    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("link", { name: "Gräber" })
+    .click();
+  await expect(page).toHaveURL(/\/graves$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Gräber" })).toBeVisible();
 });

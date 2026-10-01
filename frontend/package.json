@@ -1,23 +1,44 @@
 {
-  "name": "burkard.invoicing",
-  "version": "0.0.1",
+  "name": "burkard-invoicing-frontend",
+  "version": "0.0.0",
   "private": true,
+  "type": "module",
+  "description": "The frontend: Vue 3 and PrimeVue. The release image serves its build from the API's wwwroot.",
   "scripts": {
-    "start": "ui5 serve",
-    "build": "ui5 build --all --clean-dest --include-task=generateVersionInfo",
-    "typecheck": "tsc --noEmit",
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src",
-    "ui5lint": "ui5lint"
+    "gen:odata": "node scripts/gen-odata.mjs"
+  },
+  "dependencies": {
+    "@odata2ts/http-client-api": "^0.7.1",
+    "@odata2ts/http-client-fetch": "^0.13.1",
+    "@odata2ts/odata-core": "^0.7.1",
+    "@odata2ts/odata-query-objects": "^0.32.0",
+    "@odata2ts/odata-service": "^0.28.0",
+    "@primeuix/themes": "^2.0.3",
+    "@tanstack/vue-query": "^5.103.2",
+    "primeicons": "^7.0.0",
+    "primevue": "~4.5.5",
+    "vue": "^3.5.43",
+    "vue-i18n": "^11.4.12",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@openui5/types": "~1.151.0",
-    "@ui5/cli": "^4.0.0",
-    "@ui5/linter": "^1.23.5",
-    "eslint": "^10.9.1",
-    "globals": "^17.11.0",
-    "typescript": "^5.5.0",
-    "typescript-eslint": "^8.68.0",
-    "ui5-middleware-simpleproxy": "^3.0.0",
-    "ui5-tooling-transpile": "^3.0.0"
+    "@odata2ts/odata2ts": "^0.45.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.20.4",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-vue": "^10.11.1",
+    "globals": "^17.12.0",
+    "tailwindcss": "^4.3.3",
+    "tailwindcss-primeui": "^0.6.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.1",
+    "vue-tsc": "^3.3.11"
   }
 }

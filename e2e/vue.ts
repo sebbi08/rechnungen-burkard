@@ -1,9 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * Helpers for the Vue frontend's specs (tests/vue). The UI5 counterparts are in
- * dialog.ts; the mechanism they guard against is the same, only the markers
- * differ.
+ * Helpers that drive the frontend's PrimeVue controls the way a user finishes
+ * with them, rather than as fast as Playwright can.
  *
  * PrimeVue's Dialog moves focus to its `autofocus` field in `onAfterEnter`,
  * once its opening transition has finished — about 150ms after it appears. A
@@ -64,7 +63,7 @@ export function toasts(page: Page): Locator {
  * Picks one option from a PrimeVue Select, and does not return until the pick
  * has landed.
  *
- * Like a UI5 Select, it is not finished when the click returns: the overlay
+ * It is not finished when the click returns: the overlay
  * hides on a zero timeout and only then hands focus back to the field. A spec
  * that opens the next Select before that has its overlay closed again by the
  * pending focus change. So this waits for the overlay to have finished
@@ -128,7 +127,7 @@ export async function pickRecipient(page: Page, inputId: string, name: string): 
  *
  * The lists debounce their search field by 300ms and keep the previous rows on
  * screen until the new ones arrive, so a row count taken straight after typing
- * is satisfied by the stale rows — the trap invoices.spec.ts describes for UI5.
+ * is satisfied by the stale rows.
  */
 export async function search(
   page: Page,

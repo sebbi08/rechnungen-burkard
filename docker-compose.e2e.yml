@@ -1,34 +1,21 @@
 # The stack the E2E suite runs against: the release image, fully separate from
-# the dev stack — its own project, its own containers, its own ports and
-# databases that only live as long as the containers. Running it never touches
+# the dev stack — its own project, its own container, its own port and a
+# database that only lives as long as the container. Running it never touches
 # the dev data in ./data, and it shares no build output with the dev stack, so
 # both can be up at the same time.
 #
-# The services are built from the deployable image, so a green E2E run also
-# proves the image that gets released works.
+# The service is built from the deployable image, so a green E2E run also proves
+# the image that gets released works.
 name: invoicing-e2e
 
-x-app: &app
-  build:
-    context: .
-    dockerfile: Dockerfile
-  image: invoicing-e2e-app
-  # in memory and world-writable: every container start begins with an empty
-  # database, so runs cannot influence each other
-  tmpfs:
-    - /data:mode=0777
-
 services:
-  # the OpenUI5 frontend's specs
   app:
-    <<: *app
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "${E2E_PORT:-8081}:8080"
-
-  # The Vue frontend's specs (D-003), on the Vue port of a second container of
-  # the same image. Two suites generating grave invoices in one database would
-  # refuse and sweep up each other's runs; see playwright.config.ts.
-  app-vue:
-    <<: *app
-    ports:
-      - "${E2E_VUE_PORT:-8083}:8082"
+    # in memory and world-writable: every container start begins with an empty
+    # database, so runs cannot influence each other
+    tmpfs:
+      - /data:mode=0777

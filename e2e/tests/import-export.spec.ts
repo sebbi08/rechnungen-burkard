@@ -1,5 +1,7 @@
 import AdmZip from "adm-zip";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import { ensureRow } from "../seed";
+import { dialog } from "../vue";
 
 // Unique per run: the import is create-only, so in a stack that kept its data
 // fixed numbers would collide with rows from an earlier attempt.
@@ -34,16 +36,32 @@ function validArchive(suffix: string): Buffer {
   });
 }
 
+/** Chooses the archive and starts the import. */
+async function importArchive(page: Page, buffer: Buffer): Promise<void> {
+  // the field itself is hidden behind a button of the same name
+  await page
+    .locator("input[type='file']")
+    .setInputFiles({ name: "import.zip", mimeType: "application/zip", buffer });
+  // the chosen file is named beside the button
+  await expect(page.getByText("import.zip", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Importieren", exact: true }).click();
+}
+
+/** The table of problems a rejected archive is reported with. */
+function problems(page: Page) {
+  return page
+    .locator(".p-card")
+    .filter({ has: page.locator(".p-card-title", { hasText: "Gefundene Probleme" }) });
+}
+
 test.beforeEach(async ({ page }) => {
   // the imported item's VAT rate has to be configured, exactly as it must be
   // when an item is created through the item section
-  await page.request.post("/odata/VatRates", {
-    data: { Rate: 7 },
-  });
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
 });
 
 test("download the import template and read its four CSV files (Story 10)", async ({ page }) => {
-  await page.goto("/index.html#/import-export");
+  await page.goto("/import-export");
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Vorlage herunterladen" }).click();
@@ -61,6 +79,15 @@ test("download the import template and read its four CSV files (Story 10)", asyn
   expect(zip.readAsText("mapping.csv").trim()).toContain("Type,GraveNumber");
 });
 
+test("importing without a file asks for one first", async ({ page }) => {
+  await page.goto("/import-export");
+  await expect(page.getByText("Keine Datei ausgewählt")).toBeVisible();
+  await page.getByRole("button", { name: "Importieren", exact: true }).click();
+  await expect(
+    page.locator(".p-toast-message", { hasText: "Bitte wählen Sie zuerst eine ZIP-Datei aus." }),
+  ).toBeVisible();
+});
+
 test("a defective archive is reported per file and row and imports nothing (Story 11)", async ({
   page,
 }) => {
@@ -72,21 +99,18 @@ test("a defective archive is reported per file and row and imports nothing (Stor
     "mapping.csv": MAPPING_HEADER + `Item,${graveNumber},GIBTSNICHT,1,\r\n`,
   });
 
-  await page.goto("/index.html#/import-export");
-  await page
-    .locator("input[type='file']")
-    .setInputFiles({ name: "import.zip", mimeType: "application/zip", buffer: broken });
-  await page.getByRole("button", { name: "Importieren", exact: true }).click();
+  await page.goto("/import-export");
+  await importArchive(page, broken);
 
-  const errorBox = page.locator(".sapMDialog.sapMMessageBox");
-  await expect(errorBox).toContainText("abgelehnt");
-  await errorBox.getByRole("button").first().click();
+  const refusal = dialog(page, "Archiv");
+  await expect(refusal).toContainText("abgelehnt");
+  await refusal.getByRole("button", { name: "OK" }).click();
+  await expect(refusal).toHaveCount(0);
 
   // the report names the file and the row of every problem
-  const problems = page.locator("[id$='problemsTable-listUl']");
-  await expect(problems).toContainText("recipients.csv");
-  await expect(problems).toContainText("mapping.csv");
-  await expect(problems.locator("tbody tr").first()).toContainText("2");
+  await expect(problems(page)).toContainText("recipients.csv");
+  await expect(problems(page)).toContainText("mapping.csv");
+  await expect(problems(page).locator("tbody tr").first()).toContainText("2");
 
   // and nothing reached the database
   const graves = await (
@@ -99,23 +123,16 @@ test("a valid archive imports recipients, items, graves and their links (Story 1
   page,
 }) => {
   const suffix = `${RUN}`;
-  await page.goto("/index.html#/import-export");
-
-  await page.locator("input[type='file']").setInputFiles({
-    name: "import.zip",
-    mimeType: "application/zip",
-    buffer: validArchive(suffix),
-  });
-  await page.getByRole("button", { name: "Importieren", exact: true }).click();
+  await page.goto("/import-export");
+  await importArchive(page, validArchive(suffix));
 
   // blocking progress while the archive is processed, then the summary
-  const resultBox = page.locator(".sapMDialog.sapMMessageBox");
-  await expect(resultBox).toContainText("Import abgeschlossen", {
-    timeout: 30000,
-  });
-  await expect(resultBox).toContainText("Empfänger: 2");
-  await expect(resultBox).toContainText("Gräber: 1");
-  await resultBox.getByRole("button").first().click();
+  const result = dialog(page, "Import abgeschlossen");
+  await expect(result).toContainText("Empfänger: 2", { timeout: 30000 });
+  await expect(result).toContainText("Gräber: 1");
+  await result.getByRole("button", { name: "OK" }).click();
+  // the form is ready for the next archive
+  await expect(page.getByText("Keine Datei ausgewählt")).toBeVisible();
 
   // every reference resolves to an entry from the archive
   const graves = await (
@@ -149,28 +166,20 @@ test("importing the same archive twice is rejected as already existing (Story 11
   const suffix = `TWICE-${RUN}`;
   const buffer = validArchive(suffix);
 
-  // the first import goes through the API so the test focuses on the second
-  const upload = {
-    name: "import.zip",
-    mimeType: "application/zip",
-    buffer,
-  };
-  await page.goto("/index.html#/import-export");
-  await page.locator("input[type='file']").setInputFiles(upload);
-  await page.getByRole("button", { name: "Importieren", exact: true }).click();
-  const first = page.locator(".sapMDialog.sapMMessageBox");
-  await expect(first).toContainText("Import abgeschlossen", { timeout: 30000 });
-  await first.getByRole("button").first().click();
+  await page.goto("/import-export");
+  await importArchive(page, buffer);
+  const first = dialog(page, "Import abgeschlossen");
+  await expect(first).toContainText("Empfänger: 2", { timeout: 30000 });
+  await first.getByRole("button", { name: "OK" }).click();
+  await expect(first).toHaveCount(0);
 
-  await page.locator("input[type='file']").setInputFiles(upload);
-  await page.getByRole("button", { name: "Importieren", exact: true }).click();
-  const second = page.locator(".sapMDialog.sapMMessageBox");
+  await importArchive(page, buffer);
+  const second = dialog(page, "Archiv");
   await expect(second).toContainText("abgelehnt");
-  await second.getByRole("button").first().click();
+  await second.getByRole("button", { name: "OK" }).click();
 
-  const problems = page.locator("[id$='problemsTable-listUl']");
-  await expect(problems).toContainText("recipients.csv");
-  await expect(problems).toContainText("graves.csv");
+  await expect(problems(page)).toContainText("recipients.csv");
+  await expect(problems(page)).toContainText("graves.csv");
 
   // still exactly one grave with that number
   const graves = await (

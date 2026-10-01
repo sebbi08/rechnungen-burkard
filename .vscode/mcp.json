@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "@ui5/mcp-server": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@ui5/mcp-server"]
-    }
-  }
-}

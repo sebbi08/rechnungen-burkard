@@ -14,15 +14,15 @@ services:
   # A new named volume takes its ownership from the image at the mount point.
   # node:22 has no node_modules there, so the volume starts out root-owned and
   # npm install, running as UID:GID, fails with EACCES. That happens whenever
-  # the volumes are created afresh: a new worktree (a new project name), or
-  # `docker compose down -v`. Hand them to UID:GID before the frontends start.
+  # the volume is created afresh: a new worktree (a new project name), or
+  # `docker compose down -v`. Hand it to UID:GID before the frontend starts.
   node-modules-owner:
     image: node:22
     user: root
     volumes:
       - frontend-node-modules:/volumes/frontend
-      - frontend-vue-node-modules:/volumes/frontend-vue
-    command: ["chown", "${UID:-1000}:${GID:-1000}", "/volumes/frontend", "/volumes/frontend-vue"]
+    command: ["chown", "${UID:-1000}:${GID:-1000}", "/volumes/frontend"]
+  # The Vite dev server, proxying /odata to the backend container.
   frontend:
     image: node:22
     user: "${UID:-1000}:${GID:-1000}"
@@ -33,26 +33,8 @@ services:
     volumes:
       - ./frontend:/app/frontend
       - frontend-node-modules:/app/frontend/node_modules
-    command: ["sh", "-c", "npm install && npx ui5 serve --port 8080 --accept-remote-connections"]
-    ports:
-      - "8080:8080"
-  # The Vue evaluation frontend (docs/deviations.md D-003). The release image
-  # serves its build on port 8082 next to UI5 on 8080; here it runs from the
-  # Vite dev server and proxies /odata to the backend container like the UI5
-  # dev server does.
-  frontend-vue:
-    image: node:22
-    user: "${UID:-1000}:${GID:-1000}"
-    depends_on:
-      node-modules-owner:
-        condition: service_completed_successfully
-    working_dir: /app/frontend-vue
-    volumes:
-      - ./frontend-vue:/app/frontend-vue
-      - frontend-vue-node-modules:/app/frontend-vue/node_modules
     command: ["sh", "-c", "npm install && npm run dev -- --host"]
     ports:
-      - "8082:8082"
+      - "8080:8080"
 volumes:
   frontend-node-modules:
-  frontend-vue-node-modules:
