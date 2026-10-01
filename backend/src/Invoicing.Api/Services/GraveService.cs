@@ -32,6 +32,15 @@ public sealed class GraveService
         CancellationToken ct
     )
     {
+        // the import refuses the same (DateRangeInvalid); the dialog did not
+        if (endDate < startDate)
+        {
+            throw new ValidationException(
+                "DateRangeInvalid",
+                "The end date must not be before the start date."
+            );
+        }
+
         await ValidateAsync(graveNumber, items, recipientIds, ct);
 
         // A grave created without recipients could never be billed: generation

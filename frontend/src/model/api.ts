@@ -58,6 +58,8 @@ const CODE_TO_I18N: Record<string, string> = {
   VatRateExists: "errorVatRateExists",
   VatRateNotConfigured: "errorVatRateNotConfigured",
   InvalidVatRate: "errorInvalidVatRate",
+  VatRateInUse: "errorVatRateInUse",
+  DateRangeInvalid: "errorDateRangeInvalid",
   GravesAlreadyInvoiced: "errorGravesAlreadyInvoiced",
   JobAlreadyRunning: "errorJobAlreadyRunning",
   JobTimeout: "errorJobTimeout",

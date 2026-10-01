@@ -241,6 +241,16 @@ public sealed class InvoiceService
                 );
             }
 
+            // the document prints the price to the cent and multiplies the
+            // unrounded one, so 3 x 10,125 showed 10,13 and a total of 30,38
+            if (input.UnitPrice is { } typed && !GraveBilling.IsWholeCents(typed))
+            {
+                throw new ValidationException(
+                    "InvalidPrice",
+                    $"The price for item '{item.Number}' has more than two decimals."
+                );
+            }
+
             result.Add(
                 new InvoiceLine
                 {

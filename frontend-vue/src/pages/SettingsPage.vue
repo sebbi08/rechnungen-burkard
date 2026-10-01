@@ -69,7 +69,7 @@ const newRate = ref<number | null>(null);
 
 async function addVatRate(): Promise<void> {
   try {
-    if (newRate.value == null || !(newRate.value > 0)) {
+    if (newRate.value == null || !(newRate.value > 0 && newRate.value < 100)) {
       throw new ApiError("InvalidVatRate");
     }
     await odata.VatRates().create({ Rate: newRate.value }).execute();

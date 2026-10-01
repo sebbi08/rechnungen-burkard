@@ -564,4 +564,46 @@ public class SaveGraveTests
         Assert.Equal(99.00m, link.GetProperty("UnitPrice").GetDecimal());
         Assert.Equal(120.00m, link.GetProperty("Item").GetProperty("DefaultPrice").GetDecimal());
     }
+
+    [Fact]
+    public async Task Save_rejects_an_end_date_before_the_start_date()
+    {
+        // the import refuses the same row as DateRangeInvalid
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (pricedItem, _, recipient, _) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "S-DATE",
+                    startDate = "2030-12-31",
+                    endDate = "2026-01-01",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = pricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new List<long> { recipient },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "DateRangeInvalid",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Graves.AnyAsync(g => g.GraveNumber == "S-DATE"));
+    }
 }

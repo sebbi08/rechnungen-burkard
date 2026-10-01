@@ -41,7 +41,8 @@ public class VatRatesController : ODataController
 
         rate.Rate = VatRateNormalizer.Normalize(rate.Rate);
 
-        if (rate.Rate <= 0)
+        // a percentage of the price: at 100 or more it is a typo, not a tax
+        if (rate.Rate <= 0 || rate.Rate >= 100)
         {
             return BadRequest(
                 new
@@ -49,7 +50,7 @@ public class VatRatesController : ODataController
                     error = new
                     {
                         code = "InvalidVatRate",
-                        message = "The VAT rate must be positive.",
+                        message = "The VAT rate must be above 0 and below 100.",
                     },
                 }
             );
@@ -79,6 +80,22 @@ public class VatRatesController : ODataController
         var rate = _db.VatRates.Find(key);
         if (rate is null)
             return NotFound();
+        // an item keeps its rate as a number; with the rate gone it could be
+        // neither saved as it is (VatRateNotConfigured) nor, on a grave, changed
+        // (VatRateImmutable). Invoice lines carry their own copy and are unaffected.
+        if (_db.InvoiceItems.Any(i => i.VatRate == rate.Rate))
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "VatRateInUse",
+                        message = "Items still use this VAT rate.",
+                    },
+                }
+            );
+        }
         _db.VatRates.Remove(rate);
         _db.SaveChanges();
         return NoContent();

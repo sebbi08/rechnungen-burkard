@@ -334,4 +334,39 @@ public class CreateInvoiceTests
             });
         }
     }
+
+    [Fact]
+    public async Task Create_invoice_rejects_a_price_with_more_than_two_decimals()
+    {
+        // printed as 10,13 but multiplied unrounded, 3 x 10,125 summed to 30,38
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+
+        using var client = host.CreateClient();
+        var response = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 3,
+                            unitPrice = (decimal?)10.125m,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
 }
