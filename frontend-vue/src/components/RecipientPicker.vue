@@ -16,10 +16,12 @@ const quickOpen = ref(false);
 
 // A fresh draft starts on the newest recipient, as in the UI5 app. Taken from
 // the same list the Select shows, so the default is always one it can display.
+// Not before the refetch on opening has settled: the cached list may predate a
+// recipient created since, and the default would never move to it.
 watch(
-  () => recipients.data.value,
-  (list) => {
-    if (props.defaultToNewest && model.value == null && list?.length) {
+  [() => recipients.data.value, () => recipients.isFetching.value],
+  ([list, fetching]) => {
+    if (props.defaultToNewest && !fetching && model.value == null && list?.length) {
       model.value = list[0].Id;
     }
   },

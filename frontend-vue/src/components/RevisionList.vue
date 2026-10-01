@@ -35,7 +35,9 @@ const opened = computed(() => (revisions.value.length ? [String(revisions.value[
           </span>
         </span>
       </AccordionHeader>
-      <AccordionContent>
+      <!-- the content is a grid whose wrapper would grow to the table's width,
+           which pushed the columns past the card instead of letting it scroll -->
+      <AccordionContent :pt="{ contentWrapper: { class: 'min-w-0' } }">
         <RevisionPanel :revision="revision" />
       </AccordionContent>
     </AccordionPanel>

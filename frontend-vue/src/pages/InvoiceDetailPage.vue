@@ -4,8 +4,9 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import { computed, ref, toRef } from "vue";
+import { computed, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { loadChain } from "@/api/queries";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
@@ -23,6 +24,19 @@ const chain = useQuery({
   queryFn: () => loadChain(props.rootId),
 });
 const latest = computed(() => chain.data.value?.[0]);
+
+// A grave invoice is revised through its grave; here its editor would only be
+// refused. A link or bookmark to one lands on its own page instead.
+const router = useRouter();
+watch(
+  latest,
+  (invoice) => {
+    if (invoice?.GraveId != null) {
+      void router.replace(`/graves/${invoice.GraveId}/invoices/${invoice.RootId}`);
+    }
+  },
+  { immediate: true },
+);
 const number = computed(() => formatInvoiceNumber(latest.value?.InvoiceNumber));
 const editorTarget = computed(() =>
   latest.value ? { invoiceId: latest.value.Id, recipientId: latest.value.RecipientId } : null,

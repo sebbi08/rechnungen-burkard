@@ -27,7 +27,12 @@ const chain = useQuery({
   queryKey: ["invoices", "chain", toRef(props, "rootId")],
   queryFn: () => loadChain(props.rootId),
 });
-const latest = computed(() => chain.data.value?.[0]);
+// only an invoice of the grave in the URL: another grave's, or an ordinary one,
+// is "not found" rather than shown under the wrong grave's breadcrumbs
+const latest = computed(() => {
+  const first = chain.data.value?.[0];
+  return first?.GraveId === props.graveId ? first : undefined;
+});
 const number = computed(() => formatInvoiceNumber(latest.value?.InvoiceNumber));
 
 const latestId = computed(() => latest.value?.Id);

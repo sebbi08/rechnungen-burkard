@@ -38,7 +38,7 @@ function open(item: InvoiceItem | null): void {
   <Card>
     <template #content>
       <div class="mb-4">
-        <IconField class="w-full md:w-80">
+        <IconField class="w-full md:w-96">
           <InputIcon class="pi pi-search" />
           <InputText
             v-model="search"
@@ -59,14 +59,14 @@ function open(item: InvoiceItem | null): void {
         <Column field="Description" :header="t('itemDescription')" />
         <Column
           :header="t('vatRate')"
-          header-class="hidden md:table-cell"
+          header-class="hidden whitespace-nowrap md:table-cell"
           body-class="hidden md:table-cell"
         >
           <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
         </Column>
         <Column
           :header="t('itemDefaultPrice')"
-          header-class="hidden sm:table-cell"
+          header-class="hidden sm:table-cell col-num"
           body-class="hidden text-right tabular-nums sm:table-cell"
         >
           <template #body="{ data }">{{ formatAmount(data.DefaultPrice) }}</template>
@@ -78,7 +78,7 @@ function open(item: InvoiceItem | null): void {
               icon="pi pi-pencil"
               text
               rounded
-              :aria-label="t('edit')"
+              :aria-label="`${t('edit')}: ${data.Number}`"
               @click="open(data)"
             />
           </template>

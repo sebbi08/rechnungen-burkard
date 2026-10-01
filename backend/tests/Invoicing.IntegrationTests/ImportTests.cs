@@ -819,4 +819,65 @@ public class ImportTests
             problem.Message
         );
     }
+
+    /// <summary>The code alone does not say which sentence it was -- a duplicate
+    /// number may be a recipient's, an item's or a grave's -- and the values sit
+    /// inside the English message. Key and arguments let a frontend say it in
+    /// German.</summary>
+    [Fact]
+    public async Task A_problem_carries_a_message_key_and_its_values()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var unsplittable = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(UnsplittableArchive())
+        );
+        using (var json = await ODataJson.ReadAsync(unsplittable))
+        {
+            var problem = json
+                .RootElement.GetProperty("problems")
+                .EnumerateArray()
+                .Single(p => p.GetProperty("code").GetString() == "PricesDoNotDivide");
+            Assert.Equal("PricesDoNotDivide2", problem.GetProperty("messageKey").GetString());
+            Assert.Equal(
+                new[] { "19", "120.01", "2", "120.00", "120.02" },
+                problem
+                    .GetProperty("messageArgs")
+                    .EnumerateArray()
+                    .Select(a => a.GetString())
+                    .ToArray()
+            );
+        }
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n" + "IMP-1,2026-01-01,2040-12-31\r\n"
+            ),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        using var duplicate = await ODataJson.ReadAsync(response);
+        var duplicateProblem = duplicate
+            .RootElement.GetProperty("problems")
+            .EnumerateArray()
+            .Single(p => p.GetProperty("code").GetString() == "DuplicateNumber");
+        Assert.Equal(
+            "DuplicateGraveNumber",
+            duplicateProblem.GetProperty("messageKey").GetString()
+        );
+        Assert.Equal(
+            new[] { "IMP-1", "2" },
+            duplicateProblem
+                .GetProperty("messageArgs")
+                .EnumerateArray()
+                .Select(a => a.GetString())
+                .ToArray()
+        );
+    }
 }

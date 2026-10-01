@@ -5,8 +5,18 @@ export function formatDate(value: Date | string | null | undefined): string {
   if (value == null || value === "") {
     return "";
   }
-  const date = value instanceof Date ? value : new Date(value);
-  return date.toLocaleDateString("de-DE");
+  // An Edm.Date ("2026-01-01") is a calendar day. new Date() reads it as UTC
+  // midnight, which is the day before anywhere west of UTC; a timestamp
+  // (GeneratedAt) is an instant and converts as one.
+  const date =
+    value instanceof Date
+      ? value
+      : /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? parseIsoDate(value)!
+        : new Date(value);
+  // two-digit day and month, like the date pickers and like the invoice
+  // search, which matches "01.10.2026" but not "1.10.2026"
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function formatAmount(value: number | null | undefined): string {

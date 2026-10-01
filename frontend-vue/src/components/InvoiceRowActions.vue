@@ -14,6 +14,8 @@ const props = defineProps<{
   invoiceId: number;
   paidOn: string | null;
   detailsTo: RouteLocationRaw;
+  /** Which row, for screen readers: every row has the same buttons. */
+  rowLabel?: string;
 }>();
 const emit = defineEmits<{ edit: [] }>();
 
@@ -22,6 +24,10 @@ const router = useRouter();
 const { showError } = useErrorToast();
 const togglePaid = usePaidToggle();
 const menu = ref<InstanceType<typeof Menu>>();
+
+function named(label: string): string {
+  return props.rowLabel ? `${label}: ${props.rowLabel}` : label;
+}
 
 function open(kind: DocumentKindName): void {
   // openDocument opens the tab synchronously, inside the click
@@ -52,13 +58,15 @@ const menuItems = computed<MenuItem[]>(() => [
 
 <template>
   <div class="flex items-center justify-end gap-0.5">
-    <div class="hidden items-center gap-0.5 md:flex">
+    <!-- xl, not md: the sidebar appears at md and takes 16rem, so below xl five
+         buttons push the row's own columns out of the table -->
+    <div class="hidden items-center gap-0.5 xl:flex">
       <Button
         v-tooltip.top="t('actionDetails')"
         icon="pi pi-eye"
         text
         rounded
-        :aria-label="t('actionDetails')"
+        :aria-label="named(t('actionDetails'))"
         @click="router.push(detailsTo)"
       />
       <Button
@@ -66,7 +74,7 @@ const menuItems = computed<MenuItem[]>(() => [
         icon="pi pi-file-pdf"
         text
         rounded
-        :aria-label="t('actionDownloadNormal')"
+        :aria-label="named(t('actionDownloadNormal'))"
         @click="open('Normal')"
       />
       <Button
@@ -74,7 +82,7 @@ const menuItems = computed<MenuItem[]>(() => [
         icon="pi pi-copy"
         text
         rounded
-        :aria-label="t('actionDownloadCopy')"
+        :aria-label="named(t('actionDownloadCopy'))"
         @click="open('Copy')"
       />
       <!-- a disabled button fires no hover, so the tooltip sits on a wrapper -->
@@ -84,7 +92,7 @@ const menuItems = computed<MenuItem[]>(() => [
           text
           rounded
           :disabled="!!paidOn"
-          :aria-label="t('actionEdit')"
+          :aria-label="named(t('actionEdit'))"
           @click="emit('edit')"
         />
       </span>
@@ -94,16 +102,16 @@ const menuItems = computed<MenuItem[]>(() => [
         text
         rounded
         :severity="paidOn ? 'secondary' : 'success'"
-        :aria-label="paidOn ? t('actionMarkUnpaid') : t('actionMarkPaid')"
+        :aria-label="named(paidOn ? t('actionMarkUnpaid') : t('actionMarkPaid'))"
         @click="togglePaid(invoiceId, paidOn)"
       />
     </div>
     <Button
-      class="md:hidden"
+      class="xl:hidden"
       icon="pi pi-ellipsis-v"
       text
       rounded
-      :aria-label="t('moreActions')"
+      :aria-label="named(t('moreActions'))"
       aria-haspopup="true"
       @click="menu?.toggle($event)"
     />

@@ -31,7 +31,13 @@ import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
 import { formatDate, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
-import { currentHalfYear, halfYearKey, halfYearOptions, parseHalfYearKey } from "@/lib/halfYear";
+import {
+  currentHalfYear,
+  halfYearKey,
+  halfYearOptions,
+  halfYearText,
+  parseHalfYearKey,
+} from "@/lib/halfYear";
 
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
@@ -97,6 +103,15 @@ function paymentTag(
 
 const zipping = ref(false);
 async function downloadZip(): Promise<void> {
+  // the server answers an empty archive, which was saved without a word
+  if (status.data.value && !status.data.value.some((row) => row.InvoiceCount > 0)) {
+    showMessage(
+      t("bulkGraveInvoices"),
+      t("bulkNothingToDownload", [halfYearText(period.value[0], period.value[1])]),
+      "info",
+    );
+    return;
+  }
   zipping.value = true;
   try {
     downloadBlob(await bulkDownload("Normal", period.value[0], period.value[1]), "rechnungen.zip");
@@ -163,7 +178,7 @@ function openEditor(graveId: number | null): void {
   <Card>
     <template #content>
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <IconField class="w-full md:w-96">
+        <IconField class="w-full md:w-[26rem]">
           <InputIcon class="pi pi-search" />
           <InputText
             v-model="search"
@@ -190,7 +205,13 @@ function openEditor(graveId: number | null): void {
         />
       </div>
 
-      <DataTable :value="rows" data-key="Id" :loading="status.isFetching.value" striped-rows>
+      <!-- the search narrows the status list, so its own fetch is loading too -->
+      <DataTable
+        :value="rows"
+        data-key="Id"
+        :loading="status.isFetching.value || searchResult.isFetching.value"
+        striped-rows
+      >
         <template #empty>{{ t("noData") }}</template>
         <Column :header="t('graveNumber')">
           <template #body="{ data }">
@@ -204,15 +225,15 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column
           :header="t('startDate')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell tabular-nums"
+          header-class="hidden xl:table-cell"
+          body-class="hidden xl:table-cell tabular-nums"
         >
           <template #body="{ data }">{{ formatDate(data.StartDate) }}</template>
         </Column>
         <Column
           :header="t('endDate')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell tabular-nums"
+          header-class="hidden xl:table-cell"
+          body-class="hidden xl:table-cell tabular-nums"
         >
           <template #body="{ data }">{{ formatDate(data.EndDate) }}</template>
         </Column>
@@ -260,7 +281,7 @@ function openEditor(graveId: number | null): void {
                 icon="pi pi-eye"
                 text
                 rounded
-                :aria-label="t('actionDetails')"
+                :aria-label="`${t('actionDetails')}: ${data.GraveNumber}`"
                 @click="router.push(`/graves/${data.Id}`)"
               />
               <Button
@@ -268,7 +289,7 @@ function openEditor(graveId: number | null): void {
                 icon="pi pi-pencil"
                 text
                 rounded
-                :aria-label="t('edit')"
+                :aria-label="`${t('edit')}: ${data.GraveNumber}`"
                 @click="openEditor(data.Id)"
               />
             </div>

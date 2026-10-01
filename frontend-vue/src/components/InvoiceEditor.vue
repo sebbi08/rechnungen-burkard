@@ -13,6 +13,7 @@ import {
 } from "@/api/endpoints";
 import { loadItemVatRates } from "@/api/queries";
 import { useBlocking } from "@/composables/useBlocking";
+import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
 import { priceFieldValue } from "@/lib/money";
@@ -24,15 +25,25 @@ const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
 const { showError } = useErrorToast();
+const drawerFocus = useDrawerFocus();
+const formEl = ref<HTMLFormElement | null>(null);
 const { run } = useBlocking();
 const queryClient = useQueryClient();
 
 const recipientId = ref<number | null>(null);
 const lines = ref<DraftLine[]>([]);
 const loading = ref(false);
+// Which opening a load belongs to: lines that arrive after the drawer was
+// closed, or reopened for another invoice or a new one, are dropped (GraveEditor).
+let opening = 0;
 
 watch(visible, async (open) => {
+  const current = ++opening;
+  if (open) {
+    drawerFocus.remember();
+  }
   if (!open) {
+    loading.value = false;
     return;
   }
   recipientId.value = props.target?.recipientId ?? null;
@@ -46,6 +57,9 @@ watch(visible, async (open) => {
       fetchInvoiceLines(props.target.invoiceId),
       loadItemVatRates(queryClient),
     ]);
+    if (current !== opening) {
+      return;
+    }
     lines.value = existing
       .slice()
       .sort((a, b) => a.LineNumber - b.LineNumber)
@@ -64,14 +78,23 @@ watch(visible, async (open) => {
         }),
       );
   } catch (error) {
-    showError(error);
-    visible.value = false;
+    if (current === opening) {
+      showError(error);
+      visible.value = false;
+    }
   } finally {
-    loading.value = false;
+    if (current === opening) {
+      loading.value = false;
+      void drawerFocus.focusFirst(formEl.value);
+    }
   }
 });
 
 async function save(): Promise<void> {
+  // a click landing while the drawer slides out after a save
+  if (!visible.value) {
+    return;
+  }
   let inputs: InvoiceLineInput[];
   try {
     inputs = toLineInputs(lines.value);
@@ -82,12 +105,15 @@ async function save(): Promise<void> {
   const target = props.target;
   const recipient = recipientId.value ?? 0;
   try {
-    await run(t("invoiceRunning"), () =>
-      target
+    // The refetch runs under the overlay too: a drawer left open while the lists
+    // reload, with the busy guard already released, takes a second Save and
+    // creates the invoice twice.
+    await run(t("invoiceRunning"), async () => {
+      await (target
         ? createRevision(target.invoiceId, recipient, inputs)
-        : createInvoice(recipient, inputs),
-    );
-    await queryClient.invalidateQueries();
+        : createInvoice(recipient, inputs));
+      await queryClient.invalidateQueries();
+    });
     visible.value = false;
   } catch (error) {
     showError(error);
@@ -100,10 +126,14 @@ async function save(): Promise<void> {
     v-model:visible="visible"
     position="right"
     :header="target ? t('editInvoice') : t('createInvoice')"
+    :aria-label="target ? t('editInvoice') : t('createInvoice')"
     :style="{ width: 'min(100vw, 60rem)' }"
+    @after-show="drawerFocus.focusFirst(formEl)"
+    @after-hide="drawerFocus.restore()"
+    @keydown.capture="drawerFocus.onKeydown($event, () => (visible = false))"
   >
     <div v-if="loading" class="flex justify-center p-10"><ProgressSpinner /></div>
-    <form v-else id="invoiceForm" class="flex flex-col gap-6" @submit.prevent="save">
+    <form ref="formEl" v-else id="invoiceForm" class="flex flex-col gap-6" @submit.prevent="save">
       <div class="flex flex-col gap-2">
         <label for="invoiceRecipient" class="font-medium">{{ t("menuRecipients") }}</label>
         <RecipientPicker

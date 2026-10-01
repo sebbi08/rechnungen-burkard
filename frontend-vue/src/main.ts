@@ -15,6 +15,12 @@ import { router } from "./router";
 applyStoredTheme();
 document.documentElement.lang = locale;
 document.title = i18n.global.t("appTitle");
+// "Gräber – Rechnungen": every tab and history entry read just "Rechnungen"
+router.afterEach((to) => {
+  const app = i18n.global.t("appTitle");
+  const page = to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : "";
+  document.title = page && page !== app ? `${page} – ${app}` : app;
+});
 
 // Data only changes through this app or the UI5 one, so a refetch on every
 // window focus would reload lists under an open editor for nothing. Instead

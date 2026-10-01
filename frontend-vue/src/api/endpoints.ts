@@ -283,7 +283,11 @@ export interface ImportProblem {
   file: string;
   row: number | null;
   code: string;
+  /** English; the fallback when the key below is unknown. */
   message: string;
+  /** Which sentence it is, and its values as written in the archive. */
+  messageKey?: string | null;
+  messageArgs?: string[] | null;
 }
 
 export interface ImportSummary {

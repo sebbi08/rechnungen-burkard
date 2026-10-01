@@ -9,14 +9,16 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import { useToast } from "primevue/usetoast";
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { onBeforeRouteLeave } from "vue-router";
 import { ApiError } from "@/api/http";
 import { odata } from "@/api/odata";
 import { useSettingsQuery, useVatRatesQuery } from "@/api/queries";
 import PageHeader from "@/components/PageHeader.vue";
 import { useConfirmAsync } from "@/composables/useConfirmAsync";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatVatRate } from "@/lib/format";
 
 const { t } = useI18n();
@@ -40,6 +42,26 @@ watch(
   },
   { immediate: true },
 );
+
+// Leaving with unsaved edits asks first -- inside the app, and on a reload or a
+// closed tab through the browser's own prompt.
+const dirty = computed(() => {
+  const stored = settings.data.value;
+  return (
+    !!stored &&
+    (form.StampWord !== stored.StampWord ||
+      form.EndingText !== stored.EndingText ||
+      form.Language !== stored.Language)
+  );
+});
+onBeforeRouteLeave(async () => !dirty.value || (await ask(t("confirmDiscardSettings"))));
+function onBeforeUnload(event: BeforeUnloadEvent): void {
+  if (dirty.value) {
+    event.preventDefault();
+  }
+}
+onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
+onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 
 const languages = computed(() => [
   { value: "de", label: t("languageDe") },
@@ -69,7 +91,7 @@ const newRate = ref<number | null>(null);
 
 async function addVatRate(): Promise<void> {
   try {
-    if (newRate.value == null || !(newRate.value > 0)) {
+    if (newRate.value == null || !(newRate.value > 0 && newRate.value < 100)) {
       throw new ApiError("InvalidVatRate");
     }
     await odata.VatRates().create({ Rate: newRate.value }).execute();
@@ -98,7 +120,7 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
 
   <div class="grid gap-6 lg:grid-cols-[2fr_1fr]">
     <Card>
-      <template #title>{{ t("menuSettings") }}</template>
+      <template #title>{{ t("settingsDocumentsTitle") }}</template>
       <template #content>
         <form class="flex flex-col gap-5" @submit.prevent="save">
           <div class="flex flex-col gap-2">
@@ -159,6 +181,7 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
             <label for="newRate" class="text-sm">{{ t("vatRate") }}</label>
             <InputNumber
               v-model="newRate"
+              v-decimal-point
               input-id="newRate"
               locale="de-DE"
               :max-fraction-digits="2"

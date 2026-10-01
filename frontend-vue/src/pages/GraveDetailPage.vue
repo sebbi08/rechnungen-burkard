@@ -110,13 +110,22 @@ const {
             header-class="hidden sm:table-cell"
             body-class="hidden sm:table-cell"
           />
-          <Column field="Count" :header="t('itemCount')" body-class="text-right tabular-nums" />
-          <Column :header="t('itemPrice')" body-class="text-right tabular-nums whitespace-nowrap">
+          <Column
+            field="Count"
+            :header="t('itemCount')"
+            header-class="col-num"
+            body-class="text-right tabular-nums"
+          />
+          <Column
+            :header="t('itemPrice')"
+            header-class="col-num"
+            body-class="text-right tabular-nums whitespace-nowrap"
+          >
             <template #body="{ data }">{{ formatAmount(data.Price) }}</template>
           </Column>
           <Column
             :header="t('vatRate')"
-            header-class="hidden md:table-cell"
+            header-class="hidden md:table-cell col-num"
             body-class="hidden md:table-cell text-right"
           >
             <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
@@ -154,7 +163,13 @@ const {
               halfYearText(data.PeriodYear, data.PeriodHalf)
             }}</template>
           </Column>
-          <Column field="RecipientName" :header="t('recipientName')" />
+          <Column :header="t('recipientName')">
+            <template #body="{ data }">
+              {{ data.RecipientName }}
+              <!-- on a phone the payment state sits under the name instead of in its own column -->
+              <div class="mt-1 sm:hidden"><PaidStatusTag :paid-on="data.PaidOn" /></div>
+            </template>
+          </Column>
           <Column
             :header="t('invoiceNumber')"
             header-class="hidden md:table-cell"
@@ -172,19 +187,23 @@ const {
           </Column>
           <Column
             :header="t('invoiceDate')"
-            header-class="hidden lg:table-cell"
-            body-class="hidden lg:table-cell tabular-nums"
+            header-class="hidden xl:table-cell"
+            body-class="hidden xl:table-cell tabular-nums"
           >
             <template #body="{ data }">{{ formatDate(data.GeneratedAt) }}</template>
           </Column>
           <Column
             :header="t('grossTotal')"
-            header-class="hidden sm:table-cell"
+            header-class="hidden sm:table-cell col-num"
             body-class="hidden sm:table-cell text-right tabular-nums whitespace-nowrap"
           >
             <template #body="{ data }">{{ formatAmount(data.GrossTotal) }}</template>
           </Column>
-          <Column :header="t('paidStatus')">
+          <Column
+            :header="t('paidStatus')"
+            header-class="hidden sm:table-cell"
+            body-class="hidden sm:table-cell"
+          >
             <template #body="{ data }"><PaidStatusTag :paid-on="data.PaidOn" /></template>
           </Column>
           <Column class="w-0 whitespace-nowrap">
@@ -193,6 +212,7 @@ const {
                 :invoice-id="data.Id"
                 :paid-on="data.PaidOn"
                 :details-to="`/graves/${graveId}/invoices/${data.RootId}`"
+                :row-label="`${halfYearText(data.PeriodYear, data.PeriodHalf)} ${data.RecipientName}`"
                 @edit="openGraveInvoice(data.Id)"
               />
             </template>

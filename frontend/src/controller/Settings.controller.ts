@@ -61,7 +61,7 @@ export default class Settings extends BaseController {
   public async onAddVatRate(): Promise<void> {
     const view = this.state<SettingsView>("view");
     const rate = Number(view.getProperty("/newVatRate"));
-    if (!rate || rate <= 0) {
+    if (!rate || rate <= 0 || rate >= 100) {
       api.showError(this, new Error("InvalidVatRate"));
       return;
     }

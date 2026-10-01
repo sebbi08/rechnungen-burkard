@@ -6,14 +6,17 @@ import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Select from "primevue/select";
+import { useToast } from "primevue/usetoast";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
 import type { InvoiceItem } from "@/api/generated";
+import { ApiError } from "@/api/http";
 import { odata } from "@/api/odata";
 import { useVatRatesQuery } from "@/api/queries";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatAmount, formatVatRate } from "@/lib/format";
 
 const props = defineProps<{ item: InvoiceItem | null }>();
@@ -21,6 +24,7 @@ const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
 const { showError } = useErrorToast();
+const toast = useToast();
 const queryClient = useQueryClient();
 const vatRates = useVatRatesQuery();
 
@@ -58,6 +62,9 @@ const graves = useQuery({
   enabled: computed(() => visible.value && itemId.value != null),
 });
 const linked = computed(() => graves.data.value?.Linked ?? false);
+// Until the answer is in, a rate picked here could be one the graves forbid:
+// the select would lock on it once they load, and the save would be refused.
+const rateLocked = computed(() => linked.value || (itemId.value != null && graves.isPending.value));
 
 function groupLabel(group: ItemGraveGroup): string {
   const price =
@@ -69,11 +76,17 @@ function groupLabel(group: ItemGraveGroup): string {
 
 const saving = ref(false);
 async function save(): Promise<void> {
+  if (form.VatRate == null) {
+    // sent as 0 it came back as "rate not configured", which reads as a fault
+    showError(new ApiError("VatRateRequired"));
+    return;
+  }
   saving.value = true;
+  // trimmed, as the recipient number is: "X" and "X " were two items
   const payload = {
-    Number: form.Number,
-    Description: form.Description,
-    VatRate: form.VatRate ?? 0,
+    Number: form.Number.trim(),
+    Description: form.Description.trim(),
+    VatRate: form.VatRate,
     DefaultPrice: form.DefaultPrice,
   };
   try {
@@ -84,6 +97,7 @@ async function save(): Promise<void> {
     }
     await queryClient.invalidateQueries();
     visible.value = false;
+    toast.add({ severity: "success", summary: t("saved"), life: 3000 });
   } catch (error) {
     showError(error);
   } finally {
@@ -117,7 +131,7 @@ async function save(): Promise<void> {
           :options="rateOptions"
           option-value="value"
           option-label="label"
-          :disabled="linked"
+          :disabled="rateLocked"
         />
         <small v-if="linked" class="text-muted-color">{{ t("itemVatRateFixed") }}</small>
       </div>
@@ -125,6 +139,7 @@ async function save(): Promise<void> {
         <label for="itemDefaultPrice" class="font-medium">{{ t("itemDefaultPrice") }}</label>
         <InputNumber
           v-model="form.DefaultPrice"
+          v-decimal-point
           input-id="itemDefaultPrice"
           locale="de-DE"
           :min-fraction-digits="2"

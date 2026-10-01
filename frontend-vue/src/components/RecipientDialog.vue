@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
+import { useToast } from "primevue/usetoast";
 import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { createRecipient } from "@/api/endpoints";
@@ -16,6 +17,7 @@ const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
 const { showError } = useErrorToast();
+const toast = useToast();
 const queryClient = useQueryClient();
 const form = reactive({ Number: "", Name: "", Address: "" });
 
@@ -37,18 +39,19 @@ async function save(): Promise<void> {
     if (props.recipient) {
       await odata
         .Recipients(props.recipient.Id)
-        .patch({ Number: number, Name: form.Name, Address: form.Address })
+        .patch({ Number: number, Name: form.Name.trim(), Address: form.Address.trim() })
         .execute();
     } else {
       // an empty number is left out: the backend assigns the next one
       await createRecipient({
-        Name: form.Name,
-        Address: form.Address,
+        Name: form.Name.trim(),
+        Address: form.Address.trim(),
         ...(number ? { Number: number } : {}),
       });
     }
     await queryClient.invalidateQueries();
     visible.value = false;
+    toast.add({ severity: "success", summary: t("saved"), life: 3000 });
   } catch (error) {
     showError(error);
   } finally {
@@ -71,7 +74,7 @@ async function save(): Promise<void> {
         <InputText
           id="recipientNumber"
           v-model="form.Number"
-          :placeholder="t('recipientNumberHint')"
+          :placeholder="recipient ? undefined : t('recipientNumberHint')"
         />
       </div>
       <div class="flex flex-col gap-2">
