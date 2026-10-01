@@ -5,7 +5,15 @@ export function formatDate(value: Date | string | null | undefined): string {
   if (value == null || value === "") {
     return "";
   }
-  const date = value instanceof Date ? value : new Date(value);
+  // An Edm.Date ("2026-01-01") is a calendar day. new Date() reads it as UTC
+  // midnight, which is the day before anywhere west of UTC; a timestamp
+  // (GeneratedAt) is an instant and converts as one.
+  const date =
+    value instanceof Date
+      ? value
+      : /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? parseIsoDate(value)!
+        : new Date(value);
   return date.toLocaleDateString("de-DE");
 }
 
