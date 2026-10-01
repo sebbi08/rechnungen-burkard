@@ -37,13 +37,13 @@ async function save(): Promise<void> {
     if (props.recipient) {
       await odata
         .Recipients(props.recipient.Id)
-        .patch({ Number: number, Name: form.Name, Address: form.Address })
+        .patch({ Number: number, Name: form.Name.trim(), Address: form.Address.trim() })
         .execute();
     } else {
       // an empty number is left out: the backend assigns the next one
       await createRecipient({
-        Name: form.Name,
-        Address: form.Address,
+        Name: form.Name.trim(),
+        Address: form.Address.trim(),
         ...(number ? { Number: number } : {}),
       });
     }
@@ -71,7 +71,7 @@ async function save(): Promise<void> {
         <InputText
           id="recipientNumber"
           v-model="form.Number"
-          :placeholder="t('recipientNumberHint')"
+          :placeholder="recipient ? undefined : t('recipientNumberHint')"
         />
       </div>
       <div class="flex flex-col gap-2">

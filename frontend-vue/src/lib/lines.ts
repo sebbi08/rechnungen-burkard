@@ -25,16 +25,20 @@ export function newLine(init: Partial<Omit<DraftLine, "key">> = {}): DraftLine {
 }
 
 /** The payload for any line-taking endpoint. Every line needs an item
- *  (ItemRequired). An empty price is sent as null -- the item's default is
- *  billed -- while 0 is kept as a real price. */
+ *  (ItemRequired) and a whole count above zero (InvalidCount; the field lets a
+ *  typed "1,5" stand so it can be refused here). An empty price is sent as
+ *  null -- the item's default is billed -- while 0 is kept as a real price. */
 export function toLineInputs(lines: DraftLine[]): InvoiceLineInput[] {
   return lines.map((line) => {
     if (line.itemId == null) {
       throw new ApiError("ItemRequired");
     }
+    if (line.count == null || !Number.isInteger(line.count) || line.count <= 0) {
+      throw new ApiError("InvalidCount");
+    }
     return {
       itemId: line.itemId,
-      count: line.count ?? 0,
+      count: line.count,
       unitPrice: line.unitPrice,
       priceIncludesVat: line.priceIncludesVat,
     };

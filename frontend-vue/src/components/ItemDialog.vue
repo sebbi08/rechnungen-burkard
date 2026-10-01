@@ -11,9 +11,11 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
 import type { InvoiceItem } from "@/api/generated";
+import { ApiError } from "@/api/http";
 import { odata } from "@/api/odata";
 import { useVatRatesQuery } from "@/api/queries";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatAmount, formatVatRate } from "@/lib/format";
 
 const props = defineProps<{ item: InvoiceItem | null }>();
@@ -72,11 +74,17 @@ function groupLabel(group: ItemGraveGroup): string {
 
 const saving = ref(false);
 async function save(): Promise<void> {
+  if (form.VatRate == null) {
+    // sent as 0 it came back as "rate not configured", which reads as a fault
+    showError(new ApiError("VatRateRequired"));
+    return;
+  }
   saving.value = true;
+  // trimmed, as the recipient number is: "X" and "X " were two items
   const payload = {
-    Number: form.Number,
-    Description: form.Description,
-    VatRate: form.VatRate ?? 0,
+    Number: form.Number.trim(),
+    Description: form.Description.trim(),
+    VatRate: form.VatRate,
     DefaultPrice: form.DefaultPrice,
   };
   try {
@@ -128,6 +136,7 @@ async function save(): Promise<void> {
         <label for="itemDefaultPrice" class="font-medium">{{ t("itemDefaultPrice") }}</label>
         <InputNumber
           v-model="form.DefaultPrice"
+          v-decimal-point
           input-id="itemDefaultPrice"
           locale="de-DE"
           :min-fraction-digits="2"

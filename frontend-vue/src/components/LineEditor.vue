@@ -8,6 +8,7 @@ import { useI18n } from "vue-i18n";
 import type { InvoiceItem } from "@/api/generated";
 import { useItemsQuery } from "@/api/queries";
 import { formatAmount } from "@/lib/format";
+import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
 
 const lines = defineModel<DraftLine[]>({ required: true });
@@ -100,25 +101,43 @@ const totals = computed(() => {
         </Select>
         <small v-if="item(line)" class="px-1 text-muted-color">{{ item(line)?.Description }}</small>
       </div>
-      <InputNumber
-        v-model="line.count"
-        :min="0"
-        :use-grouping="false"
-        :aria-label="`${t('itemCount')} ${index + 1}`"
-        fluid
-      />
-      <!-- Up to four decimals: a grave invoice reopens net prices kept at three
-           on purpose, and rounding them here would change an untouched line. -->
-      <InputNumber
-        v-model="line.unitPrice"
-        locale="de-DE"
-        :min-fraction-digits="2"
-        :max-fraction-digits="4"
-        :placeholder="defaultPriceText(line)"
-        :aria-label="`${t('itemPrice')} ${index + 1}`"
-        fluid
-      />
-      <label class="flex items-center gap-2 md:pt-2">
+      <!-- The column headers are hidden on a phone, so each field carries its own
+           visible caption there; the accessible name stays the numbered label. -->
+      <div class="flex min-w-0 flex-col gap-1">
+        <span class="text-xs text-muted-color md:hidden" aria-hidden="true">
+          {{ t("itemCount") }}
+        </span>
+        <!-- A count is whole, but "1,5" or "-3" is kept as typed so the save can
+             say so; a field that dropped the comma or the sign turned them into
+             15 and 3 without a word. -->
+        <InputNumber
+          v-model="line.count"
+          v-decimal-point
+          locale="de-DE"
+          :max-fraction-digits="2"
+          :use-grouping="false"
+          :aria-label="`${t('itemCount')} ${index + 1}`"
+          fluid
+        />
+      </div>
+      <div class="flex min-w-0 flex-col gap-1">
+        <span class="text-xs text-muted-color md:hidden" aria-hidden="true">
+          {{ t("itemPrice") }}
+        </span>
+        <!-- Up to four decimals: a grave invoice reopens net prices kept at three
+             on purpose, and rounding them here would change an untouched line. -->
+        <InputNumber
+          v-model="line.unitPrice"
+          v-decimal-point
+          locale="de-DE"
+          :min-fraction-digits="2"
+          :max-fraction-digits="4"
+          :placeholder="defaultPriceText(line)"
+          :aria-label="`${t('itemPrice')} ${index + 1}`"
+          fluid
+        />
+      </div>
+      <label class="flex items-center gap-2 self-end pb-2 md:self-auto md:pt-2 md:pb-0">
         <Checkbox v-model="line.priceIncludesVat" binary />
         <span class="text-sm md:sr-only">{{ t("priceIncludesVatShort") }}</span>
       </label>

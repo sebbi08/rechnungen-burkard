@@ -27,7 +27,7 @@ const saving = ref(false);
 async function save(): Promise<void> {
   saving.value = true;
   try {
-    const id = await createRecipient({ Name: form.Name, Address: form.Address });
+    const id = await createRecipient({ Name: form.Name.trim(), Address: form.Address.trim() });
     await queryClient.invalidateQueries({ queryKey: ["recipients"] });
     emit("created", id);
     visible.value = false;
