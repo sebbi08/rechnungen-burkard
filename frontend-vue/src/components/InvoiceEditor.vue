@@ -30,9 +30,14 @@ const queryClient = useQueryClient();
 const recipientId = ref<number | null>(null);
 const lines = ref<DraftLine[]>([]);
 const loading = ref(false);
+// Which opening a load belongs to: lines that arrive after the drawer was
+// closed, or reopened for another invoice or a new one, are dropped (GraveEditor).
+let opening = 0;
 
 watch(visible, async (open) => {
+  const current = ++opening;
   if (!open) {
+    loading.value = false;
     return;
   }
   recipientId.value = props.target?.recipientId ?? null;
@@ -46,6 +51,9 @@ watch(visible, async (open) => {
       fetchInvoiceLines(props.target.invoiceId),
       loadItemVatRates(queryClient),
     ]);
+    if (current !== opening) {
+      return;
+    }
     lines.value = existing
       .slice()
       .sort((a, b) => a.LineNumber - b.LineNumber)
@@ -64,10 +72,14 @@ watch(visible, async (open) => {
         }),
       );
   } catch (error) {
-    showError(error);
-    visible.value = false;
+    if (current === opening) {
+      showError(error);
+      visible.value = false;
+    }
   } finally {
-    loading.value = false;
+    if (current === opening) {
+      loading.value = false;
+    }
   }
 });
 

@@ -44,9 +44,15 @@ const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
 const loading = ref(false);
 const saving = ref(false);
+// Which opening a load belongs to. An answer that arrives after the drawer was
+// closed -- or reopened for another grave, or for a new one -- is dropped:
+// filled in, it turned a new grave into a copy of the old one.
+let opening = 0;
 
 watch(visible, async (open) => {
+  const current = ++opening;
   if (!open) {
+    loading.value = false;
     return;
   }
   Object.assign(form, { GraveNumber: "", StartDate: null, EndDate: null });
@@ -59,6 +65,9 @@ watch(visible, async (open) => {
   loading.value = true;
   try {
     const grave = await fetchGraveDetails(props.graveId);
+    if (current !== opening) {
+      return;
+    }
     Object.assign(form, {
       GraveNumber: grave.GraveNumber,
       StartDate: parseIsoDate(grave.StartDate),
@@ -78,10 +87,14 @@ watch(visible, async (open) => {
       name: link.Recipient.Name,
     }));
   } catch (error) {
-    showError(error);
-    visible.value = false;
+    if (current === opening) {
+      showError(error);
+      visible.value = false;
+    }
   } finally {
-    loading.value = false;
+    if (current === opening) {
+      loading.value = false;
+    }
   }
 });
 
