@@ -8,7 +8,8 @@ namespace Burkard.Invoicing.Api.Services;
 /// <summary>Revises a grave's invoices for one half-year. A grave invoice bills
 /// one grave's own lines, so editing it edits the bill: every recipient of that
 /// grave and half-year gets a new revision carrying the grave's edited lines in
-/// full, raised for divisibility the same way generation raises them.</summary>
+/// full. Those lines have to split evenly across the recipients, as they do
+/// when the grave is saved; a revision that does not is refused.</summary>
 public sealed class GraveInvoiceRevisionService
 {
     private readonly AppDbContext _db;
@@ -70,6 +71,15 @@ public sealed class GraveInvoiceRevisionService
                 "GraveInvoicePaid",
                 $"The invoices of {string.Join(", ", paidRecipients)} are paid and cannot be revised."
             );
+        }
+
+        // Saving a grave and generating its invoices both refuse prices that do
+        // not split evenly; without the same check here an edit issued every
+        // recipient a total with fractions of a cent, PDFs included.
+        var problems = GraveShare.Problems(graveLines, siblings.Count);
+        if (problems.Count > 0)
+        {
+            throw new GraveShareValidationException(problems, siblings.Count);
         }
 
         // A grave's recipients cannot change, so the group is always the grave's

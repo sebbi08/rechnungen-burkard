@@ -696,4 +696,43 @@ public class GraveInvoiceRevisionTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId == graveId));
     }
+
+    [Fact]
+    public async Task Rejects_prices_that_do_not_split_across_the_recipients_without_touching_anything()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, invoiceId) = await SeedAsync(host);
+
+        // 1 × 100.01 net cannot be split between the grave's two recipients
+        using var client = host.CreateClient();
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)100.01m,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "PricesDoNotDivide",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId == graveId));
+    }
 }
