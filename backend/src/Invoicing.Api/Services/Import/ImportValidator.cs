@@ -33,7 +33,8 @@ public sealed class ImportValidator
                     "",
                     null,
                     "ArchiveUnreadable",
-                    "The file is not a readable ZIP archive."
+                    "The file is not a readable ZIP archive.",
+                    "ArchiveUnreadable"
                 )
             );
             return new ImportValidationResult(problems, null);
@@ -49,7 +50,8 @@ public sealed class ImportValidator
                         name,
                         null,
                         "FileMissing",
-                        "The file is missing from the archive."
+                        "The file is missing from the archive.",
+                        "FileMissing"
                     )
                 );
             }
@@ -72,7 +74,9 @@ public sealed class ImportValidator
                         name,
                         1,
                         "HeaderInvalid",
-                        $"The header row must be: {string.Join(", ", expectedHeader)}."
+                        $"The header row must be: {string.Join(", ", expectedHeader)}.",
+                        "HeaderInvalid",
+                        [string.Join(", ", expectedHeader)]
                     )
                 );
                 continue;
@@ -187,7 +191,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DuplicateNumber",
-                        $"The recipient number '{number}' is already used in row {first}."
+                        $"The recipient number '{number}' is already used in row {first}.",
+                        "DuplicateRecipientNumber",
+                        [number, first.ToString(CultureInfo.InvariantCulture)]
                     )
                 );
                 continue;
@@ -235,7 +241,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "VatRateInvalid",
-                        $"'{rawVat}' is not a valid VAT rate."
+                        $"'{rawVat}' is not a valid VAT rate.",
+                        "VatRateInvalid",
+                        [rawVat]
                     )
                 );
                 continue;
@@ -251,7 +259,9 @@ public sealed class ImportValidator
                             file,
                             line,
                             "PriceInvalid",
-                            $"'{rawPrice}' is not a valid price."
+                            $"'{rawPrice}' is not a valid price.",
+                            "PriceInvalid",
+                            [rawPrice]
                         )
                     );
                     continue;
@@ -266,7 +276,9 @@ public sealed class ImportValidator
                             file,
                             line,
                             "PriceInvalid",
-                            $"'{rawPrice}' has more than two decimals."
+                            $"'{rawPrice}' has more than two decimals.",
+                            "PriceDecimals",
+                            [rawPrice]
                         )
                     );
                     continue;
@@ -282,7 +294,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DuplicateNumber",
-                        $"The item number '{number}' is already used in row {first}."
+                        $"The item number '{number}' is already used in row {first}.",
+                        "DuplicateItemNumber",
+                        [number, first.ToString(CultureInfo.InvariantCulture)]
                     )
                 );
                 continue;
@@ -331,7 +345,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DateInvalid",
-                        $"'{rawStart}' is not a valid date (expected YYYY-MM-DD)."
+                        $"'{rawStart}' is not a valid date (expected YYYY-MM-DD).",
+                        "DateInvalid",
+                        [rawStart]
                     )
                 );
                 continue;
@@ -344,7 +360,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DateInvalid",
-                        $"'{rawEnd}' is not a valid date (expected YYYY-MM-DD)."
+                        $"'{rawEnd}' is not a valid date (expected YYYY-MM-DD).",
+                        "DateInvalid",
+                        [rawEnd]
                     )
                 );
                 continue;
@@ -357,7 +375,8 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DateRangeInvalid",
-                        "The end date must not be before the start date."
+                        "The end date must not be before the start date.",
+                        "DateRangeInvalid"
                     )
                 );
                 continue;
@@ -370,7 +389,9 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DuplicateNumber",
-                        $"The grave number '{number}' is already used in row {first}."
+                        $"The grave number '{number}' is already used in row {first}.",
+                        "DuplicateGraveNumber",
+                        [number, first.ToString(CultureInfo.InvariantCulture)]
                     )
                 );
                 continue;
@@ -429,7 +450,9 @@ public sealed class ImportValidator
                             file,
                             line,
                             "CountInvalid",
-                            $"'{rawCount}' is not a valid count; an item link needs a positive number."
+                            $"'{rawCount}' is not a valid count; an item link needs a positive number.",
+                            "CountInvalid",
+                            [rawCount]
                         )
                     );
                     continue;
@@ -442,7 +465,9 @@ public sealed class ImportValidator
                             file,
                             line,
                             "PriceIncludesVatInvalid",
-                            $"'{rawIncludesVat}' is not a valid yes/no value."
+                            $"'{rawIncludesVat}' is not a valid yes/no value.",
+                            "PriceIncludesVatInvalid",
+                            [rawIncludesVat]
                         )
                     );
                     continue;
@@ -456,7 +481,13 @@ public sealed class ImportValidator
                             file,
                             line,
                             "DuplicateLink",
-                            $"Grave '{graveNumber}' is already linked to item '{reference}' in row {firstItemRow}."
+                            $"Grave '{graveNumber}' is already linked to item '{reference}' in row {firstItemRow}.",
+                            "DuplicateItemLink",
+                            [
+                                graveNumber,
+                                reference,
+                                firstItemRow.ToString(CultureInfo.InvariantCulture),
+                            ]
                         )
                     );
                     continue;
@@ -482,7 +513,13 @@ public sealed class ImportValidator
                             file,
                             line,
                             "DuplicateLink",
-                            $"Grave '{graveNumber}' is already linked to recipient '{reference}' in row {firstRecipientRow}."
+                            $"Grave '{graveNumber}' is already linked to recipient '{reference}' in row {firstRecipientRow}.",
+                            "DuplicateRecipientLink",
+                            [
+                                graveNumber,
+                                reference,
+                                firstRecipientRow.ToString(CultureInfo.InvariantCulture),
+                            ]
                         )
                     );
                     continue;
@@ -499,7 +536,13 @@ public sealed class ImportValidator
                         line,
                         "TypeInvalid",
                         $"'{type}' is not a link type; use '{ImportArchiveLayout.ItemLinkType}' or "
-                            + $"'{ImportArchiveLayout.RecipientLinkType}'."
+                            + $"'{ImportArchiveLayout.RecipientLinkType}'.",
+                        "TypeInvalid",
+                        [
+                            type,
+                            ImportArchiveLayout.ItemLinkType,
+                            ImportArchiveLayout.RecipientLinkType,
+                        ]
                     )
                 );
             }
@@ -570,14 +613,7 @@ public sealed class ImportValidator
 
             foreach (var problem in GraveShare.Problems(lines, count))
             {
-                problems.Add(
-                    new ImportProblem(
-                        ImportArchiveLayout.GravesFile,
-                        grave.Row,
-                        "PricesDoNotDivide",
-                        Describe(problem, count)
-                    )
-                );
+                problems.Add(Describe(ImportArchiveLayout.GravesFile, grave.Row, problem, count));
             }
         }
     }
@@ -586,20 +622,51 @@ public sealed class ImportValidator
     /// written in. One shape whatever the kind of problem: a net total that
     /// will not divide and a gross that cannot be billed to the cent differ in
     /// why they fail, not in what the reader does about it.</summary>
-    private static string Describe(GraveShareProblem problem, int recipients)
+    /// <summary>The English message, plus a key and its arguments for the UI to
+    /// say the same in its own language: rate, amount, recipients and up to two
+    /// nearby amounts that would work (PricesDoNotDivide0..2 by their number).</summary>
+    private static ImportProblem Describe(
+        string file,
+        int row,
+        GraveShareProblem problem,
+        int recipients
+    )
     {
         var rate = problem.VatRate.ToString("0.##", CultureInfo.InvariantCulture);
         var across = recipients == 1 ? "1 recipient" : $"{recipients} recipients";
         var message =
             $"VAT {rate} %: {Euros(problem.Amount)} does not split evenly across {across}.";
+        var suggestions = problem.Suggestions.Take(2).Select(Euros).ToList();
+        string[] args =
+        [
+            rate,
+            Euros(problem.Amount),
+            recipients.ToString(CultureInfo.InvariantCulture),
+            .. suggestions,
+        ];
+        var key = $"PricesDoNotDivide{suggestions.Count}";
 
         if (problem.Suggestions.Count == 0)
         {
-            return $"{message} Adjust a price at this VAT rate.";
+            return new ImportProblem(
+                file,
+                row,
+                "PricesDoNotDivide",
+                $"{message} Adjust a price at this VAT rate.",
+                key,
+                args
+            );
         }
 
         var options = string.Join(" or ", problem.Suggestions.Select(Euros));
-        return $"{message} {options} would work.";
+        return new ImportProblem(
+            file,
+            row,
+            "PricesDoNotDivide",
+            $"{message} {options} would work.",
+            key,
+            args
+        );
     }
 
     private static string Euros(long cents) =>
@@ -625,7 +692,8 @@ public sealed class ImportValidator
                         ImportArchiveLayout.GravesFile,
                         grave.Row,
                         "NoRecipients",
-                        "The grave needs at least one recipient."
+                        "The grave needs at least one recipient.",
+                        "NoRecipients"
                     )
                 );
             }
@@ -649,7 +717,9 @@ public sealed class ImportValidator
                         ImportArchiveLayout.MappingFile,
                         link.Row,
                         "PriceRequired",
-                        $"A price is required for item '{item.Number}': a grave links it."
+                        $"A price is required for item '{item.Number}': a grave links it.",
+                        "PriceRequired",
+                        [item.Number]
                     )
                 );
             }
@@ -674,7 +744,9 @@ public sealed class ImportValidator
                         file,
                         link.Row,
                         "GraveNotDefined",
-                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."
+                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}.",
+                        "GraveNotDefined",
+                        [link.GraveNumber]
                     )
                 );
             }
@@ -686,7 +758,9 @@ public sealed class ImportValidator
                         file,
                         link.Row,
                         "ItemNotDefined",
-                        $"The item '{link.ItemNumber}' is not defined in {ImportArchiveLayout.ItemsFile}."
+                        $"The item '{link.ItemNumber}' is not defined in {ImportArchiveLayout.ItemsFile}.",
+                        "ItemNotDefined",
+                        [link.ItemNumber]
                     )
                 );
             }
@@ -701,7 +775,9 @@ public sealed class ImportValidator
                         file,
                         link.Row,
                         "GraveNotDefined",
-                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}."
+                        $"The grave '{link.GraveNumber}' is not defined in {ImportArchiveLayout.GravesFile}.",
+                        "GraveNotDefined",
+                        [link.GraveNumber]
                     )
                 );
             }
@@ -714,7 +790,9 @@ public sealed class ImportValidator
                         link.Row,
                         "RecipientNotDefined",
                         $"The recipient '{link.RecipientNumber}' is not defined in "
-                            + $"{ImportArchiveLayout.RecipientsFile}."
+                            + $"{ImportArchiveLayout.RecipientsFile}.",
+                        "RecipientNotDefined",
+                        [link.RecipientNumber]
                     )
                 );
             }
@@ -739,7 +817,9 @@ public sealed class ImportValidator
                     ImportArchiveLayout.ItemsFile,
                     item.Row,
                     "VatRateNotConfigured",
-                    $"The VAT rate '{item.VatRate}' is not configured in the settings."
+                    $"The VAT rate '{item.VatRate}' is not configured in the settings.",
+                    "VatRateNotConfigured",
+                    [item.VatRate.ToString("0.##", CultureInfo.InvariantCulture)]
                 )
             );
         }
@@ -753,7 +833,9 @@ public sealed class ImportValidator
                     ImportArchiveLayout.RecipientsFile,
                     recipient.Row,
                     "AlreadyExists",
-                    $"A recipient with the number '{recipient.Number}' already exists."
+                    $"A recipient with the number '{recipient.Number}' already exists.",
+                    "RecipientExists",
+                    [recipient.Number]
                 )
             );
         }
@@ -767,7 +849,9 @@ public sealed class ImportValidator
                     ImportArchiveLayout.ItemsFile,
                     item.Row,
                     "AlreadyExists",
-                    $"An item with the number '{item.Number}' already exists."
+                    $"An item with the number '{item.Number}' already exists.",
+                    "ItemExists",
+                    [item.Number]
                 )
             );
         }
@@ -781,7 +865,9 @@ public sealed class ImportValidator
                     ImportArchiveLayout.GravesFile,
                     grave.Row,
                     "AlreadyExists",
-                    $"A grave with the number '{grave.Number}' already exists."
+                    $"A grave with the number '{grave.Number}' already exists.",
+                    "GraveExists",
+                    [grave.Number]
                 )
             );
         }
@@ -805,7 +891,12 @@ public sealed class ImportValidator
                 file,
                 line,
                 "ColumnCount",
-                $"The row has {row.Count} columns; {expected} are expected."
+                $"The row has {row.Count} columns; {expected} are expected.",
+                "ColumnCount",
+                [
+                    row.Count.ToString(CultureInfo.InvariantCulture),
+                    expected.ToString(CultureInfo.InvariantCulture),
+                ]
             )
         );
         return false;
@@ -829,7 +920,9 @@ public sealed class ImportValidator
                 file,
                 line,
                 "FieldRequired",
-                $"The column '{column}' must not be empty."
+                $"The column '{column}' must not be empty.",
+                "FieldRequired",
+                [column]
             )
         );
         return true;
