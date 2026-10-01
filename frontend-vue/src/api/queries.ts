@@ -36,15 +36,22 @@ export function useVatRatesQuery() {
   });
 }
 
+/** A search term as the inside of an OData string literal. odata2ts only wraps
+ *  a value in quotes, so a quote in the term ("O'Brien") would end the literal
+ *  and the backend would answer 400; OData escapes it by doubling. */
+function searchLiteral(term: string): string {
+  return term.trim().replaceAll("'", "''");
+}
+
 /** Items, newest first; a term filters on number or description. */
 export function fetchItems(term: string): Promise<InvoiceItem[]> {
-  const trimmed = term.trim();
+  const literal = searchLiteral(term);
   return readAll(async (skip, top) => {
     const response = await odata
       .InvoiceItems()
       .query((b, q) => {
-        if (trimmed) {
-          b.filter(q.Number.contains(trimmed).or(q.Description.contains(trimmed)));
+        if (literal) {
+          b.filter(q.Number.contains(literal).or(q.Description.contains(literal)));
         }
         b.orderBy(q.Id.desc()).skip(skip).top(top);
       })
@@ -73,13 +80,13 @@ export async function loadItemVatRates(queryClient: QueryClient): Promise<Map<nu
 
 /** Recipients, newest first; a term filters on the name. */
 export function fetchRecipients(term: string): Promise<Recipient[]> {
-  const trimmed = term.trim();
+  const literal = searchLiteral(term);
   return readAll(async (skip, top) => {
     const response = await odata
       .Recipients()
       .query((b, q) => {
-        if (trimmed) {
-          b.filter(q.Name.contains(trimmed));
+        if (literal) {
+          b.filter(q.Name.contains(literal));
         }
         b.orderBy(q.Id.desc()).skip(skip).top(top);
       })
