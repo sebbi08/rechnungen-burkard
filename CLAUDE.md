@@ -8,11 +8,18 @@ recorded in `docs/deviations.md`. Everything below is about running things.
 The E2E suite must run against its **own** stack:
 
 ```sh
-cd e2e && npm test          # builds and starts docker-compose.e2e.yml on port 8081
+cd e2e && npm test          # builds and starts docker-compose.e2e.yml on ports 8081 and 8083
 ```
 
-`E2E_BASE_URL` points the suite at something already running instead; CI uses
-it for the release image it has started. Do not point it at the dev stack on
+The stack is two containers of the release image: the UI5 specs run against the
+first (8081), the Vue specs in `tests/vue` against the Vue port of the second
+(8083). Each suite has a database of its own because the backend runs one grave
+invoice generation at a time and a generation sweeps every grave of its
+half-year — two suites generating in one database would refuse and invoice each
+other's graves.
+
+`E2E_BASE_URL` and `E2E_VUE_BASE_URL` point the suites at something already
+running instead; CI uses them for the two containers it has started. Do not point it at the dev stack on
 port 8080: the specs create recipients, items, graves and invoices, and the API
 has no DELETE endpoints for them, so whatever a run leaves behind stays in
 `data/invoicing.db`. The dev database belongs to the user and holds their data.
@@ -54,6 +61,24 @@ the specs wait for the value to be set and the popover to be gone, rather than
 assuming the click was the last thing to happen. CI is roughly four times slower
 than a dev machine and fails this where a local run does not.
 
+## The Vue specs wait the same way, on PrimeVue's markers
+
+The Vue frontend has the same race in other clothes. A PrimeVue Dialog moves
+focus to its `autofocus` field once its opening transition ends, and a Select's
+overlay hands focus back to its field on a timeout after a pick. The specs in
+`tests/vue` therefore go through `e2e/vue.ts`: `waitForOverlayOpen` after
+opening a dialog or drawer, `pickOption` (and `pickItem`, `pickRecipient`) for
+every Select, `fillNumber` for an InputNumber, which only hands its value on
+when it is left, and `saveEditor` for a drawer's save, which renders PDFs behind
+the blocking overlay before the drawer closes. `pickOption` makes a pick again
+until it has landed: the item and recipient pickers reload their lists whenever
+an editor opens, and on a slow machine the answer replaces the option list while
+it is open.
+
+Layout bugs the Vue specs have found are marked with `test.fail` and a
+`known bug:` description, so the suite stays green while the bug is there and
+turns red once it is fixed — remove the mark together with the fix.
+
 ## An overflowing page background paginates instead of repeating
 
 The letterhead is drawn in `page.Background()`, which QuestPDF renders again on
@@ -85,14 +110,16 @@ page one.
   `src`, since `dist/` holds the whole OpenUI5 runtime.
 - **Vue evaluation frontend** (`frontend-vue/`, D-003): the dev stack also
   serves it on 8082, against the dev backend, and the release image serves its
-  build on its own port 8082 — so the E2E stack has it on 8083. For probing with
-  hot reload, run it on the host against the E2E stack instead:
-  `cd frontend-vue && VITE_PROXY_TARGET=http://localhost:8081 npm run dev`.
+  build on its own port 8082 — so the E2E stack has it on 8083, in the container
+  the Vue specs use. For probing with hot reload, run it on the host against the
+  E2E stack instead:
+  `cd frontend-vue && VITE_PROXY_TARGET=http://localhost:8083 npm run dev`.
   Checks: `npm run typecheck`, `npm run lint`, `npm run build`. After an EDM
   change, `npm run gen:odata` (reads `$metadata` from the E2E stack) and commit
   `src/api/metadata.xml` together with `src/api/generated/`.
-- **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
-  tablet projects only run `tests/layout.spec.ts`.
+- **E2E**: see above. `--project=desktop|phone|tablet` narrows it to the UI5
+  specs, `--project=vue-desktop|vue-phone|vue-tablet` to the Vue ones; the phone
+  and tablet projects only run their frontend's `layout.spec.ts`.
 - **Release scripts**: `scripts/test-release-scripts.sh`.
 
 ## Formatting is automatic

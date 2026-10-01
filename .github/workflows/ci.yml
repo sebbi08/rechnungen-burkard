@@ -34,8 +34,8 @@ jobs:
       - run: npm run ui5lint
       - run: npm run build
 
-  # The Vue evaluation frontend (D-003). No tests by decision; this keeps it
-  # compiling and lint-clean while it is being evaluated.
+  # The Vue evaluation frontend (D-003). This keeps it compiling and lint-clean;
+  # its behaviour is covered by the E2E job (e2e/tests/vue).
   frontend-vue:
     runs-on: ubuntu-latest
     defaults:
@@ -63,15 +63,21 @@ jobs:
           node-version: 22
       - name: Build the image
         run: docker build -t invoicing:e2e .
+      # Two containers of the one image: the UI5 specs use the first, the Vue
+      # specs (D-003) the Vue port of the second, so each suite has a database
+      # of its own -- see e2e/playwright.config.ts for why they cannot share.
       - name: Start the app
         run: |
-          docker run -d --name invoicing-e2e -p 8080:8080 -p 8082:8082 invoicing:e2e
+          docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
+          docker run -d --name invoicing-e2e-vue -p 8083:8082 invoicing:e2e
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/healthz > /dev/null; then exit 0; fi
+            if curl -fsS http://localhost:8080/healthz > /dev/null \
+              && curl -fsS http://localhost:8083/healthz > /dev/null; then exit 0; fi
             sleep 2
           done
           echo "the app did not become healthy"
           docker logs invoicing-e2e
+          docker logs invoicing-e2e-vue
           exit 1
       - name: Install Playwright
         working-directory: e2e
@@ -84,11 +90,13 @@ jobs:
         working-directory: e2e
         env:
           E2E_BASE_URL: http://localhost:8080
-          E2E_VUE_BASE_URL: http://localhost:8082
+          E2E_VUE_BASE_URL: http://localhost:8083
         run: npx playwright test
       - name: Backend logs on failure
         if: failure()
-        run: docker logs invoicing-e2e
+        run: |
+          docker logs invoicing-e2e
+          docker logs invoicing-e2e-vue
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
