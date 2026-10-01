@@ -58,6 +58,9 @@ const graves = useQuery({
   enabled: computed(() => visible.value && itemId.value != null),
 });
 const linked = computed(() => graves.data.value?.Linked ?? false);
+// Until the answer is in, a rate picked here could be one the graves forbid:
+// the select would lock on it once they load, and the save would be refused.
+const rateLocked = computed(() => linked.value || (itemId.value != null && graves.isPending.value));
 
 function groupLabel(group: ItemGraveGroup): string {
   const price =
@@ -117,7 +120,7 @@ async function save(): Promise<void> {
           :options="rateOptions"
           option-value="value"
           option-label="label"
-          :disabled="linked"
+          :disabled="rateLocked"
         />
         <small v-if="linked" class="text-muted-color">{{ t("itemVatRateFixed") }}</small>
       </div>
