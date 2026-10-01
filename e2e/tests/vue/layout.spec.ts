@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../../seed";
-import { drawer, pickItem, pickRecipient, waitForOverlayOpen } from "../../vue";
+import { drawer, pickItem, pickRecipient, rowAction, waitForOverlayOpen } from "../../vue";
 
 // Layout regressions on small screens: every screen must fit the viewport
 // without sideways scrolling, its actions must stay reachable and readable, and
@@ -19,14 +19,17 @@ const ITEM_NUMBER = `L${RUN}-GRABPFLEGE`;
 const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
 const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE`;
 
+/** Tailwind's breakpoints, from which a column a narrow screen drops comes back. */
+const BREAKPOINTS = { sm: 640, md: 768, xl: 1280 };
+
 interface ListScreen {
   route: string;
   /** What this run's own row in the list shows. */
   seeded: string;
   /** The action that opens the create dialog or editor. */
   action: string;
-  /** Column headers a phone does without; the tablet keeps them. */
-  phoneHides: string[];
+  /** Secondary columns, each with the width from which the table shows it. */
+  secondary: Record<string, keyof typeof BREAKPOINTS>;
 }
 
 const LIST_SCREENS: ListScreen[] = [
@@ -34,21 +37,26 @@ const LIST_SCREENS: ListScreen[] = [
     route: "items",
     seeded: ITEM_NUMBER,
     action: "Leistung anlegen",
-    phoneHides: ["MwSt.-Satz", "Standardpreis"],
+    secondary: { "MwSt.-Satz": "md", Standardpreis: "sm" },
   },
   {
     route: "recipients",
     seeded: RECIPIENT_NAME,
     action: "Empfänger anlegen",
-    phoneHides: ["Adresse"],
+    secondary: { Empfängernummer: "sm", Adresse: "md" },
   },
   {
     route: "invoices",
     seeded: RECIPIENT_NAME,
     action: "Rechnung erstellen",
-    phoneHides: ["Name", "Datum"],
+    secondary: { Name: "sm", Datum: "md", Zahlung: "sm" },
   },
-  { route: "graves", seeded: GRAVE_NUMBER, action: "Grab anlegen", phoneHides: ["Beginn", "Ende"] },
+  {
+    route: "graves",
+    seeded: GRAVE_NUMBER,
+    action: "Grab anlegen",
+    secondary: { Beginn: "xl", Ende: "xl", Zahlung: "sm" },
+  },
 ];
 
 // The rows only have to exist — these assertions are about layout, not about
@@ -91,11 +99,8 @@ async function seedRows(page: Page): Promise<number> {
 // suite stays green while the bug is there and turns red once it is fixed —
 // which is the reminder to drop the mark.
 const TABLES_OVERFLOW =
-  "known bug: on a phone and a tablet the list tables are wider than their card, so the row " +
-  "actions sit outside it until the table is scrolled sideways";
-const REVISIONS_OVERFLOW =
-  "known bug: the revision panels of the invoice detail page are wider than the screen, so " +
-  "the whole page scrolls sideways";
+  "known bug: on a phone a number without a break in it (an item's, a grave's) widens its " +
+  "column past the card, so the row actions sit outside it until the table is scrolled sideways";
 const PICKER_SQUEEZED =
   "known bug: on a phone the grave editor's recipient picker shares its row with two buttons " +
   "and is left about 12rem, too narrow for a long name";
@@ -157,14 +162,14 @@ for (const screen of LIST_SCREENS) {
     await expectNoSidewaysScrolling(page);
     await expectHeaderActionsFit(page);
 
-    // proof that the columns collapsed instead of being squeezed: a phone does
-    // without the secondary ones, a tablet keeps them
-    for (const header of screen.phoneHides) {
+    // proof that the columns collapsed instead of being squeezed: a narrow
+    // screen does without the secondary ones, a wider one gets them back
+    for (const [header, from] of Object.entries(screen.secondary)) {
       const column = table.getByRole("columnheader", { name: header, exact: true });
-      if (onPhone()) {
-        await expect(column).toBeHidden();
+      if (page.viewportSize()!.width < BREAKPOINTS[from]) {
+        await expect(column, header).toBeHidden();
       } else {
-        await expect(column).toBeVisible();
+        await expect(column, header).toBeVisible();
       }
     }
 
@@ -190,7 +195,7 @@ for (const screen of LIST_SCREENS) {
   test(`${screen.route}: the row actions are on screen without scrolling the table`, async ({
     page,
   }) => {
-    test.fail(true, TABLES_OVERFLOW);
+    test.fail(onPhone() && ["items", "graves"].includes(screen.route), TABLES_OVERFLOW);
     await seed(page);
     await page.goto(`/${screen.route}`);
     const row = page.locator("tbody tr").filter({ hasText: screen.seeded }).first();
@@ -225,20 +230,20 @@ test("invoices: every row action stays reachable", async ({ page }) => {
     "Bearbeiten",
     "Als bezahlt markieren",
   ];
-  if (!onPhone()) {
+  if (page.viewportSize()!.width >= BREAKPOINTS.xl) {
     for (const name of actions) {
-      await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
+      await expect(row.getByRole("button", { name: rowAction(name) })).toBeVisible();
     }
     return;
   }
 
-  // A phone has no room for five buttons a row: they sit in a menu instead,
-  // and the menu has to fit the screen. The menu closes when anything behind
+  // Below the widest screens there is no room for five buttons a row, beside
+  // the side bar or without it: they sit in a menu instead, and the menu has
+  // to fit the screen. The menu closes when anything behind
   // it scrolls, so nothing may need to: its button is brought to the middle of
   // the screen first, where the menu has room below it, and fully into the
-  // table's view — the table is wider than its card (see TABLES_OVERFLOW), and
-  // a click on the button or an item would otherwise scroll to reach it.
-  const more = row.getByRole("button", { name: "Weitere Aktionen" });
+  // table's view, should the table be wider than its card.
+  const more = row.getByRole("button", { name: rowAction("Weitere Aktionen") });
   await more.evaluate((element) => element.scrollIntoView({ block: "center", inline: "end" }));
   await more.click();
   const menu = page.getByRole("menu");
@@ -280,14 +285,14 @@ test("the navigation is reachable on every screen size", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Rechnungen" })).toBeVisible();
   const sidebar = page.locator("aside").getByRole("navigation", { name: "Navigation" });
 
-  if (!onPhone()) {
-    // the tablet has room for the side bar
+  // the side bar takes 16rem, so only a screen of at least 1024px shows it;
+  // the phone and the tablet keep it behind their menu button
+  if (page.viewportSize()!.width >= 1024) {
     await expect(sidebar).toBeVisible();
     await expect(page.getByRole("button", { name: "Menü" })).toBeHidden();
     return;
   }
 
-  // a phone keeps the side bar behind its menu button
   await expect(sidebar).toBeHidden();
   await page.getByRole("button", { name: "Menü" }).click();
   await waitForOverlayOpen(page);
@@ -399,7 +404,6 @@ test("invoices: the editor spends its width on the fields", async ({ page }) => 
 // generated grave invoice, and generation belongs to graves.spec.ts alone. It
 // shares its revision panels with the invoice detail page, covered below.
 test("the invoice detail page fits the viewport", async ({ page }) => {
-  test.fail(true, REVISIONS_OVERFLOW);
   const rootId = await seed(page);
 
   await page.goto(`/invoices/${rootId}`);

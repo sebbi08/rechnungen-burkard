@@ -8,6 +8,7 @@ import {
   pickItem,
   pickOption,
   pickRecipient,
+  rowAction,
   saveEditor,
   search,
   toasts,
@@ -494,7 +495,7 @@ test("the grave list colours its status and offers the invoice mass download", a
   await expect(row.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
 
   // the details action reaches the grave's own page
-  await row.getByRole("button", { name: "Details", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Details") }).click();
   await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
 
@@ -522,7 +523,7 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   await page.goto(`/graves/${graveId}`);
   await graveInvoiceRows(page)
     .filter({ hasText: names[0] })
-    .getByRole("button", { name: "Details", exact: true })
+    .getByRole("button", { name: rowAction("Details") })
     .click();
 
   await expect(page).toHaveURL(new RegExp(`/graves/${graveId}/invoices/\\d+$`));

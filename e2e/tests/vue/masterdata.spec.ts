@@ -166,9 +166,10 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   // search must actually narrow the list: this term matches only the first one
   await search(
     page,
-    page.getByRole("textbox", { name: "Nach Name suchen" }),
+    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
     `Mahr ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.includes(`Mahr ${ts}`),
+    // the term goes out lower-cased, so the search ignores case
+    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`mahr ${ts}`),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(first);

@@ -8,6 +8,7 @@ import {
   pickItem,
   pickOption,
   pickRecipient,
+  rowAction,
   saveEditor,
   search,
   toasts,
@@ -94,7 +95,7 @@ test("create an invoice with a mandatory price and open its document (Story 4, 8
     .waitForEvent("request", (request) =>
       /\/odata\/Documents\(\d+\)\/\$value$/.test(request.url()),
     );
-  await row.getByRole("button", { name: "Rechnung herunterladen", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Rechnung herunterladen") }).click();
   const tab = await tabPromise;
   // what the tab renders is up to the browser — a headless one has no PDF
   // viewer — so the assertion is on the document it navigates to
@@ -436,11 +437,11 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
     "Bearbeiten",
     "Als bezahlt markieren",
   ]) {
-    await expect(row.getByRole("button", { name, exact: true })).toBeVisible();
+    await expect(row.getByRole("button", { name: rowAction(name) })).toBeVisible();
   }
 
   // details opens the revision page for that invoice
-  await row.getByRole("button", { name: "Details", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Details") }).click();
   await expect(page).toHaveURL(new RegExp(`/invoices/${invoice.RootId ?? invoice.Id}$`));
   await expect(page.getByRole("button", { name: /Original/ })).toBeVisible();
 });
@@ -479,13 +480,13 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   await expect(row).toContainText("unbezahlt");
 
   const marked = page.waitForResponse((response) => response.url().endsWith("/SetInvoicePaid"));
-  await row.getByRole("button", { name: "Als bezahlt markieren", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Als bezahlt markieren") }).click();
   expect((await marked).ok()).toBe(true);
   await expect(row).toContainText("bezahlt");
   await expect(row).not.toContainText("unbezahlt");
   // a paid invoice cannot be revised, so its edit button is dead — and its
   // tooltip names the reason instead of staying "Bearbeiten"
-  const edit = row.getByRole("button", { name: "Bearbeiten", exact: true });
+  const edit = row.getByRole("button", { name: rowAction("Bearbeiten") });
   await expect(edit).toBeDisabled();
   await edit.hover();
   await expect(page.getByRole("tooltip")).toHaveText(
@@ -501,7 +502,7 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   await pickOption(page, paymentFilter, "Alle");
 
   // taking the payment back asks first
-  await row.getByRole("button", { name: "Zahlung zurücknehmen", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Zahlung zurücknehmen") }).click();
   await waitForOverlayOpen(page);
   const confirm = confirmation(page);
   await expect(confirm).toContainText("Soll die Zahlung wirklich zurückgenommen werden?");
@@ -509,5 +510,5 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   await confirm.getByRole("button", { name: "Ja" }).click();
   expect((await unmarked).ok()).toBe(true);
   await expect(row).toContainText("unbezahlt");
-  await expect(row.getByRole("button", { name: "Bearbeiten", exact: true })).toBeEnabled();
+  await expect(row.getByRole("button", { name: rowAction("Bearbeiten") })).toBeEnabled();
 });

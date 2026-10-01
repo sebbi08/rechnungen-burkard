@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow } from "../../seed";
-import { drawer, pickItem, pickRecipient, saveEditor, waitForOverlayOpen } from "../../vue";
+import {
+  drawer,
+  pickItem,
+  pickRecipient,
+  rowAction,
+  saveEditor,
+  waitForOverlayOpen,
+} from "../../vue";
 
 // Unique per run: the specs share one stack and write into it in parallel.
 const RUN = Date.now();
@@ -40,7 +47,7 @@ test("a line ticked as VAT-included bills the price that was entered", async ({ 
   // the invoices list shows no totals, only the invoice detail page does — open
   // it from the row this test just created
   const row = page.getByRole("row").filter({ hasText: recipientName });
-  await row.getByRole("button", { name: "Details", exact: true }).click();
+  await row.getByRole("button", { name: rowAction("Details") }).click();
 
   // 120,00 gross in, 100,84 net + 19 % = 120,00 out
   await expect(page.locator("dl")).toContainText("Netto100,84 €");

@@ -45,6 +45,15 @@ export function drawer(page: Page): Locator {
   return page.locator(".p-drawer");
 }
 
+/**
+ * A row's action button, by what it does. Every row carries the same buttons,
+ * so each one's accessible name also says which row it acts on ("Details:
+ * 2026-0042") — this matches the action whichever row it belongs to.
+ */
+export function rowAction(name: string): RegExp {
+  return new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(: |$)`);
+}
+
 /** The toasts: a failed call or a failed client check shows one, and so does
  *  a saved setting. */
 export function toasts(page: Page): Locator {
