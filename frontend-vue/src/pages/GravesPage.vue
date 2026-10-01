@@ -204,15 +204,15 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column
           :header="t('startDate')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell tabular-nums"
+          header-class="hidden xl:table-cell"
+          body-class="hidden xl:table-cell tabular-nums"
         >
           <template #body="{ data }">{{ formatDate(data.StartDate) }}</template>
         </Column>
         <Column
           :header="t('endDate')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell tabular-nums"
+          header-class="hidden xl:table-cell"
+          body-class="hidden xl:table-cell tabular-nums"
         >
           <template #body="{ data }">{{ formatDate(data.EndDate) }}</template>
         </Column>

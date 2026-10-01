@@ -52,7 +52,9 @@ const menuItems = computed<MenuItem[]>(() => [
 
 <template>
   <div class="flex items-center justify-end gap-0.5">
-    <div class="hidden items-center gap-0.5 md:flex">
+    <!-- xl, not md: the sidebar appears at md and takes 16rem, so below xl five
+         buttons push the row's own columns out of the table -->
+    <div class="hidden items-center gap-0.5 xl:flex">
       <Button
         v-tooltip.top="t('actionDetails')"
         icon="pi pi-eye"
@@ -99,7 +101,7 @@ const menuItems = computed<MenuItem[]>(() => [
       />
     </div>
     <Button
-      class="md:hidden"
+      class="xl:hidden"
       icon="pi pi-ellipsis-v"
       text
       rounded

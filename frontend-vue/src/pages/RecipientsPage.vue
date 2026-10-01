@@ -54,8 +54,19 @@ function open(recipient: Recipient | null): void {
         striped-rows
       >
         <template #empty>{{ t("noData") }}</template>
-        <Column field="Number" :header="t('recipientNumber')" />
-        <Column field="Name" :header="t('recipientName')" />
+        <Column
+          field="Number"
+          :header="t('recipientNumber')"
+          header-class="hidden sm:table-cell"
+          body-class="hidden sm:table-cell"
+        />
+        <Column :header="t('recipientName')">
+          <template #body="{ data }">
+            {{ data.Name }}
+            <!-- on a phone the number sits under the name instead of in its own column -->
+            <div class="text-sm text-muted-color sm:hidden">{{ data.Number }}</div>
+          </template>
+        </Column>
         <Column
           :header="t('recipientAddress')"
           header-class="hidden md:table-cell"

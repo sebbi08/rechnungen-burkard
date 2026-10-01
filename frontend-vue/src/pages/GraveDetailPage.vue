@@ -154,7 +154,13 @@ const {
               halfYearText(data.PeriodYear, data.PeriodHalf)
             }}</template>
           </Column>
-          <Column field="RecipientName" :header="t('recipientName')" />
+          <Column :header="t('recipientName')">
+            <template #body="{ data }">
+              {{ data.RecipientName }}
+              <!-- on a phone the payment state sits under the name instead of in its own column -->
+              <div class="mt-1 sm:hidden"><PaidStatusTag :paid-on="data.PaidOn" /></div>
+            </template>
+          </Column>
           <Column
             :header="t('invoiceNumber')"
             header-class="hidden md:table-cell"
@@ -172,8 +178,8 @@ const {
           </Column>
           <Column
             :header="t('invoiceDate')"
-            header-class="hidden lg:table-cell"
-            body-class="hidden lg:table-cell tabular-nums"
+            header-class="hidden xl:table-cell"
+            body-class="hidden xl:table-cell tabular-nums"
           >
             <template #body="{ data }">{{ formatDate(data.GeneratedAt) }}</template>
           </Column>
@@ -184,7 +190,11 @@ const {
           >
             <template #body="{ data }">{{ formatAmount(data.GrossTotal) }}</template>
           </Column>
-          <Column :header="t('paidStatus')">
+          <Column
+            :header="t('paidStatus')"
+            header-class="hidden sm:table-cell"
+            body-class="hidden sm:table-cell"
+          >
             <template #body="{ data }"><PaidStatusTag :paid-on="data.PaidOn" /></template>
           </Column>
           <Column class="w-0 whitespace-nowrap">

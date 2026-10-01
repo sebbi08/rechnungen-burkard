@@ -23,3 +23,14 @@ body {
 .app-dark body {
   background: var(--p-surface-950);
 }
+
+/* A phone has room for about three table columns at the theme's padding, and
+   the row actions were the ones pushed out of view. Tighter cells and cards
+   give that room back; the column choices in the pages do the rest. */
+@media (width < 40rem) {
+  :root {
+    --p-datatable-header-cell-padding: 0.75rem 0.5rem;
+    --p-datatable-body-cell-padding: 0.75rem 0.5rem;
+    --p-card-body-padding: 1rem;
+  }
+}

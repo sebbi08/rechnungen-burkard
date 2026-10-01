@@ -125,8 +125,10 @@ function openEditor(invoice: Invoice | null): void {
               severity="secondary"
               class="ml-2"
             />
-            <!-- on a phone the name sits under the number instead of in its own column -->
+            <!-- on a phone the name and the payment state sit under the number
+                 instead of in columns of their own -->
             <div class="text-sm text-muted-color sm:hidden">{{ data.RecipientName }}</div>
+            <div class="mt-1 sm:hidden"><PaidStatusTag :paid-on="data.PaidOn" /></div>
           </template>
         </Column>
         <Column
@@ -142,7 +144,11 @@ function openEditor(invoice: Invoice | null): void {
         >
           <template #body="{ data }">{{ formatDate(data.GeneratedAt) }}</template>
         </Column>
-        <Column :header="t('paidStatus')">
+        <Column
+          :header="t('paidStatus')"
+          header-class="hidden sm:table-cell"
+          body-class="hidden sm:table-cell"
+        >
           <template #body="{ data }"><PaidStatusTag :paid-on="data.PaidOn" /></template>
         </Column>
         <Column class="w-0 whitespace-nowrap">

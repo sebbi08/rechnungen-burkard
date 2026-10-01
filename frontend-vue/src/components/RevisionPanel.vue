@@ -61,15 +61,15 @@ function open(kind: DocumentKindName): void {
       </Column>
       <Column
         :header="t('vatRate')"
-        header-class="hidden md:table-cell"
-        body-class="hidden md:table-cell text-right"
+        header-class="hidden xl:table-cell"
+        body-class="hidden xl:table-cell text-right"
       >
         <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
       </Column>
       <Column
         :header="t('priceIncludesVatColumn')"
-        header-class="hidden md:table-cell"
-        body-class="hidden md:table-cell"
+        header-class="hidden xl:table-cell"
+        body-class="hidden xl:table-cell"
       >
         <template #body="{ data }">{{ data.PriceIncludesVat ? t("yes") : t("no") }}</template>
       </Column>

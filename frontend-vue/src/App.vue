@@ -19,7 +19,11 @@ if (locale === "de" && primevue.config.locale) {
   <AppShell>
     <RouterView />
   </AppShell>
-  <Toast position="top-right" />
+  <!-- 25rem wide by default, which pushed it off a phone's left edge -->
+  <Toast
+    position="top-right"
+    :breakpoints="{ '640px': { width: 'calc(100vw - 2rem)', right: '1rem' } }"
+  />
   <ConfirmDialog />
   <MessageDialog />
   <BlockingProgress />
