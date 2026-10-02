@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -89,6 +91,9 @@ public class SaveGraveTests
                 {
                     graveId = (long?)null,
                     graveNumber = "S-001",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -142,6 +147,9 @@ public class SaveGraveTests
                 {
                     graveId = (long?)null,
                     graveNumber = "S-002",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -182,6 +190,9 @@ public class SaveGraveTests
                 {
                     graveId = (long?)null,
                     graveNumber = "S-004",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -239,6 +250,9 @@ public class SaveGraveTests
                 {
                     graveId,
                     graveNumber = "S-003",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2041-12-31",
                     items = new[]
@@ -271,6 +285,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-002",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -299,6 +316,9 @@ public class SaveGraveTests
                 {
                     graveId,
                     graveNumber = "S-002b",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2027-01-01",
                     endDate = "2041-12-31",
                     items = new object[]
@@ -351,6 +371,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-003",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -391,6 +414,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-004",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -415,10 +441,19 @@ public class SaveGraveTests
     }
 
     [Theory]
-    [InlineData("", "2026-01-01", "GraveNumberRequired")]
-    [InlineData("S-005", "not-a-date", "InvalidDate")]
+    [InlineData("", "F-1", "Grabstätte", "SingleInside", "2026-01", "GraveNumberRequired")]
+    [InlineData("S-005", "", "Grabstätte", "SingleInside", "2026-01", "FieldNumberRequired")]
+    [InlineData("S-005", "F-1", " ", "SingleInside", "2026-01", "SiteNameRequired")]
+    [InlineData("S-005", "F-1", "Grabstätte", null, "2026-01", "PositionRequired")]
+    [InlineData("S-005", "F-1", "Grabstätte", "Sideways", "2026-01", "PositionRequired")]
+    [InlineData("S-005", "F-1", "Grabstätte", "3", "2026-01", "PositionRequired")]
+    [InlineData("S-005", "F-1", "Grabstätte", "SingleInside", "not-a-date", "InvalidDate")]
+    [InlineData("S-005", "F-1", "Grabstätte", "SingleInside", "", "InvalidDate")]
     public async Task Save_rejects_invalid_grave_fields(
         string graveNumber,
+        string fieldNumber,
+        string siteName,
+        string? position,
         string startDate,
         string expectedCode
     )
@@ -433,8 +468,11 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber,
+                    fieldNumber,
+                    siteName,
+                    position,
                     startDate,
-                    endDate = "2040-12-31",
+                    endDate = (string?)null,
                     items = new List<object>(),
                     recipientIds = new List<long>(),
                 }
@@ -461,6 +499,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-006",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -497,6 +538,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-007",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -539,6 +583,9 @@ public class SaveGraveTests
                 new
                 {
                     graveNumber = "S-008",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -580,6 +627,9 @@ public class SaveGraveTests
                 {
                     graveId = (long?)null,
                     graveNumber = "S-DATE",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2030-12-31",
                     endDate = "2026-01-01",
                     items = new[]
@@ -605,5 +655,187 @@ public class SaveGraveTests
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.False(await db.Graves.AnyAsync(g => g.GraveNumber == "S-DATE"));
+    }
+
+    private static Task<HttpResponseMessage> PostGraveAsync(
+        HttpClient client,
+        string graveNumber,
+        string startDate,
+        string? endDate,
+        long itemId,
+        long recipientId,
+        long? graveId = null,
+        string fieldNumber = "27",
+        string siteName = "Schineller Bäcke",
+        string position = "DoubleOutside"
+    ) =>
+        client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId,
+                    graveNumber,
+                    fieldNumber,
+                    siteName,
+                    position,
+                    startDate,
+                    endDate,
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipientId },
+                }
+            )
+        );
+
+    private static async Task<(string? Code, string[] Args)> ErrorOfAsync(
+        HttpResponseMessage response
+    )
+    {
+        using var json = await ODataJson.ReadAsync(response);
+        var error = json.RootElement.GetProperty("error");
+        var args = error.TryGetProperty("args", out var list)
+            ? list.EnumerateArray().Select(a => a.GetString() ?? "").ToArray()
+            : Array.Empty<string>();
+        return (error.GetProperty("code").GetString(), args);
+    }
+
+    [Fact]
+    public async Task Save_stores_the_site_fields_and_the_term_as_months()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+
+        var response = await PostGraveAsync(client, "M-1", "2026-03-15", null, item, recipient);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var created = await ODataJson.ReadAsync(response);
+        var id = created.RootElement.GetProperty("Id").GetInt64();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = await db.Graves.SingleAsync(g => g.Id == id);
+            Assert.Equal(new DateOnly(2026, 3, 1), grave.StartDate);
+            Assert.Null(grave.EndDate);
+            Assert.Equal("27", grave.FieldNumber);
+            Assert.Equal("Schineller Bäcke", grave.SiteName);
+            Assert.Equal(GravePosition.DoubleOutside, grave.Position);
+        }
+
+        using var details = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/Graves({id})")
+        );
+        Assert.Equal("27", details.RootElement.GetProperty("FieldNumber").GetString());
+        Assert.Equal("Schineller Bäcke", details.RootElement.GetProperty("SiteName").GetString());
+        Assert.Equal("DoubleOutside", details.RootElement.GetProperty("Position").GetString());
+
+        using var status = await ODataJson.ReadAsync(
+            await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
+        );
+        var row = status.RootElement.GetProperty("value")[0];
+        Assert.Equal("Schineller Bäcke", row.GetProperty("SiteName").GetString());
+        Assert.Equal("27", row.GetProperty("FieldNumber").GetString());
+
+        using var search = await ODataJson.ReadAsync(
+            await client.GetAsync("/odata/SearchGraves?term=bäcke")
+        );
+        Assert.Equal(1, search.RootElement.GetProperty("value").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Save_compares_the_end_month_with_the_start_month()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+
+        var before = await PostGraveAsync(client, "R-1", "2026-05", "2026-04", item, recipient);
+        Assert.Equal(HttpStatusCode.BadRequest, before.StatusCode);
+        Assert.Equal("DateRangeInvalid", (await ErrorOfAsync(before)).Code);
+
+        // one month long: start and end are the same month
+        var same = await PostGraveAsync(client, "R-2", "2026-05", "2026-05", item, recipient);
+        Assert.Equal(HttpStatusCode.OK, same.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_grave_number_cannot_be_used_twice_in_overlapping_terms()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostGraveAsync(client, "A-1", "2020-01", "2030-12", item, recipient)).StatusCode
+        );
+
+        // the last month overlaps; trimmed and case-insensitive, like the import
+        var clash = await PostGraveAsync(client, " a-1 ", "2030-12", null, item, recipient);
+        Assert.Equal(HttpStatusCode.BadRequest, clash.StatusCode);
+        var (code, args) = await ErrorOfAsync(clash);
+        Assert.Equal("GraveNumberInUse", code);
+        Assert.Equal(new[] { "A-1", "01/2020", "12/2030" }, args);
+
+        // the month after the end is free again
+        var next = await PostGraveAsync(client, "A-1", "2031-01", null, item, recipient);
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+
+        // that grave has no end, so every later term overlaps it
+        var later = await PostGraveAsync(client, "A-1", "2045-01", "2045-12", item, recipient);
+        var (laterCode, laterArgs) = await ErrorOfAsync(later);
+        Assert.Equal("GraveNumberInUse", laterCode);
+        Assert.Equal(new[] { "A-1", "01/2031" }, laterArgs);
+    }
+
+    [Fact]
+    public async Task Resaving_a_grave_does_not_collide_with_itself()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+        using var created = await ODataJson.ReadAsync(
+            await PostGraveAsync(client, "B-1", "2020-01", null, item, recipient)
+        );
+        var id = created.RootElement.GetProperty("Id").GetInt64();
+
+        var resaved = await PostGraveAsync(client, "B-1", "2020-01", null, item, recipient, id);
+        Assert.Equal(HttpStatusCode.OK, resaved.StatusCode);
+    }
+
+    [Fact]
+    public async Task Two_graves_may_share_a_field_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+
+        var first = await PostGraveAsync(
+            client,
+            "C-1",
+            "2020-01",
+            null,
+            item,
+            recipient,
+            fieldNumber: "27"
+        );
+        var second = await PostGraveAsync(
+            client,
+            "C-2",
+            "2020-01",
+            null,
+            item,
+            recipient,
+            fieldNumber: "27"
+        );
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
     }
 }

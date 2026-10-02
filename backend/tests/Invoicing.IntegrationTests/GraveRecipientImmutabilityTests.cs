@@ -76,6 +76,9 @@ public class GraveRecipientImmutabilityTests
                 {
                     graveId,
                     graveNumber = "G-400",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2020-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -118,6 +121,9 @@ public class GraveRecipientImmutabilityTests
                 {
                     graveId,
                     graveNumber = "G-400-neu",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2020-01-01",
                     endDate = "2041-12-31",
                     items = new[]
@@ -157,6 +163,9 @@ public class GraveRecipientImmutabilityTests
                 {
                     graveId = (long?)null,
                     graveNumber = "G-401",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2020-01-01",
                     endDate = "2040-12-31",
                     items = new[]
@@ -199,6 +208,9 @@ public class GraveRecipientImmutabilityTests
                 {
                     graveId,
                     graveNumber = "G-400",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2020-01-01",
                     endDate = "2040-12-31",
                     items = new[]

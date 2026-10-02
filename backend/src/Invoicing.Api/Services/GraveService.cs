@@ -13,6 +13,15 @@ public sealed class GraveItemInput
     public bool PriceIncludesVat { get; set; }
 }
 
+public sealed record GraveFields(
+    string GraveNumber,
+    string FieldNumber,
+    string SiteName,
+    GravePosition? Position,
+    DateOnly StartDate,
+    DateOnly? EndDate
+);
+
 public sealed class GraveService
 {
     private readonly AppDbContext _db;
@@ -24,24 +33,14 @@ public sealed class GraveService
     /// everything before anything is persisted.</summary>
     public async Task<Grave> SaveAsync(
         long? graveId,
-        string graveNumber,
-        DateOnly startDate,
-        DateOnly endDate,
+        GraveFields fields,
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
         CancellationToken ct
     )
     {
-        // the import refuses the same (DateRangeInvalid); the dialog did not
-        if (endDate < startDate)
-        {
-            throw new ValidationException(
-                "DateRangeInvalid",
-                "The end date must not be before the start date."
-            );
-        }
-
-        await ValidateAsync(graveNumber, items, recipientIds, ct);
+        await ValidateFieldsAsync(graveId, fields, ct);
+        await ValidateAsync(items, recipientIds, ct);
 
         // A grave created without recipients could never be billed: generation
         // would skip it, and once created its recipient set cannot change. A
@@ -74,9 +73,12 @@ public sealed class GraveService
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var grave = graveId is { } id ? await LoadForReplaceAsync(id, ct) : NewGrave();
-        grave.GraveNumber = graveNumber;
-        grave.StartDate = startDate;
-        grave.EndDate = endDate;
+        grave.GraveNumber = fields.GraveNumber.Trim();
+        grave.FieldNumber = fields.FieldNumber.Trim();
+        grave.SiteName = fields.SiteName.Trim();
+        grave.Position = fields.Position;
+        grave.StartDate = fields.StartDate;
+        grave.EndDate = fields.EndDate;
 
         // the deletes must reach the database before the new links are inserted,
         // or the unique (GraveId, ItemId) index rejects a re-added link
@@ -132,18 +134,69 @@ public sealed class GraveService
         return grave;
     }
 
+    private async Task ValidateFieldsAsync(long? graveId, GraveFields fields, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(fields.GraveNumber))
+        {
+            throw new ValidationException("GraveNumberRequired", "The grave number is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(fields.FieldNumber))
+        {
+            throw new ValidationException(
+                "FieldNumberRequired",
+                "The grave field number is required."
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(fields.SiteName))
+        {
+            throw new ValidationException("SiteNameRequired", "The grave site name is required.");
+        }
+
+        if (fields.Position is null)
+        {
+            throw new ValidationException("PositionRequired", "The grave position is required.");
+        }
+
+        // the import refuses the same (DateRangeInvalid)
+        if (fields.EndDate < fields.StartDate)
+        {
+            throw new ValidationException(
+                "DateRangeInvalid",
+                "The end month must not be before the start month."
+            );
+        }
+
+        // A number may come back once its grave has ended, but two graves that
+        // run at the same time cannot share it. Compared in memory, like
+        // SearchGraves: SQLite's lower() folds ASCII only.
+        var number = fields.GraveNumber.Trim();
+        var others = await _db
+            .Graves.Where(g => graveId == null || g.Id != graveId)
+            .Select(g => new
+            {
+                g.GraveNumber,
+                g.StartDate,
+                g.EndDate,
+            })
+            .ToListAsync(ct);
+        var clash = others.FirstOrDefault(g =>
+            string.Equals(g.GraveNumber.Trim(), number, StringComparison.OrdinalIgnoreCase)
+            && GraveTerm.Overlap(g.StartDate, g.EndDate, fields.StartDate, fields.EndDate)
+        );
+        if (clash is not null)
+        {
+            throw new GraveNumberInUseException(clash.GraveNumber, clash.StartDate, clash.EndDate);
+        }
+    }
+
     private async Task ValidateAsync(
-        string graveNumber,
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
         CancellationToken ct
     )
     {
-        if (string.IsNullOrWhiteSpace(graveNumber))
-        {
-            throw new ValidationException("GraveNumberRequired", "The grave number is required.");
-        }
-
         if (items.Select(i => i.ItemId).Distinct().Count() != items.Count)
         {
             throw new ValidationException(
@@ -252,4 +305,26 @@ public sealed class GraveShareValidationException : ValidationException
 
     public IReadOnlyList<GraveShareProblem> Problems { get; }
     public int Recipients { get; }
+}
+
+/// <summary>The grave number belongs to another grave whose term overlaps.
+/// Carries that grave's number and term so the message can name them.</summary>
+public sealed class GraveNumberInUseException : ValidationException
+{
+    public GraveNumberInUseException(string number, DateOnly start, DateOnly? end)
+        : base(
+            "GraveNumberInUse",
+            end is { } until
+                ? $"The grave number '{number}' is in use from {GraveTerm.FormatMonth(start)} to {GraveTerm.FormatMonth(until)}."
+                : $"The grave number '{number}' is in use from {GraveTerm.FormatMonth(start)}."
+        )
+    {
+        // two arguments for an open-ended grave, three otherwise: the UI picks
+        // its text by the count
+        Args = end is { } last
+            ? [number, GraveTerm.FormatMonth(start), GraveTerm.FormatMonth(last)]
+            : [number, GraveTerm.FormatMonth(start)];
+    }
+
+    public IReadOnlyList<string> Args { get; }
 }

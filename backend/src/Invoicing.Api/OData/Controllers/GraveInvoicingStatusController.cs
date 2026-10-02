@@ -54,6 +54,8 @@ public class GraveInvoicingStatusController : ODataController
             {
                 g.Id,
                 g.GraveNumber,
+                g.FieldNumber,
+                g.SiteName,
                 g.StartDate,
                 g.EndDate,
             })
@@ -63,6 +65,8 @@ public class GraveInvoicingStatusController : ODataController
         {
             g.Id,
             g.GraveNumber,
+            g.FieldNumber,
+            g.SiteName,
             g.StartDate,
             g.EndDate,
             Invoiced = invoicedIds.Contains(g.Id),

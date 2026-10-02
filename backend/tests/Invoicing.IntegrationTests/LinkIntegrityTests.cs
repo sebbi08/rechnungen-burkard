@@ -49,6 +49,9 @@ public class LinkIntegrityTests
                 {
                     graveId = (long?)null,
                     graveNumber = "L-001",
+                    fieldNumber = "F-1",
+                    siteName = "Grabstätte Test",
+                    position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
                     items = new[]

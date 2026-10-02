@@ -45,6 +45,10 @@ public class GravesController : ODataController
         {
             grave.Id,
             grave.GraveNumber,
+            grave.FieldNumber,
+            grave.SiteName,
+            // by name; System.Text.Json would write the enum as a number
+            Position = grave.Position?.ToString(),
             grave.StartDate,
             grave.EndDate,
             grave.CreatedAt,
@@ -106,6 +110,8 @@ public class GravesController : ODataController
             {
                 g.Id,
                 g.GraveNumber,
+                g.FieldNumber,
+                g.SiteName,
                 RecipientNames = g.Recipients.Select(r => r.Recipient.Name).ToList(),
             })
             .ToListAsync();
@@ -115,6 +121,8 @@ public class GravesController : ODataController
         var matches = graves
             .Where(g =>
                 g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || g.SiteName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || g.FieldNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase))
             )
             .ToList();
@@ -142,30 +150,39 @@ public class GravesController : ODataController
             );
         }
 
-        if (
-            !DateOnly.TryParse(request.StartDate, out var startDate)
-            || !DateOnly.TryParse(request.EndDate, out var endDate)
-        )
+        DateOnly? endDate = null;
+        if (!string.IsNullOrWhiteSpace(request.EndDate))
         {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "InvalidDate",
-                        message = "The start and end dates are required.",
-                    },
-                }
-            );
+            if (!GraveTerm.TryParseMonth(request.EndDate, out var end))
+            {
+                return InvalidDate();
+            }
+
+            endDate = end;
         }
+
+        if (!GraveTerm.TryParseMonth(request.StartDate, out var startDate))
+        {
+            return InvalidDate();
+        }
+
+        var fields = new GraveFields(
+            request.GraveNumber ?? "",
+            request.FieldNumber ?? "",
+            request.SiteName ?? "",
+            // an unknown name is reported as missing: the editor only offers the six
+            GraveTerm.TryParsePosition(request.Position, out var position)
+                ? position
+                : null,
+            startDate,
+            endDate
+        );
 
         try
         {
             var grave = await _graves.SaveAsync(
                 request.GraveId,
-                request.GraveNumber ?? "",
-                startDate,
-                endDate,
+                fields,
                 request.Items ?? new List<GraveItemInput>(),
                 request.RecipientIds ?? new List<long>(),
                 HttpContext.RequestAborted
@@ -200,6 +217,20 @@ public class GravesController : ODataController
                 }
             );
         }
+        catch (GraveNumberInUseException ex)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = ex.Code,
+                        message = ex.Message,
+                        args = ex.Args,
+                    },
+                }
+            );
+        }
         catch (ValidationException ex)
         {
             return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
@@ -219,10 +250,25 @@ public class GravesController : ODataController
         }
     }
 
+    private BadRequestObjectResult InvalidDate() =>
+        BadRequest(
+            new
+            {
+                error = new
+                {
+                    code = "InvalidDate",
+                    message = "The start month is required; start and end are months (yyyy-MM).",
+                },
+            }
+        );
+
     public sealed class SaveGraveRequest
     {
         public long? GraveId { get; set; }
         public string? GraveNumber { get; set; }
+        public string? FieldNumber { get; set; }
+        public string? SiteName { get; set; }
+        public string? Position { get; set; }
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
         public List<GraveItemInput>? Items { get; set; }
