@@ -28,7 +28,8 @@ public sealed class DocumentDataBuilder
                     l.UnitPrice,
                     l.VatRate,
                     lineTotal,
-                    vatAmount
+                    vatAmount,
+                    l.PriceIncludesVat
                 );
             })
             .ToArray();
@@ -93,6 +94,11 @@ public sealed class DocumentDataBuilder
             GeneratedAt = DateTime.SpecifyKind(invoice.GeneratedAt, DateTimeKind.Utc),
             RecipientName = invoice.RecipientName,
             RecipientAddress = invoice.RecipientAddress,
+            RecipientNumber = invoice.RecipientNumber,
+            GraveNumber = invoice.GraveNumber,
+            GraveSiteName = invoice.GraveSiteName,
+            GraveFieldNumber = invoice.GraveFieldNumber,
+            GravePosition = invoice.GravePosition?.ToString(),
             ShareText = shareText,
             EndingText = invoice.EndingText,
             StampWord = invoice.StampWord,

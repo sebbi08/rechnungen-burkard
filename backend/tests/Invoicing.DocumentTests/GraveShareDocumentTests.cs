@@ -192,4 +192,26 @@ public class GraveShareDocumentTests
         Assert.DoesNotContain("Ihr Anteil", text);
         Assert.DoesNotContain("Nettosumme gesamt", text);
     }
+
+    [Fact]
+    public void The_builder_hands_over_the_snapshot_and_the_vat_included_flag()
+    {
+        var invoice = GraveInvoice();
+        invoice.RecipientNumber = "067200";
+        invoice.GraveNumber = "1234";
+        invoice.GraveSiteName = "Schineller Bäcke";
+        invoice.GraveFieldNumber = "27";
+        invoice.GravePosition = GravePosition.DoubleOutside;
+        invoice.Lines[0].PriceIncludesVat = true;
+
+        var data = new DocumentDataBuilder().Build(invoice);
+
+        Assert.Equal("067200", data.RecipientNumber);
+        Assert.Equal("1234", data.GraveNumber);
+        Assert.Equal("Schineller Bäcke", data.GraveSiteName);
+        Assert.Equal("27", data.GraveFieldNumber);
+        Assert.Equal("DoubleOutside", data.GravePosition);
+        Assert.True(data.Lines[0].PriceIncludesVat);
+        Assert.False(data.Lines[1].PriceIncludesVat);
+    }
 }

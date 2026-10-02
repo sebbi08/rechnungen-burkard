@@ -6,6 +6,17 @@ public sealed class InvoiceDocumentData
     public DateTime GeneratedAt { get; set; }
     public string RecipientName { get; set; } = "";
     public string RecipientAddress { get; set; } = "";
+
+    public string? RecipientNumber { get; set; }
+
+    /// <summary>Set on grave invoices only. <see cref="GravePosition"/> is the
+    /// member name ("DoubleOutside"); DocumentTexts turns it into the short
+    /// form the invoice prints.</summary>
+    public string? GraveNumber { get; set; }
+    public string? GraveSiteName { get; set; }
+    public string? GraveFieldNumber { get; set; }
+    public string? GravePosition { get; set; }
+
     public string? ShareText { get; set; }
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
@@ -38,7 +49,9 @@ public sealed class InvoiceDocumentData
         decimal UnitPrice,
         decimal VatRate,
         decimal LineTotal,
-        decimal VatAmount
+        decimal VatAmount,
+        // the price was entered gross; UnitPrice is still the net
+        bool PriceIncludesVat = false
     );
 
     public sealed record VatSummary(
