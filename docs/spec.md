@@ -133,23 +133,27 @@ and that a normal document and a stamped copy both result.
 
 ### User Story 5 - Manage Graves (Priority: P2)
 
-A user manages graves, each with a grave number, start and end date, a creation
-date, one or more invoicing items (each with a count and an optional price that
+A user manages graves, each with a grave number, a field number, a site name, a
+position, a start month and an optional end month, a creation date, one or more
+invoicing items (each with a count and an optional price that
 overrides the item's default), and one or more recipients.
 
 **Why this priority**: Graves are the core business object; their configuration is
 needed before half-year invoices can be generated.
 
-**Independent Test**: Can be fully tested by creating a grave with a number, dates,
-one invoicing item, and two recipients, then listing and searching it.
+**Independent Test**: Can be fully tested by creating a grave with a number, field
+number, site name, position, months, one invoicing item, and two recipients, then
+listing and searching it.
 
 **Acceptance Scenarios**:
 
 1. **Given** the grave section is opened, **When** the user saves a grave with a
-   number, start and end date, one item with count, and one or more recipients,
-   **Then** the grave is stored with a creation date and is searchable.
-2. **Given** the user searches for a grave, **When** they enter a grave number or
-   recipient name, **Then** matching graves are returned.
+   number, field number, site name, position, start month, one item with count,
+   and one or more recipients, **Then** the grave is stored with a creation date
+   and is searchable. Saving without an end month is allowed.
+2. **Given** the user searches for a grave, **When** they enter a grave number,
+   field number, site name or recipient name, **Then** matching graves are
+   returned.
 3. **Given** a new grave that has not been saved yet, **When** the user adds items
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
@@ -157,6 +161,10 @@ one invoicing item, and two recipients, then listing and searching it.
 5. **Given** a grave with recipients, **When** the user tries to change its
    recipients, **Then** the change is rejected and the grave keeps the
    recipients it was created with.
+6. **Given** a grave with number 1234 whose term runs from 01/2020 to 12/2030,
+   **When** the user saves another grave with number 1234 and a term that
+   overlaps it, **Then** the save is refused, naming the grave that holds the
+   number and its term; a term starting 01/2031 is accepted.
 
 ---
 
@@ -396,8 +404,11 @@ non-interactive until completion, and the task runs exactly once.
   recipient is billed the identical share.
 - What happens when a recipient's address is changed after invoices were
   generated? Historical invoices must remain unchanged.
-- What happens when a grave's end date lies before the selected half-year?
-  Historical generation for that half-year must remain possible and recorded once.
+- What happens when a grave's end month lies before the selected half-year? The
+  term does not affect generation: historical generation for that half-year must
+  remain possible and recorded once.
+- What happens when a grave has no end month? Its term runs indefinitely, so no
+  other grave may take its number from its start month on.
 - What happens when a generated invoice is edited? The previous version is kept
   unchanged and the new document is saved as a revision with a clearly marked
   number.
@@ -483,7 +494,12 @@ non-interactive until completion, and the task runs exactly once.
 
 **Graves**
 
-- **FR-018**: A grave MUST have a grave number, a start date, and an end date.
+- **FR-018**: A grave MUST have a grave number, a field number, a site name, a
+  position (double, single or urn grave, inside or outside) and a start month; the
+  end month is optional.
+- **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
+  a term runs from its start month through its end month, or indefinitely without
+  one. Field numbers may repeat.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices.
@@ -509,7 +525,8 @@ non-interactive until completion, and the task runs exactly once.
   worked out per rate from that share. The percentage MUST be shown to at most
   two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
-- **FR-024**: Users MUST be able to search graves.
+- **FR-024**: Users MUST be able to search graves by grave number, field number,
+  site name and recipient name.
 
 **Half-year grave invoicing**
 
@@ -550,6 +567,25 @@ non-interactive until completion, and the task runs exactly once.
 
 - **FR-037**: The system MUST generate, for every invoice (grave and non-grave),
   a normal invoice document and a copy document in the same generation step.
+- **FR-037a**: The head of an invoice document MUST show, beside the recipient's
+  address, the invoice number, the customer number (the recipient's number), the
+  grave number as "Laufweg-Nr." on grave invoices only, the date and the page
+  ("1 von 2"). A value that is not known for an invoice MUST be left out.
+  Continuation pages MUST carry a single line with the invoice number, the
+  customer number and the page.
+- **FR-037b**: A grave invoice MUST show, in bold above its lines, the site name
+  ("GRABSTÄTTE") and the field number with the position's short form
+  ("FELD-GRAB-NR", e.g. "27 dGr.a"). A line whose values are missing MUST be left
+  out.
+- **FR-037c**: The line table MUST have the columns item number, description,
+  count, unit price, total and VAT rate ("19 %"). A line whose price includes VAT
+  MUST read "7 % Incl." and print the gross unit price and gross total.
+- **FR-037d**: The ending text MUST follow the lines. At the foot of the last page
+  a VAT block MUST show, per VAT rate, the net and the VAT, followed by the net
+  amount, the VAT and the gross amount. The block MUST NOT be split across pages.
+- **FR-037e**: On a grave invoice with several recipients the VAT block MUST bill
+  the recipient's share, and one line above it MUST give the net sum of the whole
+  grave and the recipient's percentage; the lines themselves stay in full.
 - **FR-038**: The copy document MUST carry the configured stamp word diagonally
   across the page.
 - **FR-039**: The stamp MUST appear on every page of a multi-page copy.
@@ -583,8 +619,9 @@ non-interactive until completion, and the task runs exactly once.
   address.
 - **FR-051**: The items CSV MUST capture item number, text, VAT rate, and an
   optional price.
-- **FR-052**: The graves CSV MUST capture the grave number and start and end
-  dates.
+- **FR-052**: The graves CSV MUST capture the grave number, field number, site
+  name, position, start month and an optional end month, in six columns. Months
+  are written as YYYY-MM.
 - **FR-053**: The mapping CSV MUST link each grave to its invoicing items (item
   identifier with count) and to its recipients (recipient number), covering both
   link types.
@@ -655,14 +692,17 @@ non-interactive until completion, and the task runs exactly once.
   of generation.
 - **Invoice Item**: A catalogue entry identified by a number, with a text, a VAT
   rate, and an optional default price.
-- **Grave**: Identified by a grave number; has a start date, end date, creation
-  date, one or more invoicing items (with counts), and one or more recipients,
+- **Grave**: Identified by a grave number (unique among graves whose terms
+  overlap); has a field number, a site name, a position, a start month, an
+  optional end month, a creation date, one or more invoicing items (with counts), and one or more recipients,
   fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
   invoice per recipient carrying the grave's own lines in full, at the same
   amount for every recipient, together with a percentage note stating their
   share) or to a single recipient (non-grave). Carries invoice lines, VAT,
-  ending text, generation date, and a unique invoice number. Edits create new
+  ending text, generation date, and a unique invoice number. It snapshots the
+  recipient's number and, on a grave invoice, the grave's number, site name, field
+  number and position, as it does the recipient's name and address. Edits create new
   revisions; previous revisions are preserved and invoices cannot be deleted.
 - **Invoice Line**: A single item on an invoice; has a count, a price per item,
   and a line total. On a grave invoice generated before recipients were billed
@@ -734,6 +774,8 @@ non-interactive until completion, and the task runs exactly once.
 
 - A single currency (EUR) is used for all amounts in version 1.
 - A half-year is one of two periods: January 1 – June 30 and July 1 – December 31.
+- A grave's term is counted in whole months and does not affect which half-years
+  can be invoiced.
 - The "current half-year" is derived from the current date.
 - A grave's prices are chosen so that its net subtotals divide evenly among its
   recipients; a grave that does not come out even cannot be saved, and nothing
