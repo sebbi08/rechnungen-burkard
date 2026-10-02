@@ -1,13 +1,13 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 3.0.0 → 4.0.0 (frontend framework replaced)
-Modified principles: Principle VI (OpenUI5 Frontend → Vue Frontend) — the
-  frontend is built with Vue 3 and PrimeVue instead of OpenUI5; the
-  open-source requirement stays
-Modified sections: Technology Constraints — the frontend consumes the OData
-  interface through a client generated from $metadata instead of the UI5
-  OData V4 model; Vue and PrimeVue replace OpenUI5
+Version change: 4.0.0 → 5.0.0 (the application is German only)
+Modified principles: Principle VII (English Codebase, Multilingual UI →
+  English Codebase, German UI) — the user interface and the generated
+  documents are German only; user-visible strings still live in the i18n
+  catalogue rather than in the code
+Modified sections: Technology Constraints — the i18n catalogue holds the
+  German texts instead of serving a multilingual user interface
 Added sections: none
 Removed sections: none
 Follow-up TODOs: none
@@ -73,14 +73,17 @@ licenses of the bundled dependencies MUST ship with the frontend delivery.
 Rationale: Vue and PrimeVue provide the required UI framework under the MIT
 license, without proprietary licensing obligations.
 
-### VII. English Codebase, Multilingual UI
+### VII. English Codebase, German UI
 
 Source code, identifiers, comments, commit messages, and documentation MUST be
-written in English. The application itself MUST support multiple languages via
-internationalization (i18n). User-visible strings MUST NOT be hard-coded.
+written in English. The application itself — its user interface and the
+documents it generates — MUST be German, and German only. User-visible strings
+in the frontend MUST NOT be hard-coded; they live in the i18n catalogue.
 
-Rationale: English keeps the codebase maintainable for any contributor, while
-i18n makes the application accessible to multilingual users.
+Rationale: English keeps the codebase maintainable for any contributor. The
+application's users and the recipients of its invoices are German-speaking, so a
+second language is upkeep without a reader. The catalogue keeps the texts in one
+place, apart from the code that shows them.
 
 ### VIII. Blocking Progress Indicators for Long-Running Tasks
 
@@ -101,7 +104,7 @@ data inconsistency while giving users a clear signal that work is in progress.
 - SQLite for data persistence.
 - Docker for local development and release packaging.
 - GitHub for source control, releases, and container image distribution.
-- Internationalization (i18n) support for a multilingual user interface.
+- An i18n catalogue (vue-i18n) holding the German user-visible texts.
 
 ## Development & Release Workflow
 
@@ -124,4 +127,4 @@ PATCH for clarifications and wording fixes.
 Compliance with this constitution MUST be reviewed as part of code review and
 release. Deviations MUST be justified and recorded.
 
-**Version**: 4.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-10-01
+**Version**: 5.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-10-02

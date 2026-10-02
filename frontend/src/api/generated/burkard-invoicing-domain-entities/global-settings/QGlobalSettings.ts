@@ -11,7 +11,6 @@ export class QGlobalSettings extends QueryObject {
   public readonly Id = new QNumberPath(this.withPrefix("Id"));
   public readonly EndingText = new QStringPath(this.withPrefix("EndingText"));
   public readonly StampWord = new QStringPath(this.withPrefix("StampWord"));
-  public readonly Language = new QStringPath(this.withPrefix("Language"));
 }
 
 export const qGlobalSettings = new QGlobalSettings();

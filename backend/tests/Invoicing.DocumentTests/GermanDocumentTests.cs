@@ -6,9 +6,9 @@ using Xunit;
 
 namespace Burkard.Invoicing.DocumentTests;
 
-public class DocumentLanguageTests
+public class GermanDocumentTests
 {
-    private static InvoiceDocumentData SampleData(string language) =>
+    private static InvoiceDocumentData SampleData() =>
         new()
         {
             InvoiceNumber = "2026-0004",
@@ -17,7 +17,6 @@ public class DocumentLanguageTests
             RecipientAddress = "Musterstraße 1\n12345 Musterstadt",
             EndingText = "",
             StampWord = "Kopie",
-            Language = language,
             Lines = new[]
             {
                 new InvoiceDocumentData.LineData(
@@ -47,9 +46,9 @@ public class DocumentLanguageTests
     }
 
     [Fact]
-    public void German_is_the_default_language()
+    public void Documents_use_german_labels_and_number_format()
     {
-        var text = ExtractText(DocumentService.GeneratePdf(SampleData("de"), isCopy: false));
+        var text = ExtractText(DocumentService.GeneratePdf(SampleData(), isCopy: false));
 
         Assert.Contains("Rechnung 2026-0004", text);
         Assert.Contains("Bezeichnung", text);
@@ -59,29 +58,11 @@ public class DocumentLanguageTests
     }
 
     [Fact]
-    public void An_english_invoice_uses_english_labels_and_number_format()
+    public void The_share_note_is_german()
     {
-        var text = ExtractText(DocumentService.GeneratePdf(SampleData("en"), isCopy: false));
-
-        Assert.Contains("Invoice 2026-0004", text);
-        Assert.Contains("Description", text);
-        Assert.Contains("Amount due", text);
-        Assert.Contains("240.00", text); // English decimal point
-        Assert.DoesNotContain("Gesamtbetrag", text);
-    }
-
-    [Fact]
-    public void The_share_note_follows_the_invoice_language()
-    {
-        Assert.Contains("50 % des Gesamtbetrags", DocumentTexts.For("de").ShareText(50m));
-        Assert.Contains("50 % of the total amount", DocumentTexts.For("en").ShareText(50m));
-    }
-
-    [Fact]
-    public void An_unknown_language_falls_back_to_the_default()
-    {
-        var text = ExtractText(DocumentService.GeneratePdf(SampleData("fr"), isCopy: false));
-
-        Assert.Contains("Rechnung 2026-0004", text);
+        Assert.Equal(
+            "Diese Rechnung enthält 50 % des Gesamtbetrags.",
+            DocumentTexts.ShareText(50m)
+        );
     }
 }

@@ -112,7 +112,6 @@
                 <Property Name="RecipientAddress" Type="Edm.String" Nullable="false" />
                 <Property Name="EndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
-                <Property Name="Language" Type="Edm.String" Nullable="false" />
                 <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
                 <Property Name="PaidOn" Type="Edm.Date" />
                 <Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="Variable" />
@@ -176,7 +175,6 @@
                 <Property Name="Id" Type="Edm.Int64" Nullable="false" />
                 <Property Name="EndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
-                <Property Name="Language" Type="Edm.String" Nullable="false" />
             </EntityType>
             <EntityType Name="InvoiceLine">
                 <Key>

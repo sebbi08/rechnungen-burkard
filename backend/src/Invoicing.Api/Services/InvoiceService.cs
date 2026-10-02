@@ -142,7 +142,6 @@ public sealed class InvoiceService
             RecipientAddress = recipient.Address,
             EndingText = settings.EndingText,
             StampWord = settings.StampWord,
-            Language = settings.Language,
             GeneratedAt = now,
             Lines = lines,
         };
@@ -304,7 +303,6 @@ public sealed class InvoiceService
             RecipientAddress = recipient.Address,
             EndingText = settings.EndingText,
             StampWord = settings.StampWord,
-            Language = settings.Language,
             GeneratedAt = now,
             Lines = lines,
         };

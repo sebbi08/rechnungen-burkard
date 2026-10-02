@@ -127,7 +127,6 @@ public sealed class GraveInvoiceGenerator
                 RecipientAddress = recipients[r].Address,
                 EndingText = settings.EndingText,
                 StampWord = settings.StampWord,
-                Language = settings.Language,
                 GeneratedAt = now,
             };
 

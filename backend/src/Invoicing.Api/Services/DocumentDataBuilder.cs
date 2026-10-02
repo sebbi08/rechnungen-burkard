@@ -57,10 +57,9 @@ public sealed class DocumentDataBuilder
             Math.Round(s.VatAmount * 100m, 0, MidpointRounding.AwayFromZero)
         );
 
-        // the share note is written in the invoice's own language, so a later
-        // language switch cannot change what an existing document said
-        var texts = DocumentTexts.For(invoice.Language);
-        var shareText = invoice.SharePercent is { } percent ? texts.ShareText(percent) : null;
+        var shareText = invoice.SharePercent is { } percent
+            ? DocumentTexts.ShareText(percent)
+            : null;
 
         // A grave invoice generated since the lines became the grave's own: the
         // recipient pays a share of them, and their VAT is worked out from that
@@ -97,7 +96,6 @@ public sealed class DocumentDataBuilder
             ShareText = shareText,
             EndingText = invoice.EndingText,
             StampWord = invoice.StampWord,
-            Language = invoice.Language,
             Lines = lines,
             VatSummaries = summaries,
             NetTotal = netTotalCents / 100m,

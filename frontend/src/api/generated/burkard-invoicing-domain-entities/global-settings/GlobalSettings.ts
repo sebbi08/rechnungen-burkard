@@ -30,21 +30,9 @@ export interface GlobalSettings {
    * | Nullable | `false` |
    */
   StampWord: string;
-  /**
-   *
-   * OData Attributes:
-   * |Attribute Name | Attribute Value |
-   * | --- | ---|
-   * | Name | `Language` |
-   * | Type | `Edm.String` |
-   * | Nullable | `false` |
-   */
-  Language: string;
 }
 
 export type GlobalSettingsId = number | { Id: number };
 
 export interface EditableGlobalSettings
-  extends
-    Pick<GlobalSettings, "EndingText" | "StampWord" | "Language">,
-    Partial<Pick<GlobalSettings, "Id">> {}
+  extends Pick<GlobalSettings, "EndingText" | "StampWord">, Partial<Pick<GlobalSettings, "Id">> {}

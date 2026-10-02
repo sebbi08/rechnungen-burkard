@@ -15,7 +15,7 @@ namespace Burkard.Invoicing.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Document", b =>
                 {
@@ -54,10 +54,6 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("EndingText")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Language")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -198,10 +194,6 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.Property<bool>("IsLatestRevision")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.Property<DateOnly?>("PaidOn")
                         .HasColumnType("TEXT");

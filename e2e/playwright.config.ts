@@ -21,8 +21,8 @@ export default defineConfig({
     // page.goto and page.request both resolve relative paths against this, so
     // the browser and the seeding calls always hit the same deployment
     baseURL: BASE_URL,
-    // The app ships German and English; these tests assert the German UI, so
-    // the browser locale is pinned instead of following the CI machine's.
+    // The UI is German whatever the browser prefers; the locale is pinned so
+    // that what the browser formats on its own does not follow the CI machine.
     locale: "de-DE",
     // Kept only for what failed. A trace carries the DOM, the network and the
     // console at every step, which is what turns "element not found" into a
