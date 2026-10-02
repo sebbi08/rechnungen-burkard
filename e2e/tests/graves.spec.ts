@@ -253,6 +253,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await waitForOverlayOpen(page);
   await expect(editor.getByLabel("Grabnummer")).toHaveValue(graveNumber);
   await expect(editor.getByLabel("Beginn")).toHaveValue("01/2026");
+  await expect(editor.getByLabel("Ende")).toHaveValue("12/2040");
   await expect(editor.getByLabel("Feld-Nr.")).toHaveValue("27");
   await expect(editor.getByRole("spinbutton", { name: "Anzahl 1" })).toHaveValue("2");
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("55,00");
@@ -918,4 +919,15 @@ test("a grave can be saved without an end", async ({ page }) => {
   ).json();
   expect(graves.value[0].StartDate).toBe("2026-01-01");
   expect(graves.value[0].EndDate).toBeNull();
+
+  // reopened, the open end reads as an empty field
+  await page
+    .getByRole("row")
+    .filter({ hasText: graveNumber })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForOverlayOpen(page);
+  await expect(editor.getByLabel("Ende")).toHaveValue("");
+  await editor.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(editor).toHaveCount(0);
 });
