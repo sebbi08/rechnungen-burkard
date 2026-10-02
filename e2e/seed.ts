@@ -70,8 +70,13 @@ export interface SeedGraveLine {
 
 export interface SeedGraveInput {
   graveNumber: string;
+  fieldNumber?: string;
+  siteName?: string;
+  position?: string;
+  /** "yyyy-MM" */
   startDate?: string;
-  endDate?: string;
+  /** "yyyy-MM", or null for no end */
+  endDate?: string | null;
   items: SeedGraveLine[];
   recipientIds: number[];
 }
@@ -92,8 +97,11 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
   const created = await createRow(page, "/odata/SaveGrave", {
     graveId: null,
     graveNumber: grave.graveNumber,
-    startDate: grave.startDate ?? "2026-01-01",
-    endDate: grave.endDate ?? "2040-12-31",
+    fieldNumber: grave.fieldNumber ?? "1",
+    siteName: grave.siteName ?? "Schineller Bäcke",
+    position: grave.position ?? "SingleInside",
+    startDate: grave.startDate ?? "2026-01",
+    endDate: grave.endDate === undefined ? "2040-12" : grave.endDate,
     items: grave.items.map((line) => ({
       itemId: line.itemId,
       count: line.count ?? 1,

@@ -158,14 +158,23 @@ test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)
   expect(new Set(seen).size).toBe(seen.length);
 });
 
-/** Opens the grave editor for a new grave and fills in its number and term. */
-async function startNewGrave(page: Page, graveNumber: string): Promise<Locator> {
+/** Opens the grave editor for a new grave and fills in its number, site and term. */
+async function startNewGrave(
+  page: Page,
+  graveNumber: string,
+  { end = "12/2040" }: { end?: string | null } = {},
+): Promise<Locator> {
   await page.getByRole("button", { name: "Grab anlegen" }).click();
   await waitForOverlayOpen(page);
   const editor = drawer(page);
   await editor.getByLabel("Grabnummer").fill(graveNumber);
-  await fillDate(page, editor.getByLabel("Beginn"), "01.01.2026");
-  await fillDate(page, editor.getByLabel("Ende"), "31.12.2040");
+  await editor.getByLabel("Feld-Nr.").fill("27");
+  await editor.getByLabel("Grabstätte").fill(`Schineller Bäcke ${graveNumber}`);
+  await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
+  await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
+  if (end) {
+    await fillDate(page, editor.getByLabel("Ende"), end);
+  }
   return editor;
 }
 
@@ -211,13 +220,16 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
 
   const graves = await (
     await page.request.get(
-      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id,StartDate,EndDate`,
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id,StartDate,EndDate,FieldNumber,SiteName,Position`,
     )
   ).json();
   const grave = graves.value[0];
-  // the typed days, not the day before: a picker's value is local midnight
+  // the picked months, stored as their first day -- not the month before
   expect(grave.StartDate).toBe("2026-01-01");
-  expect(grave.EndDate).toBe("2040-12-31");
+  expect(grave.EndDate).toBe("2040-12-01");
+  expect(grave.FieldNumber).toBe("27");
+  expect(grave.SiteName).toBe(`Schineller Bäcke ${graveNumber}`);
+  expect(grave.Position).toBe("DoubleOutside");
   const links = await (
     await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${grave.Id}`)
   ).json();
@@ -240,7 +252,8 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
     .click();
   await waitForOverlayOpen(page);
   await expect(editor.getByLabel("Grabnummer")).toHaveValue(graveNumber);
-  await expect(editor.getByLabel("Beginn")).toHaveValue("01.01.2026");
+  await expect(editor.getByLabel("Beginn")).toHaveValue("01/2026");
+  await expect(editor.getByLabel("Feld-Nr.")).toHaveValue("27");
   await expect(editor.getByRole("spinbutton", { name: "Anzahl 1" })).toHaveValue("2");
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("55,00");
   await expect(editor).toContainText("nur auf künftig erstellte Rechnungen");
@@ -842,4 +855,67 @@ test("the overview searches graves by recipient name as well", async ({ page }) 
   );
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody tr")).toContainText(marker);
+});
+
+test("a grave number cannot be given to two graves at the same time", async ({ page }) => {
+  const itemNumber = `OV-${RUN}`;
+  const recipientName = `Olga Overlap ${RUN}`;
+  const graveNumber = `OV-${RUN}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "Pflege",
+    VatRate: 7,
+    DefaultPrice: 50,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Weg 1",
+  });
+  await saveGrave(page, {
+    graveNumber,
+    items: [{ itemId: item.Id }],
+    recipientIds: [recipient.Id],
+  });
+
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, graveNumber, { end: null });
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 1, itemNumber);
+  await addRecipient(page, editor, recipientName);
+  await editor.getByRole("button", { name: "Speichern" }).click();
+
+  await expect(
+    page.getByText(`Die Grabnummer „${graveNumber}“ ist von 01/2026 bis 12/2040 bereits vergeben.`),
+  ).toBeVisible();
+  await expect(editor).toBeVisible();
+});
+
+test("a grave can be saved without an end", async ({ page }) => {
+  const itemNumber = `OE-${RUN}`;
+  const recipientName = `Otto Openend ${RUN}`;
+  const graveNumber = `OE-${RUN}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "Pflege",
+    VatRate: 7,
+    DefaultPrice: 50,
+  });
+  await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Weg 2" });
+
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, graveNumber, { end: null });
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 1, itemNumber);
+  await addRecipient(page, editor, recipientName);
+  await saveEditor(editor);
+
+  const graves = await (
+    await page.request.get(
+      `/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=StartDate,EndDate`,
+    )
+  ).json();
+  expect(graves.value[0].StartDate).toBe("2026-01-01");
+  expect(graves.value[0].EndDate).toBeNull();
 });
