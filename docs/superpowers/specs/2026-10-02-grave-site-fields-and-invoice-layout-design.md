@@ -52,8 +52,8 @@ change:
 | `UrnInside`     | Urnengrab innen  | uGr.i                     |
 | `UrnOutside`    | Urnengrab außen  | uGr.a                     |
 
-The short forms are part of the document texts (German and English documents
-print the same abbreviation; the scan is the only reference for them).
+The short forms are part of the document texts; the scan is the only reference
+for them.
 
 ### Invoice snapshot
 
@@ -78,7 +78,12 @@ whatever is missing.
 
 ### Migration
 
-One migration for the next version (Principle IV):
+Principle IV allows one migration per version, and `main` already carries an
+unreleased one: `20261002064856_RemoveDocumentLanguage` (from the German-only
+change, not in any release tag; the latest is `v2.1.0`). This change therefore
+does not add a second migration. It removes that one and generates a single
+migration in its place (`scripts/ef.sh`), named for both changes, that drops the
+`Language` columns from `Invoices` and `GlobalSettings` as before and also:
 
 1. Truncate `Graves.StartDate` and `Graves.EndDate` to the first of their
    month (`UPDATE … SET StartDate = substr(StartDate, 1, 8) || '01'`, same for
@@ -164,7 +169,7 @@ is next saved.
 1. Grave number (`InputText`, as today)
 2. Field number (`InputText`, `id="graveFieldNumber"`)
 3. Site name (`InputText`, `id="graveSiteName"`)
-4. Position (`Select` with the six German/English labels from i18n,
+4. Position (`Select` with the six labels from i18n,
    `input-id="gravePosition"`)
 5. Start (`DatePicker`, `view="month"`, `date-format="mm/yy"`)
 6. End (same, with `show-clear`; empty is valid)
@@ -173,7 +178,7 @@ is next saved.
 (`toIsoMonth`: `Date` → `"yyyy-MM"`; `formatMonth`: `"yyyy-MM-dd"` → `"MM/yyyy"`).
 `endpoints.ts`' `SaveGraveInput` gets the new fields and `endDate: string | null`.
 i18n gains the field labels, the six position labels, and the four new error
-texts, in `de.json` and `en.json`.
+texts, in `de.json` (the only catalogue since the UI became German only).
 
 **`GravesPage.vue`**: columns for site name and field number; start and end as
 `MM/yyyy`, a missing end as "–".
@@ -264,9 +269,10 @@ stays above the table.
 
 ### Texts
 
-Every new string goes into `DocumentTexts`, German and English (e.g.
-"INVOICE", "NUMBER", "CUSTOMER NO", "GRAVE NO", "DATE", "PAGE", "GRAVE SITE",
-"FIELD/GRAVE NO", "Net amount", "VAT", "Gross amount"). Strings that go out of
+Every new string goes into the static, German-only `DocumentTexts` (e.g.
+"RECHNUNG", "NUMMER", "KUNDEN-NR", "LAUFWEG-NR", "DATUM", "SEITE",
+"GRABSTÄTTE", "FELD-GRAB-NR", "Nettobetrag", "MWSt", "Bruttobetrag", "Incl.").
+Strings that go out of
 use (`NetForRate`, `VatForRate`, `VatForRateFromNet`, `NetTotal`, `VatTotal`,
 `GrossTotal`, `SharePart`, the page footer) are removed with their callers.
 
