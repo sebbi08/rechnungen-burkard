@@ -18,29 +18,13 @@ jobs:
       - name: Test
         run: dotnet test backend/Invoicing.sln -c Release --no-build
 
+  # Keeps the frontend compiling and lint-clean; its behaviour is covered by
+  # the E2E job.
   frontend:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run ui5lint
-      - run: npm run build
-
-  # The Vue evaluation frontend (D-003). No tests by decision; this keeps it
-  # compiling and lint-clean while it is being evaluated.
-  frontend-vue:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend-vue
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -65,7 +49,7 @@ jobs:
         run: docker build -t invoicing:e2e .
       - name: Start the app
         run: |
-          docker run -d --name invoicing-e2e -p 8080:8080 -p 8082:8082 invoicing:e2e
+          docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:8080/healthz > /dev/null; then exit 0; fi
             sleep 2
@@ -84,7 +68,6 @@ jobs:
         working-directory: e2e
         env:
           E2E_BASE_URL: http://localhost:8080
-          E2E_VUE_BASE_URL: http://localhost:8082
         run: npx playwright test
       - name: Backend logs on failure
         if: failure()

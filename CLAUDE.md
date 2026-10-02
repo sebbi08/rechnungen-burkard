@@ -28,31 +28,27 @@ first and commit before it: `scripts/reset-dev-db.sh`.
 
 ## A dialog takes focus when it finishes opening
 
-`sap.m.Dialog` moves focus to its first field once its opening animation
-completes — about 230ms after `open()`. Playwright is faster than that, so a
-spec that starts filling a dialog straight away is still typing when the focus
-change lands, and anything focus-sensitive it has opened in the meantime (a
-ComboBox suggestion popover) closes underneath it.
+A PrimeVue Dialog moves focus to its `autofocus` field once its opening
+transition ends, and a Select's overlay hands focus back to its field on a
+timeout after a pick. Playwright is faster than either, so a spec that starts
+filling a dialog straight away, or moves on to the next field right after a
+pick, is still typing when the focus change lands — and whatever focus-sensitive
+thing it has opened in the meantime (a Select's overlay) closes underneath it.
+CI is roughly four times slower than a dev machine and fails this where a local
+run does not.
 
-So a spec that opens a dialog calls `waitForDialogOpen(page)` from
-`e2e/dialog.ts` before touching it. The helper explains the mechanism.
+So the specs go through `e2e/vue.ts`: `waitForOverlayOpen` after opening a
+dialog or drawer, `pickOption` (and `pickItem`, `pickRecipient`) for every
+Select, `fillNumber` for an InputNumber, which only hands its value on when it
+is left, and `saveEditor` for a drawer's save, which renders PDFs behind the
+blocking overlay before the drawer closes. `pickOption` makes a pick again until
+it has landed: the item and recipient pickers reload their lists whenever an
+editor opens, and on a slow machine the answer replaces the option list while it
+is open.
 
-`invoices.spec.ts` used to be a deliberate exception: the wait moved when that
-spec read the recipient select's rendered label, and "the second invoice goes to
-the recipient the reopened dialog shows" then failed about four runs in five.
-That exception is gone. The recipient is a ComboBox now and the spec reads its
-input value rather than a Select's label, so the read no longer moves with the
-wait — 15 consecutive runs of that test pass with it. The spec waits like every
-other one.
-
-The same mechanism bites a second time, between two fields of one dialog. A
-ComboBox pick is not finished when the click returns: the popover closes and
-focus goes back to the field afterwards. A spec that moves straight to the next
-field opens that field's popover into the pending focus change and it closes
-again, leaving the entry in the DOM but invisible. So after picking a recipient
-the specs wait for the value to be set and the popover to be gone, rather than
-assuming the click was the last thing to happen. CI is roughly four times slower
-than a dev machine and fails this where a local run does not.
+Layout bugs the specs have found are marked with `test.fail` and a `known bug:`
+description, so the suite stays green while the bug is there and turns red once
+it is fixed — remove the mark together with the fix.
 
 ## An overflowing page background paginates instead of repeating
 
@@ -79,18 +75,13 @@ page one.
 - **Dev stack**: `env "UID=$(id -u)" "GID=$(id -g)" docker compose up -d`
   (frontend on 8080, proxying `/odata` to the backend container).
 - **Backend tests**: `scripts/dotnet.sh test Invoicing.sln`.
-- **Frontend checks**: `cd frontend && npm run typecheck`, then `npm run lint`
-  (ESLint with type-aware rules) and `npm run ui5lint` (deprecated APIs,
-  accessibility, manifest). All three must be clean; both linters are scoped to
-  `src`, since `dist/` holds the whole OpenUI5 runtime.
-- **Vue evaluation frontend** (`frontend-vue/`, D-003): the dev stack also
-  serves it on 8082, against the dev backend, and the release image serves its
-  build on its own port 8082 — so the E2E stack has it on 8083. For probing with
-  hot reload, run it on the host against the E2E stack instead:
-  `cd frontend-vue && VITE_PROXY_TARGET=http://localhost:8081 npm run dev`.
-  Checks: `npm run typecheck`, `npm run lint`, `npm run build`. After an EDM
-  change, `npm run gen:odata` (reads `$metadata` from the E2E stack) and commit
-  `src/api/metadata.xml` together with `src/api/generated/`.
+- **Frontend** (`frontend/`, Vue 3 and PrimeVue): `cd frontend && npm run
+typecheck`, then `npm run lint` (ESLint, scoped to `src`) and `npm run build`.
+  All three must be clean. For probing with hot reload, run it on the host
+  against the E2E stack rather than the dev stack:
+  `cd frontend && VITE_PROXY_TARGET=http://localhost:8081 npm run dev -- --port 5173`.
+  After an EDM change, `npm run gen:odata` (reads `$metadata` from the E2E
+  stack) and commit `src/api/metadata.xml` together with `src/api/generated/`.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
   tablet projects only run `tests/layout.spec.ts`.
 - **Release scripts**: `scripts/test-release-scripts.sh`.

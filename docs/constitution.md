@@ -1,10 +1,13 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.0.0 → 3.0.0 (release shape redefined: one container image)
-Modified principles: Principle I (Full-Stack Web Application) — frontend and
-  backend are no longer required to be independently deployable and
-  containerized; they ship together in a single image
+Version change: 3.0.0 → 4.0.0 (frontend framework replaced)
+Modified principles: Principle VI (OpenUI5 Frontend → Vue Frontend) — the
+  frontend is built with Vue 3 and PrimeVue instead of OpenUI5; the
+  open-source requirement stays
+Modified sections: Technology Constraints — the frontend consumes the OData
+  interface through a client generated from $metadata instead of the UI5
+  OData V4 model; Vue and PrimeVue replace OpenUI5
 Added sections: none
 Removed sections: none
 Follow-up TODOs: none
@@ -61,14 +64,14 @@ published as Docker container images on GitHub.
 Rationale: Containers provide a consistent environment from local development
 through production release.
 
-### VI. OpenUI5 Frontend (No SAPUI5)
+### VI. Vue Frontend (Open Source)
 
-The frontend MUST be built with OpenUI5 (open-source, Apache 2.0). SAPUI5 MUST
-NOT be used. The open-source license MUST remain in effect for the frontend
-delivery.
+The frontend MUST be built with Vue 3 and the PrimeVue component library. Every
+library the frontend ships MUST be under an open-source license, and the
+licenses of the bundled dependencies MUST ship with the frontend delivery.
 
-Rationale: OpenUI5 provides the required UI framework without proprietary
-SAPUI5 licensing obligations.
+Rationale: Vue and PrimeVue provide the required UI framework under the MIT
+license, without proprietary licensing obligations.
 
 ### VII. English Codebase, Multilingual UI
 
@@ -92,9 +95,9 @@ data inconsistency while giving users a clear signal that work is in progress.
 
 - Web application with a frontend and a backend.
 - .NET as the backend implementation stack.
-- OData v4 as the backend API protocol, consumed by the UI5 frontend's OData V4
-  model.
-- OpenUI5 (open-source) for the frontend; SAPUI5 MUST NOT be used.
+- OData v4 as the backend API protocol, consumed by the frontend through a
+  client generated from `$metadata`.
+- Vue 3 and PrimeVue (open-source) for the frontend.
 - SQLite for data persistence.
 - Docker for local development and release packaging.
 - GitHub for source control, releases, and container image distribution.
@@ -121,4 +124,4 @@ PATCH for clarifications and wording fixes.
 Compliance with this constitution MUST be reviewed as part of code review and
 release. Deviations MUST be justified and recorded.
 
-**Version**: 3.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-08-29
+**Version**: 4.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-10-01

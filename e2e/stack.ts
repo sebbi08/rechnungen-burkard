@@ -10,10 +10,6 @@ export const PORT = process.env.E2E_PORT ?? "8081";
 
 export const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;
 
-/** The same deployment's second port, where it serves the Vue frontend (D-003). */
-export const VUE_BASE_URL =
-  process.env.E2E_VUE_BASE_URL ?? `http://localhost:${process.env.E2E_VUE_PORT ?? "8083"}`;
-
 const PROJECT = "invoicing-e2e";
 
 const COMPOSE_ARGS = ["compose", "-f", "../docker-compose.e2e.yml", "-p", PROJECT];

@@ -1,8 +1,0 @@
-<mvc:View
-    xmlns:mvc="sap.ui.core.mvc"
-    xmlns="sap.m"
-    controllerName="burkard.invoicing.controller.App"
-    displayBlock="true"
->
-    <App id="app" />
-</mvc:View>

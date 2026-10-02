@@ -3,9 +3,9 @@ import { BASE_URL, OWN_STACK } from "./stack";
 
 // Without E2E_BASE_URL the suite starts its own stack (docker-compose.e2e.yml)
 // and runs against that, so a local run never writes into the dev database. CI
-// sets E2E_BASE_URL to target the release image it has already started. The dev
-// stack is not a target: the specs write graves, recipients and invoices that
-// nothing deletes again, into the database that holds the user's own data.
+// sets E2E_BASE_URL to target the release image it has already started. The dev stack is not a target: the specs write graves,
+// recipients and invoices that nothing deletes again, into the database that
+// holds the user's own data.
 export default defineConfig({
   testDir: "./tests",
   timeout: 60000,
@@ -33,20 +33,20 @@ export default defineConfig({
   },
   // The feature specs describe flows and run once, at desktop size. Only the
   // layout spec runs on the small screens, and it runs on both of them: a phone
-  // (emulated, so UI5 reports system.phone) and a tablet-sized window.
+  // (emulated, touch and all) and a tablet-sized window.
   projects: [
     {
       name: "desktop",
-      testIgnore: /layout\.spec\.ts/,
+      testIgnore: /layout\.spec\.ts$/,
     },
     {
       name: "phone",
-      testMatch: /layout\.spec\.ts/,
+      testMatch: /layout\.spec\.ts$/,
       use: { ...devices["Pixel 5"] },
     },
     {
       name: "tablet",
-      testMatch: /layout\.spec\.ts/,
+      testMatch: /layout\.spec\.ts$/,
       use: { viewport: { width: 820, height: 1180 } },
     },
   ],

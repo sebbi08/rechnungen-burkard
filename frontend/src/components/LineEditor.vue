@@ -1,0 +1,163 @@
+<script setup lang="ts">
+import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
+import InputNumber from "primevue/inputnumber";
+import Select from "primevue/select";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import type { InvoiceItem } from "@/api/generated";
+import { useItemsQuery } from "@/api/queries";
+import { formatAmount } from "@/lib/format";
+import { vDecimalPoint } from "@/directives/decimalPoint";
+import { type DraftLine, newLine } from "@/lib/lines";
+
+const lines = defineModel<DraftLine[]>({ required: true });
+
+const { t } = useI18n();
+const items = useItemsQuery(ref(""));
+const byId = computed(() => new Map((items.data.value ?? []).map((item) => [item.Id, item])));
+
+function item(line: DraftLine): InvoiceItem | undefined {
+  return line.itemId == null ? undefined : byId.value.get(line.itemId);
+}
+
+function defaultPriceText(line: DraftLine): string {
+  const price = item(line)?.DefaultPrice;
+  return price == null ? "" : formatAmount(price);
+}
+
+/** A picked item fills in its default price, or clears the field when it has
+ *  none. */
+function onItemPicked(line: DraftLine): void {
+  line.unitPrice = item(line)?.DefaultPrice ?? null;
+}
+
+function addLine(): void {
+  lines.value = [...lines.value, newLine()];
+}
+
+function removeLine(key: number): void {
+  lines.value = lines.value.filter((line) => line.key !== key);
+}
+
+/** An estimate while typing; the invoice's own totals come from the backend. */
+const totals = computed(() => {
+  let net = 0;
+  let gross = 0;
+  for (const line of lines.value) {
+    const rate = item(line)?.VatRate;
+    const price = line.unitPrice ?? item(line)?.DefaultPrice ?? null;
+    if (rate == null || price == null || line.count == null) {
+      continue;
+    }
+    const amount = line.count * price;
+    if (line.priceIncludesVat) {
+      gross += amount;
+      net += amount / (1 + rate / 100);
+    } else {
+      net += amount;
+      gross += amount * (1 + rate / 100);
+    }
+  }
+  return { net: Math.round(net * 100) / 100, gross: Math.round(gross * 100) / 100 };
+});
+</script>
+
+<template>
+  <div class="flex flex-col gap-3">
+    <div
+      class="hidden gap-3 px-1 text-sm font-medium text-muted-color md:grid md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem]"
+      aria-hidden="true"
+    >
+      <span>{{ t("itemNumber") }}</span>
+      <span>{{ t("itemCount") }}</span>
+      <span>{{ t("itemPrice") }}</span>
+      <span>{{ t("priceIncludesVatShort") }}</span>
+      <span />
+    </div>
+
+    <div
+      v-for="(line, index) in lines"
+      :key="line.key"
+      class="grid grid-cols-2 gap-3 rounded-lg border border-surface p-3 md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem] md:items-start md:border-0 md:p-1"
+    >
+      <div class="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
+        <Select
+          v-model="line.itemId"
+          :options="items.data.value ?? []"
+          option-value="Id"
+          option-label="Number"
+          filter
+          :filter-fields="['Number', 'Description']"
+          :placeholder="t('selectItem')"
+          :aria-label="`${t('itemNumber')} ${index + 1}`"
+          fluid
+          @change="onItemPicked(line)"
+        >
+          <template #option="{ option }">
+            <span class="font-medium">{{ option.Number }}</span>
+            <span class="ml-2 text-muted-color">{{ option.Description }}</span>
+          </template>
+        </Select>
+        <small v-if="item(line)" class="px-1 text-muted-color">{{ item(line)?.Description }}</small>
+      </div>
+      <!-- The column headers are hidden on a phone, so each field carries its own
+           visible caption there; the accessible name stays the numbered label. -->
+      <div class="flex min-w-0 flex-col gap-1">
+        <span class="text-xs text-muted-color md:hidden" aria-hidden="true">
+          {{ t("itemCount") }}
+        </span>
+        <!-- A count is whole, but "1,5" or "-3" is kept as typed so the save can
+             say so; a field that dropped the comma or the sign turned them into
+             15 and 3 without a word. -->
+        <InputNumber
+          v-model="line.count"
+          v-decimal-point
+          locale="de-DE"
+          :max-fraction-digits="2"
+          :use-grouping="false"
+          :aria-label="`${t('itemCount')} ${index + 1}`"
+          fluid
+        />
+      </div>
+      <div class="flex min-w-0 flex-col gap-1">
+        <span class="text-xs text-muted-color md:hidden" aria-hidden="true">
+          {{ t("itemPrice") }}
+        </span>
+        <!-- Up to four decimals: a grave invoice reopens net prices kept at three
+             on purpose, and rounding them here would change an untouched line. -->
+        <InputNumber
+          v-model="line.unitPrice"
+          v-decimal-point
+          locale="de-DE"
+          :min-fraction-digits="2"
+          :max-fraction-digits="4"
+          :placeholder="defaultPriceText(line)"
+          :aria-label="`${t('itemPrice')} ${index + 1}`"
+          fluid
+        />
+      </div>
+      <label class="flex items-center gap-2 self-end pb-2 md:self-auto md:pt-2 md:pb-0">
+        <Checkbox v-model="line.priceIncludesVat" binary />
+        <span class="text-sm md:sr-only">{{ t("priceIncludesVatShort") }}</span>
+      </label>
+      <Button
+        v-tooltip.left="t('deleteLine')"
+        icon="pi pi-trash"
+        severity="danger"
+        text
+        rounded
+        class="justify-self-end"
+        :aria-label="t('deleteLine')"
+        @click="removeLine(line.key)"
+      />
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <Button :label="t('addLine')" icon="pi pi-plus" outlined size="small" @click="addLine" />
+      <span class="text-sm text-muted-color tabular-nums">
+        {{ t("linesTotal", [formatAmount(totals.net), formatAmount(totals.gross)]) }}
+      </span>
+    </div>
+  </div>
+</template>
