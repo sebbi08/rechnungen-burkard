@@ -223,6 +223,65 @@ public class InvoiceLayoutTests
     }
 
     [Fact]
+    public void A_vat_included_line_total_agrees_with_the_vat_block()
+    {
+        // 3 x 10,00 gross at 19 % is 8,40 net each, 25,20 net, 4,79 VAT, 29,99
+        // gross: the line bills what the block bills, not 3 x 10,00 = 30,00
+        var data = GraveData();
+        data.Share = null;
+        data.Lines = new[]
+        {
+            new InvoiceDocumentData.LineData(
+                1,
+                "9001",
+                "Pflege",
+                3,
+                8.40m,
+                19m,
+                25.20m,
+                4.79m,
+                PriceIncludesVat: true
+            ),
+        };
+        data.VatSummaries = new[]
+        {
+            new InvoiceDocumentData.VatSummary(19m, 25.20m, 4.79m, 29.99m),
+        };
+        data.NetTotal = 25.20m;
+        data.TotalVat = 4.79m;
+        data.GrossTotal = 29.99m;
+
+        var text = Text(data);
+
+        Assert.Contains("29,99", text);
+        Assert.DoesNotContain("30,00", text);
+    }
+
+    [Fact]
+    public void A_rate_with_two_decimals_prints_both_in_the_line()
+    {
+        var data = GraveData();
+        data.Share = null;
+        data.Lines = new[]
+        {
+            new InvoiceDocumentData.LineData(1, "9002", "Pflege", 1, 10.00m, 7.65m, 10.00m, 0.77m),
+        };
+        data.VatSummaries = new[]
+        {
+            new InvoiceDocumentData.VatSummary(7.65m, 10.00m, 0.77m, 10.77m),
+        };
+        data.NetTotal = 10.00m;
+        data.TotalVat = 0.77m;
+        data.GrossTotal = 10.77m;
+
+        var text = Text(data);
+
+        // the VAT block's head prints 7,65 % either way; the line must not round it
+        Assert.Contains("7,65 %", text);
+        Assert.DoesNotContain("7,7 %", text);
+    }
+
+    [Fact]
     public void A_share_invoice_bills_the_share_in_the_vat_block()
     {
         var text = Text(GraveData());

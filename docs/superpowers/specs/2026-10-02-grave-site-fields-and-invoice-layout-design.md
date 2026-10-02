@@ -238,11 +238,14 @@ whatever of field number and position exists.
 | Gesamt €                       | line total                                    |
 | ST                             | `19 %`, or `7 % Incl.` on a VAT-included line |
 
-On a VAT-included line, unit price and line total are the gross amounts — the
+On a VAT-included line, unit price and line total are gross amounts — the
 price that was entered, as the second offer scan does (`1.300,00 2 i`). The
-gross unit price is `round(UnitPrice × (1 + rate/100), 2)`, which is exact,
-since saving refuses a gross that cannot be billed as a whole-cent net. The
-VAT block keeps computing from the net, so it is unchanged in value.
+gross unit price is `round(UnitPrice × (1 + rate/100), 2)`. A grave refuses a
+gross that does not survive the conversion to a whole-cent net, so there it
+comes back as entered; an ordinary invoice does not refuse it (3 × 10,00 € at
+19 % can bill 29,99 €). The line total therefore prints what is billed, the
+line's net plus its own VAT, so that the line agrees with the VAT block.
+The VAT block keeps computing from the net, so it is unchanged in value.
 `LineData` gains `PriceIncludesVat`.
 
 ### Ending text and VAT block

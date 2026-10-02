@@ -67,8 +67,8 @@ public static class DocumentTexts
             _ => null,
         };
 
-    /// <summary>"19 %", or "7,7 %" for a rate with a decimal: the line's ST cell.</summary>
-    public static string VatRate(decimal rate) => $"{rate.ToString("0.#", Culture)} %";
+    /// <summary>"19 %", or "7,65 %" for a rate with decimals: the line's ST cell.</summary>
+    public static string VatRate(decimal rate) => $"{rate.ToString("0.##", Culture)} %";
 
     /// <summary>"19,00 %": a column head of the VAT block.</summary>
     public static string VatRateHeading(decimal rate) => $"{rate.ToString("N2", Culture)} %";
