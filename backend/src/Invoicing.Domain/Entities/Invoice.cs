@@ -29,7 +29,6 @@ public sealed class Invoice
     public string RecipientAddress { get; set; } = "";
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
-    public string Language { get; set; } = "de"; // document language at generation time
     public DateTime GeneratedAt { get; set; } // UTC
 
     /// <summary>The day the invoice was marked paid; null while it is unpaid.

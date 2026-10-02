@@ -9,11 +9,10 @@ import Tooltip from "primevue/tooltip";
 import { createApp } from "vue";
 import App from "./App.vue";
 import { applyStoredTheme } from "./composables/useTheme";
-import { i18n, locale } from "./i18n";
+import { i18n } from "./i18n";
 import { router } from "./router";
 
 applyStoredTheme();
-document.documentElement.lang = locale;
 document.title = i18n.global.t("appTitle");
 // "Gräber – Rechnungen": every tab and history entry read just "Rechnungen"
 router.afterEach((to) => {

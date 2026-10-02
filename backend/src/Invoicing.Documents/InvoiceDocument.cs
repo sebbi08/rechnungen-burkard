@@ -1,4 +1,3 @@
-using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -14,15 +13,11 @@ internal sealed class InvoiceDocument : IDocument
 
     private readonly InvoiceDocumentData _data;
     private readonly bool _isCopy;
-    private readonly DocumentTexts _texts;
-    private readonly CultureInfo _culture;
 
     public InvoiceDocument(InvoiceDocumentData data, bool isCopy)
     {
         _data = data;
         _isCopy = isCopy;
-        _texts = DocumentTexts.For(data.Language);
-        _culture = _texts.Culture;
     }
 
     public DocumentMetadata GetMetadata() =>
@@ -106,39 +101,45 @@ internal sealed class InvoiceDocument : IDocument
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(HeaderCell).Text(_texts.ColumnDescription);
+                                header
+                                    .Cell()
+                                    .Element(HeaderCell)
+                                    .Text(DocumentTexts.ColumnDescription);
                                 header
                                     .Cell()
                                     .Element(HeaderCell)
                                     .AlignRight()
-                                    .Text(_texts.ColumnCount);
+                                    .Text(DocumentTexts.ColumnCount);
                                 header
                                     .Cell()
                                     .Element(HeaderCell)
                                     .AlignRight()
-                                    .Text(_texts.ColumnUnitPrice);
+                                    .Text(DocumentTexts.ColumnUnitPrice);
                                 header
                                     .Cell()
                                     .Element(HeaderCell)
                                     .AlignRight()
-                                    .Text(_texts.ColumnVat);
+                                    .Text(DocumentTexts.ColumnVat);
                                 header
                                     .Cell()
                                     .Element(HeaderCell)
                                     .AlignRight()
-                                    .Text(_texts.ColumnTotal);
+                                    .Text(DocumentTexts.ColumnTotal);
                             });
 
                             foreach (var line in _data.Lines)
                             {
                                 table.Cell().Text(line.Description);
-                                table.Cell().AlignRight().Text(line.Count.ToString(_culture));
+                                table
+                                    .Cell()
+                                    .AlignRight()
+                                    .Text(line.Count.ToString(DocumentTexts.Culture));
                                 table.Cell().AlignRight().Text(UnitPrice(line.UnitPrice));
                                 table
                                     .Cell()
                                     .AlignRight()
                                     .Text(
-                                        $"{line.VatRate.ToString("0.#", _culture)}{_texts.VatRateSuffix}"
+                                        $"{line.VatRate.ToString("0.#", DocumentTexts.Culture)}{DocumentTexts.VatRateSuffix}"
                                     );
                                 table.Cell().AlignRight().Text(Money(line.LineTotal));
                             }
@@ -161,8 +162,12 @@ internal sealed class InvoiceDocument : IDocument
                             {
                                 foreach (var vat in _data.VatSummaries)
                                 {
-                                    summary.Item().Text(_texts.NetForRate(vat.Rate, vat.NetTotal));
-                                    summary.Item().Text(_texts.VatForRate(vat.Rate, vat.VatAmount));
+                                    summary
+                                        .Item()
+                                        .Text(DocumentTexts.NetForRate(vat.Rate, vat.NetTotal));
+                                    summary
+                                        .Item()
+                                        .Text(DocumentTexts.VatForRate(vat.Rate, vat.VatAmount));
                                 }
                             }
 
@@ -174,11 +179,11 @@ internal sealed class InvoiceDocument : IDocument
                                 summary
                                     .Item()
                                     .PaddingTop(6)
-                                    .Text(_texts.NetSumTotal(_data.NetTotal))
+                                    .Text(DocumentTexts.NetSumTotal(_data.NetTotal))
                                     .SemiBold();
                                 summary
                                     .Item()
-                                    .Text(_texts.SharePart(share.Percent, share.NetTotal))
+                                    .Text(DocumentTexts.SharePart(share.Percent, share.NetTotal))
                                     .SemiBold();
                                 foreach (var vat in share.VatSummaries)
                                 {
@@ -189,7 +194,7 @@ internal sealed class InvoiceDocument : IDocument
                                     summary
                                         .Item()
                                         .Text(
-                                            _texts.VatForRateFromNet(
+                                            DocumentTexts.VatForRateFromNet(
                                                 vat.Rate,
                                                 vat.NetTotal,
                                                 vat.VatAmount
@@ -199,7 +204,7 @@ internal sealed class InvoiceDocument : IDocument
 
                                 summary
                                     .Item()
-                                    .Text(_texts.GrossTotal(share.GrossTotal))
+                                    .Text(DocumentTexts.GrossTotal(share.GrossTotal))
                                     .SemiBold()
                                     .FontSize(13);
                             }
@@ -208,12 +213,15 @@ internal sealed class InvoiceDocument : IDocument
                                 summary
                                     .Item()
                                     .PaddingTop(6)
-                                    .Text(_texts.NetTotal(_data.NetTotal))
+                                    .Text(DocumentTexts.NetTotal(_data.NetTotal))
                                     .SemiBold();
-                                summary.Item().Text(_texts.VatTotal(_data.TotalVat)).SemiBold();
                                 summary
                                     .Item()
-                                    .Text(_texts.GrossTotal(_data.GrossTotal))
+                                    .Text(DocumentTexts.VatTotal(_data.TotalVat))
+                                    .SemiBold();
+                                summary
+                                    .Item()
+                                    .Text(DocumentTexts.GrossTotal(_data.GrossTotal))
                                     .SemiBold()
                                     .FontSize(13);
                             }
@@ -229,9 +237,9 @@ internal sealed class InvoiceDocument : IDocument
                 .AlignCenter()
                 .Text(text =>
                 {
-                    text.Span(_texts.PageFooterPageOf + " ");
+                    text.Span(DocumentTexts.PageFooterPageOf + " ");
                     text.CurrentPageNumber();
-                    text.Span(_texts.PageFooterOf);
+                    text.Span(DocumentTexts.PageFooterOf);
                     text.TotalPages();
                 });
         });
@@ -276,13 +284,13 @@ internal sealed class InvoiceDocument : IDocument
                     WindowBottomMillimetre + 2 - Letterhead.AddressFieldBottomMillimetres,
                     Unit.Millimetre
                 )
-                .Text(_texts.InvoiceTitle(_data.InvoiceNumber))
+                .Text(DocumentTexts.InvoiceTitle(_data.InvoiceNumber))
                 .FontSize(18)
                 .SemiBold();
             column
                 .Item()
                 .PaddingBottom(8, Unit.Millimetre)
-                .Text(_data.GeneratedAt.ToString("d", _culture));
+                .Text(_data.GeneratedAt.ToString("d", DocumentTexts.Culture));
         });
 
     /// <summary>
@@ -294,17 +302,17 @@ internal sealed class InvoiceDocument : IDocument
             .PaddingBottom(6, Unit.Millimetre)
             .Text(text =>
             {
-                text.Span(_texts.InvoiceTitle(_data.InvoiceNumber)).SemiBold();
+                text.Span(DocumentTexts.InvoiceTitle(_data.InvoiceNumber)).SemiBold();
                 text.Span(" · ");
-                text.Span(_data.GeneratedAt.ToString("d", _culture));
+                text.Span(_data.GeneratedAt.ToString("d", DocumentTexts.Culture));
             });
 
-    private string Money(decimal value) => value.ToString("N2", _culture);
+    private string Money(decimal value) => value.ToString("N2", DocumentTexts.Culture);
 
     // Two decimals, like every other price on the page. A VAT-included price
     // used to keep a third so a line's gross stayed exact above count 1; it is
     // rounded to the cent and raised instead, so nothing here has more.
-    private string UnitPrice(decimal value) => value.ToString("#,0.00", _culture);
+    private string UnitPrice(decimal value) => value.ToString("#,0.00", DocumentTexts.Culture);
 
     private static IContainer HeaderCell(IContainer container) =>
         container.BorderBottom(1).BorderColor(Colors.Grey.Darken2).PaddingBottom(3);

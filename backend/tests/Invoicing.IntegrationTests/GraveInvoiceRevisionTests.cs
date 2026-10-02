@@ -317,7 +317,6 @@ public class GraveInvoiceRevisionTests
                     RecipientAddress = recipient.Address,
                     EndingText = "Danke",
                     StampWord = "Kopie",
-                    Language = "de",
                     GeneratedAt = now,
                     Lines = new List<InvoiceLine>
                     {

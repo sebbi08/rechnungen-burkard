@@ -167,7 +167,6 @@ public class GraveInvoiceGroupTests
                 RecipientAddress = recipients[r].Address,
                 EndingText = "Danke",
                 StampWord = "Kopie",
-                Language = "de",
                 GeneratedAt = DateTime.UtcNow,
                 Lines = new List<InvoiceLine>
                 {

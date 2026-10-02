@@ -45,8 +45,8 @@ function chooseFile(): void {
   }
 }
 
-/** The problem in the UI's language, from its key and values; the backend's
- *  English sentence where the key is unknown. The rate and amounts of a split
+/** The problem in German, from its key and values; the backend's English
+ *  sentence where the key is unknown. The rate and amounts of a split
  *  problem come as invariant numbers and are shown the German way. */
 function problemText(problem: ImportProblem): string {
   const key = `importProblem${problem.messageKey ?? ""}`;

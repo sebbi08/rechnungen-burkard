@@ -3,8 +3,8 @@ namespace Burkard.Invoicing.Api.Services.Import;
 /// <summary>One problem found before importing, located precisely enough to fix
 /// it without guessing: which file, which row, and why (FR-059). <c>Message</c>
 /// is English; <c>MessageKey</c> names the sentence and <c>MessageArgs</c>
-/// carries its values as written in the archive, so a frontend can say it in
-/// its own language. <c>Code</c> groups problems of a kind.</summary>
+/// carries its values as written in the archive, so the frontend can say it in
+/// German. <c>Code</c> groups problems of a kind.</summary>
 public sealed record ImportProblem(
     string File,
     int? Row,

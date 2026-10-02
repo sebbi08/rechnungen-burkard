@@ -623,7 +623,7 @@ public sealed class ImportValidator
     /// will not divide and a gross that cannot be billed to the cent differ in
     /// why they fail, not in what the reader does about it.</summary>
     /// <summary>The English message, plus a key and its arguments for the UI to
-    /// say the same in its own language: rate, amount, recipients and up to two
+    /// say the same in German: rate, amount, recipients and up to two
     /// nearby amounts that would work (PricesDoNotDivide0..2 by their number).</summary>
     private static ImportProblem Describe(
         string file,

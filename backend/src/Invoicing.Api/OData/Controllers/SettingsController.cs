@@ -1,5 +1,4 @@
 using Burkard.Invoicing.Api.Persistence;
-using Burkard.Invoicing.Documents;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -53,23 +52,6 @@ public class SettingsController : ODataController
                     {
                         code = "StampWordRequired",
                         message = "The stamp word must not be empty.",
-                    },
-                }
-            );
-        }
-
-        if (
-            delta.TryGetPropertyValue(nameof(GlobalSettings.Language), out var language)
-            && !DocumentTexts.IsSupported(language as string)
-        )
-        {
-            return BadRequest(
-                new
-                {
-                    error = new
-                    {
-                        code = "LanguageNotSupported",
-                        message = "The document language is not supported.",
                     },
                 }
             );

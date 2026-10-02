@@ -6,7 +6,6 @@ import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
-import Select from "primevue/select";
 import Textarea from "primevue/textarea";
 import { useToast } from "primevue/usetoast";
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
@@ -28,16 +27,12 @@ const ask = useConfirmAsync();
 const queryClient = useQueryClient();
 
 const settings = useSettingsQuery();
-const form = reactive({ StampWord: "", EndingText: "", Language: "de" });
+const form = reactive({ StampWord: "", EndingText: "" });
 watch(
   () => settings.data.value,
   (value) => {
     if (value) {
-      Object.assign(form, {
-        StampWord: value.StampWord,
-        EndingText: value.EndingText,
-        Language: value.Language,
-      });
+      Object.assign(form, { StampWord: value.StampWord, EndingText: value.EndingText });
     }
   },
   { immediate: true },
@@ -47,12 +42,7 @@ watch(
 // closed tab through the browser's own prompt.
 const dirty = computed(() => {
   const stored = settings.data.value;
-  return (
-    !!stored &&
-    (form.StampWord !== stored.StampWord ||
-      form.EndingText !== stored.EndingText ||
-      form.Language !== stored.Language)
-  );
+  return !!stored && (form.StampWord !== stored.StampWord || form.EndingText !== stored.EndingText);
 });
 onBeforeRouteLeave(async () => !dirty.value || (await ask(t("confirmDiscardSettings"))));
 function onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -63,16 +53,11 @@ function onBeforeUnload(event: BeforeUnloadEvent): void {
 onMounted(() => window.addEventListener("beforeunload", onBeforeUnload));
 onBeforeUnmount(() => window.removeEventListener("beforeunload", onBeforeUnload));
 
-const languages = computed(() => [
-  { value: "de", label: t("languageDe") },
-  { value: "en", label: t("languageEn") },
-]);
-
 const saving = ref(false);
 async function save(): Promise<void> {
   saving.value = true;
   try {
-    // no client check: the backend answers StampWordRequired / LanguageNotSupported
+    // no client check: the backend answers StampWordRequired
     await odata
       .Settings()
       .patch({ ...form })
@@ -130,17 +115,6 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
           <div class="flex flex-col gap-2">
             <label for="endingText" class="font-medium">{{ t("settingsEndingText") }}</label>
             <Textarea id="endingText" v-model="form.EndingText" rows="6" class="w-full" />
-          </div>
-          <div class="flex flex-col gap-2">
-            <label for="language" class="font-medium">{{ t("settingsDocumentLanguage") }}</label>
-            <Select
-              v-model="form.Language"
-              input-id="language"
-              :options="languages"
-              option-label="label"
-              option-value="value"
-              class="w-full md:w-80"
-            />
           </div>
           <div>
             <Button type="submit" :label="t('save')" icon="pi pi-check" :loading="saving" />

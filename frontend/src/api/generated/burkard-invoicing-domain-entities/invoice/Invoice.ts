@@ -173,16 +173,6 @@ export interface Invoice {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
-   * | Name | `Language` |
-   * | Type | `Edm.String` |
-   * | Nullable | `false` |
-   */
-  Language: string;
-  /**
-   *
-   * OData Attributes:
-   * |Attribute Name | Attribute Value |
-   * | --- | ---|
    * | Name | `GeneratedAt` |
    * | Type | `Edm.DateTimeOffset` |
    * | Nullable | `false` |
@@ -264,7 +254,6 @@ export interface EditableInvoice
       | "RecipientAddress"
       | "EndingText"
       | "StampWord"
-      | "Language"
       | "GeneratedAt"
       | "NetTotal"
       | "VatTotal"

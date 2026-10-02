@@ -31,6 +31,16 @@ test("the start page is the invoice list and the navigation reaches every sectio
   }
 });
 
+test.describe("a browser that prefers English", () => {
+  test.use({ locale: "en-US" });
+
+  test("still gets the German UI", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1, name: "Rechnungen" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  });
+});
+
 test("an unknown path leads to the start page", async ({ page }) => {
   await page.goto("/gibt-es-nicht");
   await expect(page).toHaveURL(/\/invoices$/);

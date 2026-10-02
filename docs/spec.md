@@ -614,8 +614,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-063**: During a long-running task (import or batch generation), the user
   interface MUST show a progress indicator and MUST block interaction with the
   affected interface until the task completes.
-- **FR-064**: The application MUST support multiple languages for all
-  user-visible text.
+- **FR-064**: All user-visible text — the user interface and the generated
+  documents — MUST be German.
 
 **Invoice lists and detail pages**
 
@@ -746,8 +746,7 @@ non-interactive until completion, and the task runs exactly once.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.
 - Version 1 assumes a single shared user; role-based permissions are out of scope.
-- The user interface supports at least English and German, with additional
-  languages addable later.
+- The user interface and the generated documents are German only.
 - CSV files use comma separation with a header row and standard quoting/escaping.
 - The mapping CSV carries both link types — grave↔item (with count) and
   grave↔recipient — distinguished by a type column; the exact column syntax is
@@ -760,8 +759,7 @@ non-interactive until completion, and the task runs exactly once.
 - The copy is a full duplicate of the invoice document, differing only by the
   semi-transparent diagonal stamp, which runs from one corner area of the page to
   the opposite one.
-- The stamp word is a single globally configured text value, not translated per
-  application language.
+- The stamp word is a single globally configured text value.
 - Normal invoices and copies are always downloaded via separate actions; no
   download mixes the two kinds.
-- Error messages are shown in the application's configured languages.
+- Error messages are shown in German.

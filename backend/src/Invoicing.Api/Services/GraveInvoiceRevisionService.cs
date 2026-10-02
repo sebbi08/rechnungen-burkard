@@ -137,7 +137,6 @@ public sealed class GraveInvoiceRevisionService
                 RecipientAddress = recipient.Address,
                 EndingText = settings.EndingText,
                 StampWord = settings.StampWord,
-                Language = settings.Language,
                 GeneratedAt = now,
                 Lines = billedLines
                     .Select(
