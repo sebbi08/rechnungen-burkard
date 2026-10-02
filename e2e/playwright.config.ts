@@ -24,6 +24,9 @@ export default defineConfig({
     // The UI is German whatever the browser prefers; the locale is pinned so
     // that what the browser formats on its own does not follow the CI machine.
     locale: "de-DE",
+    // CI runs in UTC, a dev machine in Berlin; a month picked as local midnight
+    // only survives a toISOString shift when the browser is not in UTC.
+    timezoneId: "Europe/Berlin",
     // Kept only for what failed. A trace carries the DOM, the network and the
     // console at every step, which is what turns "element not found" into a
     // cause — the last CI failure took a reproduction to explain because none
