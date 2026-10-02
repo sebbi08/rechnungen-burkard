@@ -54,17 +54,6 @@ export function formatShare(value: number | null | undefined): string {
   return value == null ? "" : `${value.toFixed(1).replace(".", ",")} %`;
 }
 
-/** yyyy-MM-dd from the local calendar fields. Not toISOString(): a DatePicker
- *  value is local midnight, which is the previous day in UTC here. */
-export function toIsoDate(date: Date | null | undefined): string {
-  if (!date) {
-    return "";
-  }
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 /** An Edm.Date ("2026-01-31") as local midnight, for a DatePicker. */
 export function parseIsoDate(value: string | null | undefined): Date | null {
   if (!value) {

@@ -71,15 +71,15 @@ const {
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
             <dt class="text-sm text-muted-color">{{ t("graveFieldNumber") }}</dt>
-            <dd class="m-0">{{ grave.FieldNumber }}</dd>
+            <dd class="m-0">{{ grave.FieldNumber || "–" }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("graveSiteName") }}</dt>
-            <dd class="m-0">{{ grave.SiteName }}</dd>
+            <dd class="m-0">{{ grave.SiteName || "–" }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("gravePosition") }}</dt>
-            <dd class="m-0">{{ grave.Position ? t(`gravePosition${grave.Position}`) : "" }}</dd>
+            <dd class="m-0">{{ grave.Position ? t(`gravePosition${grave.Position}`) : "–" }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("startDate") }}</dt>

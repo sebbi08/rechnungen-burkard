@@ -228,14 +228,14 @@ function openEditor(graveId: number | null): void {
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"
         >
-          <template #body="{ data }">{{ data.SiteName }}</template>
+          <template #body="{ data }">{{ data.SiteName || "–" }}</template>
         </Column>
         <Column
           :header="t('graveFieldNumber')"
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"
         >
-          <template #body="{ data }">{{ data.FieldNumber }}</template>
+          <template #body="{ data }">{{ data.FieldNumber || "–" }}</template>
         </Column>
         <Column
           :header="t('startDate')"
