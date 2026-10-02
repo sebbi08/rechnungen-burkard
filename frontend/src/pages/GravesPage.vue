@@ -225,8 +225,8 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column
           :header="t('graveSiteName')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell"
         >
           <template #body="{ data }">{{ data.SiteName }}</template>
         </Column>
