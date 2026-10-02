@@ -1,3 +1,5 @@
+using Burkard.Invoicing.Domain.Entities;
+
 namespace Burkard.Invoicing.Api.Services.Import;
 
 /// <summary>One problem found before importing, located precisely enough to fix
@@ -33,7 +35,15 @@ public sealed record ItemRow(
     decimal? Price
 );
 
-public sealed record GraveRow(int Row, string Number, DateOnly StartDate, DateOnly EndDate);
+public sealed record GraveRow(
+    int Row,
+    string Number,
+    string FieldNumber,
+    string SiteName,
+    GravePosition Position,
+    DateOnly StartDate,
+    DateOnly? EndDate
+);
 
 public sealed record ItemLinkRow(
     int Row,

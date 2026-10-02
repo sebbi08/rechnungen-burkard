@@ -18,7 +18,15 @@ public static class ImportArchiveLayout
         "VatRate",
         "Price",
     };
-    public static readonly string[] GravesHeader = { "GraveNumber", "StartDate", "EndDate" };
+    public static readonly string[] GravesHeader =
+    {
+        "GraveNumber",
+        "FieldNumber",
+        "SiteName",
+        "Position",
+        "StartDate",
+        "EndDate",
+    };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
     /// "Item" rows carry a count and a VAT-included flag, "Recipient" rows leave

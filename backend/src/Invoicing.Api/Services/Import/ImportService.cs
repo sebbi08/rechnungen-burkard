@@ -86,6 +86,9 @@ public sealed class ImportService
             row => new Grave
             {
                 GraveNumber = row.Number,
+                FieldNumber = row.FieldNumber,
+                SiteName = row.SiteName,
+                Position = row.Position,
                 StartDate = row.StartDate,
                 EndDate = row.EndDate,
                 CreatedAt = createdAt,

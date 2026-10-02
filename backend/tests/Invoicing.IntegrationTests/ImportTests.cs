@@ -20,7 +20,8 @@ public class ImportTests
 {
     private const string RecipientsHeader = "RecipientNumber,Name,Address\r\n";
     private const string ItemsHeader = "ItemNumber,Description,VatRate,Price\r\n";
-    private const string GravesHeader = "GraveNumber,StartDate,EndDate\r\n";
+    private const string GravesHeader =
+        "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
     private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 
     private static async Task ConfigureVatAsync(ApiTestHost host, params decimal[] rates)
@@ -70,7 +71,10 @@ public class ImportTests
                     + "9002,Sonderleistung,7,107.00\r\n"
                     + "9003,Extra,7,\r\n"
             ),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader
@@ -92,7 +96,10 @@ public class ImportTests
                     + "E-1001,Bert Beispiel,Nebenweg 2\r\n"
             ),
             ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader
@@ -381,7 +388,11 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,nicht-ein-datum,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader
+                    + "IMP-1,27,Grabstätte Import,DoubleOutside,nicht-ein-datum,2040-12-31\r\n"
+            ),
             ("mapping.csv", MappingHeader)
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -415,7 +426,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             ("mapping.csv", MappingHeader + "Item,IMP-1,GIBTSNICHT,1,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -444,7 +458,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             ("mapping.csv", MappingHeader + "Recipient,IMP-1,E-1000,,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -464,7 +481,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader
@@ -507,7 +527,9 @@ public class ImportTests
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n" + "9001,Doppelt,7,10\r\n"),
             (
                 "graves.csv",
-                GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n" + "IMP-1,2026-01-01,2040-12-31\r\n"
+                GravesHeader
+                    + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+                    + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
             ),
             ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n" + "Item,IMP-1,9001,2,\r\n")
         );
@@ -694,7 +716,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -720,7 +745,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             ("mapping.csv", MappingHeader + "Item,IMP-1,9999,1,\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -745,7 +773,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9002,Sonderleistung,7,\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader + "Item,IMP-1,9002,1,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
@@ -775,7 +806,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.004\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader + "Item,IMP-1,9001,3,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
@@ -804,7 +838,10 @@ public class ImportTests
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,10.01\r\n"),
-            ("graves.csv", GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n"),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
             (
                 "mapping.csv",
                 MappingHeader + "Item,IMP-1,9001,1,true\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
@@ -857,7 +894,9 @@ public class ImportTests
             ("items.csv", ItemsHeader),
             (
                 "graves.csv",
-                GravesHeader + "IMP-1,2026-01-01,2040-12-31\r\n" + "IMP-1,2026-01-01,2040-12-31\r\n"
+                GravesHeader
+                    + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
+                    + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
             ),
             ("mapping.csv", MappingHeader)
         );
@@ -879,5 +918,80 @@ public class ImportTests
                 .Select(a => a.GetString())
                 .ToArray()
         );
+    }
+
+    [Fact]
+    public async Task Graves_import_with_site_fields_month_terms_and_an_open_end()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,27,Schineller Bäcke,DoubleOutside,2026-03,\r\n"),
+            (
+                "mapping.csv",
+                MappingHeader + "Item,IMP-1,9001,1,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var grave = await db.Graves.SingleAsync();
+        Assert.Equal("27", grave.FieldNumber);
+        Assert.Equal("Schineller Bäcke", grave.SiteName);
+        Assert.Equal(GravePosition.DoubleOutside, grave.Position);
+        Assert.Equal(new DateOnly(2026, 3, 1), grave.StartDate);
+        Assert.Null(grave.EndDate);
+    }
+
+    [Theory]
+    [InlineData("IMP-1,27,Grabstätte,Sideways,2026-01,", "PositionInvalid")]
+    [InlineData("IMP-1,,Grabstätte,DoubleOutside,2026-01,", "FieldRequired")]
+    [InlineData("IMP-1,27,,DoubleOutside,2026-01,", "FieldRequired")]
+    [InlineData("IMP-1,27,Grabstätte,,2026-01,", "FieldRequired")]
+    [InlineData("IMP-1,27,Grabstätte,DoubleOutside,2026-13,", "DateInvalid")]
+    [InlineData("IMP-1,27,Grabstätte,DoubleOutside,2026-05,2026-04", "DateRangeInvalid")]
+    public async Task Invalid_grave_rows_are_reported(string row, string code)
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", GravesHeader + row + "\r\n"),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(problems, p => p.File == "graves.csv" && p.Row == 2 && p.Code == code);
+    }
+
+    [Fact]
+    public async Task An_archive_with_the_old_three_column_graves_file_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", "GraveNumber,StartDate,EndDate\r\nIMP-1,2026-01-01,2040-12-31\r\n"),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(problems, p => p.File == "graves.csv" && p.Code == "HeaderInvalid");
     }
 }

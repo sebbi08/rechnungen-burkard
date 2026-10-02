@@ -321,51 +321,60 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 3, file, line, problems))
+            if (!HasColumns(row, 6, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
-            var rawStart = row[1].Trim();
-            var rawEnd = row[2].Trim();
+            var fieldNumber = row[1].Trim();
+            var siteName = row[2].Trim();
+            var rawPosition = row[3].Trim();
+            var rawStart = row[4].Trim();
+            var rawEnd = row[5].Trim();
             if (number.Length > 0)
                 data.DeclaredGraves.Add(number);
             if (
                 Missing(number, file, line, "GraveNumber", problems)
+                | Missing(fieldNumber, file, line, "FieldNumber", problems)
+                | Missing(siteName, file, line, "SiteName", problems)
+                | Missing(rawPosition, file, line, "Position", problems)
                 | Missing(rawStart, file, line, "StartDate", problems)
-                | Missing(rawEnd, file, line, "EndDate", problems)
             )
             {
                 continue;
             }
 
-            if (!TryParseDate(rawStart, out var start))
+            if (!GraveTerm.TryParsePosition(rawPosition, out var position))
             {
+                var allowed = string.Join(", ", Enum.GetNames<GravePosition>());
                 problems.Add(
                     new ImportProblem(
                         file,
                         line,
-                        "DateInvalid",
-                        $"'{rawStart}' is not a valid date (expected YYYY-MM-DD).",
-                        "DateInvalid",
-                        [rawStart]
+                        "PositionInvalid",
+                        $"'{rawPosition}' is not a grave position (expected one of {allowed}).",
+                        "PositionInvalid",
+                        [rawPosition, allowed]
                     )
                 );
                 continue;
             }
 
-            if (!TryParseDate(rawEnd, out var end))
+            if (!GraveTerm.TryParseMonth(rawStart, out var start))
             {
-                problems.Add(
-                    new ImportProblem(
-                        file,
-                        line,
-                        "DateInvalid",
-                        $"'{rawEnd}' is not a valid date (expected YYYY-MM-DD).",
-                        "DateInvalid",
-                        [rawEnd]
-                    )
-                );
+                problems.Add(MonthInvalid(file, line, rawStart));
                 continue;
+            }
+
+            DateOnly? end = null;
+            if (rawEnd.Length > 0)
+            {
+                if (!GraveTerm.TryParseMonth(rawEnd, out var parsedEnd))
+                {
+                    problems.Add(MonthInvalid(file, line, rawEnd));
+                    continue;
+                }
+
+                end = parsedEnd;
             }
 
             if (end < start)
@@ -375,7 +384,7 @@ public sealed class ImportValidator
                         file,
                         line,
                         "DateRangeInvalid",
-                        "The end date must not be before the start date.",
+                        "The end month must not be before the start month.",
                         "DateRangeInvalid"
                     )
                 );
@@ -398,7 +407,9 @@ public sealed class ImportValidator
             }
 
             seen[number] = line;
-            data.Graves.Add(new GraveRow(line, number, start, end));
+            data.Graves.Add(
+                new GraveRow(line, number, fieldNumber, siteName, position, start, end)
+            );
         }
     }
 
@@ -965,12 +976,13 @@ public sealed class ImportValidator
         }
     }
 
-    private static bool TryParseDate(string raw, out DateOnly value) =>
-        DateOnly.TryParseExact(
-            raw,
-            "yyyy-MM-dd",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out value
-        ) || DateOnly.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
+    private static ImportProblem MonthInvalid(string file, int line, string raw) =>
+        new(
+            file,
+            line,
+            "DateInvalid",
+            $"'{raw}' is not a valid month (expected YYYY-MM).",
+            "DateInvalid",
+            [raw]
+        );
 }
