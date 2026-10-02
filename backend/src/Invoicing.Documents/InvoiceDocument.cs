@@ -1,3 +1,4 @@
+using QuestPDF.Elements.Table;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -70,7 +71,7 @@ internal sealed class InvoiceDocument : IDocument
             page.Header()
                 .Column(column =>
                 {
-                    column.Item().ShowOnce().Element(AddressBlock);
+                    column.Item().ShowOnce().Element(FirstPageHead);
                     column.Item().SkipOnce().Element(ContinuationLine);
                 });
 
@@ -78,219 +79,114 @@ internal sealed class InvoiceDocument : IDocument
                 .Column(column =>
                 {
                     // The old share note above the table only ever applied when the
-                    // lines were already the share (Share is null); the summary
-                    // column prints the share block itself once Share is set, so the
-                    // note would be redundant there.
+                    // lines were already the share (Share is null); once Share is
+                    // set, the VAT block bills the share and says so itself.
                     if (_data.Share is null && !string.IsNullOrEmpty(_data.ShareText))
                     {
                         column.Item().PaddingBottom(8).Text(_data.ShareText).SemiBold();
                     }
 
-                    column
-                        .Item()
-                        .Table(table =>
-                        {
-                            table.ColumnsDefinition(cols =>
-                            {
-                                cols.RelativeColumn(2);
-                                cols.ConstantColumn(40);
-                                cols.ConstantColumn(80);
-                                cols.ConstantColumn(50);
-                                cols.ConstantColumn(80);
-                            });
-
-                            table.Header(header =>
-                            {
-                                header
-                                    .Cell()
-                                    .Element(HeaderCell)
-                                    .Text(DocumentTexts.ColumnDescription);
-                                header
-                                    .Cell()
-                                    .Element(HeaderCell)
-                                    .AlignRight()
-                                    .Text(DocumentTexts.ColumnCount);
-                                header
-                                    .Cell()
-                                    .Element(HeaderCell)
-                                    .AlignRight()
-                                    .Text(DocumentTexts.ColumnUnitPrice);
-                                header
-                                    .Cell()
-                                    .Element(HeaderCell)
-                                    .AlignRight()
-                                    .Text(DocumentTexts.ColumnVat);
-                                header
-                                    .Cell()
-                                    .Element(HeaderCell)
-                                    .AlignRight()
-                                    .Text(DocumentTexts.ColumnTotal);
-                            });
-
-                            foreach (var line in _data.Lines)
-                            {
-                                table.Cell().Text(line.Description);
-                                table
-                                    .Cell()
-                                    .AlignRight()
-                                    .Text(line.Count.ToString(DocumentTexts.Culture));
-                                table.Cell().AlignRight().Text(UnitPrice(line.UnitPrice));
-                                table
-                                    .Cell()
-                                    .AlignRight()
-                                    .Text(
-                                        $"{line.VatRate.ToString("0.#", DocumentTexts.Culture)}{DocumentTexts.VatRateSuffix}"
-                                    );
-                                table.Cell().AlignRight().Text(Money(line.LineTotal));
-                            }
-                        });
-
-                    column
-                        .Item()
-                        .PaddingTop(10)
-                        .AlignRight()
-                        .Column(summary =>
-                        {
-                            // Only the invoice's own per-rate block, never both. On a
-                            // grave invoice the 100 % rows are not what anyone is
-                            // billed, and printing them beside the share's rows put
-                            // two different amounts under one "MwSt. 7 %" label on a
-                            // tax document, with nothing saying which is the invoiced
-                            // tax. The per-rate split stays visible either way: the
-                            // share block prints its own rows.
-                            if (_data.Share is null)
-                            {
-                                foreach (var vat in _data.VatSummaries)
-                                {
-                                    summary
-                                        .Item()
-                                        .Text(DocumentTexts.NetForRate(vat.Rate, vat.NetTotal));
-                                    summary
-                                        .Item()
-                                        .Text(DocumentTexts.VatForRate(vat.Rate, vat.VatAmount));
-                                }
-                            }
-
-                            if (_data.Share is { } share)
-                            {
-                                // The grave's own lines print in full above; this
-                                // recipient pays a share of them, worked out per rate
-                                // from that share rather than from the 100 % figures.
-                                summary
-                                    .Item()
-                                    .PaddingTop(6)
-                                    .Text(DocumentTexts.NetSumTotal(_data.NetTotal))
-                                    .SemiBold();
-                                summary
-                                    .Item()
-                                    .Text(DocumentTexts.SharePart(share.Percent, share.NetTotal))
-                                    .SemiBold();
-                                foreach (var vat in share.VatSummaries)
-                                {
-                                    // with the base it was worked out from: the
-                                    // lines above are the whole grave, so this is
-                                    // the only place the recipient's own taxable
-                                    // amount per rate appears
-                                    summary
-                                        .Item()
-                                        .Text(
-                                            DocumentTexts.VatForRateFromNet(
-                                                vat.Rate,
-                                                vat.NetTotal,
-                                                vat.VatAmount
-                                            )
-                                        );
-                                }
-
-                                summary
-                                    .Item()
-                                    .Text(DocumentTexts.GrossTotal(share.GrossTotal))
-                                    .SemiBold()
-                                    .FontSize(13);
-                            }
-                            else
-                            {
-                                summary
-                                    .Item()
-                                    .PaddingTop(6)
-                                    .Text(DocumentTexts.NetTotal(_data.NetTotal))
-                                    .SemiBold();
-                                summary
-                                    .Item()
-                                    .Text(DocumentTexts.VatTotal(_data.TotalVat))
-                                    .SemiBold();
-                                summary
-                                    .Item()
-                                    .Text(DocumentTexts.GrossTotal(_data.GrossTotal))
-                                    .SemiBold()
-                                    .FontSize(13);
-                            }
-                        });
+                    column.Item().Table(LineTable);
 
                     if (!string.IsNullOrEmpty(_data.EndingText))
                     {
                         column.Item().PaddingTop(16).Text(_data.EndingText);
                     }
-                });
 
-            page.Footer()
-                .AlignCenter()
-                .Text(text =>
-                {
-                    text.Span(DocumentTexts.PageFooterPageOf + " ");
-                    text.CurrentPageNumber();
-                    text.Span(DocumentTexts.PageFooterOf);
-                    text.TotalPages();
+                    // At the foot of the last page, as on the old stationery: the
+                    // item takes the rest of the page and puts the block at its
+                    // bottom. ShowEntire moves it to a new page as a whole when it
+                    // does not fit under the lines.
+                    column
+                        .Item()
+                        .ExtendVertical()
+                        .AlignBottom()
+                        .ShowEntire()
+                        .PaddingTop(10)
+                        .Element(VatBlock);
                 });
         });
     }
 
-    /// <summary>
-    /// The first page's head: the recipient in the envelope's window, the invoice
-    /// number below it.
-    /// </summary>
-    private void AddressBlock(IContainer container) =>
+    // The details start right of the DIN lang window's edge at 110 mm.
+    private const float DetailsWidthMillimetre = 72;
+
+    /// <summary>The first page's head: the recipient in the envelope's window,
+    /// the invoice's details beside it.</summary>
+    private void FirstPageHead(IContainer container) =>
+        container
+            .PaddingBottom(6, Unit.Millimetre)
+            .Row(row =>
+            {
+                // The letterhead prints the sender line immediately above this, so
+                // the recipient goes directly under it: folded for a DIN lang
+                // envelope, both addresses then show through the window, which
+                // reveals the sheet from 45 mm to 90 mm below its top edge. The
+                // row is at least that tall, so the table always starts clear of
+                // the window; a longer address pushes it down instead.
+                row.RelativeItem()
+                    .PaddingLeft(
+                        Letterhead.AddressFieldLeftMillimetres - SideMarginMillimetre,
+                        Unit.Millimetre
+                    )
+                    .MinHeight(
+                        WindowBottomMillimetre + 2 - Letterhead.HeaderHeightMillimetres,
+                        Unit.Millimetre
+                    )
+                    .Column(recipient =>
+                    {
+                        recipient.Item().Text(_data.RecipientName).SemiBold();
+                        recipient.Item().Text(_data.RecipientAddress);
+                    });
+                row.ConstantItem(DetailsWidthMillimetre, Unit.Millimetre).Element(Details);
+            });
+
+    private void Details(IContainer container) =>
         container.Column(column =>
         {
-            // The letterhead prints the sender line immediately above this, so the
-            // recipient goes directly under it: folded for a DIN lang envelope, both
-            // addresses then show through the window, which reveals the sheet from
-            // 45 mm to 90 mm below its top edge.
-            //
-            // The address gets that whole zone whether it fills it or not, so the
-            // invoice number always starts clear of the window instead of being sliced
-            // by its edge on short addresses. A longer address pushes the number down
-            // rather than being clipped.
+            column.Item().PaddingBottom(2, Unit.Millimetre).Text(DocumentTexts.Title);
             column
                 .Item()
-                .PaddingLeft(
-                    Letterhead.AddressFieldLeftMillimetres - SideMarginMillimetre,
-                    Unit.Millimetre
-                )
-                .MinHeight(
-                    Letterhead.AddressFieldBottomMillimetres - Letterhead.HeaderHeightMillimetres,
-                    Unit.Millimetre
-                )
-                .Column(recipient =>
+                .Table(table =>
                 {
-                    recipient.Item().Text(_data.RecipientName).SemiBold();
-                    recipient.Item().Text(_data.RecipientAddress);
-                });
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(28, Unit.Millimetre);
+                        cols.RelativeColumn();
+                    });
 
-            // just past the window's lower edge, so the number is never framed by it
-            column
-                .Item()
-                .PaddingTop(
-                    WindowBottomMillimetre + 2 - Letterhead.AddressFieldBottomMillimetres,
-                    Unit.Millimetre
-                )
-                .Text(DocumentTexts.InvoiceTitle(_data.InvoiceNumber))
-                .FontSize(18)
-                .SemiBold();
-            column
-                .Item()
-                .PaddingBottom(8, Unit.Millimetre)
-                .Text(_data.GeneratedAt.ToString("d", DocumentTexts.Culture));
+                    void Row(string label, string value)
+                    {
+                        table.Cell().Element(DetailCell).Text(label);
+                        table.Cell().Element(DetailCell).Text(value);
+                    }
+
+                    Row(DocumentTexts.LabelNumber, _data.InvoiceNumber);
+                    if (!string.IsNullOrWhiteSpace(_data.RecipientNumber))
+                    {
+                        Row(DocumentTexts.LabelCustomerNumber, _data.RecipientNumber);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(_data.GraveNumber))
+                    {
+                        Row(DocumentTexts.LabelGraveNumber, _data.GraveNumber);
+                    }
+
+                    Row(
+                        DocumentTexts.LabelDate,
+                        _data.GeneratedAt.ToString("d", DocumentTexts.Culture)
+                    );
+                    table.Cell().Element(DetailCell).Text(DocumentTexts.LabelPage);
+                    table
+                        .Cell()
+                        .Element(DetailCell)
+                        .Text(text =>
+                        {
+                            text.CurrentPageNumber();
+                            text.Span(DocumentTexts.PageOf);
+                            text.TotalPages();
+                        });
+                });
         });
 
     /// <summary>
@@ -303,9 +199,185 @@ internal sealed class InvoiceDocument : IDocument
             .Text(text =>
             {
                 text.Span(DocumentTexts.InvoiceTitle(_data.InvoiceNumber)).SemiBold();
-                text.Span(" · ");
-                text.Span(_data.GeneratedAt.ToString("d", DocumentTexts.Culture));
+                if (!string.IsNullOrWhiteSpace(_data.RecipientNumber))
+                {
+                    text.Span($" · {DocumentTexts.CustomerNumberShort} {_data.RecipientNumber}");
+                }
+
+                text.Span($" · {DocumentTexts.PageWord} ");
+                text.CurrentPageNumber();
+                text.Span(DocumentTexts.PageOf);
+                text.TotalPages();
             });
+
+    private void LineTable(TableDescriptor table)
+    {
+        table.ColumnsDefinition(cols =>
+        {
+            cols.ConstantColumn(16, Unit.Millimetre); // item number
+            cols.RelativeColumn(); // description
+            cols.ConstantColumn(16, Unit.Millimetre); // count
+            cols.ConstantColumn(22, Unit.Millimetre); // unit price
+            cols.ConstantColumn(24, Unit.Millimetre); // total
+            cols.ConstantColumn(20, Unit.Millimetre); // VAT rate
+        });
+
+        table.Header(header =>
+        {
+            header.Cell().Element(HeaderCell);
+            header.Cell().Element(HeaderCell).Text(DocumentTexts.ColumnDescription);
+            header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnCount);
+            header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnUnitPrice);
+            header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnTotal);
+            header.Cell().Element(HeaderCell).AlignRight().Text(DocumentTexts.ColumnVat);
+        });
+
+        var site = SiteLines();
+        for (var i = 0; i < site.Count; i++)
+        {
+            table.Cell();
+            table
+                .Cell()
+                .ColumnSpan(5)
+                .PaddingTop(i == 0 ? 2 : 0, Unit.Millimetre)
+                .PaddingBottom(i == site.Count - 1 ? 3 : 0, Unit.Millimetre)
+                .Text(site[i])
+                .SemiBold();
+        }
+
+        foreach (var line in _data.Lines)
+        {
+            // A VAT-included line prints what was entered, the gross. The net
+            // it was converted to is exact (saving refuses a gross that is not),
+            // so the gross comes back unchanged.
+            var unitPrice = line.PriceIncludesVat
+                ? decimal.Round(
+                    line.UnitPrice * (1m + line.VatRate / 100m),
+                    2,
+                    MidpointRounding.AwayFromZero
+                )
+                : line.UnitPrice;
+            var total = line.PriceIncludesVat ? unitPrice * line.Count : line.LineTotal;
+            var rate = DocumentTexts.VatRate(line.VatRate);
+
+            table.Cell().Text(line.ItemNumber);
+            table.Cell().Text(line.Description);
+            table.Cell().AlignRight().Text(line.Count.ToString(DocumentTexts.Culture));
+            table.Cell().AlignRight().Text(UnitPrice(unitPrice));
+            table.Cell().AlignRight().Text(Money(total));
+            table
+                .Cell()
+                .AlignRight()
+                .Text(line.PriceIncludesVat ? $"{rate} {DocumentTexts.VatIncluded}" : rate);
+        }
+    }
+
+    /// <summary>The grave site lines above the items; each one only when there
+    /// is something to print on it.</summary>
+    private List<string> SiteLines()
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_data.GraveSiteName))
+        {
+            lines.Add(DocumentTexts.GraveSite(_data.GraveSiteName));
+        }
+
+        var shortForm = DocumentTexts.PositionShortForm(_data.GravePosition);
+        if (!string.IsNullOrWhiteSpace(_data.GraveFieldNumber) || shortForm is not null)
+        {
+            lines.Add(DocumentTexts.GraveField(_data.GraveFieldNumber, shortForm));
+        }
+
+        return lines;
+    }
+
+    /// <summary>Net and VAT per rate on the left, the totals on the right. On a
+    /// grave invoice split across recipients it bills this recipient's share,
+    /// and a line above it says what that is a share of.</summary>
+    private void VatBlock(IContainer container)
+    {
+        var summaries = _data.Share?.VatSummaries ?? _data.VatSummaries;
+        var net = _data.Share?.NetTotal ?? _data.NetTotal;
+        var vat = _data.Share?.VatTotal ?? _data.TotalVat;
+        var gross = _data.Share?.GrossTotal ?? _data.GrossTotal;
+
+        container.Column(column =>
+        {
+            if (_data.Share is { } share)
+            {
+                column
+                    .Item()
+                    .PaddingBottom(2, Unit.Millimetre)
+                    .Text(DocumentTexts.ShareLine(_data.NetTotal, share.Percent));
+            }
+
+            column
+                .Item()
+                .BorderTop(1)
+                .BorderColor(Colors.Grey.Darken2)
+                .PaddingTop(2)
+                .Row(row =>
+                {
+                    row.RelativeItem()
+                        .Table(rates =>
+                        {
+                            rates.ColumnsDefinition(cols =>
+                            {
+                                cols.ConstantColumn(16, Unit.Millimetre);
+                                foreach (var _ in summaries)
+                                {
+                                    cols.RelativeColumn();
+                                }
+                            });
+
+                            rates.Cell();
+                            foreach (var s in summaries)
+                            {
+                                rates
+                                    .Cell()
+                                    .AlignRight()
+                                    .Text(DocumentTexts.VatRateHeading(s.Rate));
+                            }
+
+                            rates.Cell().Text(DocumentTexts.NetRow);
+                            foreach (var s in summaries)
+                            {
+                                rates.Cell().AlignRight().Text(Money(s.NetTotal));
+                            }
+
+                            rates.Cell().Text(DocumentTexts.VatRow);
+                            foreach (var s in summaries)
+                            {
+                                rates.Cell().AlignRight().Text(Money(s.VatAmount));
+                            }
+                        });
+
+                    row.ConstantItem(10, Unit.Millimetre);
+
+                    row.ConstantItem(60, Unit.Millimetre)
+                        .Table(totals =>
+                        {
+                            totals.ColumnsDefinition(cols =>
+                            {
+                                cols.RelativeColumn();
+                                cols.ConstantColumn(24, Unit.Millimetre);
+                            });
+
+                            totals.Cell();
+                            totals.Cell().AlignRight().Text(DocumentTexts.Currency).SemiBold();
+                            totals.Cell().Text(DocumentTexts.NetAmount);
+                            totals.Cell().AlignRight().Text(Money(net));
+                            totals.Cell().Text(DocumentTexts.VatAmount);
+                            totals.Cell().AlignRight().Text(Money(vat));
+                            totals.Cell().Text(DocumentTexts.GrossAmount).SemiBold();
+                            totals.Cell().AlignRight().Text(Money(gross)).SemiBold();
+                        });
+                });
+        });
+    }
+
+    private static IContainer DetailCell(IContainer container) =>
+        container.PaddingBottom(1.5f, Unit.Millimetre);
 
     private string Money(decimal value) => value.ToString("N2", DocumentTexts.Culture);
 

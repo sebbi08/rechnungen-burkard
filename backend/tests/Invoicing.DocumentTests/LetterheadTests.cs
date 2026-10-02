@@ -103,6 +103,27 @@ public class LetterheadTests
         Assert.Contains("33,33", string.Join("\n", pages.Select(p => p.Text)));
     }
 
+    // The VAT block comes once, on the last page, and that page is still on the
+    // stationery. MultiPageData's 40 lines and long ending text fill page one,
+    // so the block can only land on a later page.
+    [Fact]
+    public void The_vat_block_on_the_last_page_keeps_the_letterhead()
+    {
+        var data = MultiPageData();
+        var pdf = DocumentService.GeneratePdf(data, isCopy: false);
+
+        using var document = PdfDocument.Open(pdf);
+        var pages = document.GetPages().ToList();
+        var last = pages[^1];
+
+        Assert.Contains("Bruttobetrag", last.Text);
+        Assert.Equal(1, pages.Count(p => p.Text.Contains("Bruttobetrag")));
+        var images = last.GetImages().ToList();
+        Assert.Equal(2, images.Count);
+        Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
+        Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
+    }
+
     // Only the artwork that cannot be set as text is an image: the rose cluster with
     // the Burkard script it overlaps, and the rose beside the bank details.
     [Fact]
@@ -190,18 +211,19 @@ public class LetterheadTests
         Assert.InRange(gap, 0, 12 * PointsPerMillimetre);
     }
 
+    // The details block stands beside the address, as on the old invoices, not
+    // under it: its first row starts level with the recipient's name.
     [Fact]
-    public void Invoice_number_is_printed_below_the_recipient()
+    public void Invoice_details_sit_beside_the_recipient()
     {
         var pdf = DocumentService.GeneratePdf(MultiPageData(), isCopy: false);
 
         using var document = PdfDocument.Open(pdf);
         var page = document.GetPage(1);
 
-        Assert.True(
-            TopOf(page, "Rechnung") < TopOf(page, "Musterstadt"),
-            "the invoice number must come under the recipient address, not above it"
-        );
+        var gap = Math.Abs(TopOf(page, "NUMMER:") - TopOf(page, "Familie"));
+
+        Assert.InRange(gap, 0, 12 * PointsPerMillimetre);
     }
 
     [Fact]
@@ -218,12 +240,12 @@ public class LetterheadTests
         }
     }
 
-    // Whatever the address is, the invoice number has to start below the window
+    // Whatever the address is, the line table has to start below the window
     // rather than be sliced in half by its edge.
     [Theory]
     [InlineData("Musterstraße 1\n12345 Musterstadt")]
     [InlineData("z. Hd. Frau Dr. Anneliese Mustermann\nAm Alten Friedhof 17a\n67346 Speyer")]
-    public void Invoice_number_clears_the_din_lang_window(string address)
+    public void The_line_table_starts_below_the_din_lang_window(string address)
     {
         var data = MultiPageData();
         data.RecipientAddress = address;
@@ -234,8 +256,8 @@ public class LetterheadTests
         var page = document.GetPage(1);
 
         Assert.True(
-            TopOf(page, "Rechnung") < WindowBottom,
-            "the invoice number runs into the envelope window"
+            TopOf(page, "Artikel") < WindowBottom,
+            "the line table runs into the envelope window"
         );
     }
 
@@ -257,7 +279,9 @@ public class LetterheadTests
             {
                 Assert.DoesNotContain("Familie Mahr", page.Text);
                 Assert.DoesNotContain("Musterstadt", page.Text);
+                Assert.DoesNotContain("NUMMER:", page.Text);
                 Assert.Contains("2026-0042", page.Text);
+                Assert.Contains("Seite", page.Text);
             }
         );
     }

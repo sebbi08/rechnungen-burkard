@@ -11,7 +11,7 @@ namespace Burkard.Invoicing.DocumentTests;
 /// <summary>DocumentDataBuilder built directly against an <see cref="Invoice"/>,
 /// with no HTTP call and no database — the two branches on
 /// <see cref="Invoice.RecipientCount"/> are pure functions of the invoice and its
-/// lines. The last two tests render the PDF as well, because what a rate label
+/// lines. Two of the tests render the PDF as well, because what a rate label
 /// is attached to is a property of the page, not of the data.</summary>
 public class GraveShareDocumentTests
 {
@@ -136,60 +136,55 @@ public class GraveShareDocumentTests
     }
 
     [Fact]
-    public void A_grave_invoice_prints_each_rate_label_exactly_once()
+    public void A_grave_invoice_bills_the_share_per_rate()
     {
         var data = new DocumentDataBuilder().Build(GraveInvoice());
         var text = ExtractText(DocumentService.GeneratePdf(data, isCopy: false));
 
-        // The rate labels the recipient reads are the invoiced ones, worked out
-        // from their share: 7 % of 39,50 is 2,77 and 19 % of 32,57 is 6,19. The
-        // 100 % block is not printed at all — printing it too put 8,30 and 2,77
-        // under one "MwSt. 7 %" on a tax document with nothing saying which of
-        // them was owed.
-        Assert.Equal(1, Occurrences(text, "MwSt. 7 %"));
-        Assert.Equal(1, Occurrences(text, "MwSt. 19 %"));
-        Assert.DoesNotContain("MwSt. 7 %: 8,30", text);
-        Assert.DoesNotContain("MwSt. 19 %: 18,56", text);
+        // The line above the VAT block says what the block is a share of: the
+        // grave's whole net, and this recipient's part of it.
+        Assert.Contains("Nettosumme gesamt 216,21 € – davon Ihr Anteil 33,33 %", text);
 
-        // Each surviving row states the base it was worked out from. That is the
-        // point of dropping the 100 % rows rather than a nicety: the lines above
-        // are the whole grave, so without "aus 39,50" the recipient's own taxable
-        // amount per rate would appear nowhere on the page, and a VAT invoice has
-        // to show it.
-        Assert.Contains("MwSt. 7 % aus 39,50: 2,77", text);
-        Assert.Contains("MwSt. 19 % aus 32,57: 6,19", text);
+        // The block has one column per rate, and the figures in it are the
+        // invoiced ones, worked out from the share: 7 % of 39,50 is 2,77 and
+        // 19 % of 32,57 is 6,19. The 100 % rows are not printed at all —
+        // printing them too would put 8,30 and 2,77 under one 7 % head on a tax
+        // document with nothing saying which of them was owed.
+        Assert.Equal(1, Occurrences(text, "7,00 %"));
+        Assert.Equal(1, Occurrences(text, "19,00 %"));
+        Assert.DoesNotContain("8,30", text);
+        Assert.DoesNotContain("18,56", text);
 
-        // and the 100 % net rows go with them: the net that is printed is the
-        // grave's sum and the recipient's share of it, which is what the design's
-        // worked example shows and what lets the page verify itself
-        Assert.DoesNotContain("Netto 7 %", text);
-        Assert.DoesNotContain("Netto 19 %", text);
-        Assert.Contains("Nettosumme gesamt: 216,21", text);
-        Assert.Contains("Ihr Anteil (33,33 %): 72,07", text);
-        Assert.Contains("Gesamtbetrag: 81,03", text);
+        // Each rate's net stands in the block with its VAT. That is the point of
+        // printing the share's rows rather than a nicety: the lines above are
+        // the whole grave, so without them the recipient's own taxable amount
+        // per rate would appear nowhere on the page, and a VAT invoice has to
+        // show it.
+        Assert.Contains("39,50", text);
+        Assert.Contains("2,77", text);
+        Assert.Contains("32,57", text);
+        Assert.Contains("6,19", text);
+        Assert.Contains("81,03", text);
     }
 
     [Fact]
     public void A_non_grave_invoice_still_prints_its_own_rate_block()
     {
-        // The same lines with RecipientCount null — an ordinary invoice. Nothing
-        // about the per-rate block changes for it: net and VAT per rate, then the
-        // net, VAT and gross totals, with no share block anywhere.
+        // The same lines with RecipientCount null — an ordinary invoice. The
+        // block bills the whole amount: net and VAT per rate, then the net, VAT
+        // and gross totals, with no share line above it.
         var invoice = GraveInvoice();
         invoice.RecipientCount = null;
         var data = new DocumentDataBuilder().Build(invoice);
         var text = ExtractText(DocumentService.GeneratePdf(data, isCopy: false));
 
-        Assert.Contains("Netto 7 %: 118,50", text);
-        Assert.Contains("MwSt. 7 %: 8,30", text);
-        Assert.Contains("Netto 19 %: 97,71", text);
-        Assert.Contains("MwSt. 19 %: 18,56", text);
-        Assert.Equal(1, Occurrences(text, "MwSt. 7 %"));
-        Assert.Equal(1, Occurrences(text, "MwSt. 19 %"));
-        Assert.Contains("Netto gesamt: 216,21", text);
-        Assert.Contains("MwSt. gesamt: 26,86", text);
-        Assert.Contains("Gesamtbetrag: 243,07", text);
-        Assert.DoesNotContain("Ihr Anteil", text);
+        Assert.Contains("118,50", text);
+        Assert.Contains("8,30", text);
+        Assert.Contains("97,71", text);
+        Assert.Contains("18,56", text);
+        Assert.Contains("216,21", text);
+        Assert.Contains("26,86", text);
+        Assert.Contains("243,07", text);
         Assert.DoesNotContain("Nettosumme gesamt", text);
     }
 

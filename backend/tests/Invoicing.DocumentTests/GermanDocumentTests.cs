@@ -50,9 +50,10 @@ public class GermanDocumentTests
     {
         var text = ExtractText(DocumentService.GeneratePdf(SampleData(), isCopy: false));
 
-        Assert.Contains("Rechnung 2026-0004", text);
-        Assert.Contains("Bezeichnung", text);
-        Assert.Contains("Gesamtbetrag", text);
+        Assert.Contains("**** RECHNUNG ****", text);
+        Assert.Contains("2026-0004", text);
+        Assert.Contains("Artikel / Leistungsbezeichnung", text);
+        Assert.Contains("Bruttobetrag", text);
         Assert.Contains("240,00", text); // German decimal comma
         Assert.Contains("15.01.2026", text);
     }
