@@ -75,10 +75,21 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<DateOnly>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateOnly>("EndDate")
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FieldNumber")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("GraveNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Position")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteName")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -185,8 +196,20 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<DateTime>("GeneratedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("GraveFieldNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("GraveId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("GraveNumber")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GravePosition")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GraveSiteName")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
@@ -216,6 +239,9 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.Property<string>("RecipientName")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientNumber")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("RevisionNumber")

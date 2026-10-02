@@ -62,6 +62,9 @@ public sealed class AppDbContext : DbContext
             .IsUnique();
         mb.Entity<Document>().Property(d => d.Kind).HasConversion<int>();
         mb.Entity<Job>().Property(j => j.Status).HasConversion<int>();
+        // by name, so a reordered enum never reinterprets stored rows
+        mb.Entity<Grave>().Property(g => g.Position).HasConversion<string>();
+        mb.Entity<Invoice>().Property(i => i.GravePosition).HasConversion<string>();
         // cascade children when their parent goes
         mb.Entity<Grave>()
             .HasMany(g => g.Items)

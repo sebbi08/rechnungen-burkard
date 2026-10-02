@@ -4,8 +4,17 @@ public sealed class Grave
 {
     public long Id { get; set; }
     public string GraveNumber { get; set; } = "";
+    public string FieldNumber { get; set; } = "";
+    public string SiteName { get; set; } = "";
+
+    /// <summary>Required when a grave is saved; null only on graves that were
+    /// migrated from before the field existed and have not been edited since.</summary>
+    public GravePosition? Position { get; set; }
+
+    /// <summary>The term is counted in months: both ends are stored as the first
+    /// of their month. No end means the grave runs indefinitely.</summary>
     public DateOnly StartDate { get; set; }
-    public DateOnly EndDate { get; set; }
+    public DateOnly? EndDate { get; set; }
     public DateOnly CreatedAt { get; set; }
     public List<GraveItem> Items { get; set; } = new();
     public List<GraveRecipient> Recipients { get; set; } = new();

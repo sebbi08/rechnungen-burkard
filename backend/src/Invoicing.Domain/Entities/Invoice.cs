@@ -27,6 +27,17 @@ public sealed class Invoice
     public long RecipientId { get; set; }
     public string RecipientName { get; set; } = "";
     public string RecipientAddress { get; set; } = "";
+
+    /// <summary>What the document prints in its head and above the lines,
+    /// snapshotted like the name and address so a later change to the recipient
+    /// or the grave never alters an issued invoice. Null on invoices generated
+    /// before these existed; the document leaves out whatever is missing. The
+    /// grave values are set on grave invoices only.</summary>
+    public string? RecipientNumber { get; set; }
+    public string? GraveNumber { get; set; }
+    public string? GraveSiteName { get; set; }
+    public string? GraveFieldNumber { get; set; }
+    public GravePosition? GravePosition { get; set; }
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
     public DateTime GeneratedAt { get; set; } // UTC
