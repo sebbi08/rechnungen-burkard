@@ -14,12 +14,16 @@ export function useErrorToast() {
     if (error instanceof BlockingBusyError) {
       return;
     }
-    const { code } = toApiError(error);
-    const key = `error${code}`;
+    const { code, body } = toApiError(error);
+    // A refusal that names things (GraveNumberInUse) sends them as args; its
+    // text is chosen by how many there are, e.g. errorGraveNumberInUse2.
+    const args = (body as { error?: { args?: unknown } } | undefined)?.error?.args;
+    const list = Array.isArray(args) ? args.map(String) : undefined;
+    const key = list ? `error${code}${list.length}` : `error${code}`;
     toast.add({
       severity: "error",
       summary: t("errorTitle"),
-      detail: i18n.te(key) ? t(key) : `${t("errorGeneric")} (${code})`,
+      detail: i18n.te(key) ? (list ? t(key, list) : t(key)) : `${t("errorGeneric")} (${code})`,
       life: 8000,
     });
   }

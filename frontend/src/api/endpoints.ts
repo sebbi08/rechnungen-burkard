@@ -3,6 +3,7 @@
  * parameters $metadata leaves out, typed by hand after the backend's
  * controllers.
  */
+import type { GravePositionName } from "@/lib/gravePosition";
 import { type InvoiceLine, type Job, JobStatus } from "./generated";
 import { ApiError, getBlob, getJson, postBlob, postJson, request } from "./http";
 import { odata } from "./odata";
@@ -109,8 +110,10 @@ export function getItemGraves(itemId: number): Promise<ItemGraves> {
 export interface GraveStatusRow {
   Id: number;
   GraveNumber: string;
+  FieldNumber: string;
+  SiteName: string;
   StartDate: string;
-  EndDate: string;
+  EndDate: string | null;
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
@@ -135,8 +138,13 @@ export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
 export interface SaveGraveInput {
   graveId: number | null;
   graveNumber: string;
-  startDate: string;
-  endDate: string;
+  fieldNumber: string;
+  siteName: string;
+  position: GravePositionName | null;
+  /** "yyyy-MM" */
+  startDate: string | null;
+  /** "yyyy-MM"; null for a grave without an end */
+  endDate: string | null;
   items: InvoiceLineInput[];
   recipientIds: number[];
 }
@@ -164,8 +172,11 @@ export interface GraveItemLink {
 export interface GraveDetails {
   Id: number;
   GraveNumber: string;
+  FieldNumber: string;
+  SiteName: string;
+  Position: GravePositionName | null;
   StartDate: string;
-  EndDate: string;
+  EndDate: string | null;
   CreatedAt: string;
   Items: GraveItemLink[];
   Recipients: { Recipient: { Id: number; Name: string; Address: string } }[];

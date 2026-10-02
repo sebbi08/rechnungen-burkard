@@ -29,7 +29,7 @@ import { useDebounced } from "@/composables/useDebounced";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
-import { formatDate, type Translate } from "@/lib/format";
+import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
 import {
   currentHalfYear,
@@ -224,18 +224,32 @@ function openEditor(graveId: number | null): void {
           </template>
         </Column>
         <Column
+          :header="t('graveSiteName')"
+          header-class="hidden md:table-cell"
+          body-class="hidden md:table-cell"
+        >
+          <template #body="{ data }">{{ data.SiteName }}</template>
+        </Column>
+        <Column
+          :header="t('graveFieldNumber')"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell"
+        >
+          <template #body="{ data }">{{ data.FieldNumber }}</template>
+        </Column>
+        <Column
           :header="t('startDate')"
           header-class="hidden xl:table-cell"
           body-class="hidden xl:table-cell tabular-nums"
         >
-          <template #body="{ data }">{{ formatDate(data.StartDate) }}</template>
+          <template #body="{ data }">{{ formatMonth(data.StartDate) }}</template>
         </Column>
         <Column
           :header="t('endDate')"
           header-class="hidden xl:table-cell"
           body-class="hidden xl:table-cell tabular-nums"
         >
-          <template #body="{ data }">{{ formatDate(data.EndDate) }}</template>
+          <template #body="{ data }">{{ formatMonth(data.EndDate) || "–" }}</template>
         </Column>
         <Column :header="t('invoicingStatus')">
           <template #body="{ data }">

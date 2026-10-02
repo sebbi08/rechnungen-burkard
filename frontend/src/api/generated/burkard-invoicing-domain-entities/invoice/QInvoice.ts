@@ -3,6 +3,7 @@ import {
   QNumberPath,
   QBooleanPath,
   QStringPath,
+  QEnumPath,
   QDateTimeOffsetPath,
   QDatePath,
   QEntityCollectionPath,
@@ -11,6 +12,7 @@ import {
   QNumberParam,
 } from "@odata2ts/odata-query-objects";
 import type { InvoiceId } from "./Invoice.js";
+import { GravePosition } from "../grave-position/GravePosition.js";
 import { QInvoiceLine } from "../invoice-line/QInvoiceLine.js";
 import { QDocument, QDocumentId } from "../document/QDocument.js";
 
@@ -30,6 +32,11 @@ export class QInvoice extends QueryObject {
   public readonly RecipientId = new QNumberPath(this.withPrefix("RecipientId"));
   public readonly RecipientName = new QStringPath(this.withPrefix("RecipientName"));
   public readonly RecipientAddress = new QStringPath(this.withPrefix("RecipientAddress"));
+  public readonly RecipientNumber = new QStringPath(this.withPrefix("RecipientNumber"));
+  public readonly GraveNumber = new QStringPath(this.withPrefix("GraveNumber"));
+  public readonly GraveSiteName = new QStringPath(this.withPrefix("GraveSiteName"));
+  public readonly GraveFieldNumber = new QStringPath(this.withPrefix("GraveFieldNumber"));
+  public readonly GravePosition = new QEnumPath(this.withPrefix("GravePosition"), GravePosition);
   public readonly EndingText = new QStringPath(this.withPrefix("EndingText"));
   public readonly StampWord = new QStringPath(this.withPrefix("StampWord"));
   public readonly GeneratedAt = new QDateTimeOffsetPath(this.withPrefix("GeneratedAt"));

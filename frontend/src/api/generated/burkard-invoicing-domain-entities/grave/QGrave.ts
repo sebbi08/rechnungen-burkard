@@ -2,6 +2,7 @@ import {
   QueryObject,
   QNumberPath,
   QStringPath,
+  QEnumPath,
   QDatePath,
   QEntityCollectionPath,
   QBinding,
@@ -9,12 +10,16 @@ import {
   QNumberParam,
 } from "@odata2ts/odata-query-objects";
 import type { GraveId } from "./Grave.js";
+import { GravePosition } from "../grave-position/GravePosition.js";
 import { QGraveItem, QGraveItemId } from "../grave-item/QGraveItem.js";
 import { QGraveRecipient, QGraveRecipientId } from "../grave-recipient/QGraveRecipient.js";
 
 export class QGrave extends QueryObject {
   public readonly Id = new QNumberPath(this.withPrefix("Id"));
   public readonly GraveNumber = new QStringPath(this.withPrefix("GraveNumber"));
+  public readonly FieldNumber = new QStringPath(this.withPrefix("FieldNumber"));
+  public readonly SiteName = new QStringPath(this.withPrefix("SiteName"));
+  public readonly Position = new QEnumPath(this.withPrefix("Position"), GravePosition);
   public readonly StartDate = new QDatePath(this.withPrefix("StartDate"));
   public readonly EndDate = new QDatePath(this.withPrefix("EndDate"));
   public readonly CreatedAt = new QDatePath(this.withPrefix("CreatedAt"));

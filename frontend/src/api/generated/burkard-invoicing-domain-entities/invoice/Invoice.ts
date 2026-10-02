@@ -1,3 +1,4 @@
+import type { GravePosition } from "../grave-position/GravePosition.js";
 import type { InvoiceLine, EditableInvoiceLine } from "../invoice-line/InvoiceLine.js";
 import type { Document, EditableDocument, DocumentId } from "../document/Document.js";
 
@@ -153,6 +154,51 @@ export interface Invoice {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `RecipientNumber` |
+   * | Type | `Edm.String` |
+   */
+  RecipientNumber: string | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GraveNumber` |
+   * | Type | `Edm.String` |
+   */
+  GraveNumber: string | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GraveSiteName` |
+   * | Type | `Edm.String` |
+   */
+  GraveSiteName: string | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GraveFieldNumber` |
+   * | Type | `Edm.String` |
+   */
+  GraveFieldNumber: string | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GravePosition` |
+   * | Type | `Burkard.Invoicing.Domain.Entities.GravePosition` |
+   */
+  GravePosition: GravePosition | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `EndingText` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
@@ -268,6 +314,11 @@ export interface EditableInvoice
         | "PeriodHalf"
         | "SharePercent"
         | "RecipientCount"
+        | "RecipientNumber"
+        | "GraveNumber"
+        | "GraveSiteName"
+        | "GraveFieldNumber"
+        | "GravePosition"
         | "PaidOn"
       >
     > {

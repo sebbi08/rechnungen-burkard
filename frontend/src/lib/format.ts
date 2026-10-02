@@ -73,3 +73,22 @@ export function parseIsoDate(value: string | null | undefined): Date | null {
   const [year, month, day] = value.slice(0, 10).split("-").map(Number);
   return new Date(year, month - 1, day);
 }
+
+/** "2026-03" from a month picker's value, by its local fields (never
+ *  toISOString, which is the previous day -- and at the turn of a month the
+ *  previous month -- here). Null for no value. */
+export function toIsoMonth(date: Date | null | undefined): string | null {
+  if (!date) {
+    return null;
+  }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** "03/2026" from an Edm.Date ("2026-03-01"); empty for none. */
+export function formatMonth(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  const [year, month] = value.split("-");
+  return `${month}/${year}`;
+}

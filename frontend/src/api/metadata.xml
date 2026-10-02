@@ -37,8 +37,11 @@
                 </Key>
                 <Property Name="Id" Type="Edm.Int64" Nullable="false" />
                 <Property Name="GraveNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="FieldNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="SiteName" Type="Edm.String" Nullable="false" />
+                <Property Name="Position" Type="Burkard.Invoicing.Domain.Entities.GravePosition" />
                 <Property Name="StartDate" Type="Edm.Date" Nullable="false" />
-                <Property Name="EndDate" Type="Edm.Date" Nullable="false" />
+                <Property Name="EndDate" Type="Edm.Date" />
                 <Property Name="CreatedAt" Type="Edm.Date" Nullable="false" />
                 <NavigationProperty
                     Name="Items"
@@ -110,6 +113,14 @@
                 <Property Name="RecipientId" Type="Edm.Int64" Nullable="false" />
                 <Property Name="RecipientName" Type="Edm.String" Nullable="false" />
                 <Property Name="RecipientAddress" Type="Edm.String" Nullable="false" />
+                <Property Name="RecipientNumber" Type="Edm.String" />
+                <Property Name="GraveNumber" Type="Edm.String" />
+                <Property Name="GraveSiteName" Type="Edm.String" />
+                <Property Name="GraveFieldNumber" Type="Edm.String" />
+                <Property
+                    Name="GravePosition"
+                    Type="Burkard.Invoicing.Domain.Entities.GravePosition"
+                />
                 <Property Name="EndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
                 <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
@@ -192,6 +203,14 @@
                 <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
                 <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
             </EntityType>
+            <EnumType Name="GravePosition">
+                <Member Name="DoubleInside" Value="0" />
+                <Member Name="DoubleOutside" Value="1" />
+                <Member Name="SingleInside" Value="2" />
+                <Member Name="SingleOutside" Value="3" />
+                <Member Name="UrnInside" Value="4" />
+                <Member Name="UrnOutside" Value="5" />
+            </EnumType>
             <EnumType Name="DocumentKind">
                 <Member Name="Normal" Value="0" />
                 <Member Name="Copy" Value="1" />

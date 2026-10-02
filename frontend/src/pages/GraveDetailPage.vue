@@ -20,6 +20,7 @@ import {
   formatAmount,
   formatDate,
   formatInvoiceNumber,
+  formatMonth,
   formatRevisionBadge,
   formatVatRate,
 } from "@/lib/format";
@@ -69,12 +70,24 @@ const {
       <template #content>
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
           <div>
+            <dt class="text-sm text-muted-color">{{ t("graveFieldNumber") }}</dt>
+            <dd class="m-0">{{ grave.FieldNumber }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-muted-color">{{ t("graveSiteName") }}</dt>
+            <dd class="m-0">{{ grave.SiteName }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-muted-color">{{ t("gravePosition") }}</dt>
+            <dd class="m-0">{{ grave.Position ? t(`gravePosition${grave.Position}`) : "" }}</dd>
+          </div>
+          <div>
             <dt class="text-sm text-muted-color">{{ t("startDate") }}</dt>
-            <dd class="m-0 tabular-nums">{{ formatDate(grave.StartDate) }}</dd>
+            <dd class="m-0 tabular-nums">{{ formatMonth(grave.StartDate) }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("endDate") }}</dt>
-            <dd class="m-0 tabular-nums">{{ formatDate(grave.EndDate) }}</dd>
+            <dd class="m-0 tabular-nums">{{ formatMonth(grave.EndDate) || "–" }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("graveCreatedAt") }}</dt>

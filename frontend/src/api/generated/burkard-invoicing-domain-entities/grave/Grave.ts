@@ -1,3 +1,4 @@
+import type { GravePosition } from "../grave-position/GravePosition.js";
 import type { GraveItem, EditableGraveItem, GraveItemId } from "../grave-item/GraveItem.js";
 import type {
   GraveRecipient,
@@ -32,6 +33,35 @@ export interface Grave {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `FieldNumber` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  FieldNumber: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `SiteName` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  SiteName: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `Position` |
+   * | Type | `Burkard.Invoicing.Domain.Entities.GravePosition` |
+   */
+  Position: GravePosition | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `StartDate` |
    * | Type | `Edm.Date` |
    * | Nullable | `false` |
@@ -44,9 +74,8 @@ export interface Grave {
    * | --- | ---|
    * | Name | `EndDate` |
    * | Type | `Edm.Date` |
-   * | Nullable | `false` |
    */
-  EndDate: string;
+  EndDate: string | null;
   /**
    *
    * OData Attributes:
@@ -81,8 +110,8 @@ export type GraveId = number | { Id: number };
 
 export interface EditableGrave
   extends
-    Pick<Grave, "GraveNumber" | "StartDate" | "EndDate" | "CreatedAt">,
-    Partial<Pick<Grave, "Id">> {
+    Pick<Grave, "GraveNumber" | "FieldNumber" | "SiteName" | "StartDate" | "CreatedAt">,
+    Partial<Pick<Grave, "Id" | "Position" | "EndDate">> {
   /**
    * Create "Items" along with this entity (deep insert), or update it along with it (deep update).
    * Bind "Items" to an already existing entity by its key.

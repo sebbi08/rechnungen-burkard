@@ -14,6 +14,7 @@ export * from "./grave-invoice-run/QGraveInvoiceRun.js";
 export * from "./grave-item/GraveItem.js";
 export * from "./grave-item/GraveItemService.js";
 export * from "./grave-item/QGraveItem.js";
+export * from "./grave-position/GravePosition.js";
 export * from "./grave-recipient/GraveRecipient.js";
 export * from "./grave-recipient/GraveRecipientService.js";
 export * from "./grave-recipient/QGraveRecipient.js";

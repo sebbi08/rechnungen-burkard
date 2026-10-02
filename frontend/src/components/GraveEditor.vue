@@ -6,7 +6,8 @@ import Drawer from "primevue/drawer";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
-import { reactive, ref, watch } from "vue";
+import Select from "primevue/select";
+import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   checkGraveBilling,
@@ -21,7 +22,8 @@ import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { billingProblemText } from "@/lib/billing";
-import { parseIsoDate, toIsoDate, type Translate } from "@/lib/format";
+import { parseIsoDate, toIsoMonth, type Translate } from "@/lib/format";
+import { GRAVE_POSITIONS, type GravePositionName } from "@/lib/gravePosition";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
 import LineEditor from "./LineEditor.vue";
 import RecipientPicker from "./RecipientPicker.vue";
@@ -39,9 +41,15 @@ const allRecipients = useRecipientsQuery(ref(""));
 
 const form = reactive({
   GraveNumber: "",
+  FieldNumber: "",
+  SiteName: "",
+  Position: null as GravePositionName | null,
   StartDate: null as Date | null,
   EndDate: null as Date | null,
 });
+const positionOptions = computed(() =>
+  GRAVE_POSITIONS.map((value) => ({ value, label: t(`gravePosition${value}`) })),
+);
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
@@ -61,7 +69,14 @@ watch(visible, async (open) => {
     loading.value = false;
     return;
   }
-  Object.assign(form, { GraveNumber: "", StartDate: null, EndDate: null });
+  Object.assign(form, {
+    GraveNumber: "",
+    FieldNumber: "",
+    SiteName: "",
+    Position: null,
+    StartDate: null,
+    EndDate: null,
+  });
   lines.value = [];
   recipients.value = [];
   linkRecipientId.value = null;
@@ -76,6 +91,9 @@ watch(visible, async (open) => {
     }
     Object.assign(form, {
       GraveNumber: grave.GraveNumber,
+      FieldNumber: grave.FieldNumber,
+      SiteName: grave.SiteName,
+      Position: grave.Position,
       StartDate: parseIsoDate(grave.StartDate),
       EndDate: parseIsoDate(grave.EndDate),
     });
@@ -159,9 +177,11 @@ async function save(): Promise<void> {
     await saveGrave({
       graveId: props.graveId,
       graveNumber: form.GraveNumber,
-      // the local calendar day, not toISOString (which is the day before here)
-      startDate: toIsoDate(form.StartDate),
-      endDate: toIsoDate(form.EndDate),
+      fieldNumber: form.FieldNumber,
+      siteName: form.SiteName,
+      position: form.Position,
+      startDate: toIsoMonth(form.StartDate),
+      endDate: toIsoMonth(form.EndDate),
       items: inputs,
       recipientIds: recipients.value.map((recipient) => recipient.id),
     });
@@ -190,17 +210,37 @@ async function save(): Promise<void> {
     <form ref="formEl" v-else id="graveForm" class="flex flex-col gap-6" @submit.prevent="save">
       <Message v-if="graveId != null" severity="warn">{{ t("graveEditWarning") }}</Message>
 
-      <div class="grid gap-4 sm:grid-cols-3">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="flex flex-col gap-2">
           <label for="graveNumber" class="font-medium">{{ t("graveNumber") }}</label>
           <InputText id="graveNumber" v-model="form.GraveNumber" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="graveFieldNumber" class="font-medium">{{ t("graveFieldNumber") }}</label>
+          <InputText id="graveFieldNumber" v-model="form.FieldNumber" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="graveSiteName" class="font-medium">{{ t("graveSiteName") }}</label>
+          <InputText id="graveSiteName" v-model="form.SiteName" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="gravePosition" class="font-medium">{{ t("gravePosition") }}</label>
+          <Select
+            v-model="form.Position"
+            input-id="gravePosition"
+            :options="positionOptions"
+            option-label="label"
+            option-value="value"
+            fluid
+          />
         </div>
         <div class="flex flex-col gap-2">
           <label for="graveStart" class="font-medium">{{ t("startDate") }}</label>
           <DatePicker
             v-model="form.StartDate"
             input-id="graveStart"
-            date-format="dd.mm.yy"
+            view="month"
+            date-format="mm/yy"
             show-icon
             fluid
           />
@@ -210,8 +250,10 @@ async function save(): Promise<void> {
           <DatePicker
             v-model="form.EndDate"
             input-id="graveEnd"
-            date-format="dd.mm.yy"
+            view="month"
+            date-format="mm/yy"
             show-icon
+            show-clear
             fluid
           />
         </div>
