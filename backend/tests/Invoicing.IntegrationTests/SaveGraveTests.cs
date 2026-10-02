@@ -811,6 +811,29 @@ public class SaveGraveTests
     }
 
     [Fact]
+    public async Task Editing_a_grave_onto_another_graves_number_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostGraveAsync(client, "D-1", "2020-01", null, item, recipient)).StatusCode
+        );
+        using var second = await ODataJson.ReadAsync(
+            await PostGraveAsync(client, "D-2", "2020-01", null, item, recipient)
+        );
+        var id = second.RootElement.GetProperty("Id").GetInt64();
+
+        var renamed = await PostGraveAsync(client, "D-1", "2020-01", null, item, recipient, id);
+
+        Assert.Equal(HttpStatusCode.BadRequest, renamed.StatusCode);
+        var (code, args) = await ErrorOfAsync(renamed);
+        Assert.Equal("GraveNumberInUse", code);
+        Assert.Equal(new[] { "D-1", "01/2020" }, args);
+    }
+
+    [Fact]
     public async Task Two_graves_may_share_a_field_number()
     {
         using var host = new ApiTestHost();

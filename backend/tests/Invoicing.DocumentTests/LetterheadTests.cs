@@ -60,11 +60,11 @@ public class LetterheadTests
         };
     }
 
-    // Same as MultiPageData, but with a grave share: the extra summary rows the
-    // share block adds (the 100 % net sum, "Ihr Anteil", one VAT line per rate)
-    // are exactly the content CLAUDE.md warns can push the content band one
-    // millimetre past what page.Background() reserves, which drops the
-    // letterhead from every continuation page without complaint.
+    // Same as MultiPageData, but with a grave share: the line above the VAT
+    // block (the grave's whole net, and the share the block bills) and one VAT
+    // column per rate are exactly the content CLAUDE.md warns can push the
+    // content band one millimetre past what page.Background() reserves, which
+    // drops the letterhead from every continuation page without complaint.
     private static InvoiceDocumentData MultiPageShareData()
     {
         var data = MultiPageData();
@@ -98,8 +98,7 @@ public class LetterheadTests
             }
         );
 
-        // the share block itself only has to appear once, wherever the summary
-        // column lands
+        // the share's VAT block itself only has to appear once, wherever it lands
         Assert.Contains("33,33", string.Join("\n", pages.Select(p => p.Text)));
     }
 
@@ -116,6 +115,9 @@ public class LetterheadTests
         var pages = document.GetPages().ToList();
         var last = pages[^1];
 
+        Assert.True(pages.Count > 1, $"expected a multi-page invoice, got {pages.Count} page(s)");
+        Assert.Contains("Nettobetrag", last.Text);
+        Assert.Contains("19,00 %", last.Text);
         Assert.Contains("Bruttobetrag", last.Text);
         Assert.Equal(1, pages.Count(p => p.Text.Contains("Bruttobetrag")));
         var images = last.GetImages().ToList();
