@@ -784,6 +784,9 @@ non-interactive until completion, and the task runs exactly once.
   lines directly, each line's stored price is one recipient's share; where the
   pre-split price is missing, it is reconstructed from the recipients' shares
   instead, which can be a cent or two off for very small amounts.
+- Graves that existed before the field number, site name and position were
+  introduced keep them empty until edited; the editor then requires them, and
+  invoice generation does not.
 - Generated documents are PDFs.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.
