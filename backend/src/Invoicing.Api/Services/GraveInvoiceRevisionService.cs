@@ -87,6 +87,8 @@ public sealed class GraveInvoiceRevisionService
         // exactly as the dialog sent them, the same way generation bills them.
         var billedLines = graveLines;
         var settings = await _db.GlobalSettings.FirstAsync(ct);
+        // like the address, a revision takes the grave as it is now
+        var grave = await _db.Graves.AsNoTracking().SingleAsync(g => g.Id == edited.GraveId, ct);
         var sharePercent = 100m / siblings.Count;
         var now = DateTime.UtcNow;
 
@@ -135,6 +137,11 @@ public sealed class GraveInvoiceRevisionService
                 // current name and address (FR-017)
                 RecipientName = recipient.Name,
                 RecipientAddress = recipient.Address,
+                RecipientNumber = recipient.Number,
+                GraveNumber = grave.GraveNumber,
+                GraveSiteName = grave.SiteName,
+                GraveFieldNumber = grave.FieldNumber,
+                GravePosition = grave.Position,
                 EndingText = settings.EndingText,
                 StampWord = settings.StampWord,
                 GeneratedAt = now,
