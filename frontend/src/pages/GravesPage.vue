@@ -2,6 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Card from "primevue/card";
+import Checkbox from "primevue/checkbox";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import IconField from "primevue/iconfield";
@@ -56,6 +57,8 @@ const paymentOptions = computed(() => [
   { value: "unpaid", label: t("paymentFilterUnpaid") },
 ]);
 
+const correctedOnly = ref(false);
+
 const search = ref("");
 const term = useDebounced(search);
 
@@ -78,6 +81,9 @@ const rows = computed(() => {
   }
   if (payment.value === "unpaid") {
     list = list.filter((row) => row.InvoiceCount > 0 && row.PaidCount < row.InvoiceCount);
+  }
+  if (correctedOnly.value) {
+    list = list.filter((row) => row.CorrectionCount > 0);
   }
   return list;
 });
@@ -203,6 +209,10 @@ function openEditor(graveId: number | null): void {
           :aria-label="t('paymentFilter')"
           class="w-full sm:w-56"
         />
+        <label class="flex items-center gap-2">
+          <Checkbox v-model="correctedOnly" input-id="gravesCorrectedOnly" binary />
+          <span>{{ t("gravesFilterCorrected") }}</span>
+        </label>
       </div>
 
       <!-- the search narrows the status list, so its own fetch is loading too -->
@@ -221,6 +231,12 @@ function openEditor(graveId: number | null): void {
             >
               {{ data.GraveNumber }}
             </RouterLink>
+            <Tag
+              v-if="data.CorrectionCount > 0"
+              severity="warn"
+              :value="t('graveCorrectedTag')"
+              class="ml-2"
+            />
           </template>
         </Column>
         <Column

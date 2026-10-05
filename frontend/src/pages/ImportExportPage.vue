@@ -58,8 +58,6 @@ function problemText(problem: ImportProblem): string {
     args = args.map((arg, index) =>
       index === 1 ? formatVatRate(Number(arg)) : index === 2 ? formatAmount(Number(arg)) : arg,
     );
-  } else if (problem.messageKey.startsWith("PriceSuggestion")) {
-    args = args.map((arg, index) => (index >= 1 ? formatAmount(Number(arg)) : arg));
   } else if (problem.messageKey === "VatRateNotConfigured") {
     args = args.map((arg) => formatVatRate(Number(arg)));
   }
@@ -91,15 +89,18 @@ async function startImport(): Promise<void> {
       fileInput.value.value = "";
     }
     await queryClient.invalidateQueries();
+    const counts = t("importSummary", [
+      summary.recipients,
+      summary.items,
+      summary.graves,
+      summary.itemLinks,
+      summary.recipientLinks,
+    ]);
     showMessage(
       t("importDone"),
-      t("importSummary", [
-        summary.recipients,
-        summary.items,
-        summary.graves,
-        summary.itemLinks,
-        summary.recipientLinks,
-      ]),
+      summary.correctedGraves > 0
+        ? `${counts}; ${t("importCorrectedGraves", [summary.correctedGraves])}`
+        : counts,
       "info",
     );
   } catch (error) {

@@ -118,6 +118,8 @@ export interface GraveStatusRow {
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
+  /** Stored rounding corrections of the grave. */
+  CorrectionCount: number;
 }
 
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
