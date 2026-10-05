@@ -281,7 +281,7 @@
   "gravesFilterCorrected": "Nur mit Rundungsanpassungen",
   "graveCorrectedTag": "angepasst",
   "errorCorrectionsOutdated1": "Bei diesen Gräbern haben sich die Rundungsanpassungen geändert. Bitte öffnen, prüfen und speichern: {0}",
-  "importCorrectedGraves": "davon {0} Gräber mit Rundungsanpassungen",
+  "importCorrectedGraves": "Gräber mit Rundungsanpassungen: {0}",
   "errorCorrectionsChanged": "Die Rundungsanpassungen haben sich geändert. Bitte prüfen und erneut speichern.",
   "billingNothing": "In diesem Halbjahr wird keine Leistung abgerechnet.",
   "billingNetLabel": "Netto",

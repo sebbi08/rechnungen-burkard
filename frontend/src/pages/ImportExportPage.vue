@@ -99,7 +99,7 @@ async function startImport(): Promise<void> {
     showMessage(
       t("importDone"),
       summary.correctedGraves > 0
-        ? `${counts}; ${t("importCorrectedGraves", [summary.correctedGraves])}`
+        ? `${counts}, ${t("importCorrectedGraves", [summary.correctedGraves])}`
         : counts,
       "info",
     );
