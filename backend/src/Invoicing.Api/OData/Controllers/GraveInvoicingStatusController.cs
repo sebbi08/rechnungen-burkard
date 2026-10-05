@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
@@ -61,18 +62,25 @@ public class GraveInvoicingStatusController : ODataController
             })
             .ToListAsync();
 
-        var value = graves.Select(g => new
-        {
-            g.Id,
-            g.GraveNumber,
-            g.FieldNumber,
-            g.SiteName,
-            g.StartDate,
-            g.EndDate,
-            Invoiced = invoicedIds.Contains(g.Id),
-            InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
-            PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
-        });
+        // a grave whose term does not reach this half-year is not due; one that
+        // was invoiced for it anyway (before the term counted) stays listed
+        var value = graves
+            .Where(g =>
+                invoicedIds.Contains(g.Id)
+                || HalfYearBilling.PeriodIn(g.StartDate, g.EndDate, year, half) is not null
+            )
+            .Select(g => new
+            {
+                g.Id,
+                g.GraveNumber,
+                g.FieldNumber,
+                g.SiteName,
+                g.StartDate,
+                g.EndDate,
+                Invoiced = invoicedIds.Contains(g.Id),
+                InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
+                PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
+            });
 
         return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);
     }

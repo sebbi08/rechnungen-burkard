@@ -24,7 +24,8 @@ public sealed class GraveInvoiceGenerator
 
     /// <summary>Generates all invoices for one grave and half-year in a single
     /// transaction. Returns a result with a skip reason when the grave must be
-    /// skipped (no recipients, no items, or an item with no price at all),
+    /// skipped (no recipients, no items, an item with no price at all, a
+    /// half-year outside the grave's term, or nothing to bill in it),
     /// otherwise the created invoices.</summary>
     public async Task<GraveGenerationResult> GenerateForGraveAsync(
         Grave grave,
@@ -68,26 +69,24 @@ public sealed class GraveInvoiceGenerator
             return new GraveGenerationResult(null, "ItemWithoutPrice");
         }
 
-        var graveLines = graveItems
-            .Select(item => new GraveLine(
-                item.Item.Id,
-                item.Item.Number,
-                item.Item.Description,
-                item.Count,
-                // the split works in net cents — the grave's subtotals are what
-                // has to divide evenly across the recipients — so a VAT-included
-                // price gives up its VAT here, before it is billed rather than
-                // after
-                VatInclusivePrice.NetOf(
-                    EffectivePrice(item)!.Value,
-                    item.Item.VatRate,
-                    item.PriceIncludesVat
-                ),
-                item.Item.VatRate,
-                item.PriceIncludesVat,
-                item.PriceIncludesVat ? EffectivePrice(item)!.Value : null
-            ))
+        // only the months of the half-year inside the term are billed; the job
+        // never hands over a grave outside it, but a direct caller might
+        var period = HalfYearBilling.PeriodIn(grave.StartDate, grave.EndDate, year, half);
+        if (period is null)
+        {
+            return new GraveGenerationResult(null, "OutsideTerm");
+        }
+
+        var links = graveItems
+            .Select(item =>
+                GraveBilling.LinkFor(item.Item, item.Count, item.UnitPrice, item.PriceIncludesVat)
+            )
             .ToList();
+        var graveLines = HalfYearBilling.Lines(links, period);
+        if (graveLines.Count == 0)
+        {
+            return new GraveGenerationResult(null, "NothingToBill");
+        }
 
         // Every recipient is billed the same lines — the grave's own, exactly as
         // configured. The share is applied when the document is built, not by

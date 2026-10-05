@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,7 +37,15 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
 
         var graves = await db.Graves.OrderBy(g => g.GraveNumber).ToListAsync(ct);
 
-        var todo = graves.Where(g => !invoiced.Contains(g.Id)).ToList();
+        // a grave outside its term for this half-year has nothing to be billed
+        // for; it is not "skipped", it is simply not due
+        var todo = graves
+            .Where(g =>
+                !invoiced.Contains(g.Id)
+                && HalfYearBilling.PeriodIn(g.StartDate, g.EndDate, payload.Year, payload.Half)
+                    is not null
+            )
+            .ToList();
         var skipped = new List<GraveSkip>();
         var processed = 0;
 
