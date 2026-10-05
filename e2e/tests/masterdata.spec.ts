@@ -179,9 +179,19 @@ test("items: the quarter is chosen in the dialog and fixed while a grave bills t
     Name: `Quartal ${ts}`,
     Address: "Musterweg 1",
   });
+  // a grave needs an item billed all year as well
+  const allYear = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${number}-year`,
+    Description: `Ganzjährig ${ts}`,
+    VatRate: 7,
+    DefaultPrice: 10,
+  });
   await seedGrave(page, {
     graveNumber: `E2E-Q-G-${ts}`,
-    items: [{ itemId: itemRow.Id, count: 1, unitPrice: null }],
+    items: [
+      { itemId: itemRow.Id, count: 1, unitPrice: null },
+      { itemId: allYear.Id, count: 1, unitPrice: null },
+    ],
     recipientIds: [recipient.Id],
   });
 
@@ -273,13 +283,25 @@ test("graves: search by number narrows the list and empty search shows nothing (
   const ts = Date.now();
   const graveNumber = `SUCHE-${ts}`;
   // a grave cannot be saved without a recipient. The search matches recipient
-  // names as well as numbers, so this one shares nothing with the terms below;
-  // and with no items, no generation running alongside can invoice the grave
+  // names as well as numbers, so this one shares nothing with the terms below.
+  // It needs an item billed all year; a generation running alongside may
+  // invoice the grave, which leaves it in the list all the same
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `SUCHE-${ts}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 10,
+  });
   const recipient = await createRow(page, "/odata/Recipients", {
     Name: `Erika Beispiel ${ts}`,
     Address: "Musterweg 1",
   });
-  await seedGrave(page, { graveNumber, items: [], recipientIds: [recipient.Id] });
+  await seedGrave(page, {
+    graveNumber,
+    items: [{ itemId: item.Id }],
+    recipientIds: [recipient.Id],
+  });
 
   await page.goto("/graves");
   const table = page.getByRole("table");

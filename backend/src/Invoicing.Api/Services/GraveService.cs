@@ -264,6 +264,16 @@ public sealed class GraveService
             }
         }
 
+        // with one all-year item every half-year of the term bills something, so a
+        // grave is always due while its term runs
+        if (!items.Any(i => invoiceItems[i.ItemId].Quarter is null))
+        {
+            throw new ValidationException(
+                "AllYearItemRequired",
+                "A grave needs at least one item billed all year."
+            );
+        }
+
         var known = await _db.Recipients.Where(r => recipientIds.Contains(r.Id)).CountAsync(ct);
         if (known != recipientIds.Count)
         {

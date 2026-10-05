@@ -139,6 +139,17 @@ const items = useItemsQuery(ref(""));
 const defaultPrices = computed(
   () => new Map((items.data.value ?? []).map((item) => [item.Id, item.DefaultPrice])),
 );
+// Every grave needs an item billed all year, so that every half-year of its
+// term bills something. Reported only once an item is picked: a blank editor
+// has not got anything wrong yet.
+const lacksAllYearItem = computed(() => {
+  const picked = lines.value.filter((line) => line.itemId != null);
+  if (picked.length === 0) {
+    return false;
+  }
+  const quarters = new Map((items.data.value ?? []).map((item) => [item.Id, item.Quarter]));
+  return !picked.some((line) => quarters.get(line.itemId as number) == null);
+});
 const previewInput = computed<PreviewInput | null>(() => {
   if (!visible.value || loading.value) {
     return null;
@@ -188,6 +199,10 @@ async function save(): Promise<void> {
     inputs = toLineInputs(lines.value);
   } catch (error) {
     showError(error);
+    return;
+  }
+  if (lacksAllYearItem.value || !lines.value.some((line) => line.itemId != null)) {
+    showError(new ApiError("AllYearItemRequired"));
     return;
   }
   saving.value = true;
@@ -288,6 +303,9 @@ async function save(): Promise<void> {
       <section class="flex flex-col gap-2">
         <h3 class="m-0 text-base font-semibold">{{ t("graveItems") }}</h3>
         <LineEditor v-model="lines" :suggestions="suggestions" />
+        <Message v-if="lacksAllYearItem" severity="warn" size="small">{{
+          t("allYearItemRequired")
+        }}</Message>
       </section>
 
       <GraveBillingPreview

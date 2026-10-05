@@ -98,6 +98,7 @@ public sealed class ImportValidator
 
         CheckReferences(data, problems);
         CheckGraveRecipients(data, problems);
+        CheckGraveAllYearItems(data, problems);
         CheckLinkedItemPrices(data, problems);
         await CheckAgainstStoredDataAsync(data, problems, ct);
 
@@ -803,6 +804,40 @@ public sealed class ImportValidator
                     )
                 );
             }
+        }
+    }
+
+    /// <summary>A grave needs at least one item billed all year, as SaveGrave
+    /// requires. A link to an item that is not declared (or was rejected) is
+    /// reported by the reference check already, and might have been the all-year
+    /// one, so a grave with such a link is left alone here.</summary>
+    private static void CheckGraveAllYearItems(ImportData data, List<ImportProblem> problems)
+    {
+        var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
+        var linksByGrave = data.ItemLinks.ToLookup(
+            link => link.GraveNumber,
+            StringComparer.OrdinalIgnoreCase
+        );
+        foreach (var grave in data.Graves)
+        {
+            var links = linksByGrave[grave.Number].ToList();
+            if (
+                links.Any(link => !items.ContainsKey(link.ItemNumber))
+                || links.Any(link => items[link.ItemNumber].Quarter is null)
+            )
+            {
+                continue;
+            }
+
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.GravesFile,
+                    grave.Row,
+                    "AllYearItemRequired",
+                    "The grave needs at least one item billed all year.",
+                    "AllYearItemRequired"
+                )
+            );
         }
     }
 

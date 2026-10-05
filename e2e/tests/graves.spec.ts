@@ -846,6 +846,37 @@ test("the grave editor previews a prorated start and a seasonal item", async ({ 
   await expect(editor).toContainText("Noch kein Empfänger");
 });
 
+test("the grave editor asks for an item billed all year", async ({ page }) => {
+  const marker = `GY-${Date.now()}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-pflege`,
+    Description: "Grabpflege",
+    VatRate: 19,
+    DefaultPrice: 60,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-sommer`,
+    Description: "Sommerbepflanzung",
+    VatRate: 19,
+    DefaultPrice: 40,
+    Quarter: "Summer",
+  });
+
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  const hint = editor.getByText("Ein Grab braucht mindestens eine ganzjährige Leistung.");
+  await expect(hint).toHaveCount(0);
+
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 1, `${marker}-sommer`);
+  await expect(hint).toBeVisible();
+
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 2, `${marker}-pflege`);
+  await expect(hint).toHaveCount(0);
+});
+
 test("a new grave takes at most four recipients", async ({ page }) => {
   const marker = `GC-${Date.now()}`;
   const names = [1, 2, 3, 4, 5].map((n) => `Empf${n} ${marker}`);

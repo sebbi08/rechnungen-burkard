@@ -522,7 +522,8 @@ non-interactive until completion, and the task runs exactly once.
   months appended to the line's description; the start and end month each count
   as a whole month and the count is unchanged. A quarter item MUST be billed in
   full, once, in the half-year that holds its quarter, when the invoice's months
-  touch that quarter at all, and not otherwise.
+  touch that quarter at all, and not otherwise. A grave MUST have at least one
+  item billed all year (without a quarter).
 - **FR-020**: A grave MUST support one to four recipients.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.

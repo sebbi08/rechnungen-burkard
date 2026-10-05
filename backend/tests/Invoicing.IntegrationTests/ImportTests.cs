@@ -756,6 +756,28 @@ public class ImportTests
     }
 
     [Fact]
+    public async Task A_grave_whose_only_linked_item_has_a_quarter_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1,Name 1,Weg 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Sommerbepflanzung,19,40,Summer\r\n"),
+            ("graves.csv", GravesHeader + "IMP-6,27,Grabstätte,DoubleOutside,2026-01,\r\n"),
+            ("mapping.csv", MappingHeader + "Item,IMP-6,9001,1,\r\n" + "Recipient,IMP-6,E-1,,\r\n")
+        );
+
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "AllYearItemRequired"
+        );
+    }
+
+    [Fact]
     public async Task A_grave_with_five_recipients_is_refused()
     {
         using var host = new ApiTestHost();

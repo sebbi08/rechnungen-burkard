@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createRow, seedGrave } from "../seed";
+import { createRow, ensureRow, seedGrave } from "../seed";
 
 // A navigation bar lists the sections, the invoice list is the start page, and
 // a detail page leads back through its breadcrumb.
@@ -54,9 +54,16 @@ test("a detail page keeps its section marked and leads back through its breadcru
     Name: `Navigation ${ts}`,
     Address: "Musterweg 1",
   });
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `NAV-${ts}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 10,
+  });
   const graveId = await seedGrave(page, {
     graveNumber: `NAV-${ts}`,
-    items: [],
+    items: [{ itemId: item.Id }],
     recipientIds: [recipient.Id],
   });
 

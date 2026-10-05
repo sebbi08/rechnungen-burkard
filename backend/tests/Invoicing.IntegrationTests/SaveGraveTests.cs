@@ -971,4 +971,79 @@ public class SaveGraveTests
 
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
     }
+
+    private static async Task<long> SeedQuarterItemAsync(HttpClient client)
+    {
+        return await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "4003",
+                        Description = "Sommerbepflanzung",
+                        VatRate = 7.0m,
+                        DefaultPrice = 40.00m,
+                        Quarter = "Summer",
+                    }
+                )
+            )
+        );
+    }
+
+    private static object AllYearBody(long[] itemIds, long recipient) =>
+        new
+        {
+            graveId = (long?)null,
+            graveNumber = "AY-1",
+            fieldNumber = "F-1",
+            siteName = "Grabstätte Test",
+            position = "SingleInside",
+            startDate = "2026-01-01",
+            endDate = "2040-12-31",
+            items = itemIds.Select(id => new
+            {
+                itemId = id,
+                count = 1,
+                unitPrice = (decimal?)null,
+            }),
+            recipientIds = new[] { recipient },
+        };
+
+    [Fact]
+    public async Task Save_rejects_a_grave_whose_only_item_has_a_quarter()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (_, _, recipient, _) = await SeedAsync(client);
+        var summer = await SeedQuarterItemAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(AllYearBody(new[] { summer }, recipient))
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "AllYearItemRequired",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Save_accepts_a_grave_with_an_all_year_item_and_a_quarter_item()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, recipient, _) = await SeedAsync(client);
+        var summer = await SeedQuarterItemAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(AllYearBody(new[] { priced, summer }, recipient))
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
 }

@@ -23,6 +23,7 @@ that the grave site design (2026-10-02) left out of scope.
 | Even split            | Every invoice the term actually produces must divide evenly across the recipients; the save is refused otherwise             |
 | Live check            | The grave editor shows the example invoices and their check while the user types                                             |
 | Suggestions           | Per item line: the nearest prices below and above at which every invoice divides, other lines unchanged; a click applies one |
+| All-year item         | Every grave needs at least one item without a quarter (`AllYearItemRequired`)                                                |
 | Recipients            | At most 4 per grave                                                                                                          |
 | Quarter change        | Locked once a grave bills the item, like the VAT rate (FR-009a)                                                              |
 | Existing invoices     | Unchanged; the new rule applies from the next generation                                                                     |
@@ -227,7 +228,8 @@ it can be tested without the API.
 
 Refuses with `PricesDoNotDivide` when any example fails; the message names the
 first failing invoice by its label. Refuses more than four recipients with
-`TooManyRecipients`.
+`TooManyRecipients`. Refuses a grave without an item that has no quarter (none
+at all included) with `AllYearItemRequired`, after the per-item checks.
 
 ### Item update
 
@@ -268,6 +270,8 @@ prorated price as invoiced.
   which is also unreleased.
 - A grave with more than four recipient links is refused with
   `TooManyRecipients`.
+- A grave that links no item without a quarter is refused with
+  `AllYearItemRequired` on the grave's row.
 - The import's price check runs the same example check as `SaveGrave` and, like
   it, reports the first failing invoice of a grave: one problem per failing rate
   on the grave's row, key `PricesDoNotDivideIn` with the invoice's label first
