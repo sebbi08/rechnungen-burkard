@@ -569,8 +569,9 @@ non-interactive until completion, and the task runs exactly once.
   a half-year with at least one month inside the grave's term. Before a run the
   system MUST recompute the rounding corrections (FR-021a) of every grave it
   would invoice and stop the whole run, naming those graves, when a stored
-  correction differs from the current one (for instance after an item's price
-  changed); such a grave has to be opened and saved again first.
+  correction differs from the current one; such a grave has to be opened and
+  saved again first. This is a safeguard against the rule or the stored data
+  changing underneath a stored correction (for instance after an update).
 - **FR-026**: The system MUST record that a grave's invoices have been generated
   for a given half-year.
 - **FR-027**: The system MUST prevent generating duplicate invoices for the same

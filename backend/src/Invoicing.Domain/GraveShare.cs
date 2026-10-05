@@ -5,14 +5,14 @@ namespace Burkard.Invoicing.Domain;
 ///
 /// A grave's bill is split equally: every recipient gets the grave's own lines
 /// and pays the same share of each VAT-rate subtotal. That only works when the
-/// numbers divide, so the prices have to be chosen for it — nothing here adjusts
-/// them. <see cref="Problems"/> reports what does not come out, and saving a
-/// grave is refused until it does.
+/// numbers divide. <see cref="Problems"/> judges whether the lines do, and
+/// <see cref="CollectedCents"/> what the recipients end up paying. VAT is
+/// rounded once per recipient, not on the whole grave, because that is what
+/// each of them is actually billed.
 ///
-/// Raising prices automatically was tried first and abandoned. It kept the
-/// arithmetic out of sight but put figures on the page that nobody had typed,
-/// and left the grave's own worth and what the recipients paid a cent or two
-/// apart with no honest way to show both.</summary>
+/// When they do not divide, nothing is refused outright: <c>GraveBillingCheck</c>
+/// raises one line per invoice block and VAT rate (the rounding correction), by
+/// at most 1,00 €. Only a block that no line can fix within that is refused.</summary>
 public static class GraveShare
 {
     /// <summary>Everything about these lines that stops them being split evenly

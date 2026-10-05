@@ -602,17 +602,15 @@ public sealed class ImportValidator
     /// A grave's bill is split equally, so each VAT rate's net subtotal has to
     /// divide across its recipients, and a price entered as a gross has to be
     /// collectable to the cent — in every invoice of the term, the prorated
-    /// first and last half-years included. The dialog refuses a grave that
-    /// cannot; an archive that carried one would import quietly and then never
-    /// bill it — generation skips such a grave — so the whole import is refused
-    /// instead.
+    /// first and last half-years included. The import corrects what it can (the
+    /// corrections are stored by <c>ImportService</c>) and reports only a block
+    /// no line can fix within 1,00 €; an archive carrying one is refused as a
+    /// whole, since generation would otherwise skip that grave.
     ///
     /// The import never sets a link's own price, so what is billed is the
     /// item's default price from items.csv. The problems are reported against
-    /// the grave's row, because the grave is what does not add up: the first
-    /// failing invoice's rates, then per item the prices that would let every
-    /// invoice divide. A grave over the recipient cap is left to
-    /// <see cref="CheckGraveRecipients"/>.</summary>
+    /// the grave's row, because the grave is what does not add up. A grave over
+    /// the recipient cap is left to <see cref="CheckGraveRecipients"/>.</summary>
     private static void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
     {
         var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
