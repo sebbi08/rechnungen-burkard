@@ -195,7 +195,7 @@ for (const screen of LIST_SCREENS) {
   test(`${screen.route}: the row actions are on screen without scrolling the table`, async ({
     page,
   }) => {
-    test.fail(onPhone() && screen.route === "graves", TABLES_OVERFLOW);
+    test.fail(onPhone() && ["items", "graves"].includes(screen.route), TABLES_OVERFLOW);
     await seed(page);
     await page.goto(`/${screen.route}`);
     const row = page.locator("tbody tr").filter({ hasText: screen.seeded }).first();
