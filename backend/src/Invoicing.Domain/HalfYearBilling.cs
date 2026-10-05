@@ -83,7 +83,7 @@ public static class HalfYearBilling
                 // a quarter's work is done or not: in full once it is touched
                 if (Touches(quarter, period))
                 {
-                    billed.Add(Billed(index, link, link.EnteredPrice, link.Description));
+                    billed.Add(BillAt(index, link, link.EnteredPrice, link.Description));
                 }
 
                 continue;
@@ -91,7 +91,7 @@ public static class HalfYearBilling
 
             if (period.IsFull)
             {
-                billed.Add(Billed(index, link, link.EnteredPrice, link.Description));
+                billed.Add(BillAt(index, link, link.EnteredPrice, link.Description));
                 continue;
             }
 
@@ -100,7 +100,7 @@ public static class HalfYearBilling
                 2,
                 MidpointRounding.AwayFromZero
             );
-            billed.Add(Billed(index, link, prorated, link.Description + ProrationNote(period)));
+            billed.Add(BillAt(index, link, prorated, link.Description + ProrationNote(period)));
         }
 
         return billed;
@@ -233,7 +233,9 @@ public static class HalfYearBilling
         return (first, second);
     }
 
-    private static BilledLine Billed(
+    /// <summary>A billed line at a given price — used by <see cref="Bill"/> and by
+    /// the rounding correction.</summary>
+    public static BilledLine BillAt(
         int index,
         BillableLink link,
         decimal price,

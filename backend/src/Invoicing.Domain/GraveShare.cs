@@ -172,7 +172,7 @@ public static class GraveShare
         var below = 0L;
         var above = 0L;
 
-        for (var distance = 1; distance <= 400 && (below == 0 || above == 0); distance++)
+        for (var distance = 1; distance <= 100 && (below == 0 || above == 0); distance++)
         {
             if (below == 0)
             {
