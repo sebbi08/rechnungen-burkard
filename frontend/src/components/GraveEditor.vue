@@ -239,41 +239,59 @@ async function save(): Promise<void> {
 }
 
 async function confirmCorrections(): Promise<void> {
+  if (saving.value) {
+    return;
+  }
   saving.value = true;
   try {
     await persist(pendingCorrections.value);
     correctionsVisible.value = false;
   } catch (error) {
-    if (toApiError(error).code === "CorrectionsChanged") {
-      correctionsVisible.value = false;
-      await billing.check();
-    }
     showError(error);
   } finally {
     saving.value = false;
   }
 }
 
+// Only a confirm may send the corrections it was shown.
+watch(correctionsVisible, (open) => {
+  if (!open) {
+    correctionRows.value = [];
+    pendingCorrections.value = [];
+  }
+});
+
 async function persist(corrections: BillingCorrection[]): Promise<void> {
-  await saveGrave({
-    graveId: props.graveId,
-    graveNumber: form.GraveNumber,
-    fieldNumber: form.FieldNumber,
-    siteName: form.SiteName,
-    position: form.Position,
-    startDate: toIsoMonth(form.StartDate),
-    endDate: toIsoMonth(form.EndDate),
-    items: toLineInputs(lines.value),
-    recipientIds: recipients.value.map((recipient) => recipient.id),
-    corrections: corrections.map((c) => ({
-      kind: c.Kind,
-      year: c.Year,
-      half: c.Half,
-      vatRate: c.VatRate,
-      itemId: c.ItemId,
-      correctedPrice: c.CorrectedPrice,
-    })),
-  });
+  try {
+    await saveGrave({
+      graveId: props.graveId,
+      graveNumber: form.GraveNumber,
+      fieldNumber: form.FieldNumber,
+      siteName: form.SiteName,
+      position: form.Position,
+      startDate: toIsoMonth(form.StartDate),
+      endDate: toIsoMonth(form.EndDate),
+      items: toLineInputs(lines.value),
+      recipientIds: recipients.value.map((recipient) => recipient.id),
+      corrections: corrections.map((c) => ({
+        kind: c.Kind,
+        year: c.Year,
+        half: c.Half,
+        vatRate: c.VatRate,
+        itemId: c.ItemId,
+        correctedPrice: c.CorrectedPrice,
+      })),
+    });
+  } catch (error) {
+    if (toApiError(error).code !== "CorrectionsChanged") {
+      throw error;
+    }
+    // the corrections the save computes differ from the ones sent: look again
+    correctionsVisible.value = false;
+    await billing.check();
+    showError(error);
+    return;
+  }
   await queryClient.invalidateQueries();
   visible.value = false;
 }
@@ -419,6 +437,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
   <CorrectionsDialog
     v-model:visible="correctionsVisible"
     :rows="correctionRows"
+    :saving="saving"
     @confirm="confirmCorrections"
   />
 </template>

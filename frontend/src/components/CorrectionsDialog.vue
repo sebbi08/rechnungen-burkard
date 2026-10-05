@@ -12,7 +12,7 @@ export interface CorrectionRow {
   corrected: number;
 }
 
-defineProps<{ rows: CorrectionRow[] }>();
+defineProps<{ rows: CorrectionRow[]; saving?: boolean }>();
 const visible = defineModel<boolean>("visible", { required: true });
 const emit = defineEmits<{ confirm: [] }>();
 const { t } = useI18n();
@@ -61,6 +61,7 @@ const { t } = useI18n();
         :label="t('correctionsConfirm')"
         icon="pi pi-check"
         severity="warn"
+        :loading="saving"
         @click="emit('confirm')"
       />
     </template>
