@@ -26,7 +26,7 @@ import {
   formatRevisionBadge,
   formatVatRate,
 } from "@/lib/format";
-import { currentHalfYear, halfYearInTerm, halfYearText } from "@/lib/halfYear";
+import { currentHalfYear, halfYearHasBilling, halfYearText } from "@/lib/halfYear";
 
 const props = defineProps<{ graveId: number }>();
 const { t } = useI18n();
@@ -44,7 +44,13 @@ const currentLabel = computed(() =>
 
 const inTerm = computed(() =>
   grave.value
-    ? halfYearInTerm(grave.value.StartDate, grave.value.EndDate, currentYear, currentHalf)
+    ? halfYearHasBilling(
+        grave.value.StartDate,
+        grave.value.EndDate,
+        currentYear,
+        currentHalf,
+        grave.value.Items.map((link) => link.Item.Quarter),
+      )
     : true,
 );
 const previewInput = computed<PreviewInput | null>(() => {
@@ -191,9 +197,10 @@ const {
       </template>
     </Card>
 
-    <Card>
+    <Card v-if="(grave?.Items.length ?? 0) > 0">
       <template #content>
         <GraveBillingPreview
+          :assumes-one-recipient="(grave?.Recipients.length ?? 0) === 0"
           :preview="billing.preview.value"
           :pending="billing.pending.value"
           :failed="billing.failed.value"

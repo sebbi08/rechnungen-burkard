@@ -839,9 +839,10 @@ test("the grave editor previews a prorated start and a seasonal item", async ({ 
   await expect(start).toContainText("anteilig 05–06/2026");
   await expect(start).toContainText("20,00");
   await expect(start).toContainText("Sommerbepflanzung");
-  await expect(editor.getByRole("group", { name: "Volles H2" })).not.toContainText(
-    "Sommerbepflanzung",
-  );
+  await expect(start).toContainText("40,00");
+  const fullSecond = editor.getByRole("group", { name: "Volles H2" });
+  await expect(fullSecond).toBeVisible();
+  await expect(fullSecond).not.toContainText("Sommerbepflanzung");
   await expect(editor).toContainText("Noch kein Empfänger");
 });
 

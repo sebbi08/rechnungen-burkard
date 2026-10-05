@@ -1,3 +1,5 @@
+import { BillingQuarter } from "@/api/generated/burkard-invoicing-domain-entities";
+
 export interface YearHalfOption {
   key: string;
   text: string;
@@ -58,4 +60,41 @@ export function halfYearInTerm(
   const first = `${year}-${half === 1 ? "01" : "07"}`;
   const last = `${year}-${half === 1 ? "06" : "12"}`;
   return start.slice(0, 7) <= last && (end == null || end.slice(0, 7) >= first);
+}
+
+const QUARTER_NUMBER: Record<BillingQuarter, number> = {
+  [BillingQuarter.Spring]: 1,
+  [BillingQuarter.Summer]: 2,
+  [BillingQuarter.Autumn]: 3,
+  [BillingQuarter.Winter]: 4,
+};
+
+/** Whether a grave with these items bills at least one line in the half-year:
+ *  an item without a quarter whenever the term has a month in the half-year,
+ *  one with a quarter only when the term's months inside the half-year touch
+ *  that quarter. Mirrors `HalfYearBilling` in the backend, which decides which
+ *  graves a generation run invoices. */
+export function halfYearHasBilling(
+  start: string,
+  end: string | null,
+  year: number,
+  half: number,
+  quarters: (`${BillingQuarter}` | null)[],
+): boolean {
+  if (!halfYearInTerm(start, end, year, half)) {
+    return false;
+  }
+  // the months of the half-year inside the term, as 1-12
+  const halfFirst = half === 1 ? 1 : 7;
+  const startsIn = Number(start.slice(0, 4)) === year ? Number(start.slice(5, 7)) : 0;
+  const endsIn = end != null && Number(end.slice(0, 4)) === year ? Number(end.slice(5, 7)) : 13;
+  const first = Math.max(halfFirst, startsIn);
+  const last = Math.min(halfFirst + 5, endsIn);
+  return quarters.some((quarter) => {
+    if (quarter == null) {
+      return true;
+    }
+    const quarterFirst = (QUARTER_NUMBER[quarter] - 1) * 3 + 1;
+    return quarterFirst <= last && first <= quarterFirst + 2;
+  });
 }
