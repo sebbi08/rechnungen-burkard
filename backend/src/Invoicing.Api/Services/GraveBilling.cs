@@ -3,7 +3,7 @@ using Burkard.Invoicing.Domain.Entities;
 
 namespace Burkard.Invoicing.Api.Services;
 
-/// <summary>Turns a grave's item links into the lines that are billed.
+/// <summary>Turns a grave's item links into what the half-year rule bills.
 ///
 /// One place, because three callers have to agree exactly: the save that
 /// refuses a grave whose prices do not divide, the dialog's check that says so
@@ -12,6 +12,29 @@ namespace Burkard.Invoicing.Api.Services;
 /// cannot be invoiced.</summary>
 public static class GraveBilling
 {
+    /// <summary>How many recipients a grave may split its bill across.</summary>
+    public const int MaxRecipients = 4;
+
+    /// <summary>A link as the half-year rule sees it: the link's own price, or
+    /// the item's default standing in for it, rounded to the cent like
+    /// <see cref="LineFor"/>.</summary>
+    public static BillableLink LinkFor(
+        InvoiceItem item,
+        int count,
+        decimal? unitPrice,
+        bool priceIncludesVat
+    ) =>
+        new(
+            item.Id,
+            item.Number,
+            item.Description,
+            item.VatRate,
+            item.Quarter,
+            count,
+            decimal.Round(unitPrice ?? item.DefaultPrice ?? 0m, 2, MidpointRounding.AwayFromZero),
+            priceIncludesVat
+        );
+
     /// <summary>Whether a price is a whole number of cents. Prices are entered,
     /// stored and billed in cents; a third decimal would be judged rounded here
     /// and billed unrounded by generation, so every write refuses one.</summary>

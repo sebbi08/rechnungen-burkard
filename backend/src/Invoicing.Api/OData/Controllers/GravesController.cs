@@ -205,6 +205,7 @@ public class GravesController : ODataController
                         code = ex.Code,
                         message = ex.Message,
                         recipients = ex.Recipients,
+                        args = ex.Invoice is null ? null : new[] { ex.Invoice },
                         problems = ex
                             .Problems.Select(p => new
                             {

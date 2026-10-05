@@ -861,4 +861,114 @@ public class SaveGraveTests
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
     }
+
+    private static object GraveBody(
+        string number,
+        string start,
+        string? end,
+        long itemId,
+        decimal price,
+        IEnumerable<long> recipientIds
+    ) =>
+        new
+        {
+            graveId = (long?)null,
+            graveNumber = number,
+            fieldNumber = "1",
+            siteName = "Schineller Bäcke",
+            position = "SingleInside",
+            startDate = start,
+            endDate = end,
+            items = new[]
+            {
+                new
+                {
+                    itemId,
+                    count = 1,
+                    unitPrice = (decimal?)price,
+                    priceIncludesVat = false,
+                },
+            },
+            recipientIds,
+        };
+
+    private static async Task<long[]> RecipientsAsync(HttpClient client, int count)
+    {
+        var ids = new long[count];
+        for (var i = 0; i < count; i++)
+        {
+            ids[i] = await ReadIdAsync(
+                client.PostAsync(
+                    "/odata/Recipients",
+                    ODataJson.Body(new { Name = $"Empfänger {i}", Address = $"Weg {i}" })
+                )
+            );
+        }
+
+        return ids;
+    }
+
+    [Fact]
+    public async Task Saving_refuses_more_than_four_recipients()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, _, _) = await SeedAsync(client);
+        var recipients = await RecipientsAsync(client, 5);
+
+        // 120,00 divides by five, so only the cap can refuse it
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(GraveBody("TM-1", "2026-01", null, priced, 120.00m, recipients))
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "TooManyRecipients",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Saving_refuses_a_grave_whose_start_invoice_does_not_divide()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, first, second) = await SeedAsync(client);
+
+        // 60,02 divides by two; May and June of it are 20,01, which does not
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                GraveBody("SD-1", "2026-05", null, priced, 60.02m, new[] { first, second })
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var error = json.RootElement.GetProperty("error");
+        Assert.Equal("PricesDoNotDivide", error.GetProperty("code").GetString());
+        Assert.Equal(
+            "Anfang H1 2026",
+            Assert.Single(error.GetProperty("args").EnumerateArray().ToArray()).GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Saving_accepts_a_grave_whose_every_invoice_divides()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, first, second) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                GraveBody("SD-2", "2026-05", "2030-08", priced, 60.00m, new[] { first, second })
+            )
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
 }

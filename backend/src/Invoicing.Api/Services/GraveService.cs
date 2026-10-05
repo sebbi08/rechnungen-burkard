@@ -40,7 +40,7 @@ public sealed class GraveService
     )
     {
         await ValidateFieldsAsync(graveId, fields, ct);
-        await ValidateAsync(items, recipientIds, ct);
+        await ValidateAsync(items, recipientIds, fields, ct);
 
         // A grave created without recipients could never be billed: generation
         // would skip it, and once created its recipient set cannot change. A
@@ -194,6 +194,7 @@ public sealed class GraveService
     private async Task ValidateAsync(
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
+        GraveFields fields,
         CancellationToken ct
     )
     {
@@ -210,6 +211,14 @@ public sealed class GraveService
             throw new ValidationException(
                 "GraveRecipientLinkExists",
                 "This recipient is already linked to the grave."
+            );
+        }
+
+        if (recipientIds.Count > GraveBilling.MaxRecipients)
+        {
+            throw new ValidationException(
+                "TooManyRecipients",
+                $"A grave can have at most {GraveBilling.MaxRecipients} recipients."
             );
         }
 
@@ -271,9 +280,9 @@ public sealed class GraveService
         // recipients are known.
         if (recipientIds.Count > 0 && items.Count > 0)
         {
-            var lines = items
+            var links = items
                 .Select(input =>
-                    GraveBilling.LineFor(
+                    GraveBilling.LinkFor(
                         invoiceItems[input.ItemId],
                         input.Count,
                         input.UnitPrice,
@@ -282,10 +291,22 @@ public sealed class GraveService
                 )
                 .ToList();
 
-            var problems = GraveShare.Problems(lines, recipientIds.Count);
-            if (problems.Count > 0)
+            // every invoice the term produces has to divide on its own: the
+            // first and last half-year bill other amounts than the full ones
+            var evaluation = GraveBillingCheck.Evaluate(
+                links,
+                fields.StartDate,
+                fields.EndDate,
+                recipientIds.Count,
+                withSuggestions: false
+            );
+            if (evaluation.FirstFailing is { } failing)
             {
-                throw new GraveShareValidationException(problems, recipientIds.Count);
+                throw new GraveShareValidationException(
+                    failing.Problems,
+                    recipientIds.Count,
+                    HalfYearBilling.Label(failing.Example)
+                );
             }
         }
     }
@@ -296,12 +317,26 @@ public sealed class GraveService
 /// would work instead, rather than only saying no.</summary>
 public sealed class GraveShareValidationException : ValidationException
 {
-    public GraveShareValidationException(IReadOnlyList<GraveShareProblem> problems, int recipients)
-        : base("PricesDoNotDivide", "The prices cannot be split evenly across the recipients.")
+    public GraveShareValidationException(
+        IReadOnlyList<GraveShareProblem> problems,
+        int recipients,
+        string? invoice = null
+    )
+        : base(
+            "PricesDoNotDivide",
+            invoice is null
+                ? "The prices cannot be split evenly across the recipients."
+                : $"The invoice '{invoice}' cannot be split evenly across the recipients."
+        )
     {
         Problems = problems;
         Recipients = recipients;
+        Invoice = invoice;
     }
+
+    /// <summary>The label of the invoice that does not divide ("Anfang H1
+    /// 2026"); null where only one invoice is in question, as in a revision.</summary>
+    public string? Invoice { get; }
 
     public IReadOnlyList<GraveShareProblem> Problems { get; }
     public int Recipients { get; }
