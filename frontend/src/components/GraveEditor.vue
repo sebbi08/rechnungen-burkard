@@ -7,24 +7,19 @@ import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
 import Select from "primevue/select";
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  checkGraveBilling,
-  fetchGraveDetails,
-  type GraveBillingCheck,
-  type InvoiceLineInput,
-  saveGrave,
-} from "@/api/endpoints";
+import { fetchGraveDetails, type InvoiceLineInput, saveGrave } from "@/api/endpoints";
 import { ApiError } from "@/api/http";
-import { useRecipientsQuery } from "@/api/queries";
+import { useItemsQuery, useRecipientsQuery } from "@/api/queries";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
-import { showMessage } from "@/composables/useMessage";
-import { billingProblemText } from "@/lib/billing";
-import { parseIsoDate, toIsoMonth, type Translate } from "@/lib/format";
+import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
+import { MAX_RECIPIENTS, previewLines } from "@/lib/billing";
+import { parseIsoDate, toIsoMonth } from "@/lib/format";
 import { GRAVE_POSITIONS, type GravePositionName } from "@/lib/gravePosition";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
+import GraveBillingPreview from "./GraveBillingPreview.vue";
 import LineEditor from "./LineEditor.vue";
 import RecipientPicker from "./RecipientPicker.vue";
 
@@ -32,7 +27,6 @@ const props = defineProps<{ graveId: number | null }>();
 const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
-const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
 const { showError } = useErrorToast();
 const drawerFocus = useDrawerFocus();
 const formEl = ref<HTMLFormElement | null>(null);
@@ -141,22 +135,51 @@ function removeRecipient(id: number): void {
   recipients.value = recipients.value.filter((recipient) => recipient.id !== id);
 }
 
-/** The bill is split equally, so each VAT rate has to divide. Asking before
- *  the save turns a refusal into a message that names the rate and what would
- *  work. A check that cannot be reached does not block: the save validates
- *  again. */
-async function billingProblems(inputs: InvoiceLineInput[]): Promise<string | null> {
-  const count = recipients.value.length;
-  if (count === 0 || inputs.length === 0) {
+const items = useItemsQuery(ref(""));
+const defaultPrices = computed(
+  () => new Map((items.data.value ?? []).map((item) => [item.Id, item.DefaultPrice])),
+);
+const previewInput = computed<PreviewInput | null>(() => {
+  if (!visible.value || loading.value) {
     return null;
   }
-  let check: GraveBillingCheck;
-  try {
-    check = await checkGraveBilling(count, inputs);
-  } catch {
+  // an end before the start is the save's to refuse; a preview of it would
+  // only read as the check being down
+  if (form.StartDate && form.EndDate && form.EndDate.getTime() < form.StartDate.getTime()) {
     return null;
   }
-  return check.Ok ? null : billingProblemText(check.Problems, count, translate);
+  const { inputs, keys } = previewLines(
+    lines.value,
+    (itemId) => defaultPrices.value.get(itemId) ?? null,
+  );
+  if (inputs.length === 0) {
+    return null;
+  }
+  return {
+    recipients: Math.max(1, recipients.value.length),
+    startMonth: toIsoMonth(form.StartDate),
+    endMonth: toIsoMonth(form.EndDate),
+    lines: inputs,
+    keys,
+  };
+});
+const billing = useGraveBillingPreview(previewInput);
+const suggestions = computed(() => {
+  const map = new Map<number, number[]>();
+  const keys = billing.answered.value?.keys ?? [];
+  for (const entry of billing.preview.value?.LineSuggestions ?? []) {
+    const key = keys[entry.LineIndex];
+    if (key != null) {
+      map.set(key, entry.Suggestions);
+    }
+  }
+  return map;
+});
+
+/** Moves focus to the first invoice that does not divide, once it is drawn. */
+async function focusFailingInvoice(): Promise<void> {
+  await nextTick();
+  formEl.value?.querySelector<HTMLElement>("[data-billing-invalid]")?.focus();
 }
 
 async function save(): Promise<void> {
@@ -169,10 +192,13 @@ async function save(): Promise<void> {
   }
   saving.value = true;
   try {
-    const problems = await billingProblems(inputs);
-    if (problems) {
-      showMessage(t("pricesDoNotDivideTitle"), problems);
-      return;
+    if (previewInput.value) {
+      const check = await billing.check();
+      if (check && !check.Ok) {
+        showError(new ApiError("PricesDoNotDivide"));
+        await focusFailingInvoice();
+        return;
+      }
     }
     await saveGrave({
       graveId: props.graveId,
@@ -261,8 +287,15 @@ async function save(): Promise<void> {
 
       <section class="flex flex-col gap-2">
         <h3 class="m-0 text-base font-semibold">{{ t("graveItems") }}</h3>
-        <LineEditor v-model="lines" />
+        <LineEditor v-model="lines" :suggestions="suggestions" />
       </section>
+
+      <GraveBillingPreview
+        :preview="billing.preview.value"
+        :pending="billing.pending.value"
+        :failed="billing.failed.value"
+        :assumes-one-recipient="recipients.length === 0"
+      />
 
       <section class="flex flex-col gap-3">
         <h3 class="m-0 text-base font-semibold">{{ t("graveRecipients") }}</h3>
@@ -287,7 +320,10 @@ async function save(): Promise<void> {
             />
           </li>
         </ul>
-        <div v-if="graveId == null" class="flex flex-wrap items-center gap-2">
+        <div
+          v-if="graveId == null && recipients.length < MAX_RECIPIENTS"
+          class="flex flex-wrap items-center gap-2"
+        >
           <RecipientPicker
             v-model="linkRecipientId"
             input-id="graveRecipient"
@@ -296,6 +332,13 @@ async function save(): Promise<void> {
           />
           <Button :label="t('add')" icon="pi pi-plus" outlined @click="addRecipient" />
         </div>
+        <Message
+          v-if="graveId == null && recipients.length >= MAX_RECIPIENTS"
+          severity="info"
+          size="small"
+        >
+          {{ t("graveRecipientsMax") }}
+        </Message>
       </section>
     </form>
     <template #footer>

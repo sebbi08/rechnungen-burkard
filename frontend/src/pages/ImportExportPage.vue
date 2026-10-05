@@ -54,10 +54,12 @@ function problemText(problem: ImportProblem): string {
     return problem.message;
   }
   let args = problem.messageArgs ?? [];
-  if (problem.messageKey.startsWith("PricesDoNotDivide")) {
+  if (problem.messageKey === "PricesDoNotDivideIn") {
     args = args.map((arg, index) =>
-      index === 0 ? formatVatRate(Number(arg)) : index === 2 ? arg : formatAmount(Number(arg)),
+      index === 1 ? formatVatRate(Number(arg)) : index === 2 ? formatAmount(Number(arg)) : arg,
     );
+  } else if (problem.messageKey.startsWith("PriceSuggestion")) {
+    args = args.map((arg, index) => (index >= 1 ? formatAmount(Number(arg)) : arg));
   } else if (problem.messageKey === "VatRateNotConfigured") {
     args = args.map((arg) => formatVatRate(Number(arg)));
   }

@@ -10,11 +10,13 @@ import Tag from "primevue/tag";
 import { computed, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { loadGraveDetail } from "@/api/queries";
+import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
 import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
 import InvoiceRowActions from "@/components/InvoiceRowActions.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
+import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import {
   formatAmount,
@@ -24,7 +26,7 @@ import {
   formatRevisionBadge,
   formatVatRate,
 } from "@/lib/format";
-import { currentHalfYear, halfYearText } from "@/lib/halfYear";
+import { currentHalfYear, halfYearInTerm, halfYearText } from "@/lib/halfYear";
 
 const props = defineProps<{ graveId: number }>();
 const { t } = useI18n();
@@ -39,6 +41,31 @@ const [currentYear, currentHalf] = currentHalfYear();
 const currentLabel = computed(() =>
   t("currentHalfYearStatus", [halfYearText(currentYear, currentHalf)]),
 );
+
+const inTerm = computed(() =>
+  grave.value
+    ? halfYearInTerm(grave.value.StartDate, grave.value.EndDate, currentYear, currentHalf)
+    : true,
+);
+const previewInput = computed<PreviewInput | null>(() => {
+  const current = grave.value;
+  if (!current || current.Items.length === 0) {
+    return null;
+  }
+  return {
+    recipients: Math.max(1, current.Recipients.length),
+    startMonth: current.StartDate.slice(0, 7),
+    endMonth: current.EndDate?.slice(0, 7) ?? null,
+    lines: current.Items.map((link) => ({
+      itemId: link.Item.Id,
+      count: link.Count,
+      unitPrice: link.UnitPrice,
+      priceIncludesVat: link.PriceIncludesVat,
+    })),
+    keys: current.Items.map((_, index) => index),
+  };
+});
+const billing = useGraveBillingPreview(previewInput);
 
 const editorOpen = ref(false);
 const {
@@ -97,12 +124,22 @@ const {
             <dt class="text-sm text-muted-color">{{ currentLabel }}</dt>
             <dd class="m-0">
               <Tag
-                :value="detail.data.value.currentInvoiced ? t('statusInvoiced') : t('statusOpen')"
-                :severity="detail.data.value.currentInvoiced ? 'success' : 'danger'"
+                :value="
+                  detail.data.value.currentInvoiced
+                    ? t('statusInvoiced')
+                    : inTerm
+                      ? t('statusOpen')
+                      : t('statusOutsideTerm')
+                "
+                :severity="
+                  detail.data.value.currentInvoiced ? 'success' : inTerm ? 'danger' : 'secondary'
+                "
                 :aria-label="
                   detail.data.value.currentInvoiced
                     ? t('statusInvoicedAnnouncement')
-                    : t('statusOpenAnnouncement')
+                    : inTerm
+                      ? t('statusOpenAnnouncement')
+                      : t('statusOutsideTermAnnouncement')
                 "
               />
             </dd>
@@ -151,6 +188,16 @@ const {
             <template #body="{ data }">{{ data.PriceIncludesVat ? t("yes") : t("no") }}</template>
           </Column>
         </DataTable>
+      </template>
+    </Card>
+
+    <Card>
+      <template #content>
+        <GraveBillingPreview
+          :preview="billing.preview.value"
+          :pending="billing.pending.value"
+          :failed="billing.failed.value"
+        />
       </template>
     </Card>
 
