@@ -82,24 +82,43 @@ public sealed class GraveInvoiceGenerator
                 GraveBilling.LinkFor(item.Item, item.Count, item.UnitPrice, item.PriceIncludesVat)
             )
             .ToList();
-        var graveLines = HalfYearBilling.Lines(links, period);
-        if (graveLines.Count == 0)
+        if (HalfYearBilling.Lines(links, period).Count == 0)
         {
             return new GraveGenerationResult(null, "NothingToBill");
         }
 
-        // Every recipient is billed the same lines — the grave's own, exactly as
-        // configured. The share is applied when the document is built, not by
-        // dividing the lines, and nothing here adjusts a price: a grave whose
-        // subtotals do not divide is refused when it is saved, and skipped here
-        // if it reaches generation anyway.
-        var problems = GraveShare.Problems(graveLines, recipients.Count);
+        // The block this half-year is bills the stored corrections of that
+        // block: the line of each correction's item and rate is raised to the
+        // price the user confirmed when saving the grave. A grave that needs
+        // none has no rows and is billed as configured. A run is refused before
+        // it starts when the stored rows no longer match the rule, so a split
+        // that still fails here means the grave cannot be corrected at all.
+        var example = HalfYearBilling.ExampleFor(grave.StartDate, grave.EndDate, year, half)!;
+        var stored = await _db
+            .GraveBillingCorrections.AsNoTracking()
+            .Where(c =>
+                c.GraveId == grave.Id
+                && c.Kind == example.Kind
+                && c.Year == example.Period.Year
+                && c.Half == example.Period.Half
+            )
+            .ToListAsync(ct);
+        var billedLines = GraveBillingCheck
+            .ApplyCorrections(
+                links,
+                HalfYearBilling.Bill(links, period),
+                stored.Select(c => (c.ItemId, c.VatRate, c.CorrectedPrice))
+            )
+            .Select(b => b.Line)
+            .ToList();
+
+        // Every recipient is billed the same lines. The share is applied when
+        // the document is built, not by dividing the lines.
+        var problems = GraveShare.Problems(billedLines, recipients.Count);
         if (problems.Count > 0)
         {
             return new GraveGenerationResult(null, "PricesDoNotDivide");
         }
-
-        var billedLines = graveLines;
 
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / recipients.Count;

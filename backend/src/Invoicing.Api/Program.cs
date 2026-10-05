@@ -44,6 +44,7 @@ builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<GraveInvoiceGenerator>();
 builder.Services.AddScoped<GraveInvoiceRevisionService>();
 builder.Services.AddScoped<GraveService>();
+builder.Services.AddScoped<GraveCorrectionCheck>();
 builder.Services.AddScoped<RecipientNumberService>();
 builder.Services.AddScoped<ImportValidator>();
 builder.Services.AddScoped<ImportService>();

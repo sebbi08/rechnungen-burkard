@@ -15,6 +15,7 @@ public class InvoiceActionsController : ODataController
     private readonly GraveInvoiceRevisionService _graveRevisions;
     private readonly JobService _jobs;
     private readonly AppDbContext _db;
+    private readonly GraveCorrectionCheck _corrections;
     private readonly ILogger<InvoiceActionsController> _logger;
 
     public InvoiceActionsController(
@@ -22,6 +23,7 @@ public class InvoiceActionsController : ODataController
         GraveInvoiceRevisionService graveRevisions,
         JobService jobs,
         AppDbContext db,
+        GraveCorrectionCheck corrections,
         ILogger<InvoiceActionsController> logger
     )
     {
@@ -29,6 +31,7 @@ public class InvoiceActionsController : ODataController
         _graveRevisions = graveRevisions;
         _jobs = jobs;
         _db = db;
+        _corrections = corrections;
         _logger = logger;
     }
 
@@ -255,6 +258,26 @@ public class InvoiceActionsController : ODataController
                 new
                 {
                     error = new { code = "InvalidHalfYear", message = "The half-year is invalid." },
+                }
+            );
+        }
+
+        var outdated = await _corrections.OutdatedGraveNumbersAsync(
+            request.Year,
+            request.Half,
+            HttpContext.RequestAborted
+        );
+        if (outdated.Count > 0)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "CorrectionsOutdated",
+                        message = "The rounding corrections of some graves have changed.",
+                        args = new[] { string.Join(", ", outdated) },
+                    },
                 }
             );
         }

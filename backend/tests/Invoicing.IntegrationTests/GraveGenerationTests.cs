@@ -193,7 +193,7 @@ public class GraveGenerationTests
     }
 
     [Fact]
-    public async Task A_grave_whose_prices_do_not_divide_is_skipped_rather_than_billed_wrong()
+    public async Task A_grave_whose_prices_do_not_divide_is_refused_until_its_corrections_are_saved()
     {
         using var host = new ApiTestHost();
         {
@@ -259,21 +259,20 @@ public class GraveGenerationTests
         }
 
         using var client = host.CreateClient();
-        var start = await client.PostAsync(
+        var response = await client.PostAsync(
             "/odata/GenerateGraveInvoices",
             ODataJson.Body(new { year = 2026, half = 2 })
         );
-        Assert.Equal(HttpStatusCode.Accepted, start.StatusCode);
-        using var startJson = await ODataJson.ReadAsync(start);
-        var job = await PollJobAsync(client, startJson.RootElement.GetProperty("Id").GetInt64());
-        Assert.Equal("Succeeded", job.GetProperty("Status").GetString());
 
         // 2 x 100.00 = 200.00 net at 7 %, or 20 000 cents, and 20 000 % 3 = 2:
-        // the three recipients cannot be billed the same amount. Nothing here
-        // adjusts the price to make it fit -- saving such a grave is refused in
-        // the first place, and one that reaches generation anyway (saved before
-        // the rule existed, say) is skipped rather than billed wrong.
-        Assert.Contains("PricesDoNotDivide", job.GetRawText());
+        // the three recipients cannot be billed the same amount. The grave is
+        // correctable, but nobody has saved a correction for it, so the run
+        // stops and names it rather than billing something nobody confirmed.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var error = json.RootElement.GetProperty("error");
+        Assert.Equal("CorrectionsOutdated", error.GetProperty("code").GetString());
+        Assert.Contains("G-1", error.GetProperty("args")[0].GetString());
 
         {
             using var scope = host.Services.CreateScope();

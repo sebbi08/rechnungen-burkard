@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -308,5 +309,163 @@ public class GraveTermGenerationTests
             during.RootElement.GetProperty("value").EnumerateArray(),
             g => g.GetProperty("Id").GetInt64() == graveId
         );
+    }
+
+    /// <summary>A grave starting 2026-03 with care at 60,00 all year and three
+    /// recipients, which needs a rounding correction. Stores the corrections the
+    /// rule computes, the first one raised by <paramref name="drift"/>.</summary>
+    private static async Task<long> SeedCorrectedAsync(
+        ApiTestHost host,
+        bool storeCorrections,
+        decimal drift = 0m
+    )
+    {
+        var graveId = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var others = new[] { "Bert", "Carla" }
+            .Select(name => new Recipient
+            {
+                Number = $"E-{Guid.NewGuid():N}",
+                Name = name,
+                Address = "Weg 2",
+            })
+            .ToList();
+        db.Recipients.AddRange(others);
+        await db.SaveChangesAsync();
+        db.GraveRecipients.AddRange(
+            others.Select(r => new GraveRecipient { GraveId = graveId, RecipientId = r.Id })
+        );
+        await db.SaveChangesAsync();
+
+        if (storeCorrections)
+        {
+            var grave = await db.Graves.SingleAsync(g => g.Id == graveId);
+            var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
+            var keys = GraveBillingCheck
+                .EvaluateWithCorrections(links, grave.StartDate, grave.EndDate, 3)
+                .CorrectionKeys;
+            Assert.NotEmpty(keys);
+            var first = true;
+            foreach (var key in keys)
+            {
+                db.GraveBillingCorrections.Add(
+                    new GraveBillingCorrection
+                    {
+                        GraveId = graveId,
+                        Kind = key.Kind,
+                        Year = key.Year,
+                        Half = key.Half,
+                        VatRate = key.VatRate,
+                        ItemId = key.ItemId,
+                        EnteredPrice = 0m,
+                        CorrectedPrice = key.CorrectedPrice + (first ? drift : 0m),
+                    }
+                );
+                first = false;
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        return graveId;
+    }
+
+    private static async Task<JsonElement> RefusedGenerationAsync(HttpClient client)
+    {
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("error").Clone();
+    }
+
+    private static async Task<string> GraveNumberAsync(ApiTestHost host, long graveId)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return (await db.Graves.SingleAsync(g => g.Id == graveId)).GraveNumber;
+    }
+
+    [Fact]
+    public async Task Generation_bills_the_stored_correction()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedCorrectedAsync(host, storeCorrections: true);
+
+        await GenerateAsync(client, 2026, 1);
+
+        var lines = await LinesAsync(host, graveId, 2026, 1);
+        Assert.Equal(3, lines.Length);
+        Assert.All(
+            lines,
+            l =>
+            {
+                Assert.Equal(40.02m, l.UnitPrice);
+                Assert.StartsWith("Pflege, anteilig 03–06/2026", l.Description);
+            }
+        );
+    }
+
+    [Fact]
+    public async Task Generation_stops_when_a_grave_has_no_stored_correction_it_needs()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedCorrectedAsync(host, storeCorrections: false);
+
+        var error = await RefusedGenerationAsync(client);
+
+        Assert.Equal("CorrectionsOutdated", error.GetProperty("code").GetString());
+        Assert.Contains(
+            await GraveNumberAsync(host, graveId),
+            error.GetProperty("args")[0].GetString()
+        );
+        Assert.Empty(await LinesAsync(host, graveId, 2026, 1));
+    }
+
+    [Fact]
+    public async Task Generation_stops_when_a_stored_correction_differs()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedCorrectedAsync(host, storeCorrections: true, drift: 0.01m);
+
+        var error = await RefusedGenerationAsync(client);
+
+        Assert.Equal("CorrectionsOutdated", error.GetProperty("code").GetString());
+        Assert.Contains(
+            await GraveNumberAsync(host, graveId),
+            error.GetProperty("args")[0].GetString()
+        );
+        Assert.Empty(await LinesAsync(host, graveId, 2026, 1));
+    }
+
+    [Fact]
+    public async Task The_status_counts_stored_corrections()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedCorrectedAsync(host, storeCorrections: true);
+        int stored;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            stored = await db.GraveBillingCorrections.CountAsync(c => c.GraveId == graveId);
+        }
+
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
+        );
+
+        var row = json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Single(g => g.GetProperty("Id").GetInt64() == graveId);
+        Assert.True(stored >= 1);
+        Assert.Equal(stored, row.GetProperty("CorrectionCount").GetInt32());
     }
 }

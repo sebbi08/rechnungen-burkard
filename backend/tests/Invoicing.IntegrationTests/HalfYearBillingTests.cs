@@ -262,4 +262,26 @@ public class HalfYearBillingTests
     {
         Assert.Throws<ArgumentException>(() => HalfYearBilling.Examples(M(2026, 5), M(2026, 4)));
     }
+
+    [Fact]
+    public void ExampleFor_names_the_block_of_a_concrete_half_year()
+    {
+        var start = HalfYearBilling.ExampleFor(M(2026, 5), M(2030, 8), 2026, 1)!;
+        Assert.Equal(BillingExampleKind.Start, start.Kind);
+        Assert.Equal(2026, start.Period.Year);
+
+        var full = HalfYearBilling.ExampleFor(M(2026, 5), M(2030, 8), 2027, 2)!;
+        Assert.Equal(BillingExampleKind.FullSecondHalf, full.Kind);
+        Assert.Null(full.Period.Year);
+
+        Assert.Equal(
+            BillingExampleKind.End,
+            HalfYearBilling.ExampleFor(M(2026, 5), M(2030, 8), 2030, 2)!.Kind
+        );
+        Assert.Null(HalfYearBilling.ExampleFor(M(2026, 5), M(2030, 8), 2025, 2));
+        Assert.Equal(
+            BillingExampleKind.StartAndEnd,
+            HalfYearBilling.ExampleFor(M(2026, 2), M(2026, 4), 2026, 1)!.Kind
+        );
+    }
 }

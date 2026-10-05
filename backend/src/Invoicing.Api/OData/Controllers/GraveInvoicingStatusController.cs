@@ -17,7 +17,8 @@ public class GraveInvoicingStatusController : ODataController
     /// <summary>The grave overview for one half-year: graves that still need an
     /// invoice for it come first (FR-028), each with the flag the list shows,
     /// plus how many invoices that half-year produced for the grave and how
-    /// many of them are paid (latest revisions only).</summary>
+    /// many of them are paid (latest revisions only), and how many rounding
+    /// corrections are stored for it.</summary>
     [HttpGet("GraveInvoicingStatus")]
     public async Task<IActionResult> Status([FromQuery] int year, [FromQuery] int half)
     {
@@ -45,6 +46,11 @@ public class GraveInvoicingStatusController : ODataController
                 PaidCount = g.Count(i => i.PaidOn != null),
             })
             .ToDictionaryAsync(row => row.GraveId);
+
+        var corrections = await _db
+            .GraveBillingCorrections.GroupBy(c => c.GraveId)
+            .Select(g => new { GraveId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(row => row.GraveId, row => row.Count);
 
         var graves = await _db
             .Graves
@@ -89,6 +95,7 @@ public class GraveInvoicingStatusController : ODataController
                 Invoiced = invoicedIds.Contains(g.Id),
                 InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
                 PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
+                CorrectionCount = corrections.GetValueOrDefault(g.Id),
             });
 
         return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);

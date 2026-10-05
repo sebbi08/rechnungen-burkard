@@ -256,6 +256,29 @@ public static class HalfYearBilling
             )
         );
 
+    /// <summary>Which block of the term a concrete half-year is: the start, the
+    /// end, both, or a full half. Null when the half-year is outside the term.</summary>
+    public static BillingExample? ExampleFor(DateOnly start, DateOnly? end, int year, int half)
+    {
+        if (PeriodIn(start, end, year, half) is not { } period)
+        {
+            return null;
+        }
+
+        var isStart = HalfOf(start) == (year, half);
+        var isEnd = end is { } until && HalfOf(until) == (year, half);
+        return (isStart, isEnd) switch
+        {
+            (true, true) => new BillingExample(BillingExampleKind.StartAndEnd, period),
+            (true, false) => new BillingExample(BillingExampleKind.Start, period),
+            (false, true) => new BillingExample(BillingExampleKind.End, period),
+            _ => new BillingExample(
+                half == 1 ? BillingExampleKind.FullFirstHalf : BillingExampleKind.FullSecondHalf,
+                BillingPeriod.Full(half)
+            ),
+        };
+    }
+
     private static (int Year, int Half) HalfOf(DateOnly month) =>
         (month.Year, month.Month <= 6 ? 1 : 2);
 
