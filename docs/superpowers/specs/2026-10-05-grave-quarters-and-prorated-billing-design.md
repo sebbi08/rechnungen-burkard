@@ -268,14 +268,15 @@ prorated price as invoiced.
   which is also unreleased.
 - A grave with more than four recipient links is refused with
   `TooManyRecipients`.
-- The import's price check runs the same example check as `SaveGrave`. Each
-  failing invoice and rate is reported with the existing
-  `importProblemPricesDoNotDivide0` text, prefixed by the invoice's label
-  ("Anfang H1 2026: MwSt. 19 %: …"). The figure variants `…1` and `…2` are
-  dropped: they suggested amounts for one invoice that may break another. In
-  their place each line suggestion becomes its own problem,
-  `importProblemPriceSuggestion` — "Leistung {0}: Möglich wären {1} oder {2}."
-  (or "Möglich wäre {1}." with one).
+- The import's price check runs the same example check as `SaveGrave` and, like
+  it, reports the first failing invoice of a grave: one problem per failing rate
+  on the grave's row, key `PricesDoNotDivideIn` with the invoice's label first
+  ("Anfang H1 2026: MwSt. 19 %: 120,01 lässt sich nicht gleichmäßig auf 2
+  Empfänger aufteilen. Bitte einen Preis mit diesem Satz anpassen."). The figure
+  variants `PricesDoNotDivide0/1/2` go: they suggested amounts for one invoice
+  that may break another. In their place each line suggestion becomes its own
+  problem on the grave's row, key `PriceSuggestion1`/`PriceSuggestion2` —
+  "Leistung {0}: Möglich wäre {1}." / "Leistung {0}: Möglich wären {1} oder {2}."
 - There is no data export; the downloadable empty template carries the new
   header.
 
