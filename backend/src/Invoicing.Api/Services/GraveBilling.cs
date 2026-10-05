@@ -44,8 +44,12 @@ public static class GraveBilling
         CancellationToken ct = default
     )
     {
+        // ordered by link id: the correction rule picks its target line by link
+        // order, and the save and the generator both see the links in id order,
+        // so the precheck must too or it could name another line than was stored
         var rows = await db
-            .GraveItems.Select(l => new
+            .GraveItems.OrderBy(l => l.Id)
+            .Select(l => new
             {
                 l.GraveId,
                 l.Item,

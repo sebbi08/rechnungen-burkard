@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -317,10 +318,12 @@ public class GraveTermGenerationTests
     private static async Task<long> SeedCorrectedAsync(
         ApiTestHost host,
         bool storeCorrections,
-        decimal drift = 0m
+        decimal drift = 0m,
+        DateOnly? end = null,
+        decimal price = 60m
     )
     {
-        var graveId = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
+        var graveId = await SeedAsync(host, new DateOnly(2026, 3, 1), end, ("Pflege", null, price));
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var others = new[] { "Bert", "Carla" }
@@ -449,23 +452,101 @@ public class GraveTermGenerationTests
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        var graveId = await SeedCorrectedAsync(host, storeCorrections: true);
-        int stored;
+        var two = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
+        var one = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            stored = await db.GraveBillingCorrections.CountAsync(c => c.GraveId == graveId);
+            foreach (var (graveId, count) in new[] { (two, 2), (one, 1) })
+            {
+                var itemId = (await db.GraveItems.FirstAsync(i => i.GraveId == graveId)).ItemId;
+                for (var n = 0; n < count; n++)
+                {
+                    db.GraveBillingCorrections.Add(
+                        new GraveBillingCorrection
+                        {
+                            GraveId = graveId,
+                            Kind =
+                                n == 0
+                                    ? BillingExampleKind.Start
+                                    : BillingExampleKind.FullSecondHalf,
+                            Year = n == 0 ? 2026 : null,
+                            Half = n == 0 ? 1 : 2,
+                            VatRate = 19m,
+                            ItemId = itemId,
+                            EnteredPrice = 40m,
+                            CorrectedPrice = 40.02m,
+                        }
+                    );
+                }
+            }
+
+            await db.SaveChangesAsync();
         }
 
         using var json = await ODataJson.ReadAsync(
             await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
         );
 
-        var row = json
-            .RootElement.GetProperty("value")
-            .EnumerateArray()
-            .Single(g => g.GetProperty("Id").GetInt64() == graveId);
-        Assert.True(stored >= 1);
-        Assert.Equal(stored, row.GetProperty("CorrectionCount").GetInt32());
+        var rows = json.RootElement.GetProperty("value").EnumerateArray().ToList();
+        int CountOf(long id) =>
+            rows.Single(g => g.GetProperty("Id").GetInt64() == id)
+                .GetProperty("CorrectionCount")
+                .GetInt32();
+        Assert.Equal(2, CountOf(two));
+        Assert.Equal(1, CountOf(one));
+    }
+
+    [Fact]
+    public async Task Generation_bills_each_block_its_own_correction()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var end = new DateOnly(2028, 8, 1);
+        var graveId = await SeedCorrectedAsync(
+            host,
+            storeCorrections: true,
+            end: end,
+            price: 30.04m
+        );
+
+        List<CorrectionKey> keys;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
+            keys = GraveBillingCheck
+                .EvaluateWithCorrections(links, new DateOnly(2026, 3, 1), end, 3)
+                .CorrectionKeys.ToList();
+        }
+
+        decimal PriceOf(BillingExampleKind kind) => keys.Single(k => k.Kind == kind).CorrectedPrice;
+
+        // the blocks need different corrections, so a block taking another
+        // block's row would bill a visibly different price
+        var distinct = new[]
+        {
+            PriceOf(BillingExampleKind.Start),
+            PriceOf(BillingExampleKind.FullSecondHalf),
+            PriceOf(BillingExampleKind.End),
+        };
+        Assert.Equal(3, distinct.Distinct().Count());
+
+        await GenerateAsync(client, 2026, 1);
+        await GenerateAsync(client, 2027, 2);
+        await GenerateAsync(client, 2028, 2);
+
+        Assert.All(
+            await LinesAsync(host, graveId, 2026, 1),
+            l => Assert.Equal(distinct[0], l.UnitPrice)
+        );
+        Assert.All(
+            await LinesAsync(host, graveId, 2027, 2),
+            l => Assert.Equal(distinct[1], l.UnitPrice)
+        );
+        Assert.All(
+            await LinesAsync(host, graveId, 2028, 2),
+            l => Assert.Equal(distinct[2], l.UnitPrice)
+        );
     }
 }
