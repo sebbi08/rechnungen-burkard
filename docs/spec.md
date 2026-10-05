@@ -785,8 +785,9 @@ non-interactive until completion, and the task runs exactly once.
   per recipient, with zero duplicates across a batch of 50 or more graves.
 - **SC-004**: For graves with multiple recipients, every recipient is billed an
   identical amount, and their shares sum exactly to the net sum printed on the
-  invoice. A grave whose prices cannot be split that way cannot be saved: the
-  prices are never adjusted on the user's behalf.
+  invoice. Prices that do not split that way are corrected
+  (one price per block and VAT rate, by at most 1,00 €, confirmed on saving);
+  a grave no correction can fix cannot be saved.
 - **SC-005**: A user can locate a specific grave by number or recipient name within
   30 seconds.
 - **SC-006**: A bulk download of N normal grave invoices for a half-year yields
@@ -827,9 +828,10 @@ non-interactive until completion, and the task runs exactly once.
 - A grave's term is counted in whole months, and a half-year can be invoiced only
   when at least one of its months lies inside the term.
 - The "current half-year" is derived from the current date.
-- A grave's prices are chosen so that its net subtotals divide evenly among its
-  recipients; a grave that does not come out even cannot be saved, and nothing
-  adjusts a price on the user's behalf.
+- A grave's net subtotals must divide evenly among its recipients; where they
+  do not, one price per invoice block and VAT rate is raised by at most 1,00 €
+  and the user confirms this on saving. Only a block that no line can fix within
+  1,00 € is refused.
 - For grave invoices generated before recipients were billed the grave's own
   lines directly, each line's stored price is one recipient's share; where the
   pre-split price is missing, it is reconstructed from the recipients' shares
