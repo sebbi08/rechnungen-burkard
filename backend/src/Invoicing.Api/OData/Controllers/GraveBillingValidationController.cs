@@ -164,10 +164,10 @@ public class GraveBillingValidationController : ODataController
     }
 
     /// <summary>Every invoice the grave's term will produce, as the editor shows
-    /// them while the grave is being typed: the lines each bills, whether it
-    /// divides, and per line the prices that would make all of them divide.
-    /// The same rule refuses the save, so the preview cannot promise what the
-    /// save then rejects.</summary>
+    /// them while the grave is being typed: the lines each bills, the rounding
+    /// corrections that make a block divide, and whether anything is left
+    /// beyond their reach. The same rule decides the save, so the preview
+    /// cannot promise what the save then rejects.</summary>
     [HttpPost("PreviewGraveBilling")]
     public async Task<IActionResult> Preview([FromBody] PreviewGraveBillingRequest? request)
     {
@@ -235,7 +235,12 @@ public class GraveBillingValidationController : ODataController
                 GraveBilling.LinkFor(items![l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
             )
             .ToList();
-        var evaluation = GraveBillingCheck.Evaluate(links, start, end, request.Recipients);
+        var evaluation = GraveBillingCheck.EvaluateWithCorrections(
+            links,
+            start,
+            end,
+            request.Recipients
+        );
 
         return new JsonResult(
             new
@@ -266,9 +271,24 @@ public class GraveBillingValidationController : ODataController
                                     p.VatRate,
                                     Kind = p.Kind.ToString(),
                                     Amount = p.Amount / 100m,
-                                    // the per-line suggestions replace these: a
-                                    // figure for one invoice may break another
+                                    // a block that does not divide is corrected,
+                                    // so only a rate beyond the correction's reach
+                                    // is left, and no figure fixes that
                                     Suggestions = Array.Empty<decimal>(),
+                                })
+                                .ToList(),
+                            Corrections = invoice
+                                .Corrections.Select(c => new
+                                {
+                                    Kind = invoice.Example.Kind.ToString(),
+                                    invoice.Example.Period.Year,
+                                    invoice.Example.Period.Half,
+                                    LineIndex = c.LinkIndex,
+                                    c.VatRate,
+                                    c.ItemId,
+                                    c.ItemNumber,
+                                    c.EnteredPrice,
+                                    c.CorrectedPrice,
                                 })
                                 .ToList(),
                             Lines = invoice
@@ -281,16 +301,19 @@ public class GraveBillingValidationController : ODataController
                                     b.Line.VatRate,
                                     b.Line.PriceIncludesVat,
                                     b.Price,
+                                    EnteredPrice = invoice
+                                        .Corrections.FirstOrDefault(c => c.LinkIndex == b.LinkIndex)
+                                        ?.EnteredPrice
+                                        ?? b.Price,
+                                    Corrected = invoice.Corrections.Any(c =>
+                                        c.LinkIndex == b.LinkIndex
+                                    ),
                                     b.Line.UnitPrice,
                                     NetTotal = NetTotal(b.Line),
                                 })
                                 .ToList(),
                         };
                     })
-                    .ToList(),
-                LineSuggestions = evaluation
-                    .Suggestions.OrderBy(s => s.Key)
-                    .Select(s => new { LineIndex = s.Key, Suggestions = s.Value })
                     .ToList(),
             },
             ODataJsonDefaults.PascalCase

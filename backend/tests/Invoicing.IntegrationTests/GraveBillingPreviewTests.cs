@@ -107,7 +107,7 @@ public class GraveBillingPreviewTests
     }
 
     [Fact]
-    public async Task A_failing_invoice_puts_its_suggestion_on_the_line()
+    public async Task A_block_that_does_not_divide_comes_back_corrected()
     {
         using var host = new ApiTestHost();
         var (care, _) = await SeedAsync(host);
@@ -123,19 +123,31 @@ public class GraveBillingPreviewTests
             }
         );
 
-        Assert.False(body.GetProperty("Ok").GetBoolean());
-        var suggestion = Assert.Single(
-            body.GetProperty("LineSuggestions").EnumerateArray().ToArray()
-        );
-        Assert.Equal(0, suggestion.GetProperty("LineIndex").GetInt32());
-        Assert.Equal(
-            new[] { 60.00m, 60.06m },
-            suggestion.GetProperty("Suggestions").EnumerateArray().Select(v => v.GetDecimal())
-        );
+        Assert.True(body.GetProperty("Ok").GetBoolean());
+        Assert.False(body.TryGetProperty("LineSuggestions", out _));
+
         var full = body.GetProperty("Invoices")[1];
-        Assert.False(full.GetProperty("Ok").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, full.GetProperty("GrossTotal").ValueKind);
-        Assert.Empty(full.GetProperty("Problems")[0].GetProperty("Suggestions").EnumerateArray());
+        Assert.Equal("FullFirstHalf", full.GetProperty("Kind").GetString());
+        var correction = Assert.Single(full.GetProperty("Corrections").EnumerateArray().ToArray());
+        Assert.Equal("FullFirstHalf", correction.GetProperty("Kind").GetString());
+        Assert.Equal(JsonValueKind.Null, correction.GetProperty("Year").ValueKind);
+        Assert.Equal(1, correction.GetProperty("Half").GetInt32());
+        Assert.Equal(0, correction.GetProperty("LineIndex").GetInt32());
+        Assert.Equal(19m, correction.GetProperty("VatRate").GetDecimal());
+        Assert.Equal("100", correction.GetProperty("ItemNumber").GetString());
+        Assert.Equal(60.01m, correction.GetProperty("EnteredPrice").GetDecimal());
+        Assert.Equal(60.02m, correction.GetProperty("CorrectedPrice").GetDecimal());
+
+        var line = Assert.Single(full.GetProperty("Lines").EnumerateArray().ToArray());
+        Assert.Equal(60.02m, line.GetProperty("Price").GetDecimal());
+        Assert.Equal(60.01m, line.GetProperty("EnteredPrice").GetDecimal());
+        Assert.True(line.GetProperty("Corrected").GetBoolean());
+        Assert.NotEqual(JsonValueKind.Null, full.GetProperty("GrossTotal").ValueKind);
+
+        var start = body.GetProperty("Invoices")[0];
+        Assert.Equal(20.00m, start.GetProperty("NetTotal").GetDecimal());
+        Assert.Empty(start.GetProperty("Corrections").EnumerateArray());
+        Assert.False(start.GetProperty("Lines")[0].GetProperty("Corrected").GetBoolean());
     }
 
     [Theory]
