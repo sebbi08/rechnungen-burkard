@@ -734,4 +734,94 @@ public class GraveInvoiceRevisionTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId == graveId));
     }
+
+    [Fact]
+    public async Task A_revision_keeps_the_prorated_description()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (graveId, itemId) = await SeedProratedGraveAsync(host);
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
+        var invoiceId = await FirstInvoiceIdAsync(host, graveId);
+
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)21.00m,
+                        },
+                    },
+                }
+            )
+        );
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var line = await db
+            .Invoices.Where(i => i.GraveId == graveId && i.IsLatestRevision)
+            .SelectMany(i => i.Lines)
+            .SingleAsync();
+        Assert.Equal("Grabpflege, anteilig 05–06/2026 (2 von 6 Monaten)", line.Description);
+        Assert.Equal(21.00m, line.UnitPrice);
+    }
+
+    /// <summary>A grave starting 2026-05 with one recipient and one all-year item
+    /// at 60.00, so generation bills 2026 H1 prorated.</summary>
+    private static async Task<(long GraveId, long ItemId)> SeedProratedGraveAsync(ApiTestHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.VatRates.Add(new VatRate { Rate = 7m });
+        var item = new InvoiceItem
+        {
+            Number = "2010",
+            Description = "Grabpflege",
+            VatRate = 7m,
+            DefaultPrice = 60m,
+        };
+        var anna = new Recipient
+        {
+            Number = "E-0020",
+            Name = "Anna Beispiel",
+            Address = "A 1",
+        };
+        db.InvoiceItems.Add(item);
+        db.Recipients.Add(anna);
+        var grave = new Grave
+        {
+            GraveNumber = "G-310",
+            StartDate = new DateOnly(2026, 5, 1),
+            EndDate = new DateOnly(2040, 12, 31),
+            CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        db.Graves.Add(grave);
+        await db.SaveChangesAsync();
+        db.GraveItems.Add(
+            new GraveItem
+            {
+                GraveId = grave.Id,
+                ItemId = item.Id,
+                Count = 1,
+            }
+        );
+        db.GraveRecipients.Add(new GraveRecipient { GraveId = grave.Id, RecipientId = anna.Id });
+        await db.SaveChangesAsync();
+        return (grave.Id, item.Id);
+    }
+
+    private static async Task<long> FirstInvoiceIdAsync(ApiTestHost host, long graveId)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return (await db.Invoices.OrderBy(i => i.Id).FirstAsync(i => i.GraveId == graveId)).Id;
+    }
 }

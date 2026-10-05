@@ -39,7 +39,15 @@ public sealed class GraveInvoiceRevisionService
             );
         }
 
-        var graveLines = await BuildGraveLinesAsync(lineInputs, ct);
+        // the edited revision's descriptions carry what generation wrote, such
+        // as ", anteilig 05–06/2026 (2 von 6 Monaten)"; the item's own text
+        // would drop it on every edit
+        var previous = await _db
+            .InvoiceLines.AsNoTracking()
+            .Where(l => l.InvoiceId == edited.Id)
+            .OrderBy(l => l.LineNumber)
+            .ToListAsync(ct);
+        var graveLines = await BuildGraveLinesAsync(lineInputs, previous, ct);
 
         var siblings = await _db
             .Invoices.Where(i =>
@@ -184,6 +192,7 @@ public sealed class GraveInvoiceRevisionService
     /// and their line numbers stay put across a revision.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
         IReadOnlyList<InvoiceLineInput> inputs,
+        IReadOnlyList<InvoiceLine> previous,
         CancellationToken ct
     )
     {
@@ -197,6 +206,7 @@ public sealed class GraveInvoiceRevisionService
             .InvoiceItems.Where(i => itemIds.Contains(i.Id))
             .ToDictionaryAsync(i => i.Id, ct);
 
+        var unused = previous.ToList();
         var lines = new List<GraveLine>(inputs.Count);
         foreach (var input in inputs)
         {
@@ -221,11 +231,19 @@ public sealed class GraveInvoiceRevisionService
                     $"A price is required for item '{item.Number}'."
                 );
 
+            // matched by item in line order, each earlier line used once; a
+            // newly added item takes its own description
+            var earlier = unused.FirstOrDefault(l => l.ItemId == item.Id);
+            if (earlier is not null)
+            {
+                unused.Remove(earlier);
+            }
+
             lines.Add(
                 new GraveLine(
                     item.Id,
                     item.Number,
-                    item.Description,
+                    earlier?.Description ?? item.Description,
                     input.Count,
                     // the dialog sends the grave's price as it shows it, which
                     // for a VAT-included line is the gross; a line is billed net
