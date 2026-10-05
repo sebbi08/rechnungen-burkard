@@ -173,7 +173,7 @@ async function startNewGrave(
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
   await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
   if (end) {
-    await fillDate(page, editor.getByLabel("Ende"), end);
+    await fillDate(page, editor.getByLabel("Ende", { exact: true }), end);
   }
   return editor;
 }
@@ -253,7 +253,7 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await waitForOverlayOpen(page);
   await expect(editor.getByLabel("Grabnummer")).toHaveValue(graveNumber);
   await expect(editor.getByLabel("Beginn")).toHaveValue("01/2026");
-  await expect(editor.getByLabel("Ende")).toHaveValue("12/2040");
+  await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("12/2040");
   await expect(editor.getByLabel("Feld-Nr.")).toHaveValue("27");
   await expect(editor.getByRole("spinbutton", { name: "Anzahl 1" })).toHaveValue("2");
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("55,00");
@@ -783,23 +783,83 @@ test("a grave whose prices do not divide is refused until a price is changed", a
     await addRecipient(page, editor, name);
   }
 
+  // the preview says so before anything is saved: the full half-years cannot
+  // be split, and the line offers the nearest prices that can
+  const failing = editor.getByRole("group", { name: "Volles H1" });
+  await expect(failing).toContainText("Geht nicht auf");
+  await expect(failing).toContainText("47,80");
+  // formatAmount writes "47,79 €"
+  const fix = editor.getByRole("button", { name: "Preis 47,79 € für Zeile 1 übernehmen" });
+  await expect(fix).toBeVisible();
+
+  // saving anyway is refused and lands on the failing invoice
   await editor.getByRole("button", { name: "Speichern" }).click();
+  await expect(toasts(page)).toContainText("nicht gleichmäßig");
+  await expect(editor.locator("[data-billing-invalid]").first()).toBeFocused();
 
-  // refused, naming the rate and the nearest subtotals that would divide
-  const refusal = dialog(page, "Preise gehen nicht auf");
-  await expect(refusal).toContainText("47,80");
-  await expect(refusal).toContainText("47,79");
-  await expect(refusal).toContainText("47,82");
-  await refusal.getByRole("button", { name: "OK" }).click();
-  await expect(refusal).toHaveCount(0);
-
-  // the editor is still open with the draft intact, so the price can be fixed
-  await expect(editor.getByLabel("Grabnummer")).toHaveValue(marker);
-  await fillNumber(editor.getByRole("spinbutton", { name: "Preis 1" }), "47,79");
+  await fix.click();
+  await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("47,79");
+  await expect(editor.getByRole("group", { name: "Volles H1" })).toContainText("Geht auf");
   await saveEditor(editor);
 
   await expect(editor).toHaveCount(0);
   await expect(page.getByRole("table")).toContainText(marker);
+});
+
+test("the grave editor previews a prorated start and a seasonal item", async ({ page }) => {
+  const marker = `GQ-${Date.now()}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-pflege`,
+    Description: "Grabpflege",
+    VatRate: 19,
+    DefaultPrice: 60,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-sommer`,
+    Description: "Sommerbepflanzung",
+    VatRate: 19,
+    DefaultPrice: 40,
+    Quarter: "Summer",
+  });
+
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  await fillDate(page, editor.getByLabel("Beginn"), "05/2026");
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 1, `${marker}-pflege`);
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 2, `${marker}-sommer`);
+
+  // rate and quarter under the item
+  await expect(editor).toContainText("Sommerbepflanzung · 19 % · Sommer");
+
+  const start = editor.getByRole("group", { name: "Anfang · H1 2026" });
+  await expect(start).toContainText("2 von 6 Monaten");
+  await expect(start).toContainText("anteilig 05–06/2026");
+  await expect(start).toContainText("20,00");
+  await expect(start).toContainText("Sommerbepflanzung");
+  await expect(editor.getByRole("group", { name: "Volles H2" })).not.toContainText(
+    "Sommerbepflanzung",
+  );
+  await expect(editor).toContainText("Noch kein Empfänger");
+});
+
+test("a new grave takes at most four recipients", async ({ page }) => {
+  const marker = `GC-${Date.now()}`;
+  const names = [1, 2, 3, 4, 5].map((n) => `Empf${n} ${marker}`);
+  for (const name of names) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  for (const name of names.slice(0, 4)) {
+    await addRecipient(page, editor, name);
+  }
+
+  await expect(editor.getByRole("button", { name: "Hinzufügen", exact: true })).toHaveCount(0);
+  await expect(editor).toContainText("Ein Grab hat höchstens 4 Empfänger.");
 });
 
 test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {
@@ -927,7 +987,7 @@ test("a grave can be saved without an end", async ({ page }) => {
     .getByRole("button", { name: "Bearbeiten" })
     .click();
   await waitForOverlayOpen(page);
-  await expect(editor.getByLabel("Ende")).toHaveValue("");
+  await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("");
   await editor.getByRole("button", { name: "Abbrechen" }).click();
   await expect(editor).toHaveCount(0);
 });

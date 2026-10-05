@@ -132,11 +132,69 @@ test("items: the edit dialog lists the graves billing the item under their price
   const itemDialog = dialog(page, "Leistung bearbeiten");
   await expect(itemDialog).toContainText("Standardpreis 100,00 €");
   await expect(itemDialog.getByRole("link", { name: graveNumber })).toBeVisible();
-  await expect(itemDialog).toContainText("Der MwSt.-Satz ist festgelegt");
+  await expect(itemDialog).toContainText("MwSt.-Satz und Quartal sind festgelegt");
 
   // the grave's number leads to the grave
   await itemDialog.getByRole("link", { name: graveNumber }).click();
   await expect(page.getByRole("heading", { level: 1, name: graveNumber })).toBeVisible();
+});
+
+test("items: the quarter is chosen in the dialog and fixed while a grave bills the item", async ({
+  page,
+}) => {
+  const ts = Date.now();
+  const number = `E2E-Q-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await page.goto("/items");
+
+  await page.getByRole("button", { name: "Leistung anlegen" }).click();
+  await waitForOverlayOpen(page);
+  const createDialog = dialog(page, "Leistung anlegen");
+  await createDialog.getByLabel("Nummer").fill(number);
+  await createDialog.getByLabel("Bezeichnung").fill("Herbstbepflanzung");
+  await pickOption(page, createDialog.locator("#itemVatRate"), "7 %");
+  await pickOption(page, createDialog.locator("#itemQuarter"), "Herbst");
+  await createDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(createDialog).toHaveCount(0);
+
+  const row = page.getByRole("row").filter({ hasText: number });
+  await row.getByRole("button", { name: "Bearbeiten" }).click();
+  await waitForOverlayOpen(page);
+  const editDialog = dialog(page, "Leistung bearbeiten");
+  await expect(editDialog.locator("#itemQuarter")).toContainText("Herbst");
+  // nothing bills the item yet
+  await expect(editDialog.locator("#itemQuarter")).not.toHaveAttribute("aria-disabled", "true");
+  await editDialog.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(editDialog).toHaveCount(0);
+
+  // a grave that bills an item fixes its quarter
+  const itemRow = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${number}-used`,
+    Description: `Verwendet ${ts}`,
+    VatRate: 7,
+    DefaultPrice: 10,
+    Quarter: "Winter",
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Quartal ${ts}`,
+    Address: "Musterweg 1",
+  });
+  await seedGrave(page, {
+    graveNumber: `E2E-Q-G-${ts}`,
+    items: [{ itemId: itemRow.Id, count: 1, unitPrice: null }],
+    recipientIds: [recipient.Id],
+  });
+
+  await page.reload();
+  await page
+    .getByRole("row")
+    .filter({ hasText: `${number}-used` })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForOverlayOpen(page);
+  const usedDialog = dialog(page, "Leistung bearbeiten");
+  await expect(usedDialog.locator("#itemQuarter")).toContainText("Winter");
+  await expect(usedDialog.locator("#itemQuarter")).toHaveAttribute("aria-disabled", "true");
 });
 
 test("recipients: create and search a recipient (Story 3)", async ({ page }) => {

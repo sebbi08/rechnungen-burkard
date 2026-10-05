@@ -365,6 +365,8 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   await editor.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   const added = editor.getByRole("listitem").filter({ hasText: RECIPIENT_NAME });
   await expect(added).toBeVisible();
+  // the billing preview's cards are on screen when sideways scrolling is checked
+  await expect(editor.getByRole("group", { name: "Volles H1" })).toBeVisible();
 
   await expectFieldsGetTheWidth(page);
   await expectNoSidewaysScrolling(page);
