@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
@@ -62,12 +63,20 @@ public class GraveInvoicingStatusController : ODataController
             })
             .ToListAsync();
 
-        // a grave whose term does not reach this half-year is not due; one that
-        // was invoiced for it anyway (before the term counted) stays listed
+        var links = await GraveBilling.LinksByGraveAsync(_db);
+
+        // a grave is due when its term reaches this half-year and its links bill
+        // something in it; one that was invoiced for it anyway stays listed
         var value = graves
             .Where(g =>
                 invoicedIds.Contains(g.Id)
-                || HalfYearBilling.PeriodIn(g.StartDate, g.EndDate, year, half) is not null
+                || GraveBilling.IsDue(
+                    g.StartDate,
+                    g.EndDate,
+                    links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
+                    year,
+                    half
+                )
             )
             .Select(g => new
             {

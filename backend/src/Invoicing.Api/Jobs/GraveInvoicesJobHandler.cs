@@ -37,13 +37,20 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
 
         var graves = await db.Graves.OrderBy(g => g.GraveNumber).ToListAsync(ct);
 
-        // a grave outside its term for this half-year has nothing to be billed
-        // for; it is not "skipped", it is simply not due
+        var links = await GraveBilling.LinksByGraveAsync(db, ct);
+
+        // a grave outside its term for this half-year, or with nothing to bill
+        // in it, is not "skipped", it is simply not due
         var todo = graves
             .Where(g =>
                 !invoiced.Contains(g.Id)
-                && HalfYearBilling.PeriodIn(g.StartDate, g.EndDate, payload.Year, payload.Half)
-                    is not null
+                && GraveBilling.IsDue(
+                    g.StartDate,
+                    g.EndDate,
+                    links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
+                    payload.Year,
+                    payload.Half
+                )
             )
             .ToList();
         var skipped = new List<GraveSkip>();

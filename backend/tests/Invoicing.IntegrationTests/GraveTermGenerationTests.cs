@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -185,11 +186,11 @@ public class GraveTermGenerationTests
     }
 
     [Fact]
-    public async Task A_half_year_with_nothing_to_bill_is_skipped()
+    public async Task A_half_year_with_nothing_to_bill_is_not_due_and_so_not_skipped()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
-        await SeedAsync(
+        var graveId = await SeedAsync(
             host,
             new DateOnly(2026, 1, 1),
             null,
@@ -198,8 +199,91 @@ public class GraveTermGenerationTests
 
         var result = await GenerateAsync(client, 2026, 1);
 
-        var skip = Assert.Single(result.GetProperty("SkippedGraves").EnumerateArray().ToArray());
-        Assert.Equal("NothingToBill", skip.GetProperty("Reason").GetString());
+        Assert.Empty(await LinesAsync(host, graveId, 2026, 1));
+        Assert.Equal(0, result.GetProperty("InvoicedGraves").GetInt32());
+        Assert.Empty(result.GetProperty("SkippedGraves").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Generation_bills_a_prorated_gross_line_as_a_gross()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedAsync(host, new DateOnly(2026, 5, 1), null, ("Pflege", null, 119m));
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            foreach (var link in db.GraveItems.Where(l => l.GraveId == graveId))
+            {
+                link.PriceIncludesVat = true;
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        await GenerateAsync(client, 2026, 1);
+
+        var line = Assert.Single(await LinesAsync(host, graveId, 2026, 1));
+        Assert.Equal("Pflege, anteilig 05–06/2026 (2 von 6 Monaten)", line.Description);
+        Assert.True(line.PriceIncludesVat);
+        Assert.Equal(VatInclusivePrice.NetOf(39.67m, 19m, true), line.UnitPrice);
+    }
+
+    private static async Task<long[]> StatusIdsAsync(HttpClient client, int year, int half)
+    {
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/GraveInvoicingStatus?year={year}&half={half}")
+        );
+        return json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(g => g.GetProperty("Id").GetInt64())
+            .ToArray();
+    }
+
+    [Fact]
+    public async Task The_status_leaves_out_graves_with_nothing_to_bill_in_the_half_year()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedAsync(
+            host,
+            new DateOnly(2026, 1, 1),
+            null,
+            ("Herbst", BillingQuarter.Autumn, 30m)
+        );
+
+        Assert.DoesNotContain(graveId, await StatusIdsAsync(client, 2026, 1));
+        Assert.Contains(graveId, await StatusIdsAsync(client, 2026, 2));
+    }
+
+    [Fact]
+    public async Task The_status_keeps_a_grave_invoiced_for_a_half_year_it_would_not_be_due_in()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var graveId = await SeedAsync(
+            host,
+            new DateOnly(2026, 1, 1),
+            null,
+            ("Herbst", BillingQuarter.Autumn, 30m)
+        );
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.GraveInvoiceRuns.Add(
+                new GraveInvoiceRun
+                {
+                    GraveId = graveId,
+                    Year = 2026,
+                    Half = 1,
+                    CreatedAt = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Contains(graveId, await StatusIdsAsync(client, 2026, 1));
     }
 
     [Fact]

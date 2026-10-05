@@ -1,5 +1,7 @@
+using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services;
 
@@ -34,6 +36,47 @@ public static class GraveBilling
             decimal.Round(unitPrice ?? item.DefaultPrice ?? 0m, 2, MidpointRounding.AwayFromZero),
             priceIncludesVat
         );
+
+    /// <summary>Every grave's item links as the half-year rule sees them, in
+    /// one query, keyed by grave id. A grave without items has no entry.</summary>
+    public static async Task<Dictionary<long, IReadOnlyList<BillableLink>>> LinksByGraveAsync(
+        AppDbContext db,
+        CancellationToken ct = default
+    )
+    {
+        var rows = await db
+            .GraveItems.Select(l => new
+            {
+                l.GraveId,
+                l.Item,
+                l.Count,
+                l.UnitPrice,
+                l.PriceIncludesVat,
+            })
+            .ToListAsync(ct);
+        return rows.GroupBy(l => l.GraveId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                    (IReadOnlyList<BillableLink>)
+                        g.Select(l => LinkFor(l.Item, l.Count, l.UnitPrice, l.PriceIncludesVat))
+                            .ToList()
+            );
+    }
+
+    /// <summary>Whether a grave is due an invoice for a half-year: its term
+    /// reaches the half-year and its links bill at least one line in it. The
+    /// overview and the generation job both ask here, so a grave is never
+    /// listed as open that a run would then have nothing to bill for.</summary>
+    public static bool IsDue(
+        DateOnly start,
+        DateOnly? end,
+        IReadOnlyList<BillableLink> links,
+        int year,
+        int half
+    ) =>
+        HalfYearBilling.PeriodIn(start, end, year, half) is { } period
+        && HalfYearBilling.Lines(links, period).Count > 0;
 
     /// <summary>Whether a price is a whole number of cents. Prices are entered,
     /// stored and billed in cents; a third decimal would be judged rounded here

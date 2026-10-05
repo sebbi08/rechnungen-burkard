@@ -92,6 +92,13 @@ public class GraveGenerationTests
                 GraveId = g1.Id,
                 ItemId = item.Id,
                 Count = 1,
+            },
+            // G-3 bills something but has no recipient, so it is due and skipped
+            new GraveItem
+            {
+                GraveId = g0.Id,
+                ItemId = item.Id,
+                Count = 1,
             }
         );
         db.GraveRecipients.AddRange(
