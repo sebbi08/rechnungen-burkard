@@ -148,6 +148,16 @@ export interface SaveGraveInput {
   endDate: string | null;
   items: InvoiceLineInput[];
   recipientIds: number[];
+  /** The rounding corrections the user confirmed; the save refuses when they
+   *  differ from the ones it computes itself. */
+  corrections: {
+    kind: string;
+    year: number | null;
+    half: number;
+    vatRate: number;
+    itemId: number;
+    correctedPrice: number;
+  }[];
 }
 
 /** The grave and its complete item and recipient links, in one request. */
@@ -266,10 +276,27 @@ export interface BillingPreviewLine {
   Count: number;
   VatRate: number;
   PriceIncludesVat: boolean;
-  /** In the unit it was entered in: the gross on a VAT-included line. */
+  /** As billed, corrected; in the unit it was entered in: the gross on a
+   *  VAT-included line. */
   Price: number;
+  /** What was entered, before a correction. */
+  EnteredPrice: number;
+  Corrected: boolean;
   UnitPrice: number;
   NetTotal: number;
+}
+
+/** One line of an invoice block raised so the block splits evenly. */
+export interface BillingCorrection {
+  Kind: BillingExampleKind;
+  Year: number | null;
+  Half: 1 | 2;
+  LineIndex: number;
+  VatRate: number;
+  ItemId: number;
+  ItemNumber: string;
+  EnteredPrice: number;
+  CorrectedPrice: number;
 }
 
 export interface BillingPreviewInvoice {
@@ -285,13 +312,13 @@ export interface BillingPreviewInvoice {
   PerRecipient: number | null;
   Problems: GraveBillingProblem[];
   Lines: BillingPreviewLine[];
+  Corrections: BillingCorrection[];
 }
 
 export interface BillingPreview {
   Ok: boolean;
   Recipients: number;
   Invoices: BillingPreviewInvoice[];
-  LineSuggestions: { LineIndex: number; Suggestions: number[] }[];
 }
 
 export interface PreviewRequest {
@@ -304,7 +331,7 @@ export interface PreviewRequest {
 }
 
 /** Every invoice the grave's term will produce, checked like the save checks
- *  them, with per-line prices that would make all of them divide. */
+ *  them, with the rounding corrections that make them divide. */
 export function previewGraveBilling(input: PreviewRequest): Promise<BillingPreview> {
   return postJson<BillingPreview>("/odata/PreviewGraveBilling", {
     Recipients: input.recipients,

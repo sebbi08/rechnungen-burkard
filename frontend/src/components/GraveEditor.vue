@@ -9,16 +9,17 @@ import ProgressSpinner from "primevue/progressspinner";
 import Select from "primevue/select";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { fetchGraveDetails, type InvoiceLineInput, saveGrave } from "@/api/endpoints";
-import { ApiError } from "@/api/http";
+import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
+import { ApiError, toApiError } from "@/api/http";
 import { useItemsQuery, useRecipientsQuery } from "@/api/queries";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
-import { MAX_RECIPIENTS, previewLines } from "@/lib/billing";
+import { billingTitle, MAX_RECIPIENTS, previewLines } from "@/lib/billing";
 import { parseIsoDate, toIsoMonth } from "@/lib/format";
 import { GRAVE_POSITIONS, type GravePositionName } from "@/lib/gravePosition";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
+import CorrectionsDialog, { type CorrectionRow } from "./CorrectionsDialog.vue";
 import GraveBillingPreview from "./GraveBillingPreview.vue";
 import LineEditor from "./LineEditor.vue";
 import RecipientPicker from "./RecipientPicker.vue";
@@ -175,17 +176,10 @@ const previewInput = computed<PreviewInput | null>(() => {
   };
 });
 const billing = useGraveBillingPreview(previewInput);
-const suggestions = computed(() => {
-  const map = new Map<number, number[]>();
-  const keys = billing.answered.value?.keys ?? [];
-  for (const entry of billing.preview.value?.LineSuggestions ?? []) {
-    const key = keys[entry.LineIndex];
-    if (key != null) {
-      map.set(key, entry.Suggestions);
-    }
-  }
-  return map;
-});
+// What the confirmation dialog lists, and what a confirm saves.
+const correctionsVisible = ref(false);
+const correctionRows = ref<CorrectionRow[]>([]);
+const pendingCorrections = ref<BillingCorrection[]>([]);
 
 /** Moves focus to the first invoice that does not divide, once it is drawn. */
 async function focusFailingInvoice(): Promise<void> {
@@ -194,9 +188,8 @@ async function focusFailingInvoice(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  let inputs: InvoiceLineInput[];
   try {
-    inputs = toLineInputs(lines.value);
+    toLineInputs(lines.value);
   } catch (error) {
     showError(error);
     return;
@@ -207,6 +200,7 @@ async function save(): Promise<void> {
   }
   saving.value = true;
   try {
+    const corrections: BillingCorrection[] = [];
     if (previewInput.value) {
       const check = await billing.check();
       if (check && !check.Ok) {
@@ -214,25 +208,74 @@ async function save(): Promise<void> {
         await focusFailingInvoice();
         return;
       }
+      const rows: CorrectionRow[] = [];
+      for (const invoice of check?.Invoices ?? []) {
+        for (const correction of invoice.Corrections) {
+          const line = invoice.Lines.find((entry) => entry.LineIndex === correction.LineIndex);
+          rows.push({
+            invoice: billingTitle(invoice, t),
+            item: `${correction.ItemNumber} ${line?.Description ?? ""}`.trim(),
+            vatRate: correction.VatRate,
+            entered: correction.EnteredPrice,
+            corrected: correction.CorrectedPrice,
+          });
+          corrections.push(correction);
+        }
+      }
+      if (corrections.length > 0) {
+        // saved only once the user confirms what will be raised
+        correctionRows.value = rows;
+        pendingCorrections.value = corrections;
+        correctionsVisible.value = true;
+        return;
+      }
     }
-    await saveGrave({
-      graveId: props.graveId,
-      graveNumber: form.GraveNumber,
-      fieldNumber: form.FieldNumber,
-      siteName: form.SiteName,
-      position: form.Position,
-      startDate: toIsoMonth(form.StartDate),
-      endDate: toIsoMonth(form.EndDate),
-      items: inputs,
-      recipientIds: recipients.value.map((recipient) => recipient.id),
-    });
-    await queryClient.invalidateQueries();
-    visible.value = false;
+    await persist(corrections);
   } catch (error) {
     showError(error);
   } finally {
     saving.value = false;
   }
+}
+
+async function confirmCorrections(): Promise<void> {
+  saving.value = true;
+  try {
+    await persist(pendingCorrections.value);
+    correctionsVisible.value = false;
+  } catch (error) {
+    if (toApiError(error).code === "CorrectionsChanged") {
+      correctionsVisible.value = false;
+      await billing.check();
+    }
+    showError(error);
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function persist(corrections: BillingCorrection[]): Promise<void> {
+  await saveGrave({
+    graveId: props.graveId,
+    graveNumber: form.GraveNumber,
+    fieldNumber: form.FieldNumber,
+    siteName: form.SiteName,
+    position: form.Position,
+    startDate: toIsoMonth(form.StartDate),
+    endDate: toIsoMonth(form.EndDate),
+    items: toLineInputs(lines.value),
+    recipientIds: recipients.value.map((recipient) => recipient.id),
+    corrections: corrections.map((c) => ({
+      kind: c.Kind,
+      year: c.Year,
+      half: c.Half,
+      vatRate: c.VatRate,
+      itemId: c.ItemId,
+      correctedPrice: c.CorrectedPrice,
+    })),
+  });
+  await queryClient.invalidateQueries();
+  visible.value = false;
 }
 </script>
 
@@ -302,7 +345,7 @@ async function save(): Promise<void> {
 
       <section class="flex flex-col gap-2">
         <h3 class="m-0 text-base font-semibold">{{ t("graveItems") }}</h3>
-        <LineEditor v-model="lines" :suggestions="suggestions" />
+        <LineEditor v-model="lines" />
         <Message v-if="lacksAllYearItem" severity="warn" size="small">{{
           t("allYearItemRequired")
         }}</Message>
@@ -373,4 +416,9 @@ async function save(): Promise<void> {
       </div>
     </template>
   </Drawer>
+  <CorrectionsDialog
+    v-model:visible="correctionsVisible"
+    :rows="correctionRows"
+    @confirm="confirmCorrections"
+  />
 </template>

@@ -12,9 +12,6 @@ import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
 import { quarterLabelKey } from "@/lib/quarter";
 
-const props = withDefaults(defineProps<{ suggestions?: Map<number, number[]> }>(), {
-  suggestions: () => new Map(),
-});
 const lines = defineModel<DraftLine[]>({ required: true });
 
 const { t } = useI18n();
@@ -38,10 +35,6 @@ function caption(line: DraftLine): string {
     `${formatVatRate(picked.VatRate)} %`,
     t(quarterLabelKey(picked.Quarter)),
   ].join(" · ");
-}
-
-function suggestionsFor(line: DraftLine): number[] {
-  return props.suggestions.get(line.key) ?? [];
 }
 
 function defaultPriceText(line: DraftLine): string {
@@ -156,7 +149,6 @@ const totals = computed(() => {
           :min-fraction-digits="2"
           :max-fraction-digits="4"
           :placeholder="defaultPriceText(line)"
-          :invalid="suggestionsFor(line).length > 0"
           :aria-label="`${t('itemPrice')} ${index + 1}`"
           fluid
         />
@@ -175,22 +167,6 @@ const totals = computed(() => {
         :aria-label="t('deleteLine')"
         @click="removeLine(line.key)"
       />
-      <div
-        v-if="suggestionsFor(line).length > 0"
-        class="col-span-2 flex flex-wrap items-center gap-2 text-sm md:col-span-5"
-      >
-        <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-400" aria-hidden="true" />
-        <span>{{ t("lineSuggestion") }}</span>
-        <Button
-          v-for="price in suggestionsFor(line)"
-          :key="price"
-          :label="formatAmount(price)"
-          :aria-label="t('applySuggestedPrice', [formatAmount(price), index + 1])"
-          size="small"
-          outlined
-          @click="line.unitPrice = price"
-        />
-      </div>
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">

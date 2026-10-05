@@ -1,5 +1,6 @@
-import type { GraveBillingProblem, InvoiceLineInput } from "@/api/endpoints";
+import type { BillingPreviewInvoice, GraveBillingProblem, InvoiceLineInput } from "@/api/endpoints";
 import { formatAmount, formatVatRate, type Translate } from "./format";
+import { halfYearText } from "./halfYear";
 import type { DraftLine } from "./lines";
 
 /** Why a grave's prices do not split evenly across its recipients, per VAT
@@ -25,6 +26,16 @@ export function billingProblemText(
     return `${sentence} ${t("pricesAdjustAPrice")}`;
   });
   return [t("pricesDoNotDivideIntro"), "", ...lines].join("\n");
+}
+
+/** The heading of an invoice of the preview: its kind, with the half-year
+ *  where it belongs to one. */
+export function billingTitle(
+  invoice: Pick<BillingPreviewInvoice, "Kind" | "Year" | "Half">,
+  t: Translate,
+): string {
+  const key = `billingKind${invoice.Kind}`;
+  return invoice.Year == null ? t(key) : t(key, [halfYearText(invoice.Year, invoice.Half)]);
 }
 
 /** How many recipients a grave may split its bill across. */

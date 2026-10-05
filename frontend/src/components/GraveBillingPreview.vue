@@ -2,11 +2,10 @@
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
-import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { BillingPreview, BillingPreviewInvoice, GraveBillingProblem } from "@/api/endpoints";
+import { billingTitle } from "@/lib/billing";
 import { formatAmount, formatVatRate } from "@/lib/format";
-import { halfYearText } from "@/lib/halfYear";
 
 const props = defineProps<{
   preview: BillingPreview | null;
@@ -17,13 +16,8 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
-const suggested = computed(
-  () => new Set((props.preview?.LineSuggestions ?? []).map((entry) => entry.LineIndex)),
-);
-
 function title(invoice: BillingPreviewInvoice): string {
-  const key = `billingKind${invoice.Kind}`;
-  return invoice.Year == null ? t(key) : t(key, [halfYearText(invoice.Year, invoice.Half)]);
+  return billingTitle(invoice, t);
 }
 
 function problemText(problem: GraveBillingProblem): string {
@@ -33,11 +27,6 @@ function problemText(problem: GraveBillingProblem): string {
     formatAmount(problem.Amount),
     recipients,
   ]);
-}
-
-/** Without a suggestion on any of its lines, the card says what to do itself. */
-function needsAdvice(invoice: BillingPreviewInvoice): boolean {
-  return !invoice.Ok && !invoice.Lines.some((line) => suggested.value.has(line.LineIndex));
 }
 </script>
 
@@ -70,6 +59,7 @@ function needsAdvice(invoice: BillingPreviewInvoice): boolean {
         class="flex min-w-0 flex-col gap-2 rounded-lg border p-3"
         :class="invoice.Ok ? 'border-surface' : 'border-red-500'"
         :data-billing-invalid="invoice.Ok ? undefined : ''"
+        :data-billing-corrected="invoice.Ok && invoice.Corrections.length > 0 ? '' : undefined"
         :tabindex="invoice.Ok ? undefined : -1"
       >
         <header class="flex flex-wrap items-start justify-between gap-2">
@@ -79,11 +69,14 @@ function needsAdvice(invoice: BillingPreviewInvoice): boolean {
               {{ t("billingMonths", [invoice.Months]) }}
             </small>
           </div>
+          <Tag v-if="!invoice.Ok" :value="t('billingNotOk')" severity="danger" icon="pi pi-times" />
           <Tag
-            :value="invoice.Ok ? t('billingOk') : t('billingNotOk')"
-            :severity="invoice.Ok ? 'success' : 'danger'"
-            :icon="invoice.Ok ? 'pi pi-check' : 'pi pi-times'"
+            v-else-if="invoice.Corrections.length > 0"
+            :value="t('billingOkCorrected')"
+            severity="warn"
+            icon="pi pi-exclamation-circle"
           />
+          <Tag v-else :value="t('billingOk')" severity="success" icon="pi pi-check" />
         </header>
         <p v-if="invoice.Lines.length === 0" class="m-0 text-sm text-muted-color">
           {{ t("billingNothing") }}
@@ -95,11 +88,19 @@ function needsAdvice(invoice: BillingPreviewInvoice): boolean {
               <td class="py-0.5 pr-2 align-top break-words">
                 {{ line.Description }}
                 <span class="text-muted-color">· {{ formatVatRate(line.VatRate) }} %</span>
+                <small v-if="line.Corrected" class="block text-orange-700 dark:text-orange-300">
+                  {{ t("billingCorrectedNote", [formatAmount(line.EnteredPrice)]) }}
+                </small>
               </td>
               <td class="py-0.5 pr-2 text-right align-top tabular-nums whitespace-nowrap">
                 {{ line.Count }} ×
               </td>
-              <td class="py-0.5 text-right align-top tabular-nums whitespace-nowrap">
+              <td
+                class="py-0.5 text-right align-top tabular-nums whitespace-nowrap"
+                :class="
+                  line.Corrected ? 'text-orange-600 dark:text-orange-400 font-semibold' : undefined
+                "
+              >
                 {{ formatAmount(line.Price) }}
               </td>
             </tr>
@@ -127,7 +128,7 @@ function needsAdvice(invoice: BillingPreviewInvoice): boolean {
           <li v-for="problem in invoice.Problems" :key="problem.VatRate">
             {{ problemText(problem) }}
           </li>
-          <li v-if="needsAdvice(invoice)">{{ t("pricesAdjustAPrice") }}</li>
+          <li>{{ t("pricesAdjustAPrice") }}</li>
         </ul>
       </article>
     </div>
