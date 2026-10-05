@@ -18,6 +18,13 @@ import { useVatRatesQuery } from "@/api/queries";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatAmount, formatVatRate } from "@/lib/format";
+import {
+  QUARTERS,
+  type QuarterName,
+  quarterLabelKey,
+  toBillingQuarter,
+  toQuarterName,
+} from "@/lib/quarter";
 
 const props = defineProps<{ item: InvoiceItem | null }>();
 const visible = defineModel<boolean>("visible", { required: true });
@@ -35,10 +42,16 @@ const rateOptions = computed(() =>
   })),
 );
 
+const quarterOptions = computed(() => [
+  { value: null, label: t("quarterNone") },
+  ...QUARTERS.map((value) => ({ value, label: t(quarterLabelKey(value)) })),
+]);
+
 const form = reactive({
   Number: "",
   Description: "",
   VatRate: null as number | null,
+  Quarter: null as QuarterName | null,
   DefaultPrice: null as number | null,
 });
 
@@ -48,6 +61,7 @@ watch(visible, (open) => {
       Number: props.item?.Number ?? "",
       Description: props.item?.Description ?? "",
       VatRate: props.item?.VatRate ?? null,
+      Quarter: toQuarterName(props.item?.Quarter),
       // empty means "no default price"; 0 is a real price
       DefaultPrice: props.item?.DefaultPrice ?? null,
     });
@@ -87,6 +101,7 @@ async function save(): Promise<void> {
     Number: form.Number.trim(),
     Description: form.Description.trim(),
     VatRate: form.VatRate,
+    Quarter: toBillingQuarter(form.Quarter),
     DefaultPrice: form.DefaultPrice,
   };
   try {
@@ -129,6 +144,17 @@ async function save(): Promise<void> {
           v-model="form.VatRate"
           input-id="itemVatRate"
           :options="rateOptions"
+          option-value="value"
+          option-label="label"
+          :disabled="rateLocked"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="itemQuarter" class="font-medium">{{ t("itemQuarter") }}</label>
+        <Select
+          v-model="form.Quarter"
+          input-id="itemQuarter"
+          :options="quarterOptions"
           option-value="value"
           option-label="label"
           :disabled="rateLocked"

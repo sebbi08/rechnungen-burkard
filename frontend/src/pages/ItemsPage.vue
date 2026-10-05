@@ -14,6 +14,7 @@ import ItemDialog from "@/components/ItemDialog.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { useDebounced } from "@/composables/useDebounced";
 import { formatAmount, formatVatRate } from "@/lib/format";
+import { quarterLabelKey } from "@/lib/quarter";
 
 const { t } = useI18n();
 const search = ref("");
@@ -63,6 +64,13 @@ function open(item: InvoiceItem | null): void {
           body-class="hidden md:table-cell"
         >
           <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
+        </Column>
+        <Column
+          :header="t('itemQuarter')"
+          header-class="hidden md:table-cell"
+          body-class="hidden md:table-cell"
+        >
+          <template #body="{ data }">{{ t(quarterLabelKey(data.Quarter)) }}</template>
         </Column>
         <Column
           :header="t('itemDefaultPrice')"

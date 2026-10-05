@@ -7,10 +7,14 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { InvoiceItem } from "@/api/generated";
 import { useItemsQuery } from "@/api/queries";
-import { formatAmount } from "@/lib/format";
+import { formatAmount, formatVatRate } from "@/lib/format";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
+import { quarterLabelKey } from "@/lib/quarter";
 
+const props = withDefaults(defineProps<{ suggestions?: Map<number, number[]> }>(), {
+  suggestions: () => new Map(),
+});
 const lines = defineModel<DraftLine[]>({ required: true });
 
 const { t } = useI18n();
@@ -19,6 +23,25 @@ const byId = computed(() => new Map((items.data.value ?? []).map((item) => [item
 
 function item(line: DraftLine): InvoiceItem | undefined {
   return line.itemId == null ? undefined : byId.value.get(line.itemId);
+}
+
+/** The item's description, rate and quarter: what decides where and at which
+ *  rate the line is billed, without two more columns the drawer has no room
+ *  for on a tablet. */
+function caption(line: DraftLine): string {
+  const picked = item(line);
+  if (!picked) {
+    return "";
+  }
+  return [
+    picked.Description,
+    `${formatVatRate(picked.VatRate)} %`,
+    t(quarterLabelKey(picked.Quarter)),
+  ].join(" · ");
+}
+
+function suggestionsFor(line: DraftLine): number[] {
+  return props.suggestions.get(line.key) ?? [];
 }
 
 function defaultPriceText(line: DraftLine): string {
@@ -99,7 +122,7 @@ const totals = computed(() => {
             <span class="ml-2 text-muted-color">{{ option.Description }}</span>
           </template>
         </Select>
-        <small v-if="item(line)" class="px-1 text-muted-color">{{ item(line)?.Description }}</small>
+        <small v-if="item(line)" class="px-1 text-muted-color">{{ caption(line) }}</small>
       </div>
       <!-- The column headers are hidden on a phone, so each field carries its own
            visible caption there; the accessible name stays the numbered label. -->
@@ -133,6 +156,7 @@ const totals = computed(() => {
           :min-fraction-digits="2"
           :max-fraction-digits="4"
           :placeholder="defaultPriceText(line)"
+          :invalid="suggestionsFor(line).length > 0"
           :aria-label="`${t('itemPrice')} ${index + 1}`"
           fluid
         />
@@ -151,6 +175,22 @@ const totals = computed(() => {
         :aria-label="t('deleteLine')"
         @click="removeLine(line.key)"
       />
+      <div
+        v-if="suggestionsFor(line).length > 0"
+        class="col-span-2 flex flex-wrap items-center gap-2 text-sm md:col-span-5"
+      >
+        <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-400" aria-hidden="true" />
+        <span>{{ t("lineSuggestion") }}</span>
+        <Button
+          v-for="price in suggestionsFor(line)"
+          :key="price"
+          :label="formatAmount(price)"
+          :aria-label="t('applySuggestedPrice', [formatAmount(price), index + 1])"
+          size="small"
+          outlined
+          @click="line.unitPrice = price"
+        />
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center justify-between gap-3">
