@@ -427,6 +427,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
   const corrections = dialog(page, "Preise werden angepasst");
   await expect(corrections).toBeVisible();
   await expect(corrections).toContainText("47,82 €");
+  await waitForOverlayOpen(page);
   await expectNoSidewaysScrolling(page);
 
   await corrections.getByRole("button", { name: "Abbrechen" }).click();

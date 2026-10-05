@@ -798,6 +798,7 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
   await expect(confirm).toBeVisible();
   await expect(confirm).toContainText("47,80 €");
   await expect(confirm).toContainText("47,82 €");
+  await waitForOverlayOpen(page);
 
   // cancelling leaves the editor open and the grave unsaved
   await confirm.getByRole("button", { name: "Abbrechen" }).click();
@@ -806,11 +807,14 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
 
   await editor.getByRole("button", { name: "Speichern" }).click();
   await expect(confirm).toBeVisible();
+  await waitForOverlayOpen(page);
   await confirm.getByRole("button", { name: "Mit Anpassungen speichern" }).click();
   await expect(editor).toHaveCount(0);
 
   // the overview's switch keeps the graves with corrections
   await expect(page.getByRole("table")).toContainText(marker);
+  // both graves are listed before the switch is on, so the absence below is the filter's
+  await expect(page.getByRole("row").filter({ hasText: plainMarker })).toHaveCount(1);
   await page.getByLabel("Nur mit Rundungsanpassungen").check();
   const row = page.getByRole("row").filter({ hasText: marker });
   await expect(row).toHaveCount(1);
