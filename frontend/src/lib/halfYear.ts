@@ -46,3 +46,16 @@ export function parseHalfYearKey(key: string): [number, number] {
   const [year, half] = key.split("-").map(Number);
   return [year, half];
 }
+
+/** Whether a grave's term ("yyyy-MM…" strings, end optional) has a month in
+ *  the half-year. Strings of the same shape compare like their months. */
+export function halfYearInTerm(
+  start: string,
+  end: string | null,
+  year: number,
+  half: number,
+): boolean {
+  const first = `${year}-${half === 1 ? "01" : "07"}`;
+  const last = `${year}-${half === 1 ? "06" : "12"}`;
+  return start.slice(0, 7) <= last && (end == null || end.slice(0, 7) >= first);
+}

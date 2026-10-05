@@ -4,6 +4,7 @@
  * controllers.
  */
 import type { GravePositionName } from "@/lib/gravePosition";
+import type { QuarterName } from "@/lib/quarter";
 import { type InvoiceLine, type Job, JobStatus } from "./generated";
 import { ApiError, getBlob, getJson, postBlob, postJson, request } from "./http";
 import { odata } from "./odata";
@@ -166,6 +167,7 @@ export interface GraveItemLink {
     Description: string;
     VatRate: number;
     DefaultPrice: number | null;
+    Quarter: QuarterName | null;
   };
 }
 
@@ -245,6 +247,70 @@ export function checkGraveBilling(
   return postJson<GraveBillingCheck>("/odata/ValidateGraveBilling", {
     Recipients: recipients,
     Lines: lines.map((line) => ({
+      ItemId: line.itemId,
+      Count: line.count,
+      UnitPrice: line.unitPrice,
+      PriceIncludesVat: line.priceIncludesVat,
+    })),
+  });
+}
+
+export type BillingExampleKind =
+  "Start" | "StartAndEnd" | "FullFirstHalf" | "FullSecondHalf" | "End";
+
+export interface BillingPreviewLine {
+  LineIndex: number;
+  ItemNumber: string;
+  /** With ", anteilig …" where the invoice is prorated. */
+  Description: string;
+  Count: number;
+  VatRate: number;
+  PriceIncludesVat: boolean;
+  /** In the unit it was entered in: the gross on a VAT-included line. */
+  Price: number;
+  UnitPrice: number;
+  NetTotal: number;
+}
+
+export interface BillingPreviewInvoice {
+  Kind: BillingExampleKind;
+  /** Null for the generic full half-years. */
+  Year: number | null;
+  Half: 1 | 2;
+  Months: number;
+  Ok: boolean;
+  NetTotal: number;
+  /** What the recipients collect between them; null when it does not divide. */
+  GrossTotal: number | null;
+  PerRecipient: number | null;
+  Problems: GraveBillingProblem[];
+  Lines: BillingPreviewLine[];
+}
+
+export interface BillingPreview {
+  Ok: boolean;
+  Recipients: number;
+  Invoices: BillingPreviewInvoice[];
+  LineSuggestions: { LineIndex: number; Suggestions: number[] }[];
+}
+
+export interface PreviewRequest {
+  recipients: number;
+  /** "yyyy-MM" */
+  startMonth: string | null;
+  /** "yyyy-MM"; null for a grave without an end */
+  endMonth: string | null;
+  lines: InvoiceLineInput[];
+}
+
+/** Every invoice the grave's term will produce, checked like the save checks
+ *  them, with per-line prices that would make all of them divide. */
+export function previewGraveBilling(input: PreviewRequest): Promise<BillingPreview> {
+  return postJson<BillingPreview>("/odata/PreviewGraveBilling", {
+    Recipients: input.recipients,
+    StartMonth: input.startMonth,
+    EndMonth: input.endMonth,
+    Lines: input.lines.map((line) => ({
       ItemId: line.itemId,
       Count: line.count,
       UnitPrice: line.unitPrice,

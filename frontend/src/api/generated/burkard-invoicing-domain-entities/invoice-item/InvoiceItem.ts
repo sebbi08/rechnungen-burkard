@@ -1,3 +1,5 @@
+import type { BillingQuarter } from "../billing-quarter/BillingQuarter.js";
+
 export interface InvoiceItem {
   /**
    * **Key Property**: This is a key property used to identify the entity.<br/>**Immutable**: This property can be set when creating the entity, but not changed afterwards.
@@ -49,6 +51,15 @@ export interface InvoiceItem {
    * | Type | `Edm.Decimal` |
    */
   DefaultPrice: number | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `Quarter` |
+   * | Type | `Burkard.Invoicing.Domain.Entities.BillingQuarter` |
+   */
+  Quarter: BillingQuarter | null;
 }
 
 export type InvoiceItemId = number | { Id: number };
@@ -56,4 +67,4 @@ export type InvoiceItemId = number | { Id: number };
 export interface EditableInvoiceItem
   extends
     Pick<InvoiceItem, "Number" | "Description" | "VatRate">,
-    Partial<Pick<InvoiceItem, "Id" | "DefaultPrice">> {}
+    Partial<Pick<InvoiceItem, "Id" | "DefaultPrice" | "Quarter">> {}

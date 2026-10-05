@@ -1,3 +1,4 @@
+export * from "./billing-quarter/BillingQuarter.js";
 export * from "./document/Document.js";
 export * from "./document/DocumentService.js";
 export * from "./document/QDocument.js";
