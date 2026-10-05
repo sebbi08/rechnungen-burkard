@@ -67,8 +67,8 @@ function open(item: InvoiceItem | null): void {
         </Column>
         <Column
           :header="t('itemQuarter')"
-          header-class="hidden md:table-cell"
-          body-class="hidden md:table-cell"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell"
         >
           <template #body="{ data }">{{ t(quarterLabelKey(data.Quarter)) }}</template>
         </Column>
