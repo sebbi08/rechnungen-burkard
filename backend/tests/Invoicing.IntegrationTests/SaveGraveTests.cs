@@ -1163,6 +1163,47 @@ public class SaveGraveTests
         Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(response));
     }
 
+    // 100,25 gross at 19 % needs a correction even for one recipient, which the
+    // editor previews; without a recipient the save has nothing to evaluate and
+    // must say so instead of calling the corrections changed
+    [Fact]
+    public async Task A_new_grave_without_recipients_is_refused_for_that_not_for_its_corrections()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "K-2",
+                    fieldNumber = "1",
+                    siteName = "Schineller Bäcke",
+                    position = "SingleInside",
+                    startDate = "2026-03",
+                    endDate = "2028-10",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = item,
+                            count = 1,
+                            unitPrice = (decimal?)100.25m,
+                            priceIncludesVat = true,
+                        },
+                    },
+                    recipientIds = Array.Empty<long>(),
+                    corrections = new[] { Correction("Start", 2026, 1, item, 100.26m) },
+                }
+            )
+        );
+
+        Assert.Equal("NoRecipients", await ErrorCodeAsync(response));
+    }
+
     [Fact]
     public async Task Saving_with_an_unknown_correction_kind_is_refused()
     {

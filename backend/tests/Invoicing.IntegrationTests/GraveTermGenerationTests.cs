@@ -448,6 +448,36 @@ public class GraveTermGenerationTests
     }
 
     [Fact]
+    public async Task An_invoiced_grave_with_outdated_corrections_does_not_block_the_run()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var invoiced = await SeedCorrectedAsync(host, storeCorrections: false);
+        await SeedCorrectedAsync(host, storeCorrections: true);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.GraveInvoiceRuns.Add(
+                new GraveInvoiceRun
+                {
+                    GraveId = invoiced,
+                    Year = 2026,
+                    Half = 1,
+                    CreatedAt = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
     public async Task The_status_counts_stored_corrections()
     {
         using var host = new ApiTestHost();

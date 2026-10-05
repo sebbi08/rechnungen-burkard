@@ -55,27 +55,8 @@ public sealed class GraveService
         await ValidateFieldsAsync(graveId, fields, ct);
         var evaluation = await ValidateAsync(items, recipientIds, fields, ct);
 
-        // corrections are a promise the user confirmed: a price the editor did
-        // not show is never stored
-        var confirmed = corrections.Select(c => new CorrectionKey(
-            Enum.TryParse<BillingExampleKind>(c.Kind, out var kind) && Enum.IsDefined(kind)
-                ? kind
-                : (BillingExampleKind)(-1),
-            c.Year,
-            c.Half,
-            c.VatRate,
-            c.ItemId,
-            c.CorrectedPrice
-        ));
-        var computed = evaluation?.CorrectionKeys ?? [];
-        if (!GraveBillingCheck.SameCorrections(computed, confirmed))
-        {
-            throw new ValidationException(
-                "CorrectionsChanged",
-                "The rounding corrections differ from the ones confirmed."
-            );
-        }
-
+        // These come first: without recipients nothing is evaluated, so the
+        // corrections check below would fail on every retry and hide this.
         // A grave created without recipients could never be billed: generation
         // would skip it, and once created its recipient set cannot change. A
         // grave that predates this rule keeps its empty set and stays editable.
@@ -103,6 +84,27 @@ public sealed class GraveService
                     "A grave's recipients cannot be changed."
                 );
             }
+        }
+
+        // corrections are a promise the user confirmed: a price the editor did
+        // not show is never stored
+        var confirmed = corrections.Select(c => new CorrectionKey(
+            Enum.TryParse<BillingExampleKind>(c.Kind, out var kind) && Enum.IsDefined(kind)
+                ? kind
+                : (BillingExampleKind)(-1),
+            c.Year,
+            c.Half,
+            c.VatRate,
+            c.ItemId,
+            c.CorrectedPrice
+        ));
+        var computed = evaluation?.CorrectionKeys ?? [];
+        if (!GraveBillingCheck.SameCorrections(computed, confirmed))
+        {
+            throw new ValidationException(
+                "CorrectionsChanged",
+                "The rounding corrections differ from the ones confirmed."
+            );
         }
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);

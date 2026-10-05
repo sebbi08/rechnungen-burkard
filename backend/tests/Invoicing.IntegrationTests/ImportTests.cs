@@ -706,6 +706,25 @@ public class ImportTests
         );
     }
 
+    /// <summary>The imported corrections are what the precheck of a half-year run
+    /// compares against, so the run is accepted.</summary>
+    [Fact]
+    public async Task Generation_accepts_the_corrections_an_import_stored()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var import = await client.PostAsync("/odata/ImportArchive", Upload(UnsplittableArchive()));
+        Assert.True(import.IsSuccessStatusCode, await import.Content.ReadAsStringAsync());
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
     [Fact]
     public async Task An_items_quarter_is_imported()
     {
