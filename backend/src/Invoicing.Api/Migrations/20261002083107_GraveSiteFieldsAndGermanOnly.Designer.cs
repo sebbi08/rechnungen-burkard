@@ -295,6 +295,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Quarter")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("VatRate")
                         .HasColumnType("TEXT");
 

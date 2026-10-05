@@ -88,6 +88,7 @@ public class InvoiceItemsController : ODataController
             return NotFound();
 
         var previousRate = item.VatRate;
+        var previousQuarter = item.Quarter;
         var previousDefault = item.DefaultPrice;
         delta.Patch(item);
         item.VatRate = VatRateNormalizer.Normalize(item.VatRate);
@@ -123,6 +124,23 @@ public class InvoiceItemsController : ODataController
                     {
                         code = "VatRateImmutable",
                         message = "The VAT rate of an item that graves bill cannot be changed.",
+                    },
+                }
+            );
+        }
+
+        // The quarter decides which half-year invoices carry the item. Read
+        // from the item at generation like the rate, so changing it would move
+        // every linked grave's invoices at once.
+        if (linked && item.Quarter != previousQuarter)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "QuarterImmutable",
+                        message = "The quarter of an item that graves bill cannot be changed.",
                     },
                 }
             );

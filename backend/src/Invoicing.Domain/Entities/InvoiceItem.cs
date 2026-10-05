@@ -7,4 +7,8 @@ public sealed class InvoiceItem
     public string Description { get; set; } = "";
     public decimal VatRate { get; set; }
     public decimal? DefaultPrice { get; set; }
+
+    /// <summary>The quarter this item is billed in; null bills it all year.
+    /// Fixed once a grave bills the item, like <see cref="VatRate"/>.</summary>
+    public BillingQuarter? Quarter { get; set; }
 }

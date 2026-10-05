@@ -365,6 +365,78 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
     }
 
     [Fact]
+    public async Task An_item_keeps_its_quarter_by_name()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var created = await client.PostAsync(
+            "/odata/InvoiceItems",
+            ODataJson.Body(
+                new
+                {
+                    Number = "3101",
+                    Description = "Sommerbepflanzung",
+                    VatRate = 7.0m,
+                    DefaultPrice = 40.00m,
+                    Quarter = "Summer",
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = await GetCreatedIdAsync(created);
+
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/InvoiceItems({id})")
+        );
+        Assert.Equal("Summer", json.RootElement.GetProperty("Quarter").GetString());
+    }
+
+    [Fact]
+    public async Task An_item_without_a_quarter_is_billed_all_year()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var id = await CreateItemAsync(client, "3102", 60.00m);
+
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/InvoiceItems({id})")
+        );
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("Quarter").ValueKind);
+    }
+
+    // Like the VAT rate: the quarter decides which invoices carry the item, for
+    // every linked grave at once, so a split that divides today could stop.
+    [Fact]
+    public async Task Patch_quarter_of_a_linked_item_is_rejected()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var itemId = await CreateItemAsync(client, "3103", 100.00m);
+        await LinkGraveAsync(client, itemId, "I-3103", null);
+
+        var response = await PatchAsync(client, itemId, new { Quarter = "Spring" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "QuarterImmutable",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task Patch_quarter_of_an_unlinked_item_is_allowed()
+    {
+        using var client = _host.CreateClient();
+        await SeedVatRateAsync(client);
+        var itemId = await CreateItemAsync(client, "3104", 100.00m);
+
+        var response = await PatchAsync(client, itemId, new { Quarter = "Autumn" });
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Patch_vat_rate_of_an_unlinked_item_is_accepted()
     {
         using var client = _host.CreateClient();

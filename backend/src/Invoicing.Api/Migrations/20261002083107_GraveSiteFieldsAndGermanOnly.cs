@@ -82,6 +82,13 @@ namespace Burkard.Invoicing.Api.Migrations
                 defaultValue: ""
             );
 
+            migrationBuilder.AddColumn<string>(
+                name: "Quarter",
+                table: "InvoiceItems",
+                type: "TEXT",
+                nullable: true
+            );
+
             // A grave's term is a month now. DateOnly is stored as 'yyyy-MM-dd'
             // text, so the first eight characters are the month and '01' makes
             // it its first day. Not undone by Down: the day is gone.
@@ -95,6 +102,8 @@ namespace Burkard.Invoicing.Api.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(name: "Quarter", table: "InvoiceItems");
+
             migrationBuilder.DropColumn(name: "GraveFieldNumber", table: "Invoices");
 
             migrationBuilder.DropColumn(name: "GraveNumber", table: "Invoices");
