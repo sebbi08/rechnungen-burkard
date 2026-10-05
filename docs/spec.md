@@ -136,7 +136,7 @@ and that a normal document and a stamped copy both result.
 A user manages graves, each with a grave number, a field number, a site name, a
 position, a start month and an optional end month, a creation date, one or more
 invoicing items (each with a count and an optional price that
-overrides the item's default), and one or more recipients.
+overrides the item's default), and one to four recipients.
 
 **Why this priority**: Graves are the core business object; their configuration is
 needed before half-year invoices can be generated.
@@ -149,7 +149,7 @@ listing and searching it.
 
 1. **Given** the grave section is opened, **When** the user saves a grave with a
    number, field number, site name, position, start month, one item with count,
-   and one or more recipients, **Then** the grave is stored with a creation date
+   and one to four recipients, **Then** the grave is stored with a creation date
    and is searchable. Saving without an end month is allowed.
 2. **Given** the user searches for a grave, **When** they enter a grave number,
    field number, site name or recipient name, **Then** matching graves are
@@ -540,9 +540,9 @@ non-interactive until completion, and the task runs exactly once.
   refused, naming the first failing invoice, the VAT rate and its subtotal, and
   MUST offer per item line the nearest prices below and above at which every
   invoice divides. The grave's editor MUST show these example invoices and their
-  check while the user types. Where a rate carries a price entered as a gross, what the
-  recipients collect between them MUST come to exactly that gross, and the save
-  MUST be refused otherwise.
+  check while the user types. Where a rate carries a price entered as a gross,
+  what the recipients collect between them MUST come to exactly that gross, and
+  the save MUST be refused otherwise.
 - **FR-022**: Each recipient invoice MUST state which percentage of the grave's
   bill it represents, in its summary beneath the item list: the grave's net sum,
   then the recipient's share of it labelled with that percentage, then the VAT
@@ -723,7 +723,7 @@ non-interactive until completion, and the task runs exactly once.
   rate, an optional default price and an optional quarter.
 - **Grave**: Identified by a grave number (unique among graves whose terms
   overlap); has a field number, a site name, a position, a start month, an
-  optional end month, a creation date, one or more invoicing items (with counts), and one or more recipients,
+  optional end month, a creation date, one or more invoicing items (with counts), and one to four recipients,
   fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
   invoice per recipient carrying the grave's own lines in full, at the same
@@ -803,8 +803,8 @@ non-interactive until completion, and the task runs exactly once.
 
 - A single currency (EUR) is used for all amounts in version 1.
 - A half-year is one of two periods: January 1 – June 30 and July 1 – December 31.
-- A grave's term is counted in whole months and does not affect which half-years
-  can be invoiced.
+- A grave's term is counted in whole months, and a half-year can be invoiced only
+  when at least one of its months lies inside the term.
 - The "current half-year" is derived from the current date.
 - A grave's prices are chosen so that its net subtotals divide evenly among its
   recipients; a grave that does not come out even cannot be saved, and nothing
