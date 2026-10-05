@@ -63,6 +63,17 @@ public static class GraveShare
         return problems;
     }
 
+    /// <summary>Whether these lines split evenly — the verdict of
+    /// <see cref="Problems"/> without the search for suggestions, which the
+    /// per-line suggestion search would otherwise run thousands of times.</summary>
+    public static bool IsEven(IReadOnlyList<GraveLine> lines, int recipients) =>
+        lines
+            .Select(l => l.VatRate)
+            .Distinct()
+            .All(rate =>
+                KindOf(lines.Where(l => l.VatRate == rate).ToList(), recipients, rate) is null
+            );
+
     /// <summary>What stops one rate's lines being split evenly, or null when
     /// nothing does.</summary>
     private static GraveShareProblemKind? KindOf(
