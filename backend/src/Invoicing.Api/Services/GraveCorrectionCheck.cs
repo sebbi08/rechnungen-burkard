@@ -49,7 +49,7 @@ public sealed class GraveCorrectionCheck
             }
 
             var computed = GraveBillingCheck
-                .EvaluateWithCorrections(graveLinks, grave.StartDate, grave.EndDate, count)
+                .Evaluate(graveLinks, grave.StartDate, grave.EndDate, count)
                 .CorrectionKeys;
             var saved = (stored.GetValueOrDefault(grave.Id) ?? []).Select(c => new CorrectionKey(
                 c.Kind,

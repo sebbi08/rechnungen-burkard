@@ -373,6 +373,8 @@ export interface ImportSummary {
   graves: number;
   itemLinks: number;
   recipientLinks: number;
+  /** Graves that needed a rounding correction. */
+  correctedGraves: number;
 }
 
 /** The archive was rejected: nothing was imported, every problem is listed. */

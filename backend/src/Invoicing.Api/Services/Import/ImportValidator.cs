@@ -684,24 +684,11 @@ public sealed class ImportValidator
                     Describe(ImportArchiveLayout.GravesFile, grave.Row, label, problem, count)
                 );
             }
-
-            foreach (var (index, prices) in evaluation.Suggestions.OrderBy(s => s.Key))
-            {
-                problems.Add(
-                    Suggest(
-                        ImportArchiveLayout.GravesFile,
-                        grave.Row,
-                        links[index].ItemNumber,
-                        prices
-                    )
-                );
-            }
         }
     }
 
     /// <summary>One rate of the grave's first failing invoice, named by its
-    /// label. No figures: an amount that fixes this invoice may break another,
-    /// so the figures come per line, from <see cref="Suggest"/>.</summary>
+    /// label.</summary>
     private static ImportProblem Describe(
         string file,
         int row,
@@ -725,25 +712,6 @@ public sealed class ImportValidator
                 Euros(problem.Amount),
                 recipients.ToString(CultureInfo.InvariantCulture),
             ]
-        );
-    }
-
-    /// <summary>The prices at which one item would let every invoice divide.</summary>
-    private static ImportProblem Suggest(
-        string file,
-        int row,
-        string item,
-        IReadOnlyList<decimal> prices
-    )
-    {
-        var texts = prices.Select(p => p.ToString("0.00", CultureInfo.InvariantCulture)).ToList();
-        return new ImportProblem(
-            file,
-            row,
-            "PriceSuggestion",
-            $"Item {item}: {string.Join(" or ", texts)} would work.",
-            $"PriceSuggestion{texts.Count}",
-            [item, .. texts]
         );
     }
 

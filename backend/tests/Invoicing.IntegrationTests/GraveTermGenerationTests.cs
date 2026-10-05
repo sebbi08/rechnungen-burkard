@@ -346,7 +346,7 @@ public class GraveTermGenerationTests
             var grave = await db.Graves.SingleAsync(g => g.Id == graveId);
             var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
             var keys = GraveBillingCheck
-                .EvaluateWithCorrections(links, grave.StartDate, grave.EndDate, 3)
+                .Evaluate(links, grave.StartDate, grave.EndDate, 3)
                 .CorrectionKeys;
             Assert.NotEmpty(keys);
             var first = true;
@@ -516,7 +516,7 @@ public class GraveTermGenerationTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
             keys = GraveBillingCheck
-                .EvaluateWithCorrections(links, new DateOnly(2026, 3, 1), end, 3)
+                .Evaluate(links, new DateOnly(2026, 3, 1), end, 3)
                 .CorrectionKeys.ToList();
         }
 

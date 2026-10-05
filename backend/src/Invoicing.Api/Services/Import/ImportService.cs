@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 
 namespace Burkard.Invoicing.Api.Services.Import;
@@ -126,6 +127,53 @@ public sealed class ImportService
         }
 
         await _db.SaveChangesAsync(ct);
+
+        // a grave that does not split evenly is billed with raised prices, as a
+        // save would have confirmed them; the links go in id order, like the
+        // save and the generator read them
+        var correctedGraves = 0;
+        foreach (var (number, grave) in graves)
+        {
+            var count = data.RecipientLinks.Count(l =>
+                string.Equals(l.GraveNumber, number, StringComparison.OrdinalIgnoreCase)
+            );
+            var links = data
+                .ItemLinks.Where(l =>
+                    string.Equals(l.GraveNumber, number, StringComparison.OrdinalIgnoreCase)
+                )
+                .Select(l =>
+                    GraveBilling.LinkFor(items[l.ItemNumber], l.Count, null, l.PriceIncludesVat)
+                )
+                .ToList();
+            if (count == 0 || links.Count == 0)
+            {
+                continue;
+            }
+
+            var corrections = GraveBillingCheck
+                .Evaluate(links, grave.StartDate, grave.EndDate, count)
+                .Invoices.SelectMany(invoice =>
+                    invoice.Corrections.Select(c => new GraveBillingCorrection
+                    {
+                        GraveId = grave.Id,
+                        Kind = invoice.Example.Kind,
+                        Year = invoice.Example.Period.Year,
+                        Half = invoice.Example.Period.Half,
+                        VatRate = c.VatRate,
+                        ItemId = c.ItemId,
+                        EnteredPrice = c.EnteredPrice,
+                        CorrectedPrice = c.CorrectedPrice,
+                    })
+                )
+                .ToList();
+            if (corrections.Count > 0)
+            {
+                _db.GraveBillingCorrections.AddRange(corrections);
+                correctedGraves++;
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
         var summary = new ImportSummary(
@@ -133,7 +181,8 @@ public sealed class ImportService
             items.Count,
             graves.Count,
             data.ItemLinks.Count,
-            data.RecipientLinks.Count
+            data.RecipientLinks.Count,
+            correctedGraves
         );
         return new ImportResult(Array.Empty<ImportProblem>(), summary);
     }

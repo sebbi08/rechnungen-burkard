@@ -235,12 +235,7 @@ public class GraveBillingValidationController : ODataController
                 GraveBilling.LinkFor(items![l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
             )
             .ToList();
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(
-            links,
-            start,
-            end,
-            request.Recipients
-        );
+        var evaluation = GraveBillingCheck.Evaluate(links, start, end, request.Recipients);
 
         return new JsonResult(
             new

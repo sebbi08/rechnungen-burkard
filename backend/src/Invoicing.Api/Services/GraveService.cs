@@ -361,7 +361,7 @@ public sealed class GraveService
 
             // every invoice the term produces has to divide on its own: the
             // first and last half-year bill other amounts than the full ones
-            var evaluation = GraveBillingCheck.EvaluateWithCorrections(
+            var evaluation = GraveBillingCheck.Evaluate(
                 links,
                 fields.StartDate,
                 fields.EndDate,

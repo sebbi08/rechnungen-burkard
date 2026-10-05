@@ -16,13 +16,15 @@ public sealed record ImportProblem(
     IReadOnlyList<string>? MessageArgs = null
 );
 
-/// <summary>Counts per file after a successful import (FR-062).</summary>
+/// <summary>Counts per file after a successful import (FR-062), and how many of
+/// the graves needed a rounding correction.</summary>
 public sealed record ImportSummary(
     int Recipients,
     int Items,
     int Graves,
     int ItemLinks,
-    int RecipientLinks
+    int RecipientLinks,
+    int CorrectedGraves
 );
 
 public sealed record RecipientRow(int Row, string Number, string Name, string Address);

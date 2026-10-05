@@ -31,12 +31,7 @@ public class GraveBillingCorrectionTests
     [Fact]
     public void A_block_that_divides_needs_no_correction()
     {
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(
-            [AllYear(1, 60m)],
-            null,
-            null,
-            2
-        );
+        var evaluation = GraveBillingCheck.Evaluate([AllYear(1, 60m)], null, null, 2);
 
         Assert.True(evaluation.Ok);
         Assert.Empty(evaluation.CorrectionKeys);
@@ -49,12 +44,7 @@ public class GraveBillingCorrectionTests
         // bills 40,00 — both raised to 40,02; the full halves divide
         var links = new[] { AllYear(100, 60m), Seasonal(200, BillingQuarter.Spring, 45m) };
 
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(
-            links,
-            March2026,
-            October2028,
-            3
-        );
+        var evaluation = GraveBillingCheck.Evaluate(links, March2026, October2028, 3);
 
         Assert.True(evaluation.Ok);
         Assert.Equal(
@@ -80,7 +70,7 @@ public class GraveBillingCorrectionTests
         // in the list, but the all-year line takes the cent
         var links = new[] { Seasonal(1, BillingQuarter.Summer, 40.01m), AllYear(2, 60m) };
 
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
 
         var key = Assert.Single(evaluation.CorrectionKeys);
         Assert.Equal(2, key.ItemId);
@@ -95,7 +85,7 @@ public class GraveBillingCorrectionTests
         // all-year line can fix it
         var links = new[] { AllYear(1, 30m, count: 2), AllYear(2, 10.01m) };
 
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
 
         Assert.True(evaluation.Ok);
         var key = Assert.Single(
@@ -111,7 +101,7 @@ public class GraveBillingCorrectionTests
     {
         var links = new[] { AllYear(1, 60.01m, rate: 19m), AllYear(2, 25.01m, rate: 7m) };
 
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
 
         var full = evaluation.Invoices[0];
         Assert.Equal(new[] { 7m, 19m }, full.Corrections.Select(c => c.VatRate).OrderBy(r => r));
@@ -122,7 +112,7 @@ public class GraveBillingCorrectionTests
     public void A_gross_line_is_raised_as_a_gross()
     {
         // 100,25 gross at 19 % over 2 does not add up (100,24 collected)
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(
+        var evaluation = GraveBillingCheck.Evaluate(
             [AllYear(1, 100.25m, gross: true)],
             null,
             null,
@@ -151,7 +141,7 @@ public class GraveBillingCorrectionTests
             Seasonal(3, BillingQuarter.Summer, 0.01m),
         };
 
-        var evaluation = GraveBillingCheck.EvaluateWithCorrections(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
 
         var key = Assert.Single(evaluation.CorrectionKeys);
         Assert.Equal(BillingExampleKind.FullFirstHalf, key.Kind);
