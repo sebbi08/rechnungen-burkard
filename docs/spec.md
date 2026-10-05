@@ -205,6 +205,14 @@ appears twice.
    **When** the user edits one of those recipients' invoices, **Then** both
    recipients receive an identical new revision of the grave's edited lines,
    and the previous invoices are preserved unchanged.
+7. **Given** a grave starting in 05/2026 with an all-year item at 60,00 and a
+   Sommer item at 40,00, **When** invoices are generated for H1 2026, **Then**
+   the all-year item is billed at 2/6 of its price (20,00, described as
+   "anteilig 05–06/2026 (2 von 6 Monaten)") and the Sommer item in full, because
+   May and June touch its quarter.
+8. **Given** a grave whose term has no month in the selected half-year, **When**
+   invoices are generated or the grave overview is displayed for that half-year,
+   **Then** no invoice is generated for the grave and it is not listed as open.
 
 ---
 
@@ -399,14 +407,16 @@ non-interactive until completion, and the task runs exactly once.
 - What happens when an invoice is generated twice for the same grave and
   half-year? The second attempt must be prevented.
 - How are rounding differences handled when a grave's per-rate subtotal does not
-  divide evenly among three or more recipients? The grave's price is raised by
-  whole cents — never reduced — until every subtotal divides evenly, so every
-  recipient is billed the identical share.
+  divide evenly among its recipients? No price is adjusted silently: saving the
+  grave is refused, naming the first invoice that does not divide, and the
+  editor suggests per item line the nearest prices below and above at which
+  every invoice of the term divides.
 - What happens when a recipient's address is changed after invoices were
   generated? Historical invoices must remain unchanged.
-- What happens when a grave's end month lies before the selected half-year? The
-  term does not affect generation: historical generation for that half-year must
-  remain possible and recorded once.
+- What happens when a grave's end month lies before the selected half-year (or
+  its start month after it)? The half-year has no month inside the term, so no
+  invoice is generated and the grave is not listed as open for it, unless it was
+  invoiced for that half-year before this rule existed.
 - What happens when a grave has no end month? Its term runs indefinitely, so no
   other grave may take its number from its start month on.
 - What happens when a generated invoice is edited? The previous version is kept
@@ -465,7 +475,8 @@ non-interactive until completion, and the task runs exactly once.
   section.
 - **FR-009a**: An invoice item's VAT rate MUST NOT change once a grave bills the
   item: the rate is billed per grave, and a change would move every linked
-  grave's split at once.
+  grave's split at once. The same holds for the item's quarter (FR-019), which
+  moves the invoices that carry the item.
 - **FR-009b**: A changed default price MUST apply only to graves linked from then
   on. A grave that was billing the old default MUST keep it, written onto the
   link as its own price; a link price equal to the default counts as billing the
@@ -502,8 +513,17 @@ non-interactive until completion, and the task runs exactly once.
   one. Field numbers may repeat.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
-  An item is billable for a grave when it has either of the two prices.
-- **FR-020**: A grave MUST support one or more recipients.
+  An item is billable for a grave when it has either of the two prices. An item
+  MAY carry one quarter: Frühling (January–March), Sommer (April–June), Herbst
+  (July–September) or Winter (October–December); without one it is billed all
+  year. An all-year item's price is per half-year, and in a half-year the term
+  covers only partly (the first and the last) it MUST be billed at its price
+  times the covered months divided by 6, rounded to the cent, with the covered
+  months appended to the line's description; the start and end month each count
+  as a whole month and the count is unchanged. A quarter item MUST be billed in
+  full, once, in the half-year that holds its quarter, when the invoice's months
+  touch that quarter at all, and not otherwise.
+- **FR-020**: A grave MUST support one to four recipients.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
 - **FR-020b**: A grave's set of recipients MUST be fixed when the grave is
@@ -513,10 +533,14 @@ non-interactive until completion, and the task runs exactly once.
   billed at the same amount as every other recipient's invoice.
 - **FR-021a**: The grave's per-VAT-rate subtotals MUST divide evenly across its
   recipients so that every recipient's share is identical, and every invoice's
-  VAT MUST follow from its own share of that net. The system MUST NOT adjust a
+  VAT MUST follow from its own share of that net. This MUST hold for every
+  invoice the term produces — the prorated first and last half-year as well as
+  a full one — not only for a full half-year. The system MUST NOT adjust a
   price to achieve this: saving a grave whose subtotals do not divide MUST be
-  refused, naming the VAT rate, its subtotal and the nearest subtotals that
-  would divide. Where a rate carries a price entered as a gross, what the
+  refused, naming the first failing invoice, the VAT rate and its subtotal, and
+  MUST offer per item line the nearest prices below and above at which every
+  invoice divides. The grave's editor MUST show these example invoices and their
+  check while the user types. Where a rate carries a price entered as a gross, what the
   recipients collect between them MUST come to exactly that gross, and the save
   MUST be refused otherwise.
 - **FR-022**: Each recipient invoice MUST state which percentage of the grave's
@@ -530,7 +554,8 @@ non-interactive until completion, and the task runs exactly once.
 
 **Half-year grave invoicing**
 
-- **FR-025**: Grave invoices MUST be generated per half-year period.
+- **FR-025**: Grave invoices MUST be generated per half-year period, and only for
+  a half-year with at least one month inside the grave's term.
 - **FR-026**: The system MUST record that a grave's invoices have been generated
   for a given half-year.
 - **FR-027**: The system MUST prevent generating duplicate invoices for the same
@@ -617,8 +642,10 @@ non-interactive until completion, and the task runs exactly once.
   a mapping file.
 - **FR-050**: The recipients CSV MUST capture a recipient number, a name, and an
   address.
-- **FR-051**: The items CSV MUST capture item number, text, VAT rate, and an
-  optional price.
+- **FR-051**: The items CSV MUST capture item number, text, VAT rate, an
+  optional price and an optional quarter, in that order. The quarter is written
+  as `Spring`, `Summer`, `Autumn` or `Winter` or left empty; any other value is
+  a problem. An archive whose items CSV lacks the `Quarter` column is refused.
 - **FR-052**: The graves CSV MUST capture the grave number, field number, site
   name, position, start month and an optional end month, in six columns. Months
   are written as YYYY-MM.
@@ -635,7 +662,9 @@ non-interactive until completion, and the task runs exactly once.
   recipients CSV file.
 - **FR-058a**: Validation MUST refuse a grave that could not be billed: a grave
   without a recipient, a link to an item without a price, or prices that do not
-  divide across the grave's recipients (FR-021a). The archive is refused as a
+  divide across the grave's recipients (FR-021a; the first failing invoice of
+  a grave is reported with its label, plus one suggestion per item line), or
+  more than four recipients (FR-020). The archive is refused as a
   whole, so nothing imports that the dialog would have refused to save.
 - **FR-059**: Validation MUST report each problem with the affected file, the row,
   and a human-readable reason.
@@ -691,7 +720,7 @@ non-interactive until completion, and the task runs exactly once.
   address. Each generated invoice captures the recipient values used at the time
   of generation.
 - **Invoice Item**: A catalogue entry identified by a number, with a text, a VAT
-  rate, and an optional default price.
+  rate, an optional default price and an optional quarter.
 - **Grave**: Identified by a grave number (unique among graves whose terms
   overlap); has a field number, a site name, a position, a start month, an
   optional end month, a creation date, one or more invoicing items (with counts), and one or more recipients,
