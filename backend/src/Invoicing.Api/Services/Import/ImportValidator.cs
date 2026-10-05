@@ -216,13 +216,14 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = i + 1;
-            if (!HasColumns(row, 4, file, line, problems))
+            if (!HasColumns(row, 5, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
             var description = row[1].Trim();
             var rawVat = row[2].Trim();
             var rawPrice = row[3].Trim();
+            var rawQuarter = row[4].Trim();
             if (number.Length > 0)
                 data.DeclaredItems.Add(number);
             if (
@@ -287,6 +288,33 @@ public sealed class ImportValidator
                 price = parsedPrice;
             }
 
+            BillingQuarter? quarter = null;
+            if (rawQuarter.Length > 0)
+            {
+                // a member name only, as for a grave's position: Enum.TryParse
+                // alone would also take "2"
+                if (
+                    !Enum.GetNames<BillingQuarter>().Contains(rawQuarter)
+                    || !Enum.TryParse(rawQuarter, out BillingQuarter parsedQuarter)
+                )
+                {
+                    var allowed = string.Join(", ", Enum.GetNames<BillingQuarter>());
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "QuarterInvalid",
+                            $"'{rawQuarter}' is not a quarter (expected one of {allowed}).",
+                            "QuarterInvalid",
+                            [rawQuarter, allowed]
+                        )
+                    );
+                    continue;
+                }
+
+                quarter = parsedQuarter;
+            }
+
             if (seen.TryGetValue(number, out var first))
             {
                 problems.Add(
@@ -304,7 +332,14 @@ public sealed class ImportValidator
 
             seen[number] = line;
             data.Items.Add(
-                new ItemRow(line, number, description, VatRateNormalizer.Normalize(vatRate), price)
+                new ItemRow(
+                    line,
+                    number,
+                    description,
+                    VatRateNormalizer.Normalize(vatRate),
+                    price,
+                    quarter
+                )
             );
         }
     }
@@ -560,20 +595,23 @@ public sealed class ImportValidator
         }
     }
 
-    /// <summary>Whether every grave in the archive can be split across its
-    /// recipients.
+    /// <summary>Whether every invoice of every grave's term can be split across
+    /// its recipients.
     ///
     /// A grave's bill is split equally, so each VAT rate's net subtotal has to
     /// divide across its recipients, and a price entered as a gross has to be
-    /// collectable to the cent. The dialog refuses a grave that cannot; an
-    /// archive that carried one would import quietly and then never bill it —
-    /// generation skips such a grave — so the whole import is refused instead,
-    /// with the rate and the amounts that would work.
+    /// collectable to the cent — in every invoice of the term, the prorated
+    /// first and last half-years included. The dialog refuses a grave that
+    /// cannot; an archive that carried one would import quietly and then never
+    /// bill it — generation skips such a grave — so the whole import is refused
+    /// instead.
     ///
     /// The import never sets a link's own price, so what is billed is the
-    /// item's default price from items.csv. The problem is reported against the
-    /// grave's row, because the grave is what does not add up; which price to
-    /// move is the reader's choice.</summary>
+    /// item's default price from items.csv. The problems are reported against
+    /// the grave's row, because the grave is what does not add up: the first
+    /// failing invoice's rates, then per item the prices that would let every
+    /// invoice divide. A grave over the recipient cap is left to
+    /// <see cref="CheckGraveRecipients"/>.</summary>
     private static void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
     {
         var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
@@ -590,8 +628,12 @@ public sealed class ImportValidator
             // every grave has at least one: CheckGraveRecipients reported any
             // without, and this runs only on a report with nothing in it
             var count = recipients[grave.Number];
+            if (count > GraveBilling.MaxRecipients)
+            {
+                continue;
+            }
 
-            var lines = data
+            var links = data
                 .ItemLinks.Where(link =>
                     string.Equals(
                         link.GraveNumber,
@@ -602,13 +644,14 @@ public sealed class ImportValidator
                 .Select(link =>
                 {
                     var item = items[link.ItemNumber];
-                    return GraveBilling.LineFor(
+                    return GraveBilling.LinkFor(
                         new InvoiceItem
                         {
                             Number = item.Number,
                             Description = item.Description,
                             VatRate = item.VatRate,
                             DefaultPrice = item.Price,
+                            Quarter = item.Quarter,
                         },
                         link.Count,
                         null,
@@ -617,66 +660,89 @@ public sealed class ImportValidator
                 })
                 .ToList();
 
-            if (lines.Count == 0)
+            if (links.Count == 0)
             {
                 continue;
             }
 
-            foreach (var problem in GraveShare.Problems(lines, count))
+            var evaluation = GraveBillingCheck.Evaluate(
+                links,
+                grave.StartDate,
+                grave.EndDate,
+                count
+            );
+            if (evaluation.FirstFailing is not { } failing)
             {
-                problems.Add(Describe(ImportArchiveLayout.GravesFile, grave.Row, problem, count));
+                continue;
+            }
+
+            var label = HalfYearBilling.Label(failing.Example);
+            foreach (var problem in failing.Problems)
+            {
+                problems.Add(
+                    Describe(ImportArchiveLayout.GravesFile, grave.Row, label, problem, count)
+                );
+            }
+
+            foreach (var (index, prices) in evaluation.Suggestions.OrderBy(s => s.Key))
+            {
+                problems.Add(
+                    Suggest(
+                        ImportArchiveLayout.GravesFile,
+                        grave.Row,
+                        links[index].ItemNumber,
+                        prices
+                    )
+                );
             }
         }
     }
 
-    /// <summary>The dialog's sentence, in the language every import problem is
-    /// written in. One shape whatever the kind of problem: a net total that
-    /// will not divide and a gross that cannot be billed to the cent differ in
-    /// why they fail, not in what the reader does about it.</summary>
-    /// <summary>The English message, plus a key and its arguments for the UI to
-    /// say the same in German: rate, amount, recipients and up to two
-    /// nearby amounts that would work (PricesDoNotDivide0..2 by their number).</summary>
+    /// <summary>One rate of the grave's first failing invoice, named by its
+    /// label. No figures: an amount that fixes this invoice may break another,
+    /// so the figures come per line, from <see cref="Suggest"/>.</summary>
     private static ImportProblem Describe(
         string file,
         int row,
+        string invoice,
         GraveShareProblem problem,
         int recipients
     )
     {
         var rate = problem.VatRate.ToString("0.##", CultureInfo.InvariantCulture);
         var across = recipients == 1 ? "1 recipient" : $"{recipients} recipients";
-        var message =
-            $"VAT {rate} %: {Euros(problem.Amount)} does not split evenly across {across}.";
-        var suggestions = problem.Suggestions.Take(2).Select(Euros).ToList();
-        string[] args =
-        [
-            rate,
-            Euros(problem.Amount),
-            recipients.ToString(CultureInfo.InvariantCulture),
-            .. suggestions,
-        ];
-        var key = $"PricesDoNotDivide{suggestions.Count}";
-
-        if (problem.Suggestions.Count == 0)
-        {
-            return new ImportProblem(
-                file,
-                row,
-                "PricesDoNotDivide",
-                $"{message} Adjust a price at this VAT rate.",
-                key,
-                args
-            );
-        }
-
-        var options = string.Join(" or ", problem.Suggestions.Select(Euros));
         return new ImportProblem(
             file,
             row,
             "PricesDoNotDivide",
-            $"{message} {options} would work.",
-            key,
-            args
+            $"{invoice}: VAT {rate} %: {Euros(problem.Amount)} does not split evenly across {across}. "
+                + "Adjust a price at this VAT rate.",
+            "PricesDoNotDivideIn",
+            [
+                invoice,
+                rate,
+                Euros(problem.Amount),
+                recipients.ToString(CultureInfo.InvariantCulture),
+            ]
+        );
+    }
+
+    /// <summary>The prices at which one item would let every invoice divide.</summary>
+    private static ImportProblem Suggest(
+        string file,
+        int row,
+        string item,
+        IReadOnlyList<decimal> prices
+    )
+    {
+        var texts = prices.Select(p => p.ToString("0.00", CultureInfo.InvariantCulture)).ToList();
+        return new ImportProblem(
+            file,
+            row,
+            "PriceSuggestion",
+            $"Item {item}: {string.Join(" or ", texts)} would work.",
+            $"PriceSuggestion{texts.Count}",
+            [item, .. texts]
         );
     }
 
@@ -687,7 +753,8 @@ public sealed class ImportValidator
     /// imported without one could never be billed: generation would skip it and
     /// nothing could add a recipient afterwards. SaveGrave refuses the same. This
     /// runs with the other cross-file checks, so the report names it in the same
-    /// pass as everything else.</summary>
+    /// pass as everything else. A grave is also capped at
+    /// <see cref="GraveBilling.MaxRecipients"/> recipients, as SaveGrave does.</summary>
     private static void CheckGraveRecipients(ImportData data, List<ImportProblem> problems)
     {
         var linked = new HashSet<string>(
@@ -705,6 +772,34 @@ public sealed class ImportValidator
                         "NoRecipients",
                         "The grave needs at least one recipient.",
                         "NoRecipients"
+                    )
+                );
+            }
+        }
+
+        var counts = data
+            .RecipientLinks.GroupBy(link => link.GraveNumber, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.OrdinalIgnoreCase
+            );
+        foreach (var grave in data.Graves)
+        {
+            if (
+                counts.TryGetValue(grave.Number, out var count)
+                && count > GraveBilling.MaxRecipients
+            )
+            {
+                var max = GraveBilling.MaxRecipients.ToString(CultureInfo.InvariantCulture);
+                problems.Add(
+                    new ImportProblem(
+                        ImportArchiveLayout.GravesFile,
+                        grave.Row,
+                        "TooManyRecipients",
+                        $"A grave can have at most {max} recipients.",
+                        "TooManyRecipients",
+                        [max]
                     )
                 );
             }

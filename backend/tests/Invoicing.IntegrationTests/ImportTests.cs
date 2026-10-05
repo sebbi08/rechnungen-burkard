@@ -19,7 +19,7 @@ namespace Burkard.Invoicing.IntegrationTests;
 public class ImportTests
 {
     private const string RecipientsHeader = "RecipientNumber,Name,Address\r\n";
-    private const string ItemsHeader = "ItemNumber,Description,VatRate,Price\r\n";
+    private const string ItemsHeader = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
     private const string GravesHeader =
         "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
     private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
@@ -67,9 +67,9 @@ public class ImportTests
             (
                 "items.csv",
                 ItemsHeader
-                    + "9001,Grabpflege,7,120.00\r\n"
-                    + "9002,Sonderleistung,7,107.00\r\n"
-                    + "9003,Extra,7,\r\n"
+                    + "9001,Grabpflege,7,120.00,\r\n"
+                    + "9002,Sonderleistung,7,107.00,\r\n"
+                    + "9003,Extra,7,,\r\n"
             ),
             (
                 "graves.csv",
@@ -95,7 +95,7 @@ public class ImportTests
                     + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"
                     + "E-1001,Bert Beispiel,Nebenweg 2\r\n"
             ),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.01,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -387,7 +387,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,abc,10,\r\n"),
             (
                 "graves.csv",
                 GravesHeader
@@ -425,7 +425,7 @@ public class ImportTests
         // another: users fix an archive in one pass, not one error at a time
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -480,7 +480,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -524,7 +524,7 @@ public class ImportTests
                 "recipients.csv",
                 RecipientsHeader + "E-1000,Anna,Hauptstraße 1\r\n" + "E-1000,Bert,Nebenweg 2\r\n"
             ),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120\r\n" + "9001,Doppelt,7,10\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120,\r\n" + "9001,Doppelt,7,10,\r\n"),
             (
                 "graves.csv",
                 GravesHeader
@@ -591,7 +591,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120,\r\n"),
             ("graves.csv", GravesHeader),
             ("mapping.csv", MappingHeader)
         );
@@ -685,22 +685,102 @@ public class ImportTests
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = Assert.Single(await ProblemsAsync(response));
-        Assert.Equal("graves.csv", problem.File);
-        Assert.Equal(2, problem.Row);
-        Assert.Equal("PricesDoNotDivide", problem.Code);
-        // the message names the rate and what would work, the way the dialog's
-        // does -- without it, an archive of any size leaves the reader guessing
-        // which cent to move
+        var problems = await ProblemsAsync(response);
+        Assert.All(problems, p => Assert.Equal(("graves.csv", 2), (p.File, p.Row)));
+
+        // the message names the invoice, the rate and what to adjust; the
+        // figures that would work come per item, since one that fixes this
+        // invoice may break another
+        var split = Assert.Single(problems, p => p.Code == "PricesDoNotDivide");
         Assert.Equal(
-            "VAT 19 %: 120.01 does not split evenly across 2 recipients. "
-                + "120.00 or 120.02 would work.",
-            problem.Message
+            "Anfang H1 2026: VAT 19 %: 120.01 does not split evenly across 2 recipients. "
+                + "Adjust a price at this VAT rate.",
+            split.Message
         );
+        var suggestion = Assert.Single(problems, p => p.Code == "PriceSuggestion");
+        Assert.Equal("Item 9001: 120.00 or 120.02 would work.", suggestion.Message);
 
         // and nothing at all was written -- the refusal has to be the whole
         // archive, not the graves that happened to come out even
         await AssertNothingImportedAsync(host);
+    }
+
+    [Fact]
+    public async Task An_items_quarter_is_imported()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            (
+                "items.csv",
+                ItemsHeader + "9001,Sommerbepflanzung,19,40,Summer\r\n9002,Grabpflege,19,60,\r\n"
+            ),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(
+            BillingQuarter.Summer,
+            (await db.InvoiceItems.SingleAsync(i => i.Number == "9001")).Quarter
+        );
+        Assert.Null((await db.InvoiceItems.SingleAsync(i => i.Number == "9002")).Quarter);
+    }
+
+    [Fact]
+    public async Task An_unknown_quarter_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + "9001,Sommerbepflanzung,19,40,Sommer\r\n"),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "items.csv" && p.Row == 2 && p.Code == "QuarterInvalid"
+        );
+    }
+
+    [Fact]
+    public async Task A_grave_with_five_recipients_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var recipients = string.Concat(
+            Enumerable.Range(0, 5).Select(i => $"E-{i},Name {i},Weg {i}\r\n")
+        );
+        var links = string.Concat(
+            Enumerable.Range(0, 5).Select(i => $"Recipient,IMP-5,E-{i},,\r\n")
+        );
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + recipients),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
+            ("graves.csv", GravesHeader + "IMP-5,27,Grabstätte,DoubleOutside,2026-01,\r\n"),
+            ("mapping.csv", MappingHeader + "Item,IMP-5,9001,1,\r\n" + links)
+        );
+
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
+        );
     }
 
     /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
@@ -715,7 +795,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -744,7 +824,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -772,7 +852,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9002,Sonderleistung,7,\r\n"),
+            ("items.csv", ItemsHeader + "9002,Sonderleistung,7,,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -805,7 +885,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.004\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.004,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -837,7 +917,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,10.01\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,10.01,\r\n"),
             (
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01-01,2040-12-31\r\n"
@@ -850,10 +930,15 @@ public class ImportTests
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = Assert.Single(await ProblemsAsync(response));
+        var problems = await ProblemsAsync(response);
         Assert.Equal(
-            "VAT 7 %: 10.01 does not split evenly across 1 recipient. 10.00 or 10.02 would work.",
-            problem.Message
+            "Anfang H1 2026: VAT 7 %: 10.01 does not split evenly across 1 recipient. "
+                + "Adjust a price at this VAT rate.",
+            Assert.Single(problems, p => p.Code == "PricesDoNotDivide").Message
+        );
+        Assert.Equal(
+            "Item 9001: 10.00 or 10.02 would work.",
+            Assert.Single(problems, p => p.Code == "PriceSuggestion").Message
         );
     }
 
@@ -878,10 +963,24 @@ public class ImportTests
                 .RootElement.GetProperty("problems")
                 .EnumerateArray()
                 .Single(p => p.GetProperty("code").GetString() == "PricesDoNotDivide");
-            Assert.Equal("PricesDoNotDivide2", problem.GetProperty("messageKey").GetString());
+            Assert.Equal("PricesDoNotDivideIn", problem.GetProperty("messageKey").GetString());
             Assert.Equal(
-                new[] { "19", "120.01", "2", "120.00", "120.02" },
+                new[] { "Anfang H1 2026", "19", "120.01", "2" },
                 problem
+                    .GetProperty("messageArgs")
+                    .EnumerateArray()
+                    .Select(a => a.GetString())
+                    .ToArray()
+            );
+
+            var suggestion = json
+                .RootElement.GetProperty("problems")
+                .EnumerateArray()
+                .Single(p => p.GetProperty("code").GetString() == "PriceSuggestion");
+            Assert.Equal("PriceSuggestion2", suggestion.GetProperty("messageKey").GetString());
+            Assert.Equal(
+                new[] { "9001", "120.00", "120.02" },
+                suggestion
                     .GetProperty("messageArgs")
                     .EnumerateArray()
                     .Select(a => a.GetString())
@@ -929,7 +1028,7 @@ public class ImportTests
 
         var archive = Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,\r\n"),
             ("graves.csv", GravesHeader + "IMP-1,27,Schineller Bäcke,DoubleOutside,2026-03,\r\n"),
             (
                 "mapping.csv",

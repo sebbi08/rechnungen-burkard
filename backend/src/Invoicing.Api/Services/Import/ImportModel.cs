@@ -32,7 +32,8 @@ public sealed record ItemRow(
     string Number,
     string Description,
     decimal VatRate,
-    decimal? Price
+    decimal? Price,
+    BillingQuarter? Quarter
 );
 
 public sealed record GraveRow(

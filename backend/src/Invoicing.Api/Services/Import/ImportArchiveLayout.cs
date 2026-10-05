@@ -17,6 +17,7 @@ public static class ImportArchiveLayout
         "Description",
         "VatRate",
         "Price",
+        "Quarter",
     };
     public static readonly string[] GravesHeader =
     {

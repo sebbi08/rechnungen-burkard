@@ -75,6 +75,7 @@ public sealed class ImportService
                 Description = row.Description,
                 VatRate = row.VatRate,
                 DefaultPrice = row.Price,
+                Quarter = row.Quarter,
             },
             StringComparer.OrdinalIgnoreCase
         );

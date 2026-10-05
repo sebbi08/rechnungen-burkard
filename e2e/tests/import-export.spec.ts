@@ -8,7 +8,7 @@ import { dialog } from "../vue";
 const RUN = Date.now();
 
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
-const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price\r\n";
+const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
 const GRAVES_HEADER = "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
 const MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 
@@ -26,7 +26,7 @@ function validArchive(suffix: string): Buffer {
       RECIPIENTS_HEADER +
       `IMP-R1-${suffix},Anna Import,"Hauptstraße 1\n99999 Musterdorf"\r\n` +
       `IMP-R2-${suffix},Bert Import,"Nebenweg 2\n99999 Musterdorf"\r\n`,
-    "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00\r\n`,
+    "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00,\r\n`,
     "graves.csv":
       GRAVES_HEADER + `IMP-G1-${suffix},27,Grabstätte Import,DoubleOutside,2026-01,2040-12\r\n`,
     "mapping.csv":
@@ -95,7 +95,7 @@ test("a defective archive is reported per file and row and imports nothing (Stor
   const graveNumber = `BAD-G-${RUN}`;
   const broken = archive({
     "recipients.csv": RECIPIENTS_HEADER + `BAD-R-${RUN},,Hauptstraße 1\r\n`,
-    "items.csv": ITEMS_HEADER + `BAD-I-${RUN},Grabpflege,7,120\r\n`,
+    "items.csv": ITEMS_HEADER + `BAD-I-${RUN},Grabpflege,7,120,\r\n`,
     "graves.csv":
       GRAVES_HEADER + `${graveNumber},27,Grabstätte Import,DoubleOutside,2026-01,2040-12\r\n`,
     "mapping.csv": MAPPING_HEADER + `Item,${graveNumber},GIBTSNICHT,1,\r\n`,
