@@ -123,7 +123,7 @@ way the grave site fields were folded in. The dev database is reset with
 
 `Quarter` must not change once a grave bills the item: it moves which invoices
 carry the item for every linked grave at once, and a split that divides today
-could stop dividing. The item update refuses it with `ItemQuarterFixed`, the
+could stop dividing. The item update refuses it with `QuarterImmutable`, the
 counterpart of the VAT rate's lock, and the item dialog disables the field with
 the existing hint extended to name both ("MwSt.-Satz und Quartal sind fest,
 sobald ein Grab den Artikel abrechnet.").
@@ -143,9 +143,13 @@ bulk download need no change and stay reproducible from persisted data
 
 ## 4. API
 
-### `POST /odata/ValidateGraveBilling`
+### `POST /odata/PreviewGraveBilling` (new)
 
-The request gains the term:
+`ValidateGraveBilling` stays exactly as it is: the grave invoice editor uses it
+to check the lines of one half-year as they were invoiced, already prorated and
+without a term, which is not what the grave editor asks. The grave editor and
+the grave detail page use a new action next to it, in
+`GraveBillingValidationController`, that takes the term:
 
 ```json
 {
@@ -186,6 +190,7 @@ The response:
           "Count": 1,
           "VatRate": 19,
           "PriceIncludesVat": false,
+          "Price": 20.0,
           "UnitPrice": 20.0,
           "NetTotal": 20.0
         }
@@ -202,6 +207,8 @@ The response:
   divide.
 - `LineIndex` refers to the request's `Lines`, so the editor can put a
   suggestion on the row it came from.
+- `Price` is the line's price in the unit it was entered in (the gross for a
+  VAT-included line), prorated where the invoice is; `UnitPrice` is its net.
 - `Problems` keep today's shape; their `Suggestions` stay empty (the per-line
   suggestions replace them).
 
@@ -224,12 +231,13 @@ first failing invoice by its label. Refuses more than four recipients with
 
 ### Item update
 
-Refuses a changed `Quarter` on a linked item with `ItemQuarterFixed`.
+Refuses a changed `Quarter` on a linked item with `QuarterImmutable`.
 
 ### `GraveInvoicingStatus` and generation
 
-- The status lists as open only graves whose term touches the selected
-  half-year, and returns a flag `InTerm` per grave for the detail page.
+- The status leaves out graves whose term does not touch the selected
+  half-year, unless they were invoiced for it anyway (generated before this
+  change).
 - The generation job selects only graves whose term touches the half-year; the
   others are neither generated nor counted as skipped.
 - `GraveInvoiceGenerator` builds its lines from `HalfYearBilling` for the
@@ -249,7 +257,7 @@ in line order, each old line used once); a newly added item takes the item's
 description. The unit price is whatever the edit dialog sends, which opens on the
 prorated price as invoiced.
 
-## 5. Import and Export
+## 5. Import
 
 - `items.csv` gets `Quarter` as its last column. Allowed values: empty,
   `Spring`, `Summer`, `Autumn`, `Winter` (the enum names, as `Position` takes
@@ -268,7 +276,8 @@ prorated price as invoiced.
   their place each line suggestion becomes its own problem,
   `importProblemPriceSuggestion` — "Leistung {0}: Möglich wären {1} oder {2}."
   (or "Möglich wäre {1}." with one).
-- The export writes the column; the empty template carries the new header.
+- There is no data export; the downloadable empty template carries the new
+  header.
 
 ## 6. Frontend
 
@@ -282,11 +291,13 @@ prorated price as invoiced.
 
 ```
 Leistungen
-┌ Nr ▾ | Anz | Preis   | inkl. | MwSt. | Quartal   ┐
-│ 100  |  1  | 60,00   |  ☐    | 19 %  | Ganzjährig│
-│ 210  |  1  | 40,00 ⚠ |  ☐    | 19 %  | Sommer    │
-│   Geht auf mit: [39,98] [40,02]                   │
-└───────────────────────────────────────────────────┘
+┌ Nr ▾                         | Anz | Preis   | inkl. ┐
+│ 100                          |  1  | 60,00   |  ☐    │
+│ Grabpflege · 19 % · Ganzjährig                       │
+│ 210                          |  1  | 40,00 ⚠ |  ☐    │
+│ Sommerbepflanzung · 19 % · Sommer                    │
+│   Geht auf mit: [39,98] [40,02]                      │
+└──────────────────────────────────────────────────────┘
 Beispielrechnungen
 ┌ Anfang · H1 2026 · 2 von 6 Mon. ✗ ┐ ┌ Volles H2            ✓ ┐
 │ 100 Grabpflege, anteilig … 20,00  │ │ 100 Grabpflege  60,00  │
@@ -297,11 +308,14 @@ Beispielrechnungen
 └───────────────────────────────────┘ └────────────────────────┘
 ```
 
-- **`LineEditor`** gets two read-only columns from the item master, "MwSt." and
-  "Quartal", and an optional `suggestions` prop keyed by row. A row with a
-  suggestion is marked as faulty and shows "Geht auf mit:" followed by one
-  button per price; a click sets that row's price. The invoice editor, which
-  shares `LineEditor`, passes no suggestions and shows the two new columns too.
+- **`LineEditor`** shows the item's VAT rate and quarter from the item master in
+  the caption under the item select, where the description already is:
+  "Grabpflege · 19 % · Ganzjährig". Two more columns would not fit: the drawer
+  is 48 rem wide on a tablet, where the row grid already starts. It gets an
+  optional `suggestions` prop keyed by row. A row with a suggestion marks its
+  price field invalid and shows "Geht auf mit:" followed by one button per
+  price; a click sets that row's price. The invoice editor, which shares
+  `LineEditor`, passes no suggestions and shows the same caption.
 - **`GraveBillingPreview`** (new component) renders one card per example: the
   label, a status as text and icon (not colour alone), the billed lines with
   their VAT rate, net total, collected gross and the amount per recipient with
@@ -323,7 +337,8 @@ Beispielrechnungen
 
 `GraveBillingPreview` is shown read-only below the "Leistungen" card, fed from
 the grave's stored links and term. The current-half-year status reads "Außerhalb
-der Laufzeit" when `InTerm` is false.
+der Laufzeit" when the current half-year has no month inside the grave's term
+(`halfYearInTerm` in `lib/halfYear.ts`, a comparison of `yyyy-MM` strings).
 
 ### Texts
 
@@ -347,18 +362,18 @@ stored in the line's description at generation.
 
 **API**
 
-- `ValidateGraveBilling`: response shape, `LineIndex` mapping, 1–4 recipients,
-  `DateRangeInvalid`.
+- `PreviewGraveBilling`: response shape, `LineIndex` mapping, 1–4 recipients,
+  `DateRangeInvalid`. `ValidateGraveBilling`'s tests stay green unchanged.
 - `SaveGrave`: refuses five recipients; refuses a grave whose start invoice does
   not divide although its full half-years do.
 - Generation: prorated price and suffix on the start and end invoice; a
   half-year outside the term is not generated and not counted as skipped;
   `NothingToBill`.
-- Status: a grave outside the term is not listed as open; `InTerm`.
-- Item update: `ItemQuarterFixed` when linked, allowed when not.
+- Status: a grave outside the term is not listed.
+- Item update: `QuarterImmutable` when linked, allowed when not.
 - Revision keeps the "anteilig" description.
-- Import: `Quarter` read and written; `QuarterInvalid`; `TooManyRecipients`;
-  `HeaderInvalid` without the column; the price check names the invoice.
+- Import: `Quarter` read; `QuarterInvalid`; `TooManyRecipients`; `HeaderInvalid`
+  without the column; the price check names the invoice; the template's header.
 
 **E2E** (own stack, through `e2e/vue.ts`)
 
