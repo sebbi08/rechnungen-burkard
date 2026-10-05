@@ -18,6 +18,7 @@ public sealed class Grave
     public DateOnly CreatedAt { get; set; }
     public List<GraveItem> Items { get; set; } = new();
     public List<GraveRecipient> Recipients { get; set; } = new();
+    public List<GraveBillingCorrection> Corrections { get; set; } = new();
 }
 
 public sealed class GraveItem

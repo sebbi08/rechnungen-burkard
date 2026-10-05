@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -931,13 +932,14 @@ public class SaveGraveTests
     }
 
     [Fact]
-    public async Task Saving_refuses_a_grave_whose_start_invoice_does_not_divide()
+    public async Task Saving_a_grave_whose_start_invoice_needs_a_correction_asks_for_it()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
         var (priced, _, first, second) = await SeedAsync(client);
 
-        // 60,02 divides by two; May and June of it are 20,01, which does not
+        // 60,02 divides by two; May and June of it are 20,01, which does not and
+        // is raised to 20,02 -- a correction the request has not confirmed
         var response = await client.PostAsync(
             "/odata/SaveGrave",
             ODataJson.Body(
@@ -948,11 +950,7 @@ public class SaveGraveTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
         var error = json.RootElement.GetProperty("error");
-        Assert.Equal("PricesDoNotDivide", error.GetProperty("code").GetString());
-        Assert.Equal(
-            "Anfang H1 2026",
-            Assert.Single(error.GetProperty("args").EnumerateArray().ToArray()).GetString()
-        );
+        Assert.Equal("CorrectionsChanged", error.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -1045,5 +1043,256 @@ public class SaveGraveTests
         );
 
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    private static async Task<long> SeedItemAt19Async(HttpClient client)
+    {
+        await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19.0m }));
+        return await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "4010",
+                        Description = "Grabpflege 19",
+                        VatRate = 19.0m,
+                        DefaultPrice = (decimal?)null,
+                    }
+                )
+            )
+        );
+    }
+
+    private static object CorrectedBody(
+        long? graveId,
+        long itemId,
+        decimal price,
+        IEnumerable<long> recipientIds,
+        object[] corrections
+    ) =>
+        new
+        {
+            graveId,
+            graveNumber = "K-1",
+            fieldNumber = "1",
+            siteName = "Schineller Bäcke",
+            position = "SingleInside",
+            startDate = "2026-03",
+            endDate = "2028-10",
+            items = new[]
+            {
+                new
+                {
+                    itemId,
+                    count = 1,
+                    unitPrice = (decimal?)price,
+                    priceIncludesVat = false,
+                },
+            },
+            recipientIds,
+            corrections,
+        };
+
+    private static object Correction(
+        string kind,
+        int? year,
+        int half,
+        long itemId,
+        decimal price
+    ) =>
+        new
+        {
+            kind,
+            year,
+            half,
+            vatRate = 19.0m,
+            itemId,
+            correctedPrice = price,
+        };
+
+    private static async Task<string> ErrorCodeAsync(HttpResponseMessage response)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("error").GetProperty("code").GetString()!;
+    }
+
+    // 3 recipients, care 60,00 all year, term 03/2026-10/2028: start H1 2026 and
+    // end H2 2028 bill 40,00, raised to 40,02
+    [Fact]
+    public async Task Saving_without_the_needed_corrections_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await RecipientsAsync(client, 3);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(CorrectedBody(null, item, 60.00m, recipients, []))
+        );
+
+        Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Saving_with_outdated_corrections_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await RecipientsAsync(client, 3);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                CorrectedBody(
+                    null,
+                    item,
+                    60.00m,
+                    recipients,
+                    [
+                        Correction("Start", 2026, 1, item, 40.01m),
+                        Correction("End", 2028, 2, item, 40.02m),
+                    ]
+                )
+            )
+        );
+
+        Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Saving_with_an_unknown_correction_kind_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await RecipientsAsync(client, 3);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                CorrectedBody(
+                    null,
+                    item,
+                    60.00m,
+                    recipients,
+                    [
+                        Correction("Nonsense", 2026, 1, item, 40.02m),
+                        Correction("End", 2028, 2, item, 40.02m),
+                    ]
+                )
+            )
+        );
+
+        Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Saving_with_the_confirmed_corrections_stores_them()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await RecipientsAsync(client, 3);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                CorrectedBody(
+                    null,
+                    item,
+                    60.00m,
+                    recipients,
+                    [
+                        Correction("Start", 2026, 1, item, 40.02m),
+                        Correction("End", 2028, 2, item, 40.02m),
+                    ]
+                )
+            )
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var json = await ODataJson.ReadAsync(response);
+        var graveId = json.RootElement.GetProperty("Id").GetInt64();
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var rows = await db
+            .GraveBillingCorrections.Where(c => c.GraveId == graveId)
+            .OrderBy(c => c.Year)
+            .ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, r => Assert.Equal(40.00m, r.EnteredPrice));
+        Assert.All(rows, r => Assert.Equal(40.02m, r.CorrectedPrice));
+        Assert.All(rows, r => Assert.Equal(19.0m, r.VatRate));
+        Assert.All(rows, r => Assert.Equal(item, r.ItemId));
+        Assert.Equal(BillingExampleKind.Start, rows[0].Kind);
+        Assert.Equal((2026, 1), (rows[0].Year, rows[0].Half));
+        Assert.Equal(BillingExampleKind.End, rows[1].Kind);
+        Assert.Equal((2028, 2), (rows[1].Year, rows[1].Half));
+    }
+
+    [Fact]
+    public async Task Saving_replaces_the_stored_corrections()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await RecipientsAsync(client, 3);
+        var first = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                CorrectedBody(
+                    null,
+                    item,
+                    60.00m,
+                    recipients,
+                    [
+                        Correction("Start", 2026, 1, item, 40.02m),
+                        Correction("End", 2028, 2, item, 40.02m),
+                    ]
+                )
+            )
+        );
+        Assert.True(first.IsSuccessStatusCode, await first.Content.ReadAsStringAsync());
+        using var created = await ODataJson.ReadAsync(first);
+        var graveId = created.RootElement.GetProperty("Id").GetInt64();
+
+        // 60,03 divides by three, and 4/6 of it, 40,02, divides as well
+        var second = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(CorrectedBody(graveId, item, 60.03m, recipients, []))
+        );
+
+        Assert.True(second.IsSuccessStatusCode, await second.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(
+            await db.GraveBillingCorrections.Where(c => c.GraveId == graveId).ToListAsync()
+        );
+    }
+
+    [Fact]
+    public async Task A_grave_needing_no_correction_saves_without_any()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, first, second) = await SeedAsync(client);
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(CorrectedBody(null, priced, 60.00m, new[] { first, second }, []))
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var json = await ODataJson.ReadAsync(response);
+        var graveId = json.RootElement.GetProperty("Id").GetInt64();
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(
+            await db.GraveBillingCorrections.Where(c => c.GraveId == graveId).ToListAsync()
+        );
     }
 }

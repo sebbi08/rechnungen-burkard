@@ -13,6 +13,18 @@ public sealed class GraveItemInput
     public bool PriceIncludesVat { get; set; }
 }
 
+/// <summary>One correction the editor showed and the user confirmed. The kind
+/// travels as its name; one that is not a kind matches nothing.</summary>
+public sealed class GraveCorrectionInput
+{
+    public string Kind { get; set; } = "";
+    public int? Year { get; set; }
+    public int Half { get; set; }
+    public decimal VatRate { get; set; }
+    public long ItemId { get; set; }
+    public decimal CorrectedPrice { get; set; }
+}
+
 public sealed record GraveFields(
     string GraveNumber,
     string FieldNumber,
@@ -36,11 +48,33 @@ public sealed class GraveService
         GraveFields fields,
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
+        IReadOnlyList<GraveCorrectionInput> corrections,
         CancellationToken ct
     )
     {
         await ValidateFieldsAsync(graveId, fields, ct);
-        await ValidateAsync(items, recipientIds, fields, ct);
+        var evaluation = await ValidateAsync(items, recipientIds, fields, ct);
+
+        // corrections are a promise the user confirmed: a price the editor did
+        // not show is never stored
+        var confirmed = corrections.Select(c => new CorrectionKey(
+            Enum.TryParse<BillingExampleKind>(c.Kind, out var kind) && Enum.IsDefined(kind)
+                ? kind
+                : (BillingExampleKind)(-1),
+            c.Year,
+            c.Half,
+            c.VatRate,
+            c.ItemId,
+            c.CorrectedPrice
+        ));
+        var computed = evaluation?.CorrectionKeys ?? [];
+        if (!GraveBillingCheck.SameCorrections(computed, confirmed))
+        {
+            throw new ValidationException(
+                "CorrectionsChanged",
+                "The rounding corrections differ from the ones confirmed."
+            );
+        }
 
         // A grave created without recipients could never be billed: generation
         // would skip it, and once created its recipient set cannot change. A
@@ -80,8 +114,8 @@ public sealed class GraveService
         grave.StartDate = fields.StartDate;
         grave.EndDate = fields.EndDate;
 
-        // the deletes must reach the database before the new links are inserted,
-        // or the unique (GraveId, ItemId) index rejects a re-added link
+        // the deletes must reach the database before the new links and corrections
+        // are inserted, or the unique indexes reject a re-added row
         await _db.SaveChangesAsync(ct);
 
         foreach (var input in items)
@@ -105,6 +139,26 @@ public sealed class GraveService
             );
         }
 
+        foreach (var invoice in evaluation?.Invoices ?? [])
+        {
+            foreach (var correction in invoice.Corrections)
+            {
+                grave.Corrections.Add(
+                    new GraveBillingCorrection
+                    {
+                        GraveId = grave.Id,
+                        Kind = invoice.Example.Kind,
+                        Year = invoice.Example.Period.Year,
+                        Half = invoice.Example.Period.Half,
+                        VatRate = correction.VatRate,
+                        ItemId = correction.ItemId,
+                        EnteredPrice = correction.EnteredPrice,
+                        CorrectedPrice = correction.CorrectedPrice,
+                    }
+                );
+            }
+        }
+
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return grave;
@@ -123,14 +177,17 @@ public sealed class GraveService
             await _db
                 .Graves.Include(g => g.Items)
                 .Include(g => g.Recipients)
+                .Include(g => g.Corrections)
                 .SingleOrDefaultAsync(g => g.Id == graveId, ct)
             ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
 
         // the dialog always sends the complete set of links, so replace wholesale
         _db.GraveItems.RemoveRange(grave.Items);
         _db.GraveRecipients.RemoveRange(grave.Recipients);
+        _db.GraveBillingCorrections.RemoveRange(grave.Corrections);
         grave.Items.Clear();
         grave.Recipients.Clear();
+        grave.Corrections.Clear();
         return grave;
     }
 
@@ -191,7 +248,7 @@ public sealed class GraveService
         }
     }
 
-    private async Task ValidateAsync(
+    private async Task<GraveBillingEvaluation?> ValidateAsync(
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
         GraveFields fields,
@@ -280,10 +337,11 @@ public sealed class GraveService
             throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
         }
 
-        // The bill is split equally, so it has to divide. Nothing is adjusted to
-        // make it: a grave that does not come out even is refused here, while
-        // the dialog is still open and a price can be changed, rather than
-        // producing invoices that disagree with each other or with the grave.
+        // The bill is split equally, so it has to divide. Where a block does not,
+        // a line per VAT rate is raised by a few cents (see GraveBillingCheck);
+        // the corrections are returned for the save to compare with what the
+        // user confirmed and to store. A grave no correction can fix is refused
+        // here, while the dialog is still open and a price can be changed.
         //
         // Only checked once there are recipients -- until then there is nothing
         // to divide by, and a grave is often saved with its items before its
@@ -303,12 +361,11 @@ public sealed class GraveService
 
             // every invoice the term produces has to divide on its own: the
             // first and last half-year bill other amounts than the full ones
-            var evaluation = GraveBillingCheck.Evaluate(
+            var evaluation = GraveBillingCheck.EvaluateWithCorrections(
                 links,
                 fields.StartDate,
                 fields.EndDate,
-                recipientIds.Count,
-                withSuggestions: false
+                recipientIds.Count
             );
             if (evaluation.FirstFailing is { } failing)
             {
@@ -318,7 +375,11 @@ public sealed class GraveService
                     HalfYearBilling.Label(failing.Example)
                 );
             }
+
+            return evaluation;
         }
+
+        return null;
     }
 }
 

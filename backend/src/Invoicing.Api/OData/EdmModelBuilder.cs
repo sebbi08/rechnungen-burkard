@@ -23,6 +23,8 @@ public static class EdmModelBuilder
         // EDM would let one $expand=Documents pull every document's bytes through
         // the query pipeline in a single response.
         b.EntityType<Document>().Ignore(d => d.Content);
+        // corrections are stored for generation, never read through OData
+        b.EntityType<Grave>().Ignore(g => g.Corrections);
         b.EntitySet<Job>("Jobs");
         b.Singleton<GlobalSettings>("Settings");
         b.Action("CreateInvoice").ReturnsFromEntitySet<Invoice>("Invoices");

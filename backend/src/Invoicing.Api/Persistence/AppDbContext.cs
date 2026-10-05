@@ -15,6 +15,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Grave> Graves => Set<Grave>();
     public DbSet<GraveItem> GraveItems => Set<GraveItem>();
     public DbSet<GraveRecipient> GraveRecipients => Set<GraveRecipient>();
+    public DbSet<GraveBillingCorrection> GraveBillingCorrections => Set<GraveBillingCorrection>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<Document> Documents => Set<Document>();
@@ -65,6 +66,7 @@ public sealed class AppDbContext : DbContext
         // by name, so a reordered enum never reinterprets stored rows
         mb.Entity<Grave>().Property(g => g.Position).HasConversion<string>();
         mb.Entity<InvoiceItem>().Property(i => i.Quarter).HasConversion<string>();
+        mb.Entity<GraveBillingCorrection>().Property(c => c.Kind).HasConversion<string>();
         mb.Entity<Invoice>().Property(i => i.GravePosition).HasConversion<string>();
         // cascade children when their parent goes
         mb.Entity<Grave>()
@@ -102,5 +104,25 @@ public sealed class AppDbContext : DbContext
         // one link per (grave, item) / (grave, recipient)
         mb.Entity<GraveItem>().HasIndex(i => new { i.GraveId, i.ItemId }).IsUnique();
         mb.Entity<GraveRecipient>().HasIndex(r => new { r.GraveId, r.RecipientId }).IsUnique();
+        // corrections belong to their grave and go with it; the item they raise
+        // cannot be deleted while one refers to it
+        mb.Entity<Grave>()
+            .HasMany(g => g.Corrections)
+            .WithOne()
+            .HasForeignKey(c => c.GraveId)
+            .OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<GraveBillingCorrection>()
+            .HasOne(c => c.Item)
+            .WithMany()
+            .HasForeignKey(c => c.ItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+        mb.Entity<GraveBillingCorrection>()
+            .HasIndex(c => new
+            {
+                c.GraveId,
+                c.Kind,
+                c.VatRate,
+            })
+            .IsUnique();
     }
 }

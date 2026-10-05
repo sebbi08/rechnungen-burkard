@@ -186,6 +186,7 @@ public class GravesController : ODataController
                 fields,
                 request.Items ?? new List<GraveItemInput>(),
                 request.RecipientIds ?? new List<long>(),
+                request.Corrections ?? new List<GraveCorrectionInput>(),
                 HttpContext.RequestAborted
             );
             // PascalCase like every other entity payload; MVC's default camelCase
@@ -275,5 +276,6 @@ public class GravesController : ODataController
         public string? EndDate { get; set; }
         public List<GraveItemInput>? Items { get; set; }
         public List<long>? RecipientIds { get; set; }
+        public List<GraveCorrectionInput>? Corrections { get; set; }
     }
 }

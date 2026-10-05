@@ -101,6 +101,47 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.ToTable("Graves");
                 });
 
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.GraveBillingCorrection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("CorrectedPrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EnteredPrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("GraveId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Half")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId");
+
+                    b.HasIndex("GraveId", "Kind", "VatRate")
+                        .IsUnique();
+
+                    b.ToTable("GraveBillingCorrections");
+                });
+
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.GraveInvoiceRun", b =>
                 {
                     b.Property<long>("Id")
@@ -450,6 +491,23 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.GraveBillingCorrection", b =>
+                {
+                    b.HasOne("Burkard.Invoicing.Domain.Entities.Grave", null)
+                        .WithMany("Corrections")
+                        .HasForeignKey("GraveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Burkard.Invoicing.Domain.Entities.InvoiceItem", "Item")
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.GraveItem", b =>
                 {
                     b.HasOne("Burkard.Invoicing.Domain.Entities.Grave", null)
@@ -495,6 +553,8 @@ namespace Burkard.Invoicing.Api.Migrations
 
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Grave", b =>
                 {
+                    b.Navigation("Corrections");
+
                     b.Navigation("Items");
 
                     b.Navigation("Recipients");
