@@ -215,6 +215,9 @@ The response:
 
 ### Suggestions
 
+> Replaced: `2026-10-05-grave-billing-corrections-design.md` corrects a block that
+> does not split automatically and removes these suggestions.
+
 For each request line that is billed on at least one failing invoice, the
 nearest entered price below and above is searched in cent steps, up to 400 cents
 away (today's reach), at which **every** example invoice divides while all other

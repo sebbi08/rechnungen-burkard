@@ -407,10 +407,12 @@ non-interactive until completion, and the task runs exactly once.
 - What happens when an invoice is generated twice for the same grave and
   half-year? The second attempt must be prevented.
 - How are rounding differences handled when a grave's per-rate subtotal does not
-  divide evenly among its recipients? No price is adjusted silently: saving the
-  grave is refused, naming the first invoice that does not divide, and the
-  editor suggests per item line the nearest prices below and above at which
-  every invoice of the term divides.
+  divide evenly among its recipients? One line per invoice of the term and VAT
+  rate is raised by the smallest amount, at most 1,00 €, at which the subtotal
+  divides; the grave's editor shows it, the user confirms it before saving, and
+  the correction is stored with the grave. A price is never lowered. Only when
+  no line can be raised far enough is saving refused, naming the first invoice
+  that does not divide.
 - What happens when a recipient's address is changed after invoices were
   generated? Historical invoices must remain unchanged.
 - What happens when a grave's end month lies before the selected half-year (or
@@ -536,14 +538,22 @@ non-interactive until completion, and the task runs exactly once.
   recipients so that every recipient's share is identical, and every invoice's
   VAT MUST follow from its own share of that net. This MUST hold for every
   invoice the term produces — the prorated first and last half-year as well as
-  a full one — not only for a full half-year. The system MUST NOT adjust a
-  price to achieve this: saving a grave whose subtotals do not divide MUST be
-  refused, naming the first failing invoice, the VAT rate and its subtotal, and
-  MUST offer per item line the nearest prices below and above at which every
-  invoice divides. The grave's editor MUST show these example invoices and their
-  check while the user types. Where a rate carries a price entered as a gross,
-  what the recipients collect between them MUST come to exactly that gross, and
-  the save MUST be refused otherwise.
+  a full one — not only for a full half-year. Where a subtotal does not divide,
+  the system MUST correct it instead of refusing the grave: per invoice of the
+  term and VAT rate it MUST raise one line, the first all-year line of that
+  rate (otherwise the first line of the rate, and the next line of the rate if
+  that one cannot fix it), by the smallest amount at which the subtotal
+  divides, and by at most 1,00 €. A price MUST NOT be lowered. A save that needs
+  corrections MUST first list them (invoice, item, VAT rate, entered and
+  corrected price) in a confirmation the user can cancel, and the corrections
+  MUST be stored with the grave and applied when its invoices are generated.
+  Only when no line can be raised by 1,00 € or less MUST saving be refused,
+  naming the first failing invoice, the VAT rate and its subtotal. The grave's
+  editor MUST show the example invoices, their check and each corrected price
+  (marked as adjusted, with the price as entered) while the user types. Every
+  grave MUST have an item billed all year, which carries the correction. Where
+  a rate carries a price entered as a gross, what the recipients collect between
+  them MUST come to exactly that gross, and the save MUST be refused otherwise.
 - **FR-022**: Each recipient invoice MUST state which percentage of the grave's
   bill it represents, in its summary beneath the item list: the grave's net sum,
   then the recipient's share of it labelled with that percentage, then the VAT
@@ -556,7 +566,11 @@ non-interactive until completion, and the task runs exactly once.
 **Half-year grave invoicing**
 
 - **FR-025**: Grave invoices MUST be generated per half-year period, and only for
-  a half-year with at least one month inside the grave's term.
+  a half-year with at least one month inside the grave's term. Before a run the
+  system MUST recompute the rounding corrections (FR-021a) of every grave it
+  would invoice and stop the whole run, naming those graves, when a stored
+  correction differs from the current one (for instance after an item's price
+  changed); such a grave has to be opened and saved again first.
 - **FR-026**: The system MUST record that a grave's invoices have been generated
   for a given half-year.
 - **FR-027**: The system MUST prevent generating duplicate invoices for the same
@@ -565,6 +579,9 @@ non-interactive until completion, and the task runs exactly once.
   half-year first.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
+- **FR-029a**: Each grave with rounding corrections MUST carry the tag
+  "angepasst" in the overview, and a switch "Nur mit Rundungsanpassungen" MUST
+  narrow the list to those graves.
 
 **Non-grave invoices**
 
@@ -663,9 +680,11 @@ non-interactive until completion, and the task runs exactly once.
   recipients CSV file.
 - **FR-058a**: Validation MUST refuse a grave that could not be billed: a grave
   without a recipient, a link to an item without a price, or prices that do not
-  divide across the grave's recipients (FR-021a; the first failing invoice of
-  a grave is reported with its label, plus one suggestion per item line), or
-  more than four recipients (FR-020). The archive is refused as a
+  divide across the grave's recipients even after a rounding correction
+  (FR-021a; the first failing invoice of a grave is reported with its label), a
+  grave without an item billed all year, or more than four recipients (FR-020).
+  A price that merely needs a correction is accepted; the correction is stored
+  with the grave without a confirmation. The archive is refused as a
   whole, so nothing imports that the dialog would have refused to save.
 - **FR-059**: Validation MUST report each problem with the affected file, the row,
   and a human-readable reason.
@@ -674,7 +693,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-061**: The system MUST create recipients, invoice items, and graves from a
   valid archive, linking each grave's items and recipients via the mapping CSV.
 - **FR-062**: After a successful import, the system MUST show a summary of the
-  imported data (counts per file).
+  imported data (counts per file) and, when graves needed rounding corrections,
+  how many ("Gräber mit Rundungsanpassungen: {n}").
 
 **Progress and language**
 
