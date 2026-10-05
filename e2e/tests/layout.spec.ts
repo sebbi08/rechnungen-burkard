@@ -1,6 +1,15 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
-import { drawer, pickItem, pickRecipient, rowAction, waitForOverlayOpen } from "../vue";
+import {
+  dialog,
+  drawer,
+  fillDate,
+  pickItem,
+  pickOption,
+  pickRecipient,
+  rowAction,
+  waitForOverlayOpen,
+} from "../vue";
 
 // Layout regressions on small screens: every screen must fit the viewport
 // without sideways scrolling, its actions must stay reachable and readable, and
@@ -377,6 +386,51 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   // last, since on a phone it is where this test stops (see PICKER_SQUEEZED)
   await expectPickerGetsTheWidth(page, "graveRecipient");
 
+  await editor.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(editor).toHaveCount(0);
+});
+
+test("graves: the rounding corrections dialog fits the viewport", async ({ page }) => {
+  // 47,80 at 19 % does not divide across three recipients, so saving the grave
+  // asks for a confirmation first
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  const itemNumber = `L${RUN}-KORREKTUR`;
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "Grabstein reinigen mit einer längeren Beschreibung",
+    VatRate: 19,
+    DefaultPrice: 47.8,
+  });
+  const names = ["Anna", "Bert", "Cilly"].map((name) => `${name} ${RUN}`);
+  for (const name of names) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/graves");
+  await page.getByRole("button", { name: "Grab anlegen", exact: true }).click();
+  await waitForOverlayOpen(page);
+  const editor = drawer(page);
+  await editor.getByLabel("Grabnummer").fill(`LK-${RUN}`);
+  await editor.getByLabel("Feld-Nr.").fill("27");
+  await editor.getByLabel("Grabstätte").fill("Schineller Bäcke");
+  await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
+  await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await pickItem(page, 1, itemNumber);
+  for (const name of names) {
+    await pickRecipient(page, "graveRecipient", name);
+    await editor.getByRole("button", { name: "Hinzufügen", exact: true }).click();
+    await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
+  }
+
+  await editor.getByRole("button", { name: "Speichern" }).click();
+  const corrections = dialog(page, "Preise werden angepasst");
+  await expect(corrections).toBeVisible();
+  await expect(corrections).toContainText("47,82 €");
+  await expectNoSidewaysScrolling(page);
+
+  await corrections.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(corrections).toHaveCount(0);
   await editor.getByRole("button", { name: "Abbrechen" }).click();
   await expect(editor).toHaveCount(0);
 });

@@ -756,11 +756,11 @@ test("an invoice works each rate's gross out at that rate, not at a blended one"
   await expect(lines.filter({ hasText: "Blumenschmuck" })).toContainText("117,81 €");
 });
 
-test("a grave whose prices do not divide is refused until a price is changed", async ({ page }) => {
+test("a grave whose prices do not divide is saved with confirmed corrections", async ({ page }) => {
   const marker = `GW-${Date.now()}`;
   // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,
-  // so the three of them cannot be billed the same amount. Nothing raises the
-  // price to make it fit — the save is refused and names what would work.
+  // so the three of them cannot be billed the same amount. The price is raised
+  // to the next one that divides (47,82), shown before saving and confirmed.
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   await createRow(page, "/odata/InvoiceItems", {
     Number: `${marker}-item`,
@@ -772,6 +772,9 @@ test("a grave whose prices do not divide is refused until a price is changed", a
   for (const name of names) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
+  // a grave that divides as it is, to be hidden by the overview filter
+  const plainMarker = `GP-${Date.now()}`;
+  await seedGrave(page, plainMarker, [`Dora ${plainMarker}`]);
 
   await page.goto("/graves");
   const editor = await startNewGrave(page, marker);
@@ -783,27 +786,36 @@ test("a grave whose prices do not divide is refused until a price is changed", a
     await addRecipient(page, editor, name);
   }
 
-  // the preview says so before anything is saved: the full half-years cannot
-  // be split, and the line offers the nearest prices that can
-  const failing = editor.getByRole("group", { name: "Volles H1" });
-  await expect(failing).toContainText("Geht nicht auf");
-  await expect(failing).toContainText("47,80");
-  // formatAmount writes "47,79 €"
-  const fix = editor.getByRole("button", { name: "Preis 47,79 € für Zeile 1 übernehmen" });
-  await expect(fix).toBeVisible();
+  // the preview says so before anything is saved
+  const card = editor.getByRole("group", { name: "Volles H1" });
+  await expect(card).toContainText("Geht auf (angepasst)");
+  await expect(card).toContainText("angepasst, eingegeben 47,80 €");
+  await expect(card).toContainText("47,82 €");
 
-  // saving anyway is refused and lands on the failing invoice
+  // saving asks first and lists what changes
   await editor.getByRole("button", { name: "Speichern" }).click();
-  await expect(toasts(page)).toContainText("nicht gleichmäßig");
-  await expect(editor.locator("[data-billing-invalid]").first()).toBeFocused();
+  const confirm = dialog(page, "Preise werden angepasst");
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText("47,80 €");
+  await expect(confirm).toContainText("47,82 €");
 
-  await fix.click();
-  await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("47,79");
-  await expect(editor.getByRole("group", { name: "Volles H1" })).toContainText("Geht auf");
-  await saveEditor(editor);
+  // cancelling leaves the editor open and the grave unsaved
+  await confirm.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(confirm).toHaveCount(0);
+  await expect(editor).toBeVisible();
 
+  await editor.getByRole("button", { name: "Speichern" }).click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole("button", { name: "Mit Anpassungen speichern" }).click();
   await expect(editor).toHaveCount(0);
+
+  // the overview's switch keeps the graves with corrections
   await expect(page.getByRole("table")).toContainText(marker);
+  await page.getByLabel("Nur mit Rundungsanpassungen").check();
+  const row = page.getByRole("row").filter({ hasText: marker });
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("angepasst");
+  await expect(page.getByRole("row").filter({ hasText: plainMarker })).toHaveCount(0);
 });
 
 test("the grave editor previews a prorated start and a seasonal item", async ({ page }) => {
