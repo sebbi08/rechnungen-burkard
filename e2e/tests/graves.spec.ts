@@ -646,6 +646,54 @@ test("the generate dialog refuses a half-year older than two half-years back", a
   await expect(submit).toBeEnabled();
 });
 
+test("the generate dialog opens on today when the overview shows a half-year too old", async ({
+  page,
+}) => {
+  // an early start widens the overview's year range down to it
+  const oldYear = CURRENT_YEAR - 3;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `OLD-${RUN}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Alt ${RUN}`,
+    Address: "Hauptstraße 1",
+  });
+  await saveGrave(page, {
+    graveNumber: `OLD-${RUN}`,
+    startDate: `${oldYear}-01`,
+    items: [{ itemId: item.Id, count: 1 }],
+    recipientIds: [recipient.Id],
+  });
+
+  await page.goto("/graves");
+  // emptying the year field leaves it empty while it is edited, and the kept year returns when it closes
+  const overviewYear = page.locator("#gravesYear");
+  await overviewYear.fill("");
+  await expect(overviewYear).toHaveValue("");
+  await overviewYear.press("Escape");
+  await expect(overviewYear).toHaveValue(String(CURRENT_YEAR));
+  await fillYear(page, overviewYear, String(oldYear));
+  await halfButton(page, 1).click();
+  await expect(halfButton(page, 1)).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForOverlayOpen(page);
+  const generate = dialog(page, "Rechnungen erzeugen");
+  await expect(generate.locator("#generateYear")).toHaveValue(String(CURRENT_YEAR));
+  await expect(halfButton(generate, CURRENT_HALF)).toHaveAttribute("aria-pressed", "true");
+  const submit = generate.getByRole("button", { name: "Jetzt erzeugen" });
+  await expect(submit).toBeEnabled();
+
+  // without a year there is nothing to generate
+  await generate.locator("#generateYear").fill("");
+  await expect(submit).toBeDisabled();
+  await generate.locator("#generateYear").press("Escape");
+});
+
 test("a grave with three recipients bills every one of them the identical share (2035/2)", async ({
   page,
 }) => {

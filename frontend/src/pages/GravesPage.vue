@@ -12,7 +12,7 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 import {
@@ -54,20 +54,28 @@ const halves = [
 
 // the years that have graves, and next year: graves without an end run on
 const yearRange = useGraveYearRange();
+// a picker must not open on a disabled year when every grave starts in the future
 const minYearDate = computed(
   () => new Date(Math.min(yearRange.data.value?.first ?? currentYear - 2, currentYear), 0, 1),
 );
-const maxYearDate = computed(
-  () => new Date(Math.max(yearRange.data.value?.last ?? currentYear + 1, currentYear), 11, 31),
-);
-const yearDate = computed(() => new Date(period.value[0], 0, 1));
-// remounts the year field when it is cleared, so it shows the kept year again
-const yearFieldKey = ref(0);
+const maxYearDate = computed(() => new Date(yearRange.data.value?.last ?? currentYear + 1, 11, 31));
+// the field's own value: empty while the user retypes it, whereas the kept
+// year (in `halfYear`) is what the page queries with
+const yearField = ref<Date | null>(new Date(period.value[0], 0, 1));
+watch(period, ([year]) => {
+  if (yearField.value?.getFullYear() !== year) {
+    yearField.value = new Date(year, 0, 1);
+  }
+});
 function setYear(value: Date | Date[] | (Date | null)[] | null | undefined): void {
   if (value instanceof Date) {
     halfYear.value = halfYearKey(value.getFullYear(), period.value[1]);
-  } else {
-    yearFieldKey.value++;
+  }
+}
+// a field left empty shows the kept year again
+function restoreYear(): void {
+  if (yearField.value == null) {
+    yearField.value = new Date(period.value[0], 0, 1);
   }
 }
 const half = computed({
@@ -219,8 +227,7 @@ function openEditor(graveId: number | null): void {
           />
         </IconField>
         <DatePicker
-          :key="yearFieldKey"
-          :model-value="yearDate"
+          v-model="yearField"
           input-id="gravesYear"
           view="year"
           date-format="yy"
@@ -230,6 +237,7 @@ function openEditor(graveId: number | null): void {
           show-icon
           class="w-full sm:w-36"
           @update:model-value="setYear"
+          @hide="restoreYear"
         />
         <SelectButton
           v-model="half"
