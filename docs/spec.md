@@ -201,6 +201,8 @@ appears twice.
    first.
 5. **Given** the user selects a past or future half-year, **When** the view
    updates, **Then** the invoicing status for the selected half-year is displayed.
+   The overview picks the year in a calendar (limited to the years in which graves
+   exist, plus next year) and the half-year with an H1/H2 toggle.
 6. **Given** a grave with two recipients has been invoiced for a half-year,
    **When** the user edits one of those recipients' invoices, **Then** both
    recipients receive an identical new revision of the grave's edited lines,
@@ -213,6 +215,11 @@ appears twice.
 8. **Given** a grave whose term has no month in the selected half-year, **When**
    invoices are generated or the grave overview is displayed for that half-year,
    **Then** no invoice is generated for the grave and it is not listed as open.
+9. **Given** the generate dialog, **When** the user picks the year (calendar, any
+   future year) and the half-year (H1/H2 toggle), **Then** a half-year more than
+   two half-years before the current one cannot be generated: the dialog shows the
+   earliest one ("Frühestens H2 2025.") and disables "Jetzt erzeugen" for anything
+   older, and the server refuses it too.
 
 ---
 

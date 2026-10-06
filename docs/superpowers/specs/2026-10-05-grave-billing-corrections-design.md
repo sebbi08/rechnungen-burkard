@@ -151,7 +151,10 @@ confirmed list from the editor never contains one. The precheck also leaves out
 stored `Start`/`StartAndEnd` rows of a half-year that has begun: a grave saved
 while its start still lay ahead must not block every run once that half-year is
 reached. Generation itself still applies a stored correction for the half-year
-it bills.
+it bills. When a half-year whose start block was left unchecked is generated
+(possible within the two-half-year look-back), that grave has no stored
+correction for it and is skipped with "Preise lassen sich nicht aufteilen" if the
+start block does not divide.
 
 ### Generation reaches back two half-years
 
