@@ -646,6 +646,34 @@ test("the generate dialog refuses a half-year older than two half-years back", a
   await expect(submit).toBeEnabled();
 });
 
+test("the generate dialog disables its submit button below the earliest half-year", async ({
+  page,
+}) => {
+  const index = CURRENT_YEAR * 2 + (CURRENT_HALF - 1) - 2;
+  const earliestYear = Math.floor(index / 2);
+  const earliestHalf = (index % 2) + 1;
+  // with the earliest half being H1 no half of its year lies below the bound
+  test.skip(earliestHalf === 1, "every half of the earliest year is allowed");
+
+  await page.goto("/graves");
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForOverlayOpen(page);
+  const generate = dialog(page, "Rechnungen erzeugen");
+  const submit = generate.getByRole("button", { name: "Jetzt erzeugen" });
+
+  // H1 of the current year is allowed; moving the year back below the bound
+  // leaves it selected, and the run would be refused
+  await halfButton(generate, 1).click();
+  await expect(halfButton(generate, 1)).toHaveAttribute("aria-pressed", "true");
+  await expect(submit).toBeEnabled();
+  await fillYear(page, generate.locator("#generateYear"), String(earliestYear));
+  await expect(submit).toBeDisabled();
+
+  // the allowed half enables it again
+  await halfButton(generate, 2).click();
+  await expect(submit).toBeEnabled();
+});
+
 test("the generate dialog opens on today when the overview shows a half-year too old", async ({
   page,
 }) => {
