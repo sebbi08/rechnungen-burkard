@@ -67,10 +67,17 @@ public class GraveBillingCheckTests
     }
 
     [Fact]
-    public void A_start_block_of_a_started_term_is_not_checked_or_corrected()
+    public void A_start_block_before_the_generation_window_is_not_checked_or_corrected()
     {
-        // 60,02: the start block (May/June, 20,01) would need a correction
-        var evaluation = GraveBillingCheck.Evaluate([Care(60.02m)], May2026, null, 2, (2026, 2));
+        // 60,02: the start block (May/June, 20,01) would need a correction, but
+        // H1 2025 is before H2 2025, the earliest half-year of a clock in H2 2026
+        var evaluation = GraveBillingCheck.Evaluate(
+            [Care(60.02m)],
+            new DateOnly(2025, 5, 1),
+            null,
+            2,
+            (2026, 2)
+        );
 
         Assert.True(evaluation.Ok);
         Assert.Equal(2, evaluation.Invoices.Count);

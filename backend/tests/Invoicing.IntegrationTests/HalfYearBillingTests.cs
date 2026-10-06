@@ -252,49 +252,42 @@ public class HalfYearBillingTests
         Assert.Equal((2026, 2), HalfYearBilling.HalfYearOf(new DateTime(2026, 10, 6, 12, 0, 0)));
     }
 
-    [Fact]
-    public void Examples_leave_out_a_start_that_is_in_the_current_half_year()
+    [Theory]
+    [InlineData(2025, 2)]
+    [InlineData(2026, 1)]
+    [InlineData(2026, 2)]
+    [InlineData(2027, 1)]
+    public void Examples_keep_a_start_that_can_still_be_generated(int year, int half)
     {
-        var examples = HalfYearBilling.Examples(M(2026, 8), null, (2026, 2));
+        // the clock stands in H2 2026: H2 2025 is the earliest half-year generation reaches
+        var from = M(year, half == 1 ? 2 : 8);
 
         Assert.Equal(
-            new[] { BillingExampleKind.FullFirstHalf, BillingExampleKind.FullSecondHalf },
-            examples.Select(e => e.Kind)
+            BillingExampleKind.Start,
+            HalfYearBilling.Examples(from, null, (2026, 2))[0].Kind
         );
-    }
-
-    [Fact]
-    public void Examples_leave_out_a_start_that_is_before_the_current_half_year()
-    {
-        var examples = HalfYearBilling.Examples(M(2026, 5), M(2030, 8), (2026, 2));
-
-        Assert.Equal(
-            new[]
-            {
-                BillingExampleKind.FullFirstHalf,
-                BillingExampleKind.FullSecondHalf,
-                BillingExampleKind.End,
-            },
-            examples.Select(e => e.Kind)
-        );
-    }
-
-    [Fact]
-    public void Examples_keep_a_start_that_is_after_the_current_half_year()
-    {
-        var examples = HalfYearBilling.Examples(M(2027, 1), null, (2026, 2));
-
-        Assert.Equal(BillingExampleKind.Start, examples[0].Kind);
-    }
-
-    [Fact]
-    public void Examples_leave_out_a_start_and_end_that_has_begun_and_keep_a_later_one()
-    {
-        Assert.Empty(HalfYearBilling.Examples(M(2026, 2), M(2026, 4), (2026, 1)));
         Assert.Equal(
             BillingExampleKind.StartAndEnd,
-            Assert.Single(HalfYearBilling.Examples(M(2026, 8), M(2026, 9), (2026, 1))).Kind
+            Assert.Single(HalfYearBilling.Examples(from, from, (2026, 2))).Kind
         );
+    }
+
+    [Fact]
+    public void Examples_leave_out_a_start_before_the_earliest_generatable_half_year()
+    {
+        Assert.Equal(
+            new[] { BillingExampleKind.FullFirstHalf, BillingExampleKind.FullSecondHalf },
+            HalfYearBilling.Examples(M(2025, 5), null, (2026, 2)).Select(e => e.Kind)
+        );
+        Assert.Empty(HalfYearBilling.Examples(M(2025, 2), M(2025, 4), (2026, 2)));
+    }
+
+    [Fact]
+    public void The_earliest_generatable_half_year_is_two_back()
+    {
+        Assert.Equal((2025, 2), HalfYearBilling.EarliestGeneratable((2026, 2)));
+        Assert.Equal((2025, 1), HalfYearBilling.EarliestGeneratable((2026, 1)));
+        Assert.Equal((2024, 2), HalfYearBilling.EarliestGeneratable((2025, 2)));
     }
 
     [Fact]

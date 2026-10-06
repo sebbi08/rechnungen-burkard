@@ -63,8 +63,7 @@ public class GraveBillingPreviewTests
     [Fact]
     public async Task The_preview_lists_the_terms_invoices_with_their_lines()
     {
-        // a clock before the term: its start block is still ahead
-        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
+        using var host = new ApiTestHost();
         var (care, summer) = await SeedAsync(host);
         using var client = host.CreateClient();
 
@@ -110,10 +109,10 @@ public class GraveBillingPreviewTests
     }
 
     [Fact]
-    public async Task The_start_block_of_a_term_that_has_begun_is_not_previewed()
+    public async Task A_start_block_before_the_generation_window_is_not_previewed()
     {
-        // the fixed clock stands in H2 2026: a start in 05/2026 has begun, one in
-        // 01/2027 has not
+        // the fixed clock stands in H2 2026: generation reaches back to H2 2025,
+        // so a start in 05/2025 can no longer be invoiced, one in 05/2026 can
         using var host = new ApiTestHost();
         var (care, _) = await SeedAsync(host);
         using var client = host.CreateClient();
@@ -135,18 +134,17 @@ public class GraveBillingPreviewTests
                 .ToArray();
         }
 
-        Assert.Equal(new[] { "FullFirstHalf", "FullSecondHalf" }, await KindsAsync("2026-05"));
+        Assert.Equal(new[] { "FullFirstHalf", "FullSecondHalf" }, await KindsAsync("2025-05"));
         Assert.Equal(
             new[] { "Start", "FullFirstHalf", "FullSecondHalf" },
-            await KindsAsync("2027-05")
+            await KindsAsync("2026-05")
         );
     }
 
     [Fact]
     public async Task A_block_that_does_not_divide_comes_back_corrected()
     {
-        // a clock before the term: its start block is still ahead
-        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
+        using var host = new ApiTestHost();
         var (care, _) = await SeedAsync(host);
         using var client = host.CreateClient();
 

@@ -122,9 +122,9 @@ public static class HalfYearBilling
     /// start and end in one), a full H1 and a full H2 where one lies entirely
     /// inside the term, and the end. Without a start, only the two full ones.
     ///
-    /// The start block of a term that has begun is left out: it is not billed,
-    /// checked or corrected once its half-year is <paramref name="current"/> or
-    /// earlier. Only a start in a later half-year is listed.</summary>
+    /// The start block is left out only when its half-year is before
+    /// <see cref="EarliestGeneratable"/> of <paramref name="current"/>: it can no
+    /// longer be invoiced, so it is not billed, checked or corrected.</summary>
     public static IReadOnlyList<BillingExample> Examples(
         DateOnly? start,
         DateOnly? end,
@@ -154,7 +154,8 @@ public static class HalfYearBilling
         var sameHalf = endHalf == (startYear, startHalf);
 
         var examples = new List<BillingExample>();
-        if (startYear * 2 + startHalf > current.Year * 2 + current.Half)
+        var earliest = EarliestGeneratable(current);
+        if (startYear * 2 + startHalf >= earliest.Year * 2 + earliest.Half)
         {
             examples.Add(
                 new(
@@ -294,16 +295,28 @@ public static class HalfYearBilling
     public static (int Year, int Half) HalfYearOf(DateTime moment) =>
         (moment.Year, moment.Month <= 6 ? 1 : 2);
 
-    /// <summary>Whether the block is the start of a term in the current
-    /// half-year or an earlier one, which is neither billed nor checked.</summary>
-    public static bool IsStartedBlock(
+    /// <summary>Whether the block is the start of a term in a half-year before
+    /// <see cref="EarliestGeneratable"/>: it can no longer be invoiced, so it is
+    /// neither billed nor checked.</summary>
+    public static bool IsBeyondGeneration(
         BillingExampleKind kind,
         int? year,
         int half,
         (int Year, int Half) current
-    ) =>
-        kind is BillingExampleKind.Start or BillingExampleKind.StartAndEnd
-        && (year ?? 0) * 2 + half <= current.Year * 2 + current.Half;
+    )
+    {
+        var earliest = EarliestGeneratable(current);
+        return kind is BillingExampleKind.Start or BillingExampleKind.StartAndEnd
+            && (year ?? 0) * 2 + half < earliest.Year * 2 + earliest.Half;
+    }
+
+    /// <summary>The earliest half-year invoices can still be generated for: two
+    /// half-years before the current one.</summary>
+    public static (int Year, int Half) EarliestGeneratable((int Year, int Half) current)
+    {
+        var index = current.Year * 2 + current.Half - 1 - 2;
+        return (index / 2, index % 2 + 1);
+    }
 
     private static (int Year, int Half) HalfOf(DateOnly month) =>
         (month.Year, month.Month <= 6 ? 1 : 2);

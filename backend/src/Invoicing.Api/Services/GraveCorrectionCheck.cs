@@ -57,10 +57,10 @@ public sealed class GraveCorrectionCheck
             var computed = GraveBillingCheck
                 .Evaluate(graveLinks, grave.StartDate, grave.EndDate, count, current)
                 .CorrectionKeys;
-            // a start block that has begun is no longer checked, so a row stored
-            // while it still lay ahead must not count as a difference
+            // a start block before the generation window is no longer checked, so a
+            // row stored while it was must not count as a difference
             var saved = (stored.GetValueOrDefault(grave.Id) ?? [])
-                .Where(c => !HalfYearBilling.IsStartedBlock(c.Kind, c.Year, c.Half, current))
+                .Where(c => !HalfYearBilling.IsBeyondGeneration(c.Kind, c.Year, c.Half, current))
                 .Select(c => new CorrectionKey(
                     c.Kind,
                     c.Year,

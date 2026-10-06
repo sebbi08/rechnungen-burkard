@@ -268,12 +268,11 @@ public class InvoiceActionsController : ODataController
 
         // an invoice is generated for the current half-year or one of the two
         // before it; anything older is a mistake that would bill a long-closed period
-        var (currentYear, currentHalf) = HalfYearBilling.HalfYearOf(_clock.GetLocalNow());
-        var earliest = currentYear * 2 + currentHalf - 2;
-        if (request.Year * 2 + request.Half < earliest)
+        var (earliestYear, earliestHalf) = HalfYearBilling.EarliestGeneratable(
+            HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
+        );
+        if (request.Year * 2 + request.Half < earliestYear * 2 + earliestHalf)
         {
-            var earliestHalf = (earliest - 1) % 2 + 1;
-            var earliestYear = (earliest - earliestHalf) / 2;
             return BadRequest(
                 new
                 {
