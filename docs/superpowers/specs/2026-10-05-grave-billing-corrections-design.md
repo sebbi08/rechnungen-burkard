@@ -141,20 +141,20 @@ beyond the reach is reported with `PricesDoNotDivideIn` as before (label first).
 
 ### Started terms
 
-The start block of a term (`Start`, or `StartAndEnd`) is not billed, checked or
-corrected once its half-year is the current one (by `IClock.GetLocalNow()`) or
-an earlier one; only a start in a later half-year is. The full half-year blocks
-and the `End` block are unchanged. `HalfYearBilling.Examples` and
-`GraveBillingCheck.Evaluate` take the current half-year and leave such a block
-out, so the preview, `SaveGrave`, the import and the precheck all agree, and a
-confirmed list from the editor never contains one. The precheck also leaves out
-stored `Start`/`StartAndEnd` rows of a half-year that has begun: a grave saved
-while its start still lay ahead must not block every run once that half-year is
-reached. Generation itself still applies a stored correction for the half-year
-it bills. When a half-year whose start block was left unchecked is generated
-(possible within the two-half-year look-back), that grave has no stored
-correction for it and is skipped with "Preise lassen sich nicht aufteilen" if the
-start block does not divide.
+The start block of a term (`Start`, or `StartAndEnd`) is checked and corrected
+whenever its half-year can still be generated: the current half-year (by
+`IClock.GetLocalNow()`), up to two back, or any later one. Only a start in an
+older half-year is left out, because it can no longer be invoiced. The full
+half-year blocks and the `End` block are unchanged.
+`HalfYearBilling.EarliestGeneratable(current)` (the current half-year minus two)
+is the one place that bound lives; `HalfYearBilling.Examples`,
+`GraveBillingCheck.Evaluate` (both take the current half-year), the precheck's
+stored-row filter (`IsBeyondGeneration`) and the `HalfYearTooOld` check all use
+it, so the preview, `SaveGrave`, the import, the precheck and generation agree.
+The precheck leaves out stored `Start`/`StartAndEnd` rows older than the bound,
+so a grave saved while its start was still inside it does not block every run
+once it falls out. Generation applies a stored correction for the half-year it
+bills.
 
 ### Generation reaches back two half-years
 
