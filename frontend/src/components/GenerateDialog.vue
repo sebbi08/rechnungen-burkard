@@ -17,9 +17,12 @@ const visible = defineModel<boolean>("visible", { required: true });
 const emit = defineEmits<{ generate: [year: number, half: number] }>();
 
 const { t } = useI18n();
-// the backend refuses anything older; the dialog says so before it is asked
-const [earliestYear, earliestHalf] = earliestGenerationHalfYear();
-const minDate = new Date(earliestYear, 0, 1);
+// the backend refuses anything older; the dialog says so before it is asked.
+// Read when the dialog opens, so a page left open across New Year or 1 July
+// offers what the server accepts.
+const earliestYear = ref(0);
+const earliestHalf = ref(1);
+const minDate = computed(() => new Date(earliestYear.value, 0, 1));
 
 const year = ref<Date | null>(null);
 const half = ref(1);
@@ -28,14 +31,14 @@ const halves = computed(() => [
   {
     value: 1,
     label: "H1",
-    disabled: year.value?.getFullYear() === earliestYear && earliestHalf > 1,
+    disabled: year.value?.getFullYear() === earliestYear.value && earliestHalf.value > 1,
   },
   { value: 2, label: "H2", disabled: false },
 ]);
 const tooOld = computed(
   () =>
     year.value != null &&
-    halfYearBefore(year.value.getFullYear(), half.value, earliestYear, earliestHalf),
+    halfYearBefore(year.value.getFullYear(), half.value, earliestYear.value, earliestHalf.value),
 );
 const canGenerate = computed(() => year.value != null && !tooOld.value);
 
@@ -43,12 +46,13 @@ watch(visible, (open) => {
   if (!open) {
     return;
   }
+  [earliestYear.value, earliestHalf.value] = earliestGenerationHalfYear();
   // the overview's half-year, unless that is older than a run may reach
   const [initialYear, initialHalf] = halfYearBefore(
     props.initialYear,
     props.initialHalf,
-    earliestYear,
-    earliestHalf,
+    earliestYear.value,
+    earliestHalf.value,
   )
     ? currentHalfYear()
     : [props.initialYear, props.initialHalf];
