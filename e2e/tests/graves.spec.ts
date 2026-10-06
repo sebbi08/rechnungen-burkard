@@ -5,6 +5,7 @@ import {
   drawer,
   fillDate,
   fillNumber,
+  fillYear,
   pickItem,
   pickOption,
   pickRecipient,
@@ -577,12 +578,16 @@ test("the half-year status announces its meaning, not a validation error", async
   await expect(status).toHaveAttribute("aria-label", "Rechnungen offen");
 });
 
+/** The H1/H2 toggle of a form: the button of this half, pressed or not. */
+function halfButton(scope: Page | Locator, half: number): Locator {
+  return scope.getByRole("group", { name: "Halbjahr" }).getByRole("button", { name: `H${half}` });
+}
+
 test("overview and generate dialog open on the half-year today falls in", async ({ page }) => {
   await page.goto("/graves");
 
-  await expect(page.getByRole("combobox", { name: "Halbjahr" })).toHaveText(
-    `H${CURRENT_HALF} ${CURRENT_YEAR}`,
-  );
+  await expect(page.locator("#gravesYear")).toHaveValue(String(CURRENT_YEAR));
+  await expect(halfButton(page, CURRENT_HALF)).toHaveAttribute("aria-pressed", "true");
 
   // the two are asserted together on purpose: a dialog defaulting to another
   // half-year still generates successfully, but leaves the status column the
@@ -590,24 +595,55 @@ test("overview and generate dialog open on the half-year today falls in", async 
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
   await waitForOverlayOpen(page);
   const generate = dialog(page, "Rechnungen erzeugen");
-  await expect(generate.locator("#generateYear")).toHaveText(String(CURRENT_YEAR));
-  await expect(generate.locator("#generateHalf")).toHaveText(`H${CURRENT_HALF}`);
+  await expect(generate.locator("#generateYear")).toHaveValue(String(CURRENT_YEAR));
+  await expect(halfButton(generate, CURRENT_HALF)).toHaveAttribute("aria-pressed", "true");
   await generate.getByRole("button", { name: "Abbrechen" }).click();
   await expect(generate).toHaveCount(0);
 });
 
 test("the generate dialog starts on the half-year the overview shows", async ({ page }) => {
   await page.goto("/graves");
-  const previous = CURRENT_HALF === 1 ? `H2 ${CURRENT_YEAR - 1}` : `H1 ${CURRENT_YEAR}`;
-  await pickOption(page, page.getByRole("combobox", { name: "Halbjahr" }), previous);
+  const [year, half] = CURRENT_HALF === 1 ? [CURRENT_YEAR - 1, 2] : [CURRENT_YEAR, 1];
+  if (year !== CURRENT_YEAR) {
+    await fillYear(page, page.locator("#gravesYear"), String(year));
+  }
+  await halfButton(page, half).click();
+  await expect(halfButton(page, half)).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
   await waitForOverlayOpen(page);
   const generate = dialog(page, "Rechnungen erzeugen");
-  const [half, year] = previous.split(" ");
-  await expect(generate.locator("#generateYear")).toHaveText(year);
-  await expect(generate.locator("#generateHalf")).toHaveText(half);
+  await expect(generate.locator("#generateYear")).toHaveValue(String(year));
+  await expect(halfButton(generate, half)).toHaveAttribute("aria-pressed", "true");
   await generate.getByRole("button", { name: "Abbrechen" }).click();
+});
+
+test("the generate dialog refuses a half-year older than two half-years back", async ({ page }) => {
+  // the current half-year minus two, as the backend counts it
+  const index = CURRENT_YEAR * 2 + (CURRENT_HALF - 1) - 2;
+  const earliestYear = Math.floor(index / 2);
+  const earliestHalf = (index % 2) + 1;
+
+  await page.goto("/graves");
+  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+  await waitForOverlayOpen(page);
+  const generate = dialog(page, "Rechnungen erzeugen");
+  await expect(generate).toContainText(`Frühestens H${earliestHalf} ${earliestYear}.`);
+  const submit = generate.getByRole("button", { name: "Jetzt erzeugen" });
+  await expect(submit).toBeEnabled();
+
+  // the calendar starts in the earliest year: typing an earlier one is not taken
+  const year = generate.locator("#generateYear");
+  await fillYear(page, year, String(earliestYear));
+  await year.fill(String(earliestYear - 1));
+  await year.press("Escape");
+  await expect(page.locator(".p-datepicker-panel")).toHaveCount(0);
+  await expect(year).toHaveValue(String(earliestYear));
+
+  // in the earliest year a half before the earliest one cannot be chosen
+  await expect(halfButton(generate, 1)).toBeEnabled({ enabled: earliestHalf === 1 });
+  await expect(halfButton(generate, 2)).toBeEnabled();
+  await expect(submit).toBeEnabled();
 });
 
 test("a grave with three recipients bills every one of them the identical share (2035/2)", async ({
@@ -841,7 +877,9 @@ test("the grave editor previews a prorated start and a seasonal item", async ({ 
 
   await page.goto("/graves");
   const editor = await startNewGrave(page, marker);
-  await fillDate(page, editor.getByLabel("Beginn"), "05/2026");
+  // always a start in the future: a started term has no start block
+  const startYear = CURRENT_YEAR + 1;
+  await fillDate(page, editor.getByLabel("Beginn"), `05/${startYear}`);
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
   await pickItem(page, 1, `${marker}-pflege`);
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
@@ -850,9 +888,9 @@ test("the grave editor previews a prorated start and a seasonal item", async ({ 
   // rate and quarter under the item
   await expect(editor).toContainText("Sommerbepflanzung · 19 % · Sommer");
 
-  const start = editor.getByRole("group", { name: "Anfang · H1 2026" });
+  const start = editor.getByRole("group", { name: `Anfang · H1 ${startYear}` });
   await expect(start).toContainText("2 von 6 Monaten");
-  await expect(start).toContainText("anteilig 05–06/2026");
+  await expect(start).toContainText(`anteilig 05–06/${startYear}`);
   await expect(start).toContainText("20,00");
   await expect(start).toContainText("Sommerbepflanzung");
   await expect(start).toContainText("40,00");

@@ -175,3 +175,14 @@ export async function fillDate(page: Page, field: Locator, date: string): Promis
   await expect(page.locator(".p-datepicker-panel")).toHaveCount(0);
   await expect(field).toHaveValue(date);
 }
+
+/**
+ * Types a year into a year-view DatePicker, closing its calendar like
+ * `fillDate` does.
+ */
+export async function fillYear(page: Page, field: Locator, year: string): Promise<void> {
+  await field.fill(year);
+  await field.press("Escape");
+  await expect(page.locator(".p-datepicker-panel")).toHaveCount(0);
+  await expect(field).toHaveValue(year);
+}
