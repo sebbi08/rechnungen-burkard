@@ -5,10 +5,12 @@ import Card from "primevue/card";
 import Checkbox from "primevue/checkbox";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
+import DatePicker from "primevue/datepicker";
 import IconField from "primevue/iconfield";
 import InputIcon from "primevue/inputicon";
 import InputText from "primevue/inputtext";
 import Select from "primevue/select";
+import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
@@ -21,6 +23,7 @@ import {
   pollJob,
   searchGraves,
 } from "@/api/endpoints";
+import { useGraveYearRange } from "@/api/queries";
 import { type Job, JobStatus } from "@/api/generated";
 import GenerateDialog from "@/components/GenerateDialog.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
@@ -32,13 +35,7 @@ import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
 import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
-import {
-  currentHalfYear,
-  halfYearKey,
-  halfYearOptions,
-  halfYearText,
-  parseHalfYearKey,
-} from "@/lib/halfYear";
+import { currentHalfYear, halfYearKey, halfYearText, parseHalfYearKey } from "@/lib/halfYear";
 
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
@@ -50,7 +47,35 @@ const queryClient = useQueryClient();
 const [currentYear, currentHalf] = currentHalfYear();
 const halfYear = ref(halfYearKey(currentYear, currentHalf));
 const period = computed(() => parseHalfYearKey(halfYear.value));
-const halfYearChoices = halfYearOptions(2, 1);
+const halves = [
+  { value: 1, label: "H1" },
+  { value: 2, label: "H2" },
+];
+
+// the years that have graves, and next year: graves without an end run on
+const yearRange = useGraveYearRange();
+const minYearDate = computed(
+  () => new Date(Math.min(yearRange.data.value?.first ?? currentYear - 2, currentYear), 0, 1),
+);
+const maxYearDate = computed(
+  () => new Date(Math.max(yearRange.data.value?.last ?? currentYear + 1, currentYear), 11, 31),
+);
+const yearDate = computed(() => new Date(period.value[0], 0, 1));
+// remounts the year field when it is cleared, so it shows the kept year again
+const yearFieldKey = ref(0);
+function setYear(value: Date | Date[] | (Date | null)[] | null | undefined): void {
+  if (value instanceof Date) {
+    halfYear.value = halfYearKey(value.getFullYear(), period.value[1]);
+  } else {
+    yearFieldKey.value++;
+  }
+}
+const half = computed({
+  get: () => period.value[1],
+  set: (value: number) => {
+    halfYear.value = halfYearKey(period.value[0], value);
+  },
+});
 const payment = ref<"all" | "unpaid">("all");
 const paymentOptions = computed(() => [
   { value: "all", label: t("paymentFilterAll") },
@@ -193,13 +218,26 @@ function openEditor(graveId: number | null): void {
             class="w-full"
           />
         </IconField>
-        <Select
-          v-model="halfYear"
-          :options="halfYearChoices"
-          option-label="text"
-          option-value="key"
+        <DatePicker
+          :key="yearFieldKey"
+          :model-value="yearDate"
+          input-id="gravesYear"
+          view="year"
+          date-format="yy"
+          :min-date="minYearDate"
+          :max-date="maxYearDate"
+          :aria-label="t('year')"
+          show-icon
+          class="w-full sm:w-36"
+          @update:model-value="setYear"
+        />
+        <SelectButton
+          v-model="half"
+          :options="halves"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
           :aria-label="t('halfYear')"
-          class="w-full sm:w-40"
         />
         <Select
           v-model="payment"

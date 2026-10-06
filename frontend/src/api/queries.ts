@@ -222,3 +222,40 @@ export async function loadGraveDetail(graveId: number): Promise<GraveDetailView>
 
   return { grave, currentInvoiced, lines, invoices };
 }
+
+export interface GraveYearRange {
+  first: number;
+  last: number;
+}
+
+/** The years the overview's year field spans: from the earliest grave start to
+ *  the latest grave end, and always up to next year, since a grave without an
+ *  end runs into the future. Without any grave: two years back to next year. */
+export function useGraveYearRange() {
+  return useQuery({
+    queryKey: ["graves", "yearRange"],
+    queryFn: async (): Promise<GraveYearRange> => {
+      const thisYear = new Date().getFullYear();
+      const [earliest, latest] = await Promise.all([
+        odata
+          .Graves()
+          .query((b, q) => {
+            b.select("StartDate").orderBy(q.StartDate.asc()).top(1);
+          })
+          .execute(),
+        odata
+          .Graves()
+          .query((b, q) => {
+            b.select("EndDate").filter(q.EndDate.ne(null)).orderBy(q.EndDate.desc()).top(1);
+          })
+          .execute(),
+      ]);
+      const start = earliest.data.value[0]?.StartDate;
+      const end = latest.data.value[0]?.EndDate;
+      return {
+        first: start ? Number(start.slice(0, 4)) : thisYear - 2,
+        last: Math.max(end ? Number(end.slice(0, 4)) : 0, thisYear + 1),
+      };
+    },
+  });
+}
