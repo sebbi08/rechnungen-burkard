@@ -231,12 +231,6 @@ function openEditor(graveId: number | null): void {
             >
               {{ data.GraveNumber }}
             </RouterLink>
-            <Tag
-              v-if="data.CorrectionCount > 0"
-              severity="warn"
-              :value="t('graveCorrectedTag')"
-              class="ml-2"
-            />
           </template>
         </Column>
         <Column
@@ -269,14 +263,21 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column :header="t('invoicingStatus')">
           <template #body="{ data }">
-            <Tag
-              :value="data.Invoiced ? t('statusInvoiced') : t('statusOpen')"
-              :severity="data.Invoiced ? 'success' : 'danger'"
-              :icon="data.Invoiced ? 'pi pi-check' : 'pi pi-exclamation-circle'"
-              :aria-label="
-                data.Invoiced ? t('statusInvoicedAnnouncement') : t('statusOpenAnnouncement')
-              "
-            />
+            <div class="flex flex-wrap items-center gap-1">
+              <Tag
+                :value="data.Invoiced ? t('statusInvoiced') : t('statusOpen')"
+                :severity="data.Invoiced ? 'success' : 'danger'"
+                :icon="data.Invoiced ? 'pi pi-check' : 'pi pi-exclamation-circle'"
+                :aria-label="
+                  data.Invoiced ? t('statusInvoicedAnnouncement') : t('statusOpenAnnouncement')
+                "
+              />
+              <Tag
+                v-if="data.CorrectionCount > 0"
+                severity="warn"
+                :value="t('graveCorrectedTag')"
+              />
+            </div>
             <!-- on a phone the payment state sits under the status instead of in its own column -->
             <div v-if="paymentTag(data)" class="mt-1 sm:hidden">
               <Tag
