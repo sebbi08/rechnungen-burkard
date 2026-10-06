@@ -1,10 +1,5 @@
 import { BillingQuarter } from "@/api/generated/burkard-invoicing-domain-entities";
 
-export interface YearHalfOption {
-  key: string;
-  text: string;
-}
-
 /** The half-year today falls in: Jan-Jun is 1, Jul-Dec is 2. The graves
  *  overview, the grave detail page and the generation dialog all open on it, so
  *  they agree on which graves are still to be invoiced. */
@@ -13,25 +8,24 @@ export function currentHalfYear(): [number, number] {
   return [now.getFullYear(), now.getMonth() < 6 ? 1 : 2];
 }
 
-// Half-year keys ("2026-1", "2026-2") for the given year range, newest first.
-export function halfYearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
-  const currentYear = new Date().getFullYear();
-  const options: YearHalfOption[] = [];
-  for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
-    options.push({ key: `${year}-2`, text: `H2 ${year}` });
-    options.push({ key: `${year}-1`, text: `H1 ${year}` });
-  }
-  return options;
+/** How many half-years back a generation run may reach; the backend refuses older ones. */
+export const GENERATION_LOOK_BACK = 2;
+
+/** The earliest half-year a run may generate: the current one, two half-years back. */
+export function earliestGenerationHalfYear(): [number, number] {
+  const [year, half] = currentHalfYear();
+  const index = year * 2 + (half - 1) - GENERATION_LOOK_BACK;
+  return [Math.floor(index / 2), (index % 2) + 1];
 }
 
-// Year-only keys ("2026") for the given year range, newest first.
-export function yearOptions(yearsBack: number, yearsAhead: number): YearHalfOption[] {
-  const currentYear = new Date().getFullYear();
-  const options: YearHalfOption[] = [];
-  for (let year = currentYear + yearsAhead; year >= currentYear - yearsBack; year--) {
-    options.push({ key: String(year), text: String(year) });
-  }
-  return options;
+/** Whether the first half-year lies before the second. */
+export function halfYearBefore(
+  year: number,
+  half: number,
+  otherYear: number,
+  otherHalf: number,
+): boolean {
+  return year < otherYear || (year === otherYear && half < otherHalf);
 }
 
 /** "H1 2026" — the label the half-year selects already use. */
