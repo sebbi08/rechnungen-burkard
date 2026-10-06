@@ -2,6 +2,7 @@ using System.Text.Json;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Domain;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ public class InvoiceActionsController : ODataController
     private readonly JobService _jobs;
     private readonly AppDbContext _db;
     private readonly GraveCorrectionCheck _corrections;
+    private readonly IClock _clock;
     private readonly ILogger<InvoiceActionsController> _logger;
 
     public InvoiceActionsController(
@@ -24,6 +26,7 @@ public class InvoiceActionsController : ODataController
         JobService jobs,
         AppDbContext db,
         GraveCorrectionCheck corrections,
+        IClock clock,
         ILogger<InvoiceActionsController> logger
     )
     {
@@ -32,6 +35,7 @@ public class InvoiceActionsController : ODataController
         _jobs = jobs;
         _db = db;
         _corrections = corrections;
+        _clock = clock;
         _logger = logger;
     }
 
@@ -258,6 +262,27 @@ public class InvoiceActionsController : ODataController
                 new
                 {
                     error = new { code = "InvalidHalfYear", message = "The half-year is invalid." },
+                }
+            );
+        }
+
+        // an invoice is generated for the current half-year or one of the two
+        // before it; anything older is a mistake that would bill a long-closed period
+        var (currentYear, currentHalf) = HalfYearBilling.HalfYearOf(_clock.GetLocalNow());
+        var earliest = currentYear * 2 + currentHalf - 2;
+        if (request.Year * 2 + request.Half < earliest)
+        {
+            var earliestHalf = (earliest - 1) % 2 + 1;
+            var earliestYear = (earliest - earliestHalf) / 2;
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "HalfYearTooOld",
+                        message = "Invoices can be generated at most two half-years back.",
+                        args = new[] { $"H{earliestHalf} {earliestYear}" },
+                    },
                 }
             );
         }

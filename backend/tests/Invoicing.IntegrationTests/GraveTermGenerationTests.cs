@@ -467,6 +467,49 @@ public class GraveTermGenerationTests
     }
 
     [Fact]
+    public async Task Generation_refuses_a_half_year_more_than_two_back()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2025, half = 1 })
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var error = json.RootElement.GetProperty("error");
+        Assert.Equal("HalfYearTooOld", error.GetProperty("code").GetString());
+        Assert.Equal(
+            "Invoices can be generated at most two half-years back.",
+            error.GetProperty("message").GetString()
+        );
+        Assert.Equal(
+            new[] { "H2 2025" },
+            error.GetProperty("args").EnumerateArray().Select(a => a.GetString())
+        );
+    }
+
+    [Theory]
+    [InlineData(2025, 2)]
+    [InlineData(2026, 1)]
+    [InlineData(2026, 2)]
+    [InlineData(2027, 1)]
+    public async Task Generation_accepts_the_current_half_year_and_two_back(int year, int half)
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year, half })
+        );
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
     public async Task An_invoiced_grave_with_outdated_corrections_does_not_block_the_run()
     {
         // a clock before the term: its start block is still checked
