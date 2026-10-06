@@ -139,6 +139,27 @@ grave).
 beyond the reach is reported with `PricesDoNotDivideIn` as before (label first).
 `ImportSummary` gains `CorrectedGraves`.
 
+### Started terms
+
+The start block of a term (`Start`, or `StartAndEnd`) is not billed, checked or
+corrected once its half-year is the current one (by `IClock.GetLocalNow()`) or
+an earlier one; only a start in a later half-year is. The full half-year blocks
+and the `End` block are unchanged. `HalfYearBilling.Examples` and
+`GraveBillingCheck.Evaluate` take the current half-year and leave such a block
+out, so the preview, `SaveGrave`, the import and the precheck all agree, and a
+confirmed list from the editor never contains one. The precheck also leaves out
+stored `Start`/`StartAndEnd` rows of a half-year that has begun: a grave saved
+while its start still lay ahead must not block every run once that half-year is
+reached. Generation itself still applies a stored correction for the half-year
+it bills.
+
+### Generation reaches back two half-years
+
+`POST GenerateGraveInvoices` refuses a half-year more than two before the current
+one (in H2 2026, H2 2025 is the earliest) with `400 HalfYearTooOld`, `args` =
+the earliest allowed half-year as `H{half} {year}`. The check follows
+`InvalidHalfYear` and precedes the corrections precheck.
+
 ## 5. Frontend
 
 - **Preview cards** (`GraveBillingPreview.vue`): a corrected line's price is

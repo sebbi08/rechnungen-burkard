@@ -554,6 +554,9 @@ non-interactive until completion, and the task runs exactly once.
   grave MUST have an item billed all year, which carries the correction. Where
   a rate carries a price entered as a gross, what the recipients collect between
   them MUST come to exactly that gross, and the save MUST be refused otherwise.
+  The start block of a term that has already started — its half-year is the
+  current one or an earlier one — MUST NOT be billed, checked or corrected; only
+  the start of a term beginning in a later half-year is.
 - **FR-022**: Each recipient invoice MUST state which percentage of the grave's
   bill it represents, in its summary beneath the item list: the grave's net sum,
   then the recipient's share of it labelled with that percentage, then the VAT
@@ -572,6 +575,8 @@ non-interactive until completion, and the task runs exactly once.
   correction differs from the current one; such a grave has to be opened and
   saved again first. This is a safeguard against the rule or the stored data
   changing underneath a stored correction (for instance after an update).
+  A run MUST NOT reach further back than two half-years before the current one
+  and MUST refuse an older half-year, naming the earliest one allowed.
 - **FR-026**: The system MUST record that a grave's invoices have been generated
   for a given half-year.
 - **FR-027**: The system MUST prevent generating duplicate invoices for the same
