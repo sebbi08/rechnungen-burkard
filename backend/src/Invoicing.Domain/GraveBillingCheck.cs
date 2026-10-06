@@ -69,16 +69,19 @@ public static class GraveBillingCheck
 
     /// <summary>Every invoice of the term, each block corrected per VAT rate
     /// where it does not split evenly. An invoice still has problems only when
-    /// no line of a rate can fix it within <see cref="CorrectionReachCents"/>.</summary>
+    /// no line of a rate can fix it within <see cref="CorrectionReachCents"/>. The
+    /// start block of a term that has begun by <paramref name="current"/> is not
+    /// among them.</summary>
     public static GraveBillingEvaluation Evaluate(
         IReadOnlyList<BillableLink> links,
         DateOnly? start,
         DateOnly? end,
-        int recipients
+        int recipients,
+        (int Year, int Half) current
     )
     {
         var invoices = HalfYearBilling
-            .Examples(start, end)
+            .Examples(start, end, current)
             .Select(example =>
             {
                 var (lines, corrections) = Correct(

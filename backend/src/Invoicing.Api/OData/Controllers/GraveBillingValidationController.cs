@@ -25,8 +25,13 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class GraveBillingValidationController : ODataController
 {
     private readonly AppDbContext _db;
+    private readonly IClock _clock;
 
-    public GraveBillingValidationController(AppDbContext db) => _db = db;
+    public GraveBillingValidationController(AppDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     [HttpPost("ValidateGraveBilling")]
     public async Task<IActionResult> Validate([FromBody] ValidateGraveBillingRequest? request)
@@ -235,7 +240,13 @@ public class GraveBillingValidationController : ODataController
                 GraveBilling.LinkFor(items![l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
             )
             .ToList();
-        var evaluation = GraveBillingCheck.Evaluate(links, start, end, request.Recipients);
+        var evaluation = GraveBillingCheck.Evaluate(
+            links,
+            start,
+            end,
+            request.Recipients,
+            HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
+        );
 
         return new JsonResult(
             new

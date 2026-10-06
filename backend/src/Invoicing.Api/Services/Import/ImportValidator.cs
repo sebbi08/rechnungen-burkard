@@ -15,8 +15,13 @@ namespace Burkard.Invoicing.Api.Services.Import;
 public sealed class ImportValidator
 {
     private readonly AppDbContext _db;
+    private readonly IClock _clock;
 
-    public ImportValidator(AppDbContext db) => _db = db;
+    public ImportValidator(AppDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     public async Task<ImportValidationResult> ValidateAsync(Stream archive, CancellationToken ct)
     {
@@ -611,7 +616,7 @@ public sealed class ImportValidator
     /// item's default price from items.csv. The problems are reported against
     /// the grave's row, because the grave is what does not add up. A grave over
     /// the recipient cap is left to <see cref="CheckGraveRecipients"/>.</summary>
-    private static void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
+    private void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
     {
         var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
         var recipients = data
@@ -668,7 +673,8 @@ public sealed class ImportValidator
                 links,
                 grave.StartDate,
                 grave.EndDate,
-                count
+                count,
+                HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
             );
             if (evaluation.FirstFailing is not { } failing)
             {

@@ -12,6 +12,7 @@ public class GraveBillingCorrectionTests
 {
     private static readonly DateOnly March2026 = new(2026, 3, 1);
     private static readonly DateOnly October2028 = new(2028, 10, 1);
+    private static readonly (int Year, int Half) EarlierHalf = (2025, 2);
 
     private static BillableLink AllYear(
         long id,
@@ -31,7 +32,7 @@ public class GraveBillingCorrectionTests
     [Fact]
     public void A_block_that_divides_needs_no_correction()
     {
-        var evaluation = GraveBillingCheck.Evaluate([AllYear(1, 60m)], null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate([AllYear(1, 60m)], null, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Ok);
         Assert.Empty(evaluation.CorrectionKeys);
@@ -44,7 +45,7 @@ public class GraveBillingCorrectionTests
         // bills 40,00 — both raised to 40,02; the full halves divide
         var links = new[] { AllYear(100, 60m), Seasonal(200, BillingQuarter.Spring, 45m) };
 
-        var evaluation = GraveBillingCheck.Evaluate(links, March2026, October2028, 3);
+        var evaluation = GraveBillingCheck.Evaluate(links, March2026, October2028, 3, EarlierHalf);
 
         Assert.True(evaluation.Ok);
         Assert.Equal(
@@ -70,7 +71,7 @@ public class GraveBillingCorrectionTests
         // in the list, but the all-year line takes the cent
         var links = new[] { Seasonal(1, BillingQuarter.Summer, 40.01m), AllYear(2, 60m) };
 
-        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2, EarlierHalf);
 
         var key = Assert.Single(evaluation.CorrectionKeys);
         Assert.Equal(2, key.ItemId);
@@ -85,7 +86,7 @@ public class GraveBillingCorrectionTests
         // all-year line can fix it
         var links = new[] { AllYear(1, 30m, count: 2), AllYear(2, 10.01m) };
 
-        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Ok);
         var key = Assert.Single(
@@ -101,7 +102,7 @@ public class GraveBillingCorrectionTests
     {
         var links = new[] { AllYear(1, 60.01m, rate: 19m), AllYear(2, 25.01m, rate: 7m) };
 
-        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2, EarlierHalf);
 
         var full = evaluation.Invoices[0];
         Assert.Equal(new[] { 7m, 19m }, full.Corrections.Select(c => c.VatRate).OrderBy(r => r));
@@ -116,7 +117,8 @@ public class GraveBillingCorrectionTests
             [AllYear(1, 100.25m, gross: true)],
             null,
             null,
-            2
+            2,
+            EarlierHalf
         );
 
         var correction = Assert.Single(evaluation.Invoices[0].Corrections);
@@ -141,7 +143,7 @@ public class GraveBillingCorrectionTests
             Seasonal(3, BillingQuarter.Summer, 0.01m),
         };
 
-        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2, EarlierHalf);
 
         var key = Assert.Single(evaluation.CorrectionKeys);
         Assert.Equal(BillingExampleKind.FullFirstHalf, key.Kind);

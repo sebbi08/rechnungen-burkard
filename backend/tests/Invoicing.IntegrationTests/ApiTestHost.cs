@@ -4,10 +4,12 @@ using System.Linq;
 using Burkard.Invoicing.Api;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
@@ -17,6 +19,12 @@ public class ApiTestHost : WebApplicationFactory<Program>
         Path.GetTempPath(),
         $"invoicing-test-{Guid.NewGuid():N}.db"
     );
+
+    /// <summary>The moment the app's clock stands at: 2026-10-06, in H2 2026, so
+    /// a term starting in 2026 has already begun. Set it in an initializer
+    /// (<c>new ApiTestHost { Now = ... }</c>) before the host is first used; the
+    /// class stays constructible as an xunit fixture.</summary>
+    public DateTime Now { get; init; } = new(2026, 10, 6, 12, 0, 0);
 
     public string DbFilePath => _dbFile;
 
@@ -31,6 +39,8 @@ public class ApiTestHost : WebApplicationFactory<Program>
             services.Remove(descriptor);
             services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
             services.AddSingleton<IJobHandler, TestJobHandler>();
+            services.RemoveAll<IClock>();
+            services.AddSingleton<IClock>(new FixedClock(Now));
         });
     }
 

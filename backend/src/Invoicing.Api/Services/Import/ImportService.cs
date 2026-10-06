@@ -13,11 +13,13 @@ public sealed class ImportService
 {
     private readonly AppDbContext _db;
     private readonly ImportValidator _validator;
+    private readonly IClock _clock;
 
-    public ImportService(AppDbContext db, ImportValidator validator)
+    public ImportService(AppDbContext db, ImportValidator validator, IClock clock)
     {
         _db = db;
         _validator = validator;
+        _clock = clock;
     }
 
     /// <summary>The empty archive users fill in offline: four CSV files, each
@@ -151,7 +153,13 @@ public sealed class ImportService
             }
 
             var corrections = GraveBillingCheck
-                .Evaluate(links, grave.StartDate, grave.EndDate, count)
+                .Evaluate(
+                    links,
+                    grave.StartDate,
+                    grave.EndDate,
+                    count,
+                    HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
+                )
                 .Invoices.SelectMany(invoice =>
                     invoice.Corrections.Select(c => new GraveBillingCorrection
                     {

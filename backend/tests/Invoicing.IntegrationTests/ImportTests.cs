@@ -695,9 +695,10 @@ public class ImportTests
         Assert.All(corrections, c => Assert.Equal(grave.Id, c.GraveId));
         Assert.All(corrections, c => Assert.Equal(120.02m, c.CorrectedPrice));
         Assert.Equal(
+            // the term starts 2026-01: with the clock in H2 2026 that start block
+            // has begun and is not corrected
             new[]
             {
-                BillingExampleKind.Start,
                 BillingExampleKind.FullFirstHalf,
                 BillingExampleKind.FullSecondHalf,
                 BillingExampleKind.End,

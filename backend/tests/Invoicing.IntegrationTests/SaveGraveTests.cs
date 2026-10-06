@@ -939,11 +939,12 @@ public class SaveGraveTests
         var (priced, _, first, second) = await SeedAsync(client);
 
         // 60,02 divides by two; May and June of it are 20,01, which does not and
-        // is raised to 20,02 -- a correction the request has not confirmed
+        // is raised to 20,02 -- a correction the request has not confirmed. The
+        // start lies after the fixed clock (H2 2026), so its block is checked.
         var response = await client.PostAsync(
             "/odata/SaveGrave",
             ODataJson.Body(
-                GraveBody("SD-1", "2026-05", null, priced, 60.02m, new[] { first, second })
+                GraveBody("SD-1", "2027-05", null, priced, 60.02m, new[] { first, second })
             )
         );
 
@@ -951,6 +952,42 @@ public class SaveGraveTests
         using var json = await ODataJson.ReadAsync(response);
         var error = json.RootElement.GetProperty("error");
         Assert.Equal("CorrectionsChanged", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task The_start_block_of_a_term_that_has_begun_is_not_corrected()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (priced, _, first, second) = await SeedAsync(client);
+
+        // the start block of 05/2026 would need a correction, but H2 2026 is
+        // current: it is not checked, so none is asked for or stored
+        var begun = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                GraveBody("SD-3", "2026-05", null, priced, 60.02m, new[] { first, second })
+            )
+        );
+        Assert.True(begun.IsSuccessStatusCode, await begun.Content.ReadAsStringAsync());
+        using var json = await ODataJson.ReadAsync(begun);
+        var graveId = json.RootElement.GetProperty("Id").GetInt64();
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Empty(
+                await db.GraveBillingCorrections.Where(c => c.GraveId == graveId).ToListAsync()
+            );
+        }
+
+        // the same grave starting in 2027 still needs it
+        var ahead = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                GraveBody("SD-4", "2027-05", null, priced, 60.02m, new[] { first, second })
+            )
+        );
+        Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(ahead));
     }
 
     [Fact]
@@ -1234,7 +1271,8 @@ public class SaveGraveTests
     [Fact]
     public async Task Saving_with_the_confirmed_corrections_stores_them()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: the start block of 03/2026 is still checked
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         using var client = host.CreateClient();
         var item = await SeedItemAt19Async(client);
         var recipients = await RecipientsAsync(client, 3);
@@ -1278,7 +1316,8 @@ public class SaveGraveTests
     [Fact]
     public async Task Saving_replaces_the_stored_corrections()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: the start block of 03/2026 is still checked
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         using var client = host.CreateClient();
         var item = await SeedItemAt19Async(client);
         var recipients = await RecipientsAsync(client, 3);

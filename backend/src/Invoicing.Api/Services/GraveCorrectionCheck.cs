@@ -10,8 +10,13 @@ namespace Burkard.Invoicing.Api.Services;
 public sealed class GraveCorrectionCheck
 {
     private readonly AppDbContext _db;
+    private readonly IClock _clock;
 
-    public GraveCorrectionCheck(AppDbContext db) => _db = db;
+    public GraveCorrectionCheck(AppDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     /// <summary>The numbers of the graves due in the half-year, not yet invoiced
     /// for it, whose stored corrections differ from the computed ones.</summary>
@@ -35,6 +40,7 @@ public sealed class GraveCorrectionCheck
             .GroupBy(c => c.GraveId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        var current = HalfYearBilling.HalfYearOf(_clock.GetLocalNow());
         var outdated = new List<string>();
         foreach (var grave in graves)
         {
@@ -49,16 +55,20 @@ public sealed class GraveCorrectionCheck
             }
 
             var computed = GraveBillingCheck
-                .Evaluate(graveLinks, grave.StartDate, grave.EndDate, count)
+                .Evaluate(graveLinks, grave.StartDate, grave.EndDate, count, current)
                 .CorrectionKeys;
-            var saved = (stored.GetValueOrDefault(grave.Id) ?? []).Select(c => new CorrectionKey(
-                c.Kind,
-                c.Year,
-                c.Half,
-                c.VatRate,
-                c.ItemId,
-                c.CorrectedPrice
-            ));
+            // a start block that has begun is no longer checked, so a row stored
+            // while it still lay ahead must not count as a difference
+            var saved = (stored.GetValueOrDefault(grave.Id) ?? [])
+                .Where(c => !HalfYearBilling.IsStartedBlock(c.Kind, c.Year, c.Half, current))
+                .Select(c => new CorrectionKey(
+                    c.Kind,
+                    c.Year,
+                    c.Half,
+                    c.VatRate,
+                    c.ItemId,
+                    c.CorrectedPrice
+                ));
             if (!GraveBillingCheck.SameCorrections(computed, saved))
             {
                 outdated.Add(grave.GraveNumber);

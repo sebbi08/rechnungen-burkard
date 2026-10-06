@@ -37,8 +37,13 @@ public sealed record GraveFields(
 public sealed class GraveService
 {
     private readonly AppDbContext _db;
+    private readonly IClock _clock;
 
-    public GraveService(AppDbContext db) => _db = db;
+    public GraveService(AppDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     /// <summary>Creates or updates a grave together with its full set of item and
     /// recipient links in a single transaction, so the dialog can collect
@@ -367,7 +372,8 @@ public sealed class GraveService
                 links,
                 fields.StartDate,
                 fields.EndDate,
-                recipientIds.Count
+                recipientIds.Count,
+                HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
             );
             if (evaluation.FirstFailing is { } failing)
             {

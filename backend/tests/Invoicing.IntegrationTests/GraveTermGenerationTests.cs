@@ -346,7 +346,7 @@ public class GraveTermGenerationTests
             var grave = await db.Graves.SingleAsync(g => g.Id == graveId);
             var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
             var keys = GraveBillingCheck
-                .Evaluate(links, grave.StartDate, grave.EndDate, 3)
+                .Evaluate(links, grave.StartDate, grave.EndDate, 3, (2025, 2))
                 .CorrectionKeys;
             Assert.NotEmpty(keys);
             var first = true;
@@ -416,7 +416,8 @@ public class GraveTermGenerationTests
     [Fact]
     public async Task Generation_stops_when_a_grave_has_no_stored_correction_it_needs()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: its start block is still checked
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         using var client = host.CreateClient();
         var graveId = await SeedCorrectedAsync(host, storeCorrections: false);
 
@@ -433,7 +434,8 @@ public class GraveTermGenerationTests
     [Fact]
     public async Task Generation_stops_when_a_stored_correction_differs()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: its start block is still checked
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         using var client = host.CreateClient();
         var graveId = await SeedCorrectedAsync(host, storeCorrections: true, drift: 0.01m);
 
@@ -448,9 +450,27 @@ public class GraveTermGenerationTests
     }
 
     [Fact]
+    public async Task The_precheck_ignores_a_stored_start_row_of_a_half_year_that_has_begun()
+    {
+        // the fixed clock stands in H2 2026: the start block of 2026 H1 is no
+        // longer checked, so its stored row, wrong as it is, blocks nothing
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await SeedCorrectedAsync(host, storeCorrections: true, drift: 0.01m);
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
     public async Task An_invoiced_grave_with_outdated_corrections_does_not_block_the_run()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: its start block is still checked
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         using var client = host.CreateClient();
         var invoiced = await SeedCorrectedAsync(host, storeCorrections: false);
         await SeedCorrectedAsync(host, storeCorrections: true);
@@ -546,7 +566,7 @@ public class GraveTermGenerationTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var links = (await GraveBilling.LinksByGraveAsync(db))[graveId];
             keys = GraveBillingCheck
-                .Evaluate(links, new DateOnly(2026, 3, 1), end, 3)
+                .Evaluate(links, new DateOnly(2026, 3, 1), end, 3, (2025, 2))
                 .CorrectionKeys.ToList();
         }
 

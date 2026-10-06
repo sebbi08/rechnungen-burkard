@@ -11,6 +11,7 @@ namespace Burkard.Invoicing.IntegrationTests;
 public class GraveBillingCheckTests
 {
     private static readonly DateOnly May2026 = new(2026, 5, 1);
+    private static readonly (int Year, int Half) EarlierHalf = (2025, 2);
 
     private static BillableLink Care(decimal price) =>
         new(1, "100", "Grabpflege", 19m, null, 1, price, false);
@@ -19,7 +20,7 @@ public class GraveBillingCheckTests
     public void A_grave_whose_every_invoice_divides_is_ok()
     {
         // 60,00 full, 20,00 for May/June: both even over two
-        var evaluation = GraveBillingCheck.Evaluate([Care(60m)], May2026, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate([Care(60m)], May2026, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Ok);
         Assert.Equal(3, evaluation.Invoices.Count);
@@ -30,7 +31,7 @@ public class GraveBillingCheckTests
     public void The_start_invoice_is_corrected_while_the_full_ones_need_nothing()
     {
         // 60,02 is 6 002 cents, even; two months of it are 20,01, odd
-        var evaluation = GraveBillingCheck.Evaluate([Care(60.02m)], May2026, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate([Care(60.02m)], May2026, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Ok);
         var correction = Assert.Single(evaluation.Invoices[0].Corrections);
@@ -56,13 +57,25 @@ public class GraveBillingCheckTests
 
         // start in May: H1 2026 bills nothing, the full H1 bills 40,01 (odd) and
         // is corrected
-        var evaluation = GraveBillingCheck.Evaluate([spring], May2026, null, 2);
+        var evaluation = GraveBillingCheck.Evaluate([spring], May2026, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Invoices[0].Ok);
         Assert.Empty(evaluation.Invoices[0].Lines);
         Assert.Empty(evaluation.Invoices[0].Corrections);
         Assert.Single(evaluation.Invoices[1].Corrections);
         Assert.True(evaluation.Invoices[1].Ok);
+    }
+
+    [Fact]
+    public void A_start_block_of_a_started_term_is_not_checked_or_corrected()
+    {
+        // 60,02: the start block (May/June, 20,01) would need a correction
+        var evaluation = GraveBillingCheck.Evaluate([Care(60.02m)], May2026, null, 2, (2026, 2));
+
+        Assert.True(evaluation.Ok);
+        Assert.Equal(2, evaluation.Invoices.Count);
+        Assert.DoesNotContain(evaluation.Invoices, i => i.Example.Kind == BillingExampleKind.Start);
+        Assert.Empty(evaluation.CorrectionKeys);
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -61,7 +63,8 @@ public class GraveBillingPreviewTests
     [Fact]
     public async Task The_preview_lists_the_terms_invoices_with_their_lines()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: its start block is still ahead
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         var (care, summer) = await SeedAsync(host);
         using var client = host.CreateClient();
 
@@ -107,9 +110,43 @@ public class GraveBillingPreviewTests
     }
 
     [Fact]
+    public async Task The_start_block_of_a_term_that_has_begun_is_not_previewed()
+    {
+        // the fixed clock stands in H2 2026: a start in 05/2026 has begun, one in
+        // 01/2027 has not
+        using var host = new ApiTestHost();
+        var (care, _) = await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        async Task<string?[]> KindsAsync(string startMonth)
+        {
+            var body = await PreviewAsync(
+                client,
+                new
+                {
+                    Recipients = 2,
+                    StartMonth = startMonth,
+                    Lines = new[] { Line(care, 60.02m) },
+                }
+            );
+            return body.GetProperty("Invoices")
+                .EnumerateArray()
+                .Select(i => i.GetProperty("Kind").GetString())
+                .ToArray();
+        }
+
+        Assert.Equal(new[] { "FullFirstHalf", "FullSecondHalf" }, await KindsAsync("2026-05"));
+        Assert.Equal(
+            new[] { "Start", "FullFirstHalf", "FullSecondHalf" },
+            await KindsAsync("2027-05")
+        );
+    }
+
+    [Fact]
     public async Task A_block_that_does_not_divide_comes_back_corrected()
     {
-        using var host = new ApiTestHost();
+        // a clock before the term: its start block is still ahead
+        using var host = new ApiTestHost { Now = new DateTime(2025, 10, 6) };
         var (care, _) = await SeedAsync(host);
         using var client = host.CreateClient();
 

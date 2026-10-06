@@ -120,8 +120,16 @@ public static class HalfYearBilling
 
     /// <summary>The invoices the term produces, in order: the start (or the
     /// start and end in one), a full H1 and a full H2 where one lies entirely
-    /// inside the term, and the end. Without a start, only the two full ones.</summary>
-    public static IReadOnlyList<BillingExample> Examples(DateOnly? start, DateOnly? end)
+    /// inside the term, and the end. Without a start, only the two full ones.
+    ///
+    /// The start block of a term that has begun is left out: it is not billed,
+    /// checked or corrected once its half-year is <paramref name="current"/> or
+    /// earlier. Only a start in a later half-year is listed.</summary>
+    public static IReadOnlyList<BillingExample> Examples(
+        DateOnly? start,
+        DateOnly? end,
+        (int Year, int Half) current
+    )
     {
         var fullFirst = new BillingExample(BillingExampleKind.FullFirstHalf, BillingPeriod.Full(1));
         var fullSecond = new BillingExample(
@@ -145,13 +153,16 @@ public static class HalfYearBilling
         (int Year, int Half)? endHalf = end is { } last ? HalfOf(last) : null;
         var sameHalf = endHalf == (startYear, startHalf);
 
-        var examples = new List<BillingExample>
+        var examples = new List<BillingExample>();
+        if (startYear * 2 + startHalf > current.Year * 2 + current.Half)
         {
-            new(
-                sameHalf ? BillingExampleKind.StartAndEnd : BillingExampleKind.Start,
-                PeriodIn(from, end, startYear, startHalf)!
-            ),
-        };
+            examples.Add(
+                new(
+                    sameHalf ? BillingExampleKind.StartAndEnd : BillingExampleKind.Start,
+                    PeriodIn(from, end, startYear, startHalf)!
+                )
+            );
+        }
 
         var (hasFirst, hasSecond) = FullHalves(from, end);
         if (hasFirst)
@@ -278,6 +289,21 @@ public static class HalfYearBilling
             ),
         };
     }
+
+    /// <summary>The half-year a moment falls in: H1 is January to June.</summary>
+    public static (int Year, int Half) HalfYearOf(DateTime moment) =>
+        (moment.Year, moment.Month <= 6 ? 1 : 2);
+
+    /// <summary>Whether the block is the start of a term in the current
+    /// half-year or an earlier one, which is neither billed nor checked.</summary>
+    public static bool IsStartedBlock(
+        BillingExampleKind kind,
+        int? year,
+        int half,
+        (int Year, int Half) current
+    ) =>
+        kind is BillingExampleKind.Start or BillingExampleKind.StartAndEnd
+        && (year ?? 0) * 2 + half <= current.Year * 2 + current.Half;
 
     private static (int Year, int Half) HalfOf(DateOnly month) =>
         (month.Year, month.Month <= 6 ? 1 : 2);
