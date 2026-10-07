@@ -38,15 +38,35 @@ jobs:
   # The constitution puts integration and E2E tests ahead of unit tests, so the
   # Playwright suite runs on every change, against the image that gets released
   # — which also makes this the job that proves the image still builds.
+  #
+  # A runner for a private repository has two cores, so one runner works
+  # through the suite two tests at a time. Three runners each take a third of
+  # it; fail-fast is off so a red shard does not cancel the others and hide
+  # what they would have found.
   e2e:
+    name: e2e (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      # Every shard builds the image itself rather than waiting for a job that
+      # builds it once; the layer cache makes that cheap whenever the
+      # dependencies have not changed, which is most runs.
+      - uses: docker/setup-buildx-action@v4
       - name: Build the image
-        run: docker build -t invoicing:e2e .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: invoicing:e2e
+          cache-from: type=gha,scope=e2e-image
+          cache-to: type=gha,mode=max,scope=e2e-image
       - name: Start the app
         run: |
           docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
@@ -57,25 +77,45 @@ jobs:
           echo "the app did not become healthy"
           docker logs invoicing-e2e
           exit 1
-      - name: Install Playwright
+      - name: Install the E2E dependencies
         working-directory: e2e
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
+        run: npm ci
+      # The browser belongs to the Playwright version, so that version is the
+      # cache key: an upgrade downloads the matching build, anything else
+      # reuses it. The system libraries it needs live outside the cache and are
+      # installed either way.
+      - name: Read the Playwright version
+        id: playwright
+        working-directory: e2e
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        id: browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Playwright
+        if: steps.browsers.outputs.cache-hit != 'true'
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright's system dependencies
+        if: steps.browsers.outputs.cache-hit == 'true'
+        working-directory: e2e
+        run: npx playwright install-deps chromium
       # against the container started above, not the isolated compose stack a
       # local `npm test` spins up
       - name: Run E2E tests
         working-directory: e2e
         env:
           E2E_BASE_URL: http://localhost:8080
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shard }}/3
       - name: Backend logs on failure
         if: failure()
         run: docker logs invoicing-e2e
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: e2e/playwright-report
 
   # Same reasoning as commit-lint below: the pre-commit hook formats staged
