@@ -83,7 +83,12 @@ typecheck`, then `npm run lint` (ESLint, scoped to `src`) and `npm run build`.
   After an EDM change, `npm run gen:odata` (reads `$metadata` from the E2E
   stack) and commit `src/api/metadata.xml` together with `src/api/generated/`.
 - **E2E**: see above. `--project=desktop|phone|tablet` narrows it; the phone and
-  tablet projects only run `tests/layout.spec.ts`.
+  tablet projects only run `tests/layout.spec.ts`. Tests run fully parallel,
+  each one on its own: every test seeds its own data (names from `e2e/unique.ts`)
+  and must not depend on another test or its order. The one exception is the
+  serial group in `graves.spec.ts` around the current half-year, which a
+  generation changes for every grave at once. CI shards the suite over three
+  runners.
 - **Release scripts**: `scripts/test-release-scripts.sh`.
 
 ## Formatting is automatic
