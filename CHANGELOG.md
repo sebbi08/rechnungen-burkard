@@ -5,6 +5,83 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.0.0 — 2026-10-07
+
+### Breaking changes
+- **import**: read an item's quarter, cap recipients and check a term's invoices (59fb42e)
+- **import**: import grave site fields and month terms (f7e02f8)
+- make the application German only (4d31f0a)
+- make the Vue frontend the application's frontend and remove OpenUI5 (42e48b3)
+
+### Features
+- **frontend**: filter the graves by any year with graves (1b20b08)
+- **frontend**: pick the year by calendar and the half-year by toggle when generating (fbad608)
+- **generation**: generate at most two half-years back (bddce36)
+- **billing**: leave the start block of a started term unchecked (9ae649b)
+- **frontend**: filter graves with rounding corrections and explain a stopped run (5a6f0eb)
+- **frontend**: show rounding corrections and confirm them before saving a grave (cd4b0b2)
+- **import**: store rounding corrections and drop the price suggestions (17605be)
+- **generation**: bill stored corrections and stop a run whose corrections are outdated (349c079)
+- **graves**: preview the rounding corrections of every invoice (0dbe56b)
+- **graves**: store rounding corrections a save confirmed (8fe1fe5)
+- **billing**: correct a block that does not split by raising one line per rate (da1c83b)
+- **graves**: require at least one all-year item on every grave (471c494)
+- **frontend**: preview a grave's invoices while it is edited and on its page (fc32be2)
+- **frontend**: show an item's quarter, offer line price suggestions, render billing previews (04124f6)
+- **frontend**: read item quarters and the grave billing preview (210a4cc)
+- **generation**: bill only the months of a grave's term and the quarters they touch (e2b3889)
+- **graves**: preview every invoice of a grave's term with per-line price suggestions (c8486ca)
+- **graves**: refuse a grave unless every invoice of its term divides, and cap it at four recipients (d19f612)
+- **billing**: check every invoice of a grave's term and suggest prices that fix all of them (2273951)
+- **billing**: bill a half-year by the months of the term and the items' quarters (0c3daf6)
+- **items**: give an item an optional billing quarter, fixed once a grave bills it (b5a96bd)
+- **frontend**: edit grave site fields and month terms (6f2ede5)
+- **documents**: lay invoices out like the scanned originals (a4b7529)
+- **invoices**: snapshot the recipient number and the grave site (e52ec2e)
+- **graves**: save site fields and month terms, keep grave numbers unique in time (4e287a6)
+- give each import problem a message key and its values (fb21c6c)
+
+### Fixes
+- **frontend**: read the earliest generatable half-year when the dialog opens (3250e99)
+- **billing**: check every start block that can still be generated (8bbe53b)
+- **frontend**: keep the overview's year while its field is emptied (a716572)
+- **frontend**: show the rounding tag next to the invoicing status (9613558)
+- **graves**: report a missing recipient before changed corrections (1d815cf)
+- **frontend**: list corrected graves like the other import counts (197791a)
+- **frontend**: refresh the preview on changed corrections and block a double confirm (bc63b2b)
+- **frontend**: read outside the term when no item bills in the half-year (9c3263c)
+- **backend**: bill a grave only in half-years where its links bill a line (2a07483)
+- **frontend**: show the items' quarter column from lg so the tablet row actions fit (48dd43b)
+- **frontend**: keep the metadata snapshot in its wrapped format (f0c88fc)
+- **revisions**: keep a grave invoice line's prorated description when it is edited (48b47a2)
+- **frontend**: show a dash for missing grave site fields (5a0cefb)
+- **documents**: print the billed gross on VAT-included lines (13d3f32)
+- **frontend**: show the grave site column from lg so the tablet table fits (35a33ed)
+- **vue**: guide focus, name controls and finish the screens (af2d53f)
+- **vue**: make the lists' search, counts, dates and downloads say what they do (9b607db)
+- **vue**: stop number fields from silently changing what was typed (b782453)
+- refuse a used VAT rate's deletion, rates of 100 %, sub-cent prices and reversed grave dates (f90acbc)
+- **vue**: show the graves search as loading while it runs (2e97688)
+- **vue**: show a stored date as the calendar day it is (43696ae)
+- **vue**: show a grave invoice only under its own grave (8cbb05e)
+- **vue**: drop an editor's late load once the drawer moved on (0606507)
+- **vue**: explain why a grave invoice revision does not split (0b6fe61)
+- refuse a grave invoice revision whose prices do not split (96060ea)
+- **vue**: keep tables and their row actions within phone and tablet widths (5fe6e39)
+- **vue**: clear import problems after a successful import (4f2bc5d)
+- **vue**: default a new invoice to the recipient that is newest now (2085d55)
+- **vue**: stop a second Save from creating an invoice twice (8d3a566)
+- **vue**: keep an item's VAT rate locked until its graves are known (d75714b)
+- **vue**: escape quotes in item and recipient search terms (14bc4e6)
+
+### Other changes
+- Revert "test(e2e): drop the phone known-bug mark for the items list" (29f1ca0)
+- **documents**: pass the invoice snapshot and VAT-included lines to the document (bf56177)
+- **db**: add grave site fields and invoice snapshots in one consolidated migration (a83f068)
+- Merge remote-tracking branch 'origin/main' into worktree-bridge-cse_01SnxByVoXPpGkXTSna4xTsq (b4dfa7e)
+- Merge pull request #13 from sebbi08/ccr-718205f7-2otaxy (7701267)
+- Merge remote-tracking branch 'origin/main' into ccr-718205f7-2otaxy (004232b)
+
 ## v2.1.0 — 2026-09-28
 
 ### Features
