@@ -118,10 +118,6 @@ const PICKER_SQUEEZED =
   "known bug: on a phone the grave editor's recipient picker shares its row with two buttons " +
   "and is left about 12rem, too narrow for a long name";
 
-const PREVIEW_OVERFLOWS =
-  "known bug: the grave detail page's billing preview does not break a long item number, so " +
-  "its tables push the page wider than a phone or a tablet";
-
 const onPhone = () => test.info().project.name === "phone";
 
 const widthOf = (locator: Locator): Promise<number> =>
@@ -477,7 +473,6 @@ test("the invoice detail page fits the viewport", async ({ page }) => {
 });
 
 test("the grave detail page fits the viewport", async ({ page }) => {
-  test.fail(true, PREVIEW_OVERFLOWS);
   await seed(page);
   const graves = await (
     await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${GRAVE_NUMBER}'&$select=Id`)

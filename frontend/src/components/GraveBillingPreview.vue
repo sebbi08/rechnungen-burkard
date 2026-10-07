@@ -84,8 +84,11 @@ function problemText(problem: GraveBillingProblem): string {
         <table v-else class="w-full text-sm">
           <tbody>
             <tr v-for="line in invoice.Lines" :key="line.LineIndex">
-              <td class="py-0.5 pr-2 align-top whitespace-nowrap">{{ line.ItemNumber }}</td>
-              <td class="py-0.5 pr-2 align-top break-words">
+              <!-- may break anywhere: a number has no space to break at, and a
+                   long one pushed the preview, and the page, past a small screen.
+                   The description gets the same, for a word longer than its column. -->
+              <td class="py-0.5 pr-2 align-top [overflow-wrap:anywhere]">{{ line.ItemNumber }}</td>
+              <td class="py-0.5 pr-2 align-top [overflow-wrap:anywhere]">
                 {{ line.Description }}
                 <span class="text-muted-color">· {{ formatVatRate(line.VatRate) }} %</span>
                 <small v-if="line.Corrected" class="block text-orange-700 dark:text-orange-300">
