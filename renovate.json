@@ -3,6 +3,37 @@
   "extends": ["config:recommended"],
   "packageRules": [
     {
+      "groupName": "github-actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "groupName": "node",
+      "matchDepNames": ["node", "@types/node"]
+    },
+    {
+      "groupName": "dotnet",
+      "matchPackageNames": [
+        "mcr.microsoft.com/dotnet/sdk",
+        "mcr.microsoft.com/dotnet/aspnet",
+        "dotnet-sdk",
+        "Microsoft.EntityFrameworkCore.*",
+        "Microsoft.AspNetCore.Mvc.Testing"
+      ]
+    },
+    {
+      "matchPackageNames": ["mcr.microsoft.com/dotnet/**"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "groupName": "primevue",
+      "matchPackageNames": ["primevue", "@primevue/**", "@primeuix/**"]
+    },
+    {
+      "groupName": "odata2ts",
+      "matchPackageNames": ["@odata2ts/**"]
+    },
+    {
       "groupName": "patch-all",
       "matchUpdateTypes": ["patch", "digest"],
       "automerge": true
@@ -10,6 +41,11 @@
     {
       "groupName": "minor-updates-npm",
       "matchDatasources": ["npm"],
+      "matchUpdateTypes": ["minor"]
+    },
+    {
+      "groupName": "minor-updates-nuget",
+      "matchDatasources": ["nuget"],
       "matchUpdateTypes": ["minor"]
     }
   ]
