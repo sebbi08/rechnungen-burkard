@@ -57,7 +57,9 @@ jobs:
           node-version: 22
       # Every shard builds the image itself rather than waiting for a job that
       # builds it once; the layer cache makes that cheap whenever the
-      # dependencies have not changed, which is most runs.
+      # dependencies have not changed, which is most runs. All three build the
+      # same layers, so only the first shard writes them back: three uploads of
+      # one cache would only spend the cache's storage and the runners' time.
       - uses: docker/setup-buildx-action@v4
       - name: Build the image
         uses: docker/build-push-action@v7
@@ -66,7 +68,7 @@ jobs:
           load: true
           tags: invoicing:e2e
           cache-from: type=gha,scope=e2e-image
-          cache-to: type=gha,mode=max,scope=e2e-image
+          cache-to: ${{ matrix.shard == 1 && 'type=gha,mode=max,scope=e2e-image' || '' }}
       - name: Start the app
         run: |
           docker run -d --name invoicing-e2e -p 8080:8080 invoicing:e2e
