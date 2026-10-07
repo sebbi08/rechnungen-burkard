@@ -23,10 +23,13 @@ import {
 // millisecond would otherwise collide on the unique numbers below.
 const RUN = `${Date.now()}-${process.env.TEST_PARALLEL_INDEX ?? "0"}`;
 // long on purpose: a number and a name that fit a narrow column anyway would
-// not notice a column too narrow to hold them
-const ITEM_NUMBER = `L${RUN}-GRABPFLEGE`;
+// not notice a column too narrow to hold them. The numbers have no space in
+// them and are longer than a tablet's table has room for, so a column that
+// cannot break them pushes the row actions off the card on every run, not only
+// when other specs happen to have left a long number in the list.
+const ITEM_NUMBER = `L${RUN}-GRABPFLEGE-SOMMERBEPFLANZUNG-HERBST`;
 const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
-const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE`;
+const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE-SCHINELLER-BAECKE-NORD`;
 
 /** Tailwind's breakpoints, from which a column a narrow screen drops comes back. */
 const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280 };
@@ -107,9 +110,6 @@ async function seedRows(page: Page): Promise<number> {
 // own. Each test that runs into one is marked with `test.fail`, so the
 // suite stays green while the bug is there and turns red once it is fixed —
 // which is the reminder to drop the mark.
-const TABLES_OVERFLOW =
-  "known bug: on a phone a number without a break in it (an item's, a grave's) widens its " +
-  "column past the card, so the row actions sit outside it until the table is scrolled sideways";
 const PICKER_SQUEEZED =
   "known bug: on a phone the grave editor's recipient picker shares its row with two buttons " +
   "and is left about 12rem, too narrow for a long name";
@@ -204,7 +204,6 @@ for (const screen of LIST_SCREENS) {
   test(`${screen.route}: the row actions are on screen without scrolling the table`, async ({
     page,
   }) => {
-    test.fail(onPhone() && ["items", "graves"].includes(screen.route), TABLES_OVERFLOW);
     await seed(page);
     await page.goto(`/${screen.route}`);
     const row = page.locator("tbody tr").filter({ hasText: screen.seeded }).first();
