@@ -56,7 +56,9 @@ function open(item: InvoiceItem | null): void {
         striped-rows
       >
         <template #empty>{{ t("noData") }}</template>
-        <Column field="Number" :header="t('itemNumber')" />
+        <!-- a number has no space to break at; without this a long one widens
+             its column until the row actions leave the card on a small screen -->
+        <Column field="Number" :header="t('itemNumber')" body-class="[overflow-wrap:anywhere]" />
         <Column field="Description" :header="t('itemDescription')" />
         <Column
           :header="t('vatRate')"

@@ -108,11 +108,17 @@ const totals = computed(() => {
           :placeholder="t('selectItem')"
           :aria-label="`${t('itemNumber')} ${index + 1}`"
           fluid
+          overlay-class="max-w-[calc(100vw-1rem)]"
           @change="onItemPicked(line)"
         >
+          <!-- A long number has no space to break at. Without the width limit and
+               the break, it widened the list past the screen of a phone, which
+               then zoomed the whole page out and slid the editor under it. -->
           <template #option="{ option }">
-            <span class="font-medium">{{ option.Number }}</span>
-            <span class="ml-2 text-muted-color">{{ option.Description }}</span>
+            <span class="min-w-0 [overflow-wrap:anywhere]">
+              <span class="font-medium">{{ option.Number }}</span>
+              <span class="ml-2 text-muted-color">{{ option.Description }}</span>
+            </span>
           </template>
         </Select>
         <small v-if="item(line)" class="px-1 text-muted-color">{{ caption(line) }}</small>

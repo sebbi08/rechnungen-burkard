@@ -271,9 +271,11 @@ function openEditor(graveId: number | null): void {
         <template #empty>{{ t("noData") }}</template>
         <Column :header="t('graveNumber')">
           <template #body="{ data }">
+            <!-- may break anywhere: a grave number has no space to break at, and
+                 a long one would otherwise push the row actions off the card -->
             <RouterLink
               :to="`/graves/${data.Id}`"
-              class="font-medium whitespace-nowrap text-primary hover:underline"
+              class="font-medium [overflow-wrap:anywhere] text-primary hover:underline"
             >
               {{ data.GraveNumber }}
             </RouterLink>
