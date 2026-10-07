@@ -116,7 +116,8 @@ public class PaymentTests
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var invoice = await db.Invoices.SingleAsync(i => i.Id == invoiceId);
-            Assert.Equal(DateOnly.FromDateTime(DateTime.Now), invoice.PaidOn);
+            // "today" is the host's clock, which the tests pin to a fixed day
+            Assert.Equal(DateOnly.FromDateTime(host.Now), invoice.PaidOn);
         }
 
         var cleared = await SetPaidAsync(client, invoiceId, false);
