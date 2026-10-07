@@ -18,6 +18,13 @@ const COMPOSE_ARGS = ["compose", "-f", "../docker-compose.e2e.yml", "-p", PROJEC
 // protected is the project and its port, both machine-wide.
 const LOCK_PATH = join(tmpdir(), `${PROJECT}.stack.lock`);
 
+/**
+ * The lock graves.spec.ts's generating tests take turns through: the backend
+ * runs one generation at a time. Machine-wide like the stack lock, since every
+ * worker of a run has to see the same file.
+ */
+export const GENERATION_LOCK_PATH = join(tmpdir(), `${PROJECT}.generation.lock`);
+
 // A queued run waits rather than failing -- a suite takes well under a minute,
 // and an image build a few more -- but it does not wait forever, so a wedged
 // run surfaces as an error instead of a hang.

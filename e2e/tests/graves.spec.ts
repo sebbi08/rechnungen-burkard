@@ -1,8 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { acquireStackLock } from "../lock";
 import { createRow, ensureRow, seedGrave as saveGrave, type SeedGraveLine } from "../seed";
+import { GENERATION_LOCK_PATH } from "../stack";
 import { unique } from "../unique";
 import {
   dialog,
@@ -44,8 +43,11 @@ const NEXT_HALF = CURRENT_HALF === 1 ? 2 : 1;
  * Every test runs at the same time as every other, and a generation invoices
  * every grave due in its half-year, whoever seeded it. So a test that counts
  * its grave's invoices keeps the grave's term to the half-years it generates
- * itself: no other test's generation then reaches it. It also keeps those
- * generations short, since the graves of other tests are not due in them.
+ * itself: no other test's generation then reaches that grave, and its counts
+ * stay exact. It does not keep other graves out of this test's generation —
+ * a grave seeded with seed.ts's default term (2026-01 to 2040-12) is due in
+ * every one of these half-years and gets invoiced too, which nothing here
+ * counts.
  */
 function term(
   year: number,
@@ -87,7 +89,8 @@ function blocking(page: Page): Locator {
 /**
  * Seeds `count` graves due in the current half-year only, so a generation of
  * another half-year does not have to render them, and answers the first one's
- * number.
+ * number. The last one is billed to two recipients, so the duplicate check
+ * after the generation always covers a grave with more than one invoice.
  */
 async function seedGraveGenerationData(page: Page, count: number): Promise<string> {
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -101,13 +104,17 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     Name: `Anna Beispiel ${RUN}`,
     Address: "Hauptstraße 1",
   });
+  const secondRecipient = await createRow(page, "/odata/Recipients", {
+    Name: `Clara Beispiel ${RUN}`,
+    Address: "Seitenweg 2",
+  });
 
   for (let i = 1; i <= count; i++) {
     await saveGrave(page, {
       graveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
       ...term(CURRENT_YEAR, CURRENT_HALF),
       items: [{ itemId: item.Id, count: 1 }],
-      recipientIds: [recipient.Id],
+      recipientIds: i === count ? [recipient.Id, secondRecipient.Id] : [recipient.Id],
     });
   }
   return `G-${RUN}-001`;
@@ -117,15 +124,16 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
 // first is running (JobAlreadyRunning). The tests of this file run in parallel
 // workers, so the ones that generate take turns: through a lock file, the same
 // kind of machine-wide lock the stack itself is guarded by (../lock.ts).
-const GENERATION_LOCK = join(tmpdir(), "invoicing-e2e.generation.lock");
 
 /** Runs `work` once no other test is generating, and keeps the others waiting until it is done. */
 async function withGenerationLock<T>(work: () => Promise<T>): Promise<T> {
-  // a step of its own, so a test that times out waiting says what it waited for
-  const lock = await test.step("wait until no other test is generating", async () => {
+  // a step of its own, so a test that times out waiting says what it waited
+  // for, and on which file: one a dead process left can be removed by hand
+  const step = `wait until no other test is generating (lock ${GENERATION_LOCK_PATH})`;
+  const lock = await test.step(step, async () => {
     for (;;) {
       try {
-        return acquireStackLock(GENERATION_LOCK, { waitMs: 0 });
+        return acquireStackLock(GENERATION_LOCK_PATH, { waitMs: 0 });
       } catch (error) {
         // a file system error is not contention
         if ((error as NodeJS.ErrnoException).code) {
@@ -1041,12 +1049,18 @@ test("a grave can be saved without an end", async ({ page }) => {
 // at once, whoever seeded the grave. A test that asserts its fresh grave is
 // still open fails whenever another test generates this half-year between its
 // seeding and its assertion. So the tests that generate the current half-year
-// and the tests that read a grave's state in it run one after another, in one
-// worker, while everything else runs beside them. Their order does not matter:
-// each seeds its own graves, and a grave seeded after a generation is open
-// again. Every other test keeps away from this half-year's state.
+// and the tests that read a grave's state in it must not run at the same time
+// as each other: they run one after another, in one worker, while everything
+// else runs beside them. Their order does not matter: each seeds its own
+// graves and generates what it needs itself, and a grave seeded after a
+// generation is open again. Every other test keeps away from this half-year's
+// state.
+//
+// "default" rather than "serial": the group still runs in order on one worker
+// despite fullyParallel, but a failing test does not skip the ones after it —
+// none of them depends on it.
 test.describe("the half-year today falls in", () => {
-  test.describe.configure({ mode: "serial" });
+  test.describe.configure({ mode: "default" });
 
   test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
     page,
@@ -1166,7 +1180,11 @@ test.describe("the half-year today falls in", () => {
     await page.getByRole("link", { name: marker, exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
 
-    // the mass download hands back a ZIP of the half-year the overview shows
+    // the mass download hands back a ZIP of the half-year the overview shows —
+    // once there is something in it: with no invoice for that half-year the page
+    // says so instead of saving an empty archive. This test's own grave is the
+    // one it can count on, so it invoices it.
+    await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
     await page.goto("/graves");
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();

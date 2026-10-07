@@ -1,4 +1,5 @@
-import { closeSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { closeSync, linkSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
 
 /**
  * A machine-wide lock around the suite's stack.
@@ -12,7 +13,7 @@ import { closeSync, openSync, readFileSync, rmSync, writeSync } from "node:fs";
  * it fails to connect, and whichever spec touches the most shared state gets
  * the blame. So runs are serialised rather than left to race.
  *
- * The lock is a file holding the owner's pid, created with the exclusive flag,
+ * The lock is a file holding the owner's pid, linked into place complete with it,
  * which is atomic. A run that dies without releasing leaves the file behind, so
  * a lock whose pid is no longer running is treated as stale and taken over --
  * otherwise one crashed run would block the machine until someone deleted it
@@ -70,23 +71,36 @@ function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+/**
+ * Creates the lock file with this process's pid already in it, or answers
+ * false if it exists.
+ *
+ * Creating the file and writing the pid must be one step. Done as two, another
+ * process polling in between reads an empty file, takes the missing pid for a
+ * dead owner and removes a lock that is very much held. So the pid goes into a
+ * file of this process's own first, which is then linked into place: a link
+ * either appears complete or fails with EEXIST.
+ */
 function tryCreate(path: string): boolean {
-  let fd: number;
-  try {
-    fd = openSync(path, "wx");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      return false;
-    }
-    throw error;
-  }
-
+  const staged = `${path}.${process.pid}.${randomBytes(4).toString("hex")}`;
+  const fd = openSync(staged, "wx");
   try {
     writeSync(fd, String(process.pid));
   } finally {
     closeSync(fd);
   }
-  return true;
+
+  try {
+    linkSync(staged, path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      return false;
+    }
+    throw error;
+  } finally {
+    rmSync(staged, { force: true });
+  }
 }
 
 /**

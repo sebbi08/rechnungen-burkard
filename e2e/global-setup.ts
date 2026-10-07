@@ -1,4 +1,5 @@
-import { compose, lockStack, OWN_STACK, waitUntilReady } from "./stack";
+import { rmSync } from "node:fs";
+import { compose, GENERATION_LOCK_PATH, lockStack, OWN_STACK, waitUntilReady } from "./stack";
 
 // Brings up the suite's own stack: separate project, separate containers, and a
 // tmpfs database, so a run never sees or touches the dev stack's data.
@@ -13,6 +14,10 @@ export default async function globalSetup(): Promise<void> {
   }
 
   lockStack();
+  // Holding the stack lock, this is the only run on the machine, so a
+  // generation lock still lying around is a dead run's and would only make the
+  // first generating test wait for nothing.
+  rmSync(GENERATION_LOCK_PATH, { force: true });
   compose("down", "-v", "--remove-orphans");
   compose("up", "-d", "--build", "--force-recreate");
   await waitUntilReady();

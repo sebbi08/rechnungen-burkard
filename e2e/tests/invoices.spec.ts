@@ -329,9 +329,35 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   // a fresh draft starts on the newest recipient, and a spec running beside
   // this one may have created one since. What must hold is that the save
   // invoices exactly the recipient on screen.
+  //
+  // That recipient is told by its id, not its name: another spec renames a
+  // recipient that was briefly the newest (masterdata.spec.ts), and a rename
+  // landing between this draft opening and the check below would make the
+  // right recipient look like the wrong one. The draft's default is the first
+  // entry of the list the picker loads, so the first entry of every list it
+  // loads is noted, with the name it had then.
+  const listed: Promise<{ Id: number; Name: string } | undefined>[] = [];
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (
+      response.request().method() === "GET" &&
+      url.pathname.endsWith("/odata/Recipients") &&
+      !url.searchParams.has("$filter") &&
+      !Number(url.searchParams.get("$skip"))
+    ) {
+      listed.push(
+        response
+          .json()
+          .then((body) => body.value?.[0])
+          .catch(() => undefined),
+      );
+    }
+  });
   await openNewInvoice(page);
   const shown = (await page.locator(`#${RECIPIENT}`).innerText()).trim();
   expect(shown).not.toBe("");
+  const onScreen = (await Promise.all(listed)).reverse().find((first) => first?.Name === shown);
+  expect(onScreen, "the recipient shown is the newest of a list the editor loaded").toBeDefined();
 
   await fillLine(page, itemNumber);
   const created = page.waitForRequest((request) => request.url().endsWith("/odata/CreateInvoice"));
@@ -341,8 +367,7 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   // the first frontend once sent recipient 0 here, because the fresh draft
   // never picked up the selection it showed
   expect(recipientId).toBeGreaterThan(0);
-  const sent = await (await page.request.get(`/odata/Recipients(${recipientId})`)).json();
-  expect(sent.Name).toBe(shown);
+  expect(recipientId).toBe(onScreen!.Id);
   await expect.poll(() => countInvoices(page, recipientId)).toBeGreaterThan(0);
 });
 
