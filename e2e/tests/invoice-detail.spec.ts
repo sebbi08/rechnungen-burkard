@@ -1,8 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 import { createRow, ensureRow } from "../seed";
+import { unique } from "../unique";
 
-// Unique per run: other specs write invoices into the same stack in parallel.
-const RUN = Date.now();
+// Unique per worker, and each test seeds under names of its own: every other
+// test writes invoices into the same stack at the same time.
+const RUN = unique();
 const RECIPIENT_NAME = `Detail ${RUN}`;
 
 /** One revision's panel of the detail page, found by its header. */

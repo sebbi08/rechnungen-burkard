@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow } from "../seed";
+import { unique } from "../unique";
 import { drawer, pickItem, pickRecipient, rowAction, saveEditor, waitForOverlayOpen } from "../vue";
 
-// Unique per run: the specs share one stack and write into it in parallel.
-const RUN = Date.now();
+// Unique per worker, and each test seeds under names of its own: every test
+// shares the one stack and writes into it at the same time as the others.
+const RUN = unique();
 
 test("a line ticked as VAT-included bills the price that was entered", async ({ page }) => {
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });

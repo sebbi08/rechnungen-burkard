@@ -1,11 +1,13 @@
 import AdmZip from "adm-zip";
 import { expect, type Page, test } from "@playwright/test";
 import { ensureRow } from "../seed";
+import { unique } from "../unique";
 import { dialog } from "../vue";
 
-// Unique per run: the import is create-only, so in a stack that kept its data
-// fixed numbers would collide with rows from an earlier attempt.
-const RUN = Date.now();
+// Unique per worker, and each test puts its own prefix in front: the import is
+// create-only, so a number another test or an earlier run already imported
+// would turn a valid archive into a rejected one.
+const RUN = unique();
 
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
 const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,Quarter\r\n";

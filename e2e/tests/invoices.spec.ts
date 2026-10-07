@@ -1,5 +1,6 @@
 import { expect, type Page, type Request, test } from "@playwright/test";
 import { createRow, ensureRow } from "../seed";
+import { unique } from "../unique";
 import {
   confirmation,
   dialog,
@@ -15,40 +16,35 @@ import {
   waitForOverlayOpen,
 } from "../vue";
 
-// Unique per run: the parallel grave generation (graves.spec.ts) inserts
-// invoices in bursts, and a stack that kept its data still holds the rows of
-// earlier runs, so row-count and first-row assertions are invalid. A unique
-// recipient makes this spec's assertions independent of both.
-const RUN = Date.now();
-const RECIPIENT_NAME = `E2E 9001 ${RUN}`;
-const ITEM_NUMBER = `9001-${RUN}`;
-
 /** The invoice editor's recipient picker. */
 const RECIPIENT = "invoiceRecipient";
 
-async function seedMasterData(page: Page): Promise<void> {
-  // Direct API calls keep the test focused on the UI flow.
+/**
+ * Seeds an item without a default price and a recipient, both the calling
+ * test's own. Direct API calls keep the test focused on the UI flow.
+ *
+ * Unique per test: the grave generation (graves.spec.ts) inserts invoices in
+ * bursts, every other test writes into the same stack at the same time, and a
+ * stack that kept its data still holds the rows of earlier runs, so row-count
+ * and first-row assertions are invalid. A recipient of the test's own makes its
+ * assertions independent of all of them.
+ */
+async function seedMasterData(page: Page): Promise<{ recipientName: string; itemNumber: string }> {
+  const run = unique();
+  const recipientName = `E2E 9001 ${run}`;
+  const itemNumber = `9001-${run}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
-  await ensureRow(page, "/odata/InvoiceItems", {
-    Number: ITEM_NUMBER,
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
     Description: "Grabpflege",
     VatRate: 7,
     DefaultPrice: null,
   });
-  // Recipient names are not unique in the backend and the tests in this file
-  // share the seeded recipient, so seed only when it does not exist yet —
-  // otherwise the picker would hold duplicates and the strict locator would fail.
-  const recipients = await (
-    await page.request.get(
-      `/odata/Recipients?$filter=Name eq '${encodeURIComponent(RECIPIENT_NAME)}'`,
-    )
-  ).json();
-  if (!(recipients.value as unknown[]).length) {
-    await createRow(page, "/odata/Recipients", {
-      Name: RECIPIENT_NAME,
-      Address: "Musterstraße 1\n12345 Musterstadt",
-    });
-  }
+  await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Musterstraße 1\n12345 Musterstadt",
+  });
+  return { recipientName, itemNumber };
 }
 
 /** Opens the editor for a new invoice and waits until it can be typed into. */
@@ -67,14 +63,14 @@ function invoiceRow(page: Page, text: string) {
 test("create an invoice with a mandatory price and open its document (Story 4, 8)", async ({
   page,
 }) => {
-  await seedMasterData(page);
+  const { recipientName, itemNumber } = await seedMasterData(page);
   await page.goto("/invoices");
 
   await openNewInvoice(page);
   // this run's recipient name is unique: picking it cannot collide with rows
   // created by other tests, parallel workers or previous runs
-  await pickRecipient(page, RECIPIENT, RECIPIENT_NAME);
-  await pickItem(page, 1, ITEM_NUMBER);
+  await pickRecipient(page, RECIPIENT, recipientName);
+  await pickItem(page, 1, itemNumber);
   const editor = drawer(page);
   await fillNumber(editor.getByRole("spinbutton", { name: "Anzahl 1" }), "2");
   await fillNumber(editor.getByRole("spinbutton", { name: "Preis 1" }), "120");
@@ -84,7 +80,7 @@ test("create an invoice with a mandatory price and open its document (Story 4, 8
 
   // saving closes the editor and lists a row for this run's unique recipient
   await expect(editor).toHaveCount(0);
-  const row = invoiceRow(page, RECIPIENT_NAME).first();
+  const row = invoiceRow(page, recipientName).first();
   await expect(row).toBeVisible();
 
   // the normal document opens in a new tab, where the browser shows it
@@ -112,40 +108,40 @@ test("create an invoice with a mandatory price and open its document (Story 4, 8
 });
 
 test("a recipient suggestion shows the first line of the address (Story 3)", async ({ page }) => {
-  await seedMasterData(page);
+  const { recipientName } = await seedMasterData(page);
   await page.goto("/invoices");
   await openNewInvoice(page);
 
   await page.locator(`#${RECIPIENT}`).click();
   const overlay = page.locator(".p-select-overlay");
-  await overlay.locator("input.p-select-filter").fill(RECIPIENT_NAME);
+  await overlay.locator("input.p-select-filter").fill(recipientName);
 
   // the recipient is seeded with "Musterstraße 1\n12345 Musterstadt", so this
   // also pins that the secondary value is the first line and not the whole
   // address — an address runs over as many lines as the user typed
-  const option = overlay.getByRole("option", { name: RECIPIENT_NAME });
+  const option = overlay.getByRole("option", { name: recipientName });
   await expect(option).toContainText("Musterstraße 1");
   await expect(option).not.toContainText("12345 Musterstadt");
 });
 
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
-  await seedMasterData(page);
+  const { recipientName, itemNumber } = await seedMasterData(page);
   await page.goto("/invoices");
 
   await openNewInvoice(page);
-  await pickRecipient(page, RECIPIENT, RECIPIENT_NAME);
-  await pickItem(page, 1, ITEM_NUMBER);
+  await pickRecipient(page, RECIPIENT, recipientName);
+  await pickItem(page, 1, itemNumber);
   await drawer(page).getByRole("button", { name: "Speichern" }).click();
 
   // the backend refuses the line, the editor stays open with the draft
   await expect(
     toasts(page).filter({ hasText: "Zu dieser Leistung fehlt ein Preis." }),
   ).toBeVisible();
-  await expect(drawer(page).getByRole("combobox", { name: "Nummer 1" })).toContainText(ITEM_NUMBER);
+  await expect(drawer(page).getByRole("combobox", { name: "Nummer 1" })).toContainText(itemNumber);
 });
 
 test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page }) => {
-  const ts = Date.now();
+  const ts = unique();
   const quickName = `Schnell ${ts}`;
   const itemNumber = `9004-${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -182,7 +178,7 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page })
 test("editing an invoice creates a revision with -R1 number and badge (Story 9)", async ({
   page,
 }) => {
-  const ts = Date.now();
+  const ts = unique();
   const recipientName = `Revision ${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
@@ -228,7 +224,7 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
 });
 
 test("the list shows the invoice date, and marks revisions only (Story 9)", async ({ page }) => {
-  const ts = Date.now();
+  const ts = unique();
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: `DAT-${ts}`,
@@ -318,7 +314,7 @@ async function fillLine(page: Page, itemNumber: string): Promise<void> {
 }
 
 test("the second invoice goes to the recipient the reopened editor shows", async ({ page }) => {
-  const { itemNumber, recipientName } = await seedOwnMasterData(page, `Wieder ${Date.now()}`);
+  const { itemNumber, recipientName } = await seedOwnMasterData(page, `Wieder ${unique()}`);
   await page.goto("/invoices");
 
   // first invoice: the recipient is picked from the list, as a user would
@@ -353,7 +349,7 @@ test("the second invoice goes to the recipient the reopened editor shows", async
 test("a double click on save creates one invoice, not two", async ({ page }) => {
   const { itemNumber, recipientName, recipientId } = await seedOwnMasterData(
     page,
-    `Doppel ${Date.now()}`,
+    `Doppel ${unique()}`,
   );
   await page.goto("/invoices");
 
@@ -382,7 +378,7 @@ test("a double click on save creates one invoice, not two", async ({ page }) => 
 });
 
 test("the list shows non-grave invoices only and searches them (Story 9)", async ({ page }) => {
-  const marker = `Suche ${Date.now()}`;
+  const marker = `Suche ${unique()}`;
   const { itemNumber, recipientId, recipientName } = await seedOwnMasterData(page, marker);
   const item = await (
     await page.request.get(`/odata/InvoiceItems?$filter=Number eq '${itemNumber}'`)
@@ -447,10 +443,10 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
 });
 
 test("mark an invoice paid, filter by payment, and take it back (Story 4)", async ({ page }) => {
-  // its own recipient and item, unique to this run: the unpaid-filter
-  // assertion below would otherwise catch the invoice the first test in this
-  // file leaves behind for the shared RECIPIENT_NAME, which stays unpaid
-  const ts = Date.now();
+  // its own recipient and item, unique to this test: the unpaid-filter
+  // assertion below would otherwise catch another test's invoice, which stays
+  // unpaid
+  const ts = unique();
   const recipientName = `Zahlung ${ts}`;
   const itemNumber = `9006-${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });

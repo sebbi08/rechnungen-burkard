@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
+import { unique } from "../unique";
 import { dialog, pickOption, search, toasts, waitForOverlayOpen } from "../vue";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
@@ -43,7 +44,7 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
 });
 
 test("items: create an item without default price (Story 2)", async ({ page }) => {
-  const number = `1001-${Date.now()}`;
+  const number = `1001-${unique()}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   await page.goto("/items");
 
@@ -65,7 +66,7 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
 });
 
 test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
-  const ts = Date.now();
+  const ts = unique();
   const number = `E2E-ITEM-${ts}`;
   const original = `Original ${ts}`;
   const changed = `Geändert ${ts}`;
@@ -98,7 +99,7 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({ page 
 test("items: the edit dialog lists the graves billing the item under their price (Story 2)", async ({
   page,
 }) => {
-  const ts = Date.now();
+  const ts = unique();
   const number = `E2E-USED-${ts}`;
   const graveNumber = `E2E-USED-G-${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -142,7 +143,7 @@ test("items: the edit dialog lists the graves billing the item under their price
 test("items: the quarter is chosen in the dialog and fixed while a grave bills the item", async ({
   page,
 }) => {
-  const ts = Date.now();
+  const ts = unique();
   const number = `E2E-Q-${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   await page.goto("/items");
@@ -208,7 +209,7 @@ test("items: the quarter is chosen in the dialog and fixed while a grave bills t
 });
 
 test("recipients: create and search a recipient (Story 3)", async ({ page }) => {
-  const ts = Date.now();
+  const ts = unique();
   const first = `Familie Mahr ${ts}`;
   const second = `Zweiter Empfänger ${ts}`;
   await page.goto("/recipients");
@@ -245,7 +246,7 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
 });
 
 test("recipients: edit an existing recipient via the row dialog (Story 3)", async ({ page }) => {
-  const ts = Date.now();
+  const ts = unique();
   const name = `Vorher ${ts}`;
   const changed = `Geändert ${ts}`;
   await createRow(page, "/odata/Recipients", { Name: name, Address: "Alte Gasse 1" });
@@ -280,7 +281,7 @@ test("recipients: edit an existing recipient via the row dialog (Story 3)", asyn
 test("graves: search by number narrows the list and empty search shows nothing (Story 5.2)", async ({
   page,
 }) => {
-  const ts = Date.now();
+  const ts = unique();
   const graveNumber = `SUCHE-${ts}`;
   // a grave cannot be saved without a recipient. The search matches recipient
   // names as well as numbers, so this one shares nothing with the terms below.

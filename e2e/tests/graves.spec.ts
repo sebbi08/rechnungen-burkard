@@ -1,5 +1,9 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { acquireStackLock } from "../lock";
 import { createRow, ensureRow, seedGrave as saveGrave, type SeedGraveLine } from "../seed";
+import { unique } from "../unique";
 import {
   dialog,
   drawer,
@@ -16,10 +20,11 @@ import {
   waitForOverlayOpen,
 } from "../vue";
 
-// Unique per test run. `npm test` starts with an empty database, but CI runs the
-// suite against an image it started once, and a rerun there must not collide
-// with the rows the first attempt left or make assertions vacuous.
-const RUN = Date.now();
+// Unique per worker, and each test puts its own prefix in front. `npm test`
+// starts with an empty database, but CI runs the suite against an image it
+// started once, and a rerun there must not collide with the rows the first
+// attempt left or make assertions vacuous.
+const RUN = unique();
 
 // The overview and the generate dialog both open on the half-year today falls
 // in, so a generation started without further input lands here. Derived from
@@ -28,19 +33,36 @@ const RUN = Date.now();
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_HALF = new Date().getMonth() < 6 ? 1 : 2;
 
-// How many graves the generation test below seeds. Shared so the payment test
-// further down can name the exact grave `seedGraveGenerationData` gives two
-// recipients (`G-${RUN}-<this, zero-padded>`) instead of searching across
-// every grave invoiced for the current half-year: a full-suite run also
-// invoices other spec files' graves for this same period, and at least one of
-// them (import-export.spec.ts's `IMP-G1-*`) has two recipients too.
-const GRAVE_GENERATION_COUNT = 60;
+// The half-year after today's. Only the grave detail page test generates it.
+const NEXT_YEAR = CURRENT_HALF === 1 ? CURRENT_YEAR : CURRENT_YEAR + 1;
+const NEXT_HALF = CURRENT_HALF === 1 ? 2 : 1;
+
+/**
+ * A grave's term from the first month of one half-year to the last month of
+ * another, as SaveGrave takes it.
+ *
+ * Every test runs at the same time as every other, and a generation invoices
+ * every grave due in its half-year, whoever seeded it. So a test that counts
+ * its grave's invoices keeps the grave's term to the half-years it generates
+ * itself: no other test's generation then reaches it. It also keeps those
+ * generations short, since the graves of other tests are not due in them.
+ */
+function term(
+  year: number,
+  half: number,
+  until: { year: number; half: number } = { year, half },
+): { startDate: string; endDate: string } {
+  return {
+    startDate: `${year}-${half === 1 ? "01" : "07"}`,
+    endDate: `${until.year}-${until.half === 1 ? "06" : "12"}`,
+  };
+}
 
 // A generation renders the documents of every grave not yet invoiced for its
 // half-year, and a stack that kept the graves of earlier runs has more of them
-// each time: generateFor waits up to 90s for its job, so a test has to be
-// allowed longer than that.
-test.describe.configure({ timeout: 150_000 });
+// each time: generateFor waits up to 90s for its job, and before that for any
+// other test's generation to finish, so a test has to be allowed longer.
+test.describe.configure({ timeout: 240_000 });
 
 /** The grave editor's recipient picker. */
 const RECIPIENT = "graveRecipient";
@@ -62,6 +84,11 @@ function blocking(page: Page): Locator {
   return page.locator("[role='alertdialog'][aria-busy='true']");
 }
 
+/**
+ * Seeds `count` graves due in the current half-year only, so a generation of
+ * another half-year does not have to render them, and answers the first one's
+ * number.
+ */
 async function seedGraveGenerationData(page: Page, count: number): Promise<string> {
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
@@ -74,21 +101,45 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     Name: `Anna Beispiel ${RUN}`,
     Address: "Hauptstraße 1",
   });
-  // linked to the last grave only (below): a grave billed to more than one
-  // recipient is what makes "teilweise bezahlt" observable at all
-  const secondRecipient = await createRow(page, "/odata/Recipients", {
-    Name: `Clara Beispiel ${RUN}`,
-    Address: "Seitenweg 2",
-  });
 
   for (let i = 1; i <= count; i++) {
     await saveGrave(page, {
       graveNumber: `G-${RUN}-${String(i).padStart(3, "0")}`,
+      ...term(CURRENT_YEAR, CURRENT_HALF),
       items: [{ itemId: item.Id, count: 1 }],
-      recipientIds: i === count ? [recipient.Id, secondRecipient.Id] : [recipient.Id],
+      recipientIds: [recipient.Id],
     });
   }
   return `G-${RUN}-001`;
+}
+
+// The backend runs one generation at a time and refuses a second one while the
+// first is running (JobAlreadyRunning). The tests of this file run in parallel
+// workers, so the ones that generate take turns: through a lock file, the same
+// kind of machine-wide lock the stack itself is guarded by (../lock.ts).
+const GENERATION_LOCK = join(tmpdir(), "invoicing-e2e.generation.lock");
+
+/** Runs `work` once no other test is generating, and keeps the others waiting until it is done. */
+async function withGenerationLock<T>(work: () => Promise<T>): Promise<T> {
+  // a step of its own, so a test that times out waiting says what it waited for
+  const lock = await test.step("wait until no other test is generating", async () => {
+    for (;;) {
+      try {
+        return acquireStackLock(GENERATION_LOCK, { waitMs: 0 });
+      } catch (error) {
+        // a file system error is not contention
+        if ((error as NodeJS.ErrnoException).code) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+  });
+  try {
+    return await work();
+  } finally {
+    lock.release();
+  }
 }
 
 interface PeriodInvoice {
@@ -113,51 +164,6 @@ async function periodInvoices(page: Page): Promise<PeriodInvoice[]> {
     }
   }
 }
-
-test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
-  page,
-}) => {
-  const firstGraveNumber = await seedGraveGenerationData(page, GRAVE_GENERATION_COUNT);
-  await page.goto("/graves");
-  const table = page.getByRole("table");
-  await expect(table).toContainText(firstGraveNumber);
-
-  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
-  await waitForOverlayOpen(page);
-  await dialog(page, "Rechnungen erzeugen").getByRole("button", { name: "Jetzt erzeugen" }).click();
-
-  // the blocking progress overlay is visible while the job runs
-  await expect(blocking(page)).toBeVisible({ timeout: 5000 });
-  await expect(blocking(page)).toBeHidden({ timeout: 90000 });
-
-  // the result is reported, and the status column now shows graves as invoiced
-  const result = dialog(page, "Rechnungen erzeugen");
-  await expect(result).toContainText(/Erstellt: [1-9]/);
-  await expect(table.locator(".p-tag-success", { hasText: "erstellt" }).first()).toBeVisible();
-  await result.getByRole("button", { name: "OK" }).click();
-  await expect(result).toHaveCount(0);
-  expect(await periodInvoices(page)).not.toHaveLength(0);
-
-  await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
-  await waitForOverlayOpen(page);
-  await dialog(page, "Rechnungen erzeugen").getByRole("button", { name: "Jetzt erzeugen" }).click();
-  // either the "already invoiced" refusal (when every grave is invoiced) or the
-  // result of a second run, for graves other specs created in the meantime
-  const alreadyInvoiced = toasts(page).filter({
-    hasText: "Für dieses Halbjahr wurden bereits Rechnungen erstellt.",
-  });
-  await expect(
-    alreadyInvoiced.or(dialog(page, "Rechnungen erzeugen").getByText(/Erstellt:/)),
-  ).toBeVisible({ timeout: 90000 });
-
-  // FR-027: no grave and recipient may end up with two invoices for the same
-  // half-year. Asserting the pairs rather than a total keeps this immune to the
-  // graves other specs create in parallel, which a second run may legitimately
-  // invoice for the first time.
-  const pairs = await periodInvoices(page);
-  const seen = pairs.map((i) => `${i.GraveId}:${i.RecipientId}`);
-  expect(new Set(seen).size).toBe(seen.length);
-});
 
 /** Opens the grave editor for a new grave and fills in its number, site and term. */
 async function startNewGrave(
@@ -312,7 +318,7 @@ test("an item without a default price needs an explicit price (Story 6)", async 
 });
 
 test("editing a grave warns about future invoices and freezes its recipients", async ({ page }) => {
-  const marker = Date.now();
+  const marker = unique();
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: `7100-${marker}`,
@@ -351,20 +357,23 @@ test("editing a grave warns about future invoices and freezes its recipients", a
 
 /**
  * Generates the grave invoices of one half-year and waits for the job. Each
- * caller uses a period no other test touches, so a run never collides with the
- * generation tests above or with another test's expectations.
+ * caller other than the current half-year's tests uses a period no other test
+ * generates, and keeps its grave's term to it, so a run never collides with
+ * another test's expectations.
  */
 async function generateFor(page: Page, year: number, half: number): Promise<void> {
-  const response = await page.request.post("/odata/GenerateGraveInvoices", {
-    data: { year, half },
+  await withGenerationLock(async () => {
+    const response = await page.request.post("/odata/GenerateGraveInvoices", {
+      data: { year, half },
+    });
+    expect(response.status()).toBe(202);
+    const job = await response.json();
+    await expect
+      .poll(async () => (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status, {
+        timeout: 90000,
+      })
+      .toBe("Succeeded");
   });
-  expect(response.status()).toBe(202);
-  const job = await response.json();
-  await expect
-    .poll(async () => (await (await page.request.get(`/odata/Jobs(${job.Id})`)).json()).Status, {
-      timeout: 90000,
-    })
-    .toBe("Succeeded");
 }
 
 /** One item line `seedGrave` links to the grave. */
@@ -377,12 +386,14 @@ interface SeedGraveItem {
 }
 
 /** A grave with the given items and recipients, unique per run. Defaults to
- *  one 100.00 net item, count 1, at 7 %. */
+ *  one 100.00 net item, count 1, at 7 %, and to a term of the current
+ *  half-year alone (see `term`). */
 async function seedGrave(
   page: Page,
   marker: string,
   recipientNames: string[],
   items: SeedGraveItem[] = [{}],
+  { startDate, endDate } = term(CURRENT_YEAR, CURRENT_HALF),
 ): Promise<{ graveId: number; recipientNames: string[] }> {
   // each line bills its item's default price: the link carries no price of
   // its own, only the count and whether that default is a gross one
@@ -410,48 +421,20 @@ async function seedGrave(
     });
     recipientIds.push(recipient.Id);
   }
-  const graveId = await saveGrave(page, { graveNumber: marker, items: lines, recipientIds });
+  const graveId = await saveGrave(page, {
+    graveNumber: marker,
+    startDate,
+    endDate,
+    items: lines,
+    recipientIds,
+  });
   return { graveId, recipientNames };
 }
 
-test("the grave detail page shows the grave, its status and its invoices", async ({ page }) => {
-  const marker = `GD-${Date.now()}`;
-  const names = [`Anna ${marker}`, `Bernd ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names);
-
-  await page.goto(`/graves/${graveId}`);
-
-  await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
-  // this grave was created after the generation tests above ran, so nothing has
-  // invoiced it for the current half-year
-  await expect(page.getByText(`Halbjahr H${CURRENT_HALF} ${CURRENT_YEAR}`)).toBeVisible();
-  await expect(page.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
-  for (const name of names) {
-    await expect(card(page, "Empfänger").getByText(name)).toBeVisible();
-  }
-  await expect(
-    page.getByText("Für dieses Grab wurden noch keine Rechnungen erstellt."),
-  ).toBeVisible();
-
-  // a period no other test uses, so the rows below are exactly this generation
-  await generateFor(page, 2039, 2);
-  await page.reload();
-
-  await expect(graveInvoiceRows(page)).toHaveCount(2);
-  await expect(card(page, "Rechnungen")).toContainText("H2 2039");
-  // each recipient pays half of 1 × 100.00 + 7% = 53,50
-  await expect(graveInvoiceRows(page).filter({ hasText: "53,50 €" })).toHaveCount(2);
-
-  // both documents are reachable per row
-  const row = graveInvoiceRows(page).filter({ hasText: names[0] });
-  await expect(row.getByRole("button", { name: "Rechnung herunterladen" })).toBeVisible();
-  await expect(row.getByRole("button", { name: "Kopie herunterladen" })).toBeVisible();
-});
-
 test("editing a grave invoice revises every recipient", async ({ page }) => {
-  const marker = `GE-${Date.now()}`;
+  const marker = `GE-${unique()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names);
+  const { graveId } = await seedGrave(page, marker, names, [{}], term(2038, 2));
 
   // its own period, so the rows below belong to this test alone
   await generateFor(page, 2038, 2);
@@ -497,40 +480,10 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   await expect(graveInvoiceRows(page).filter({ hasText: "107,00 €" })).toHaveCount(2);
 });
 
-test("the grave list colours its status and offers the invoice mass download", async ({ page }) => {
-  const marker = `GL-${Date.now()}`;
-  await seedGrave(page, marker, [`Liste ${marker}`]);
-
-  await page.goto("/graves");
-  const row = page.getByRole("row").filter({ hasText: marker });
-  await expect(row).toBeVisible();
-
-  // created after the generation tests above, so this grave is still open —
-  // and an open half-year reads red
-  await expect(row.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
-
-  // the details action reaches the grave's own page
-  await row.getByRole("button", { name: rowAction("Details") }).click();
-  await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
-
-  // and so does the grave's number
-  await page.goto("/graves");
-  await page.getByRole("link", { name: marker, exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
-
-  // the mass download hands back a ZIP of the half-year the overview shows
-  await page.goto("/graves");
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("rechnungen.zip");
-});
-
 test("a grave invoice's detail page shows its revisions and its siblings", async ({ page }) => {
-  const marker = `GI-${Date.now()}`;
+  const marker = `GI-${unique()}`;
   const names = [`Anna ${marker}`, `Bernd ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names);
+  const { graveId } = await seedGrave(page, marker, names, [{}], term(2037, 2));
 
   // its own period, so the rows below belong to this test alone
   await generateFor(page, 2037, 2);
@@ -563,19 +516,6 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
     .click();
   await expect(page).toHaveURL(new RegExp(`/graves/${graveId}$`));
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
-});
-
-test("the half-year status announces its meaning, not a validation error", async ({ page }) => {
-  const marker = `GA-${Date.now()}`;
-  await seedGrave(page, marker, [`Ansage ${marker}`]);
-
-  await page.goto("/graves");
-  const status = page.getByRole("row").filter({ hasText: marker }).locator(".p-tag").first();
-  await expect(status).toHaveText("offen");
-
-  // The red state could make a screen reader call an open half-year an invalid
-  // entry; the tag carries its own announcement instead.
-  await expect(status).toHaveAttribute("aria-label", "Rechnungen offen");
 });
 
 /** The H1/H2 toggle of a form: the button of this half, pressed or not. */
@@ -725,14 +665,20 @@ test("the generate dialog opens on today when the overview shows a half-year too
 test("a grave with three recipients bills every one of them the identical share (2035/2)", async ({
   page,
 }) => {
-  const marker = `GT-${Date.now()}`;
+  const marker = `GT-${unique()}`;
   const names = [`Erna ${marker}`, `Otto ${marker}`, `Rosa ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names, [
-    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
-    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
-    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
-    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
-  ]);
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    names,
+    [
+      { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+      { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+      { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
+      { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+    ],
+    term(2035, 2),
+  );
   // 2035 H2 is not used by any other test, so no duplicate-generation conflicts
   await generateFor(page, 2035, 2);
 
@@ -747,11 +693,15 @@ test("a grave with three recipients bills every one of them the identical share 
 });
 
 test("a grave splits a VAT-included price without taking its VAT out twice", async ({ page }) => {
-  const marker = `GV-${Date.now()}`;
+  const marker = `GV-${unique()}`;
   const names = [`Vera ${marker}`, `Walter ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names, [
-    { vatRate: 7, price: 117.02, priceIncludesVat: true },
-  ]);
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    names,
+    [{ vatRate: 7, price: 117.02, priceIncludesVat: true }],
+    term(2036, 2),
+  );
   await generateFor(page, 2036, 2);
 
   await page.goto(`/graves/${graveId}`);
@@ -783,39 +733,10 @@ test("a grave splits a VAT-included price without taking its VAT out twice", asy
   await expect(graveInvoiceRows(page).filter({ hasText: "58,51 €" })).toHaveCount(2);
 });
 
-test("the grave detail page shows this half-year's billed price once it is today's", async ({
-  page,
-}) => {
-  const marker = `GC-${Date.now()}`;
-  const names = [`Uwe ${marker}`, `Vroni ${marker}`, `Wanda ${marker}`];
-  const { graveId } = await seedGrave(page, marker, names, [
-    { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
-    { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
-    { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
-    { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
-  ]);
-
-  // The file's first test already invoiced most graves for the current
-  // half-year, but GenerateGraveInvoices only refuses a request once *every*
-  // grave has a run for that period — this one, seeded just above, does not.
-  await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
-
-  await page.goto(`/graves/${graveId}`);
-  // The page has no half-year selector: it always shows what was billed for
-  // the half-year today falls in, which is now invoiced.
-  await expect(page.locator(".p-tag-success", { hasText: "erstellt" })).toBeVisible();
-  // The 19 % subtotal is 49,90 + 47,81 = 97,71, which divides by three; the
-  // page shows the grave's own price, unadjusted.
-  const stoneRow = card(page, "Leistungen")
-    .locator("tbody tr")
-    .filter({ hasText: "Grabstein reinigen" });
-  await expect(stoneRow).toContainText("47,81 €");
-});
-
 test("the grave's item table shows the price as entered, its rate and the flag", async ({
   page,
 }) => {
-  const marker = `GK-${Date.now()}`;
+  const marker = `GK-${unique()}`;
   const { graveId } = await seedGrave(
     page,
     marker,
@@ -840,7 +761,7 @@ test("the grave's item table shows the price as entered, its rate and the flag",
 test("an invoice works each rate's gross out at that rate, not at a blended one", async ({
   page,
 }) => {
-  const marker = `GR-${Date.now()}`;
+  const marker = `GR-${unique()}`;
   // Two rates over three recipients, both dividing: 7 % comes to 300,00 net and
   // 19 % to 99,00. A gross column that shares one blended total across every
   // line gives both the same multiplier — 300,00 at 7 % then read 331,71 €
@@ -853,6 +774,7 @@ test("an invoice works each rate's gross out at that rate, not at a blended one"
       { description: "Grabpflege", vatRate: 7, price: 100, count: 3 },
       { description: "Blumenschmuck", vatRate: 19, price: 99, count: 1 },
     ],
+    term(2037, 1),
   );
   await generateFor(page, 2037, 1);
 
@@ -869,7 +791,7 @@ test("an invoice works each rate's gross out at that rate, not at a blended one"
 });
 
 test("a grave whose prices do not divide is saved with confirmed corrections", async ({ page }) => {
-  const marker = `GW-${Date.now()}`;
+  const marker = `GW-${unique()}`;
   // 47,80 at 19 % over three recipients: its 4 780 net cents leave a remainder,
   // so the three of them cannot be billed the same amount. The price is raised
   // to the next one that divides (47,82), shown before saving and confirmed.
@@ -885,7 +807,7 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
   // a grave that divides as it is, to be hidden by the overview filter
-  const plainMarker = `GP-${Date.now()}`;
+  const plainMarker = `GP-${unique()}`;
   await seedGrave(page, plainMarker, [`Dora ${plainMarker}`]);
 
   await page.goto("/graves");
@@ -935,7 +857,7 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
 });
 
 test("the grave editor previews a prorated start and a seasonal item", async ({ page }) => {
-  const marker = `GQ-${Date.now()}`;
+  const marker = `GQ-${unique()}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   await createRow(page, "/odata/InvoiceItems", {
     Number: `${marker}-pflege`,
@@ -977,7 +899,7 @@ test("the grave editor previews a prorated start and a seasonal item", async ({ 
 });
 
 test("the grave editor asks for an item billed all year", async ({ page }) => {
-  const marker = `GY-${Date.now()}`;
+  const marker = `GY-${unique()}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   await createRow(page, "/odata/InvoiceItems", {
     Number: `${marker}-pflege`,
@@ -1008,7 +930,7 @@ test("the grave editor asks for an item billed all year", async ({ page }) => {
 });
 
 test("a new grave takes at most four recipients", async ({ page }) => {
-  const marker = `GC-${Date.now()}`;
+  const marker = `GM-${unique()}`;
   const names = [1, 2, 3, 4, 5].map((n) => `Empf${n} ${marker}`);
   for (const name of names) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
@@ -1024,49 +946,8 @@ test("a new grave takes at most four recipients", async ({ page }) => {
   await expect(editor).toContainText("Ein Grab hat höchstens 4 Empfänger.");
 });
 
-test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({ page }) => {
-  // the file's first test has already generated this half-year's invoices;
-  // this one only marks them, so it starts no job of its own. The grave is the
-  // one seedGraveGenerationData gave two recipients, named directly rather
-  // than found by scanning every grave invoiced for the current half-year.
-  const graveNumber = `G-${RUN}-${String(GRAVE_GENERATION_COUNT).padStart(3, "0")}`;
-  const graves = await (
-    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`)
-  ).json();
-  const invoices = await (
-    await page.request.get(
-      `/odata/Invoices?$filter=GraveId eq ${graves.value[0].Id} and PeriodYear eq ${CURRENT_YEAR}` +
-        ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id`,
-    )
-  ).json();
-  const invoiceIds = (invoices.value as { Id: number }[]).map((invoice) => invoice.Id);
-  expect(invoiceIds.length).toBeGreaterThan(1);
-
-  await page.request.post("/odata/SetInvoicePaid", {
-    data: { invoiceId: invoiceIds[0], paid: true },
-  });
-  await page.goto("/graves");
-  const row = page.getByRole("row").filter({ hasText: graveNumber });
-  // the count says how many of the grave's recipients have settled
-  await expect(row).toContainText(`teilweise bezahlt (1 / ${invoiceIds.length})`);
-
-  for (const invoiceId of invoiceIds.slice(1)) {
-    await page.request.post("/odata/SetInvoicePaid", { data: { invoiceId, paid: true } });
-  }
-  await page.reload();
-  // "bezahlt" alone would also match "teilweise bezahlt", so this would pass
-  // even if the last recipient's mark did nothing
-  await expect(row).toContainText("bezahlt");
-  await expect(row).not.toContainText("teilweise");
-  await expect(row).not.toContainText("unbezahlt");
-
-  // fully paid, so the unpaid filter drops it
-  await pickOption(page, page.getByRole("combobox", { name: "Zahlung" }), "Nur unbezahlte");
-  await expect(page.getByRole("row").filter({ hasText: graveNumber })).toHaveCount(0);
-});
-
 test("the overview searches graves by recipient name as well", async ({ page }) => {
-  const marker = `GS-${Date.now()}`;
+  const marker = `GS-${unique()}`;
   await seedGrave(page, marker, [`Suchname ${marker}`]);
 
   await page.goto("/graves");
@@ -1152,4 +1033,231 @@ test("a grave can be saved without an end", async ({ page }) => {
   await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("");
   await editor.getByRole("button", { name: "Abbrechen" }).click();
   await expect(editor).toHaveCount(0);
+});
+
+// The half-year today falls in is the one piece of state these tests share
+// and cannot divide between them: the overview and the grave page show it
+// without being asked, and a generation for it invoices every grave due in it
+// at once, whoever seeded the grave. A test that asserts its fresh grave is
+// still open fails whenever another test generates this half-year between its
+// seeding and its assertion. So the tests that generate the current half-year
+// and the tests that read a grave's state in it run one after another, in one
+// worker, while everything else runs beside them. Their order does not matter:
+// each seeds its own graves, and a grave seeded after a generation is open
+// again. Every other test keeps away from this half-year's state.
+test.describe("the half-year today falls in", () => {
+  test.describe.configure({ mode: "serial" });
+
+  test("half-year generation blocks the UI and prevents duplicates (Stories 6, 13)", async ({
+    page,
+  }) => {
+    const firstGraveNumber = await seedGraveGenerationData(page, 60);
+    await page.goto("/graves");
+    const table = page.getByRole("table");
+    await expect(table).toContainText(firstGraveNumber);
+
+    await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+    await waitForOverlayOpen(page);
+    await withGenerationLock(async () => {
+      await dialog(page, "Rechnungen erzeugen")
+        .getByRole("button", { name: "Jetzt erzeugen" })
+        .click();
+
+      // the blocking progress overlay is visible while the job runs
+      await expect(blocking(page)).toBeVisible({ timeout: 5000 });
+      await expect(blocking(page)).toBeHidden({ timeout: 90000 });
+
+      // the result is reported, and the status column now shows graves as invoiced
+      const result = dialog(page, "Rechnungen erzeugen");
+      await expect(result).toContainText(/Erstellt: [1-9]/);
+      await expect(table.locator(".p-tag-success", { hasText: "erstellt" }).first()).toBeVisible();
+      await result.getByRole("button", { name: "OK" }).click();
+      await expect(result).toHaveCount(0);
+      expect(await periodInvoices(page)).not.toHaveLength(0);
+
+      await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+      await waitForOverlayOpen(page);
+      await dialog(page, "Rechnungen erzeugen")
+        .getByRole("button", { name: "Jetzt erzeugen" })
+        .click();
+      // either the "already invoiced" refusal (when every grave is invoiced) or the
+      // result of a second run, for graves other specs created in the meantime
+      const alreadyInvoiced = toasts(page).filter({
+        hasText: "Für dieses Halbjahr wurden bereits Rechnungen erstellt.",
+      });
+      await expect(
+        alreadyInvoiced.or(dialog(page, "Rechnungen erzeugen").getByText(/Erstellt:/)),
+      ).toBeVisible({ timeout: 90000 });
+    });
+
+    // FR-027: no grave and recipient may end up with two invoices for the same
+    // half-year. Asserting the pairs rather than a total keeps this immune to the
+    // graves other specs create in parallel, which a second run may legitimately
+    // invoice for the first time.
+    const pairs = await periodInvoices(page);
+    const seen = pairs.map((i) => `${i.GraveId}:${i.RecipientId}`);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  test("the grave detail page shows the grave, its status and its invoices", async ({ page }) => {
+    const marker = `GD-${unique()}`;
+    const names = [`Anna ${marker}`, `Bernd ${marker}`];
+    // due today, which the page shows, and in the half-year after it, which this
+    // test generates and no other test does — and in no half-year beyond, so
+    // another test's generation never reaches it
+    const { graveId } = await seedGrave(
+      page,
+      marker,
+      names,
+      [{}],
+      term(CURRENT_YEAR, CURRENT_HALF, { year: NEXT_YEAR, half: NEXT_HALF }),
+    );
+
+    await page.goto(`/graves/${graveId}`);
+
+    await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+    // this grave was just created, and no test generates the current half-year
+    // while this one runs, so nothing has invoiced it yet
+    await expect(page.getByText(`Halbjahr H${CURRENT_HALF} ${CURRENT_YEAR}`)).toBeVisible();
+    await expect(page.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
+    for (const name of names) {
+      await expect(card(page, "Empfänger").getByText(name)).toBeVisible();
+    }
+    await expect(
+      page.getByText("Für dieses Grab wurden noch keine Rechnungen erstellt."),
+    ).toBeVisible();
+
+    // a period no other test uses, so the rows below are exactly this generation
+    await generateFor(page, NEXT_YEAR, NEXT_HALF);
+    await page.reload();
+
+    await expect(graveInvoiceRows(page)).toHaveCount(2);
+    await expect(card(page, "Rechnungen")).toContainText(`H${NEXT_HALF} ${NEXT_YEAR}`);
+    // each recipient pays half of 1 × 100.00 + 7% = 53,50
+    await expect(graveInvoiceRows(page).filter({ hasText: "53,50 €" })).toHaveCount(2);
+
+    // both documents are reachable per row
+    const row = graveInvoiceRows(page).filter({ hasText: names[0] });
+    await expect(row.getByRole("button", { name: "Rechnung herunterladen" })).toBeVisible();
+    await expect(row.getByRole("button", { name: "Kopie herunterladen" })).toBeVisible();
+  });
+
+  test("the grave list colours its status and offers the invoice mass download", async ({
+    page,
+  }) => {
+    const marker = `GL-${unique()}`;
+    await seedGrave(page, marker, [`Liste ${marker}`]);
+
+    await page.goto("/graves");
+    const row = page.getByRole("row").filter({ hasText: marker });
+    await expect(row).toBeVisible();
+
+    // just created, and no test generates the current half-year while this one
+    // runs, so this grave is still open — and an open half-year reads red
+    await expect(row.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
+
+    // the details action reaches the grave's own page
+    await row.getByRole("button", { name: rowAction("Details") }).click();
+    await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
+
+    // and so does the grave's number
+    await page.goto("/graves");
+    await page.getByRole("link", { name: marker, exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+
+    // the mass download hands back a ZIP of the half-year the overview shows
+    await page.goto("/graves");
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("rechnungen.zip");
+  });
+
+  test("the half-year status announces its meaning, not a validation error", async ({ page }) => {
+    const marker = `GA-${unique()}`;
+    await seedGrave(page, marker, [`Ansage ${marker}`]);
+
+    await page.goto("/graves");
+    const status = page.getByRole("row").filter({ hasText: marker }).locator(".p-tag").first();
+    await expect(status).toHaveText("offen");
+
+    // The red state could make a screen reader call an open half-year an invalid
+    // entry; the tag carries its own announcement instead.
+    await expect(status).toHaveAttribute("aria-label", "Rechnungen offen");
+  });
+
+  test("the grave detail page shows this half-year's billed price once it is today's", async ({
+    page,
+  }) => {
+    const marker = `GC-${unique()}`;
+    const names = [`Uwe ${marker}`, `Vroni ${marker}`, `Wanda ${marker}`];
+    const { graveId } = await seedGrave(page, marker, names, [
+      { description: "Grabpflege", vatRate: 7, price: 100, count: 1 },
+      { description: "Blumenschmuck", vatRate: 19, price: 24.95, count: 2 },
+      { description: "Grabstein reinigen", vatRate: 19, price: 47.81, count: 1 },
+      { description: "Gießdienst", vatRate: 7, price: 3.7, count: 5 },
+    ]);
+
+    // Another test may already have invoiced other graves for the current
+    // half-year, but GenerateGraveInvoices only refuses a request once *every*
+    // grave has a run for that period — this one, seeded just above, does not.
+    await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
+
+    await page.goto(`/graves/${graveId}`);
+    // The page has no half-year selector: it always shows what was billed for
+    // the half-year today falls in, which is now invoiced.
+    await expect(page.locator(".p-tag-success", { hasText: "erstellt" })).toBeVisible();
+    // The 19 % subtotal is 49,90 + 47,81 = 97,71, which divides by three; the
+    // page shows the grave's own price, unadjusted.
+    const stoneRow = card(page, "Leistungen")
+      .locator("tbody tr")
+      .filter({ hasText: "Grabstein reinigen" });
+    await expect(stoneRow).toContainText("47,81 €");
+  });
+
+  test("a half-year reads partly paid until every recipient has paid (Story 6)", async ({
+    page,
+  }) => {
+    // a grave billed to more than one recipient is what makes "teilweise
+    // bezahlt" observable at all; the overview shows the current half-year, so
+    // that is the one generated for it
+    const graveNumber = `GZ-${unique()}`;
+    const { graveId } = await seedGrave(page, graveNumber, [
+      `Anna ${graveNumber}`,
+      `Clara ${graveNumber}`,
+    ]);
+    await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
+
+    const invoices = await (
+      await page.request.get(
+        `/odata/Invoices?$filter=GraveId eq ${graveId} and PeriodYear eq ${CURRENT_YEAR}` +
+          ` and PeriodHalf eq ${CURRENT_HALF} and IsLatestRevision eq true&$orderby=Id`,
+      )
+    ).json();
+    const invoiceIds = (invoices.value as { Id: number }[]).map((invoice) => invoice.Id);
+    expect(invoiceIds.length).toBeGreaterThan(1);
+
+    await page.request.post("/odata/SetInvoicePaid", {
+      data: { invoiceId: invoiceIds[0], paid: true },
+    });
+    await page.goto("/graves");
+    const row = page.getByRole("row").filter({ hasText: graveNumber });
+    // the count says how many of the grave's recipients have settled
+    await expect(row).toContainText(`teilweise bezahlt (1 / ${invoiceIds.length})`);
+
+    for (const invoiceId of invoiceIds.slice(1)) {
+      await page.request.post("/odata/SetInvoicePaid", { data: { invoiceId, paid: true } });
+    }
+    await page.reload();
+    // "bezahlt" alone would also match "teilweise bezahlt", so this would pass
+    // even if the last recipient's mark did nothing
+    await expect(row).toContainText("bezahlt");
+    await expect(row).not.toContainText("teilweise");
+    await expect(row).not.toContainText("unbezahlt");
+
+    // fully paid, so the unpaid filter drops it
+    await pickOption(page, page.getByRole("combobox", { name: "Zahlung" }), "Nur unbezahlte");
+    await expect(page.getByRole("row").filter({ hasText: graveNumber })).toHaveCount(0);
+  });
 });

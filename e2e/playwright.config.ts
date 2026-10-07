@@ -9,6 +9,21 @@ import { BASE_URL, OWN_STACK } from "./stack";
 export default defineConfig({
   testDir: "./tests",
   timeout: 60000,
+  // Every test runs on its own, in whichever worker is free, not only every
+  // file: graves.spec.ts alone used to take as long as all the other files
+  // together. That holds because each test seeds its own data and depends on no
+  // other test; the one group that must not overlap says so itself.
+  fullyParallel: true,
+  // GitHub's runners for a private repository have two cores, where
+  // Playwright's default of half the cores leaves a single worker. Two keep
+  // both busy while a test waits on the app.
+  workers: process.env.CI ? 2 : undefined,
+  // Every test writes into the one SQLite database at once, and a grave
+  // generation renders each grave's documents inside its write. A dialog that
+  // closes once its row is saved has been seen to wait more than the default
+  // five seconds behind one, so an assertion is given longer to come true.
+  // Nothing that should fail passes because of it; it only fails later.
+  expect: { timeout: 15_000 },
   globalSetup: OWN_STACK ? "./global-setup.ts" : undefined,
   globalTeardown: OWN_STACK ? "./global-teardown.ts" : undefined,
   // The line reporter is what a terminal wants; the HTML one is what a failed

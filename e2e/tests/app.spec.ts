@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
+import { unique } from "../unique";
 
 // A navigation bar lists the sections, the invoice list is the start page, and
 // a detail page leads back through its breadcrumb.
@@ -49,7 +50,7 @@ test("an unknown path leads to the start page", async ({ page }) => {
 test("a detail page keeps its section marked and leads back through its breadcrumb", async ({
   page,
 }) => {
-  const ts = Date.now();
+  const ts = unique();
   const recipient = await createRow(page, "/odata/Recipients", {
     Name: `Navigation ${ts}`,
     Address: "Musterweg 1",

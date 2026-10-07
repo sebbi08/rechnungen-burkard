@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
+import { unique } from "../unique";
 import {
   dialog,
   drawer,
@@ -18,10 +19,11 @@ import {
 //
 // Runs in the "phone" and "tablet" projects only (see playwright.config.ts).
 
-// The phone and the tablet project seed in parallel workers, so the run marker
-// carries the worker index as well — two workers starting in the same
-// millisecond would otherwise collide on the unique numbers below.
-const RUN = `${Date.now()}-${process.env.TEST_PARALLEL_INDEX ?? "0"}`;
+// Every worker that runs a test of this file seeds its own rows, and several of
+// them start at once, so the marker carries the worker index as well — two
+// workers starting in the same millisecond would otherwise collide on the
+// unique numbers below.
+const RUN = unique();
 // long on purpose: a number and a name that fit a narrow column anyway would
 // not notice a column too narrow to hold them. The numbers have no space in
 // them and are longer than a tablet's table has room for, so a column that
@@ -74,6 +76,8 @@ const LIST_SCREENS: ListScreen[] = [
 // The rows only have to exist — these assertions are about layout, not about
 // the data — but their numbers are unique per run so that seeding never
 // collides with rows an earlier attempt left in a stack that kept its data.
+// Every test that needs them calls `seed` itself, so it runs alone or in any
+// order; a worker only keeps from seeding them twice.
 let seeding: Promise<number> | undefined;
 
 /** Seeds this worker's rows once, and answers its invoice's root id. */
@@ -113,6 +117,10 @@ async function seedRows(page: Page): Promise<number> {
 const PICKER_SQUEEZED =
   "known bug: on a phone the grave editor's recipient picker shares its row with two buttons " +
   "and is left about 12rem, too narrow for a long name";
+
+const PREVIEW_OVERFLOWS =
+  "known bug: the grave detail page's billing preview does not break a long item number, so " +
+  "its tables push the page wider than a phone or a tablet";
 
 const onPhone = () => test.info().project.name === "phone";
 
@@ -469,6 +477,7 @@ test("the invoice detail page fits the viewport", async ({ page }) => {
 });
 
 test("the grave detail page fits the viewport", async ({ page }) => {
+  test.fail(true, PREVIEW_OVERFLOWS);
   await seed(page);
   const graves = await (
     await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${GRAVE_NUMBER}'&$select=Id`)
@@ -476,7 +485,12 @@ test("the grave detail page fits the viewport", async ({ page }) => {
 
   await page.goto(`/graves/${graves.value[0].Id}`);
   await expect(page.getByRole("heading", { level: 1, name: GRAVE_NUMBER })).toBeVisible();
-  await expect(page.getByRole("cell", { name: ITEM_NUMBER })).toBeVisible();
+  await expect(page.getByRole("cell", { name: ITEM_NUMBER }).first()).toBeVisible();
+  // The billing preview arrives after the rest of the page, and its tables are
+  // the widest part of it. Measured before they are there, the page fitted on
+  // a quiet machine and overflowed on a busy one, where the preview had
+  // already come in.
+  await expect(page.getByRole("group", { name: /^Volles H[12]$/ }).first()).toBeVisible();
   await expectHeaderActionsFit(page);
   await expectNoSidewaysScrolling(page);
 });
