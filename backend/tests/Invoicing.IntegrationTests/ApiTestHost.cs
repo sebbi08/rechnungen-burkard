@@ -43,6 +43,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
             services.Remove(descriptor);
             services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
             services.AddSingleton<IJobHandler, TestJobHandler>();
+            services.AddSingleton<IJobHandler, UnrecordableJobHandler>();
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(new FixedClock(Now, UtcNow));
         });

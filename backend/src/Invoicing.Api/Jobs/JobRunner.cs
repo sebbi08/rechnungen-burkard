@@ -33,7 +33,35 @@ public sealed class JobRunner : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Job {JobId} failed unexpectedly", jobId);
+                await RecordFailureAsync(jobId, stoppingToken);
             }
+        }
+    }
+
+    /// <summary>Marks a job Failed from a scope of its own, for when the job's
+    /// own outcome could not be written. Left Running, it would refuse every
+    /// new job of its type (JobService.HasActive) until the next start
+    /// requeued it.</summary>
+    private async Task RecordFailureAsync(long jobId, CancellationToken stoppingToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var job = await db.Jobs.FindAsync(new object[] { jobId }, stoppingToken);
+            if (job is null || job.Status is JobStatus.Succeeded or JobStatus.Failed)
+            {
+                return;
+            }
+
+            job.Status = JobStatus.Failed;
+            job.Error = "The job's outcome could not be recorded.";
+            job.FinishedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(stoppingToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Job {JobId} could not be marked failed either", jobId);
         }
     }
 

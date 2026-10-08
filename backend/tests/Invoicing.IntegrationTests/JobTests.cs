@@ -26,6 +26,20 @@ public class TestJobHandler : IJobHandler
     }
 }
 
+/// <summary>Runs, then leaves the job row unsavable (Type is NOT NULL), so the
+/// runner's write of the outcome fails -- standing in for any failure of that
+/// last save, such as a database locked for longer than the busy timeout.</summary>
+public class UnrecordableJobHandler : IJobHandler
+{
+    public string Type => "Unrecordable";
+
+    public Task ExecuteAsync(Job job, IProgressWriter progress, CancellationToken ct)
+    {
+        job.Type = null!;
+        return Task.CompletedTask;
+    }
+}
+
 public class JobTests : IClassFixture<ApiTestHost>
 {
     private readonly ApiTestHost _host;
@@ -67,6 +81,23 @@ public class JobTests : IClassFixture<ApiTestHost>
         Assert.Equal(10, finished.ProcessedCount);
 
         Assert.Equal(callsBefore + 1, handler.Calls);
+    }
+
+    /// <summary>A job whose outcome could not be written used to stay Running,
+    /// and a Running job of a type refuses every new one of that type -- no
+    /// generation until the container restarted.</summary>
+    [Fact]
+    public async Task A_job_whose_outcome_cannot_be_written_ends_failed_and_blocks_nothing()
+    {
+        using var scope = _host.Services.CreateScope();
+        var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
+        var job = await jobs.EnqueueAsync("Unrecordable", null, 1, CancellationToken.None);
+
+        var finished = await WaitForTerminalAsync(job.Id, TimeSpan.FromSeconds(15));
+
+        Assert.Equal(JobStatus.Failed, finished.Status);
+        Assert.NotNull(finished.FinishedAt);
+        Assert.False(jobs.HasActive("Unrecordable"));
     }
 
     [Fact]

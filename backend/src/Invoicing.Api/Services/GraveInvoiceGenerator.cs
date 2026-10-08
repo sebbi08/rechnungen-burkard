@@ -128,6 +128,11 @@ public sealed class GraveInvoiceGenerator
         // the wall-clock here, like the number's year (see InvoiceService)
         var now = _clock.GetLocalNow();
 
+        // Unlike InvoiceService.CreateAsync, no retry around the numbers: SQLite
+        // opens this transaction with BEGIN IMMEDIATE, so it holds the write lock
+        // from here on, and no other connection can insert an invoice between
+        // AllocateAsync reading the highest number and the insert using the
+        // next one.
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var invoices = new List<Invoice>();
         for (var r = 0; r < recipients.Count; r++)
