@@ -14,11 +14,17 @@ public sealed class GraveInvoiceRevisionService
 {
     private readonly AppDbContext _db;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly IClock _clock;
 
-    public GraveInvoiceRevisionService(AppDbContext db, InvoiceDocumentFactory documentFactory)
+    public GraveInvoiceRevisionService(
+        AppDbContext db,
+        InvoiceDocumentFactory documentFactory,
+        IClock clock
+    )
     {
         _db = db;
         _documentFactory = documentFactory;
+        _clock = clock;
     }
 
     public async Task<List<Invoice>> CreateAsync(
@@ -47,10 +53,10 @@ public sealed class GraveInvoiceRevisionService
             .Where(l => l.InvoiceId == edited.Id)
             .OrderBy(l => l.LineNumber)
             .ToListAsync(ct);
-        var graveLines = await BuildGraveLinesAsync(lineInputs, previous, ct);
 
         var siblings = await _db
-            .Invoices.Where(i =>
+            .Invoices.Include(i => i.Lines)
+            .Where(i =>
                 i.GraveId == edited.GraveId
                 && i.PeriodYear == edited.PeriodYear
                 && i.PeriodHalf == edited.PeriodHalf
@@ -65,6 +71,18 @@ public sealed class GraveInvoiceRevisionService
         {
             throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
         }
+
+        // the lines the dialog opened on, read the way the group endpoint read
+        // them for it: a price left as shown is taken back as shown
+        if (!GraveInvoiceGroupLines.CarrySameLines(siblings))
+        {
+            throw new ValidationException(
+                "GraveInvoiceGroupInconsistent",
+                "The invoices of this grave and half-year do not carry the same lines."
+            );
+        }
+        var shown = GraveInvoiceGroupLines.AsInvoiced(siblings);
+        var graveLines = await BuildGraveLinesAsync(lineInputs, previous, shown, ct);
 
         // One edit revises every recipient of the half-year, so one paid
         // recipient blocks all of them. Naming them is the point: from the row
@@ -98,7 +116,8 @@ public sealed class GraveInvoiceRevisionService
         // like the address, a revision takes the grave as it is now
         var grave = await _db.Graves.AsNoTracking().SingleAsync(g => g.Id == edited.GraveId, ct);
         var sharePercent = 100m / siblings.Count;
-        var now = DateTime.UtcNow;
+        // the wall-clock here, like the number's year (see InvoiceService)
+        var now = _clock.GetLocalNow();
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var created = new List<Invoice>(siblings.Count);
@@ -189,10 +208,15 @@ public sealed class GraveInvoiceRevisionService
     ///
     /// The order is the request body's, preserved line for line — nothing here
     /// re-sorts or groups, so the lines come back in the order they are shown
-    /// and their line numbers stay put across a revision.</summary>
+    /// and their line numbers stay put across a revision.
+    ///
+    /// <paramref name="previous"/> are the edited revision's own lines and
+    /// <paramref name="shown"/> the grave's lines as the dialog showed them,
+    /// line for line in the same order.</summary>
     private async Task<List<GraveLine>> BuildGraveLinesAsync(
         IReadOnlyList<InvoiceLineInput> inputs,
-        IReadOnlyList<InvoiceLine> previous,
+        List<InvoiceLine> previous,
+        IReadOnlyList<GraveLine> shown,
         CancellationToken ct
     )
     {
@@ -234,9 +258,29 @@ public sealed class GraveInvoiceRevisionService
             // matched by item in line order, each earlier line used once; a
             // newly added item takes its own description
             var earlier = unused.FirstOrDefault(l => l.ItemId == item.Id);
+            decimal? shownPrice = null;
             if (earlier is not null)
             {
+                var index = previous.IndexOf(earlier);
+                shownPrice = index < shown.Count ? shown[index].UnitPrice : null;
                 unused.Remove(earlier);
+            }
+
+            // The document prints the price to the cent and multiplies the
+            // unrounded one, so a third decimal is refused wherever a price is
+            // typed -- not where it was not: a grave invoice from before prices
+            // were held to the cent keeps its net at three decimals, the dialog
+            // shows it as stored, and a line left as shown saves as shown.
+            if (
+                input.UnitPrice is { } typed
+                && !GraveBilling.IsWholeCents(typed)
+                && typed != shownPrice
+            )
+            {
+                throw new ValidationException(
+                    "InvalidPrice",
+                    $"The price for item '{item.Number}' has more than two decimals."
+                );
             }
 
             lines.Add(

@@ -84,7 +84,7 @@ public sealed class ImportService
         );
         _db.InvoiceItems.AddRange(items.Values);
 
-        var createdAt = DateOnly.FromDateTime(DateTime.UtcNow);
+        var createdAt = DateOnly.FromDateTime(_clock.GetLocalNow());
         var graves = data.Graves.ToDictionary(
             row => row.Number,
             row => new Grave

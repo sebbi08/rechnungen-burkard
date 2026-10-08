@@ -91,6 +91,12 @@ public sealed class DocumentDataBuilder
         return new InvoiceDocumentData
         {
             InvoiceNumber = invoice.InvoiceNumber,
+            // GeneratedAt is the wall-clock here, in Europe/Berlin: the day it
+            // names is the issue date the document prints. It is handed on
+            // marked UTC so the PDF's metadata timestamp is written as it is on
+            // any machine rather than shifted by that machine's time zone -- a
+            // document has to come out byte for byte the same wherever it is
+            // rebuilt.
             GeneratedAt = DateTime.SpecifyKind(invoice.GeneratedAt, DateTimeKind.Utc),
             RecipientName = invoice.RecipientName,
             RecipientAddress = invoice.RecipientAddress,

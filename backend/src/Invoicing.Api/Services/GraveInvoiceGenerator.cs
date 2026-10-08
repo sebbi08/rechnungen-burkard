@@ -10,16 +10,19 @@ public sealed class GraveInvoiceGenerator
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly IClock _clock;
 
     public GraveInvoiceGenerator(
         AppDbContext db,
         InvoiceNumberService numbers,
-        InvoiceDocumentFactory documentFactory
+        InvoiceDocumentFactory documentFactory,
+        IClock clock
     )
     {
         _db = db;
         _numbers = numbers;
         _documentFactory = documentFactory;
+        _clock = clock;
     }
 
     /// <summary>Generates all invoices for one grave and half-year in a single
@@ -122,7 +125,8 @@ public sealed class GraveInvoiceGenerator
 
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         var sharePercent = 100m / recipients.Count;
-        var now = DateTime.UtcNow;
+        // the wall-clock here, like the number's year (see InvoiceService)
+        var now = _clock.GetLocalNow();
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var invoices = new List<Invoice>();

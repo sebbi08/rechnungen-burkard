@@ -26,6 +26,10 @@ public class ApiTestHost : WebApplicationFactory<Program>
     /// class stays constructible as an xunit fixture.</summary>
     public DateTime Now { get; init; } = new(2026, 10, 6, 12, 0, 0);
 
+    /// <summary>The same moment in UTC, for tests about the hours after midnight
+    /// in which the two days differ. Defaults to <see cref="Now"/>.</summary>
+    public DateTime? UtcNow { get; init; }
+
     public string DbFilePath => _dbFile;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -40,7 +44,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
             services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
             services.AddSingleton<IJobHandler, TestJobHandler>();
             services.RemoveAll<IClock>();
-            services.AddSingleton<IClock>(new FixedClock(Now));
+            services.AddSingleton<IClock>(new FixedClock(Now, UtcNow));
         });
     }
 

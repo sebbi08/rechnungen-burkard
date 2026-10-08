@@ -735,6 +735,100 @@ public class GraveInvoiceRevisionTests
         Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId == graveId));
     }
 
+    /// <summary>The guard every other price entry has: the document prints the
+    /// price to the cent and multiplies the unrounded one, so 3 x 10,125 would
+    /// show 10,13 and a total of 30,38.</summary>
+    [Fact]
+    public async Task Rejects_a_changed_price_with_more_than_two_decimals_without_touching_anything()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, invoiceId) = await SeedAsync(host);
+
+        using var client = host.CreateClient();
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)10.125m,
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "InvalidPrice",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await db.Invoices.CountAsync(i => i.GraveId == graveId));
+    }
+
+    /// <summary>Grave invoices from before 2026-09-01 carry net prices at three
+    /// decimals (a gross price divided by the rate). The dialog reopens them as
+    /// stored, and saving with such a line untouched is not refused -- only a
+    /// price the user changed is held to whole cents.</summary>
+    [Fact]
+    public async Task Keeps_an_untouched_three_decimal_price_of_an_older_invoice()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, invoiceId) = await SeedAsync(host);
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // 2 x 93,458 = 186,916, which rounds to 18 692 cents and splits
+            // evenly across the two recipients
+            await db
+                .InvoiceLines.Where(l =>
+                    db.Invoices.Any(i => i.Id == l.InvoiceId && i.GraveId == graveId)
+                )
+                .ExecuteUpdateAsync(s => s.SetProperty(l => l.UnitPrice, 93.458m));
+        }
+
+        using var client = host.CreateClient();
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)93.458m,
+                        },
+                    },
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verify = host.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var revisions = await verifyDb
+            .Invoices.Include(i => i.Lines)
+            .Where(i => i.GraveId == graveId && i.RevisionNumber == 1)
+            .ToListAsync();
+        Assert.Equal(2, revisions.Count);
+        Assert.All(revisions, r => Assert.Equal(93.458m, Assert.Single(r.Lines).UnitPrice));
+    }
+
     [Fact]
     public async Task A_revision_keeps_the_prorated_description()
     {

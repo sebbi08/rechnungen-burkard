@@ -173,7 +173,7 @@ public sealed class GraveService
 
     private Grave NewGrave()
     {
-        var grave = new Grave { CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow) };
+        var grave = new Grave { CreatedAt = DateOnly.FromDateTime(_clock.GetLocalNow()) };
         _db.Graves.Add(grave);
         return grave;
     }

@@ -123,7 +123,7 @@ public sealed class InvoiceService
             ?? edited.RevisionNumber;
         var revisionNumber = lastRevision + 1;
 
-        var now = DateTime.UtcNow;
+        var now = _clock.GetLocalNow();
         var baseNumber = InvoiceNumberFormatter.StripRevision(edited.InvoiceNumber);
 
         var revision = new Invoice
@@ -297,7 +297,10 @@ public sealed class InvoiceService
         }
 
         var (number, year, sequence) = await _numbers.AllocateAsync(ct);
-        var now = DateTime.UtcNow;
+        // the wall-clock here, like the number's year: the day it names is the
+        // issue date the document prints, and until one or two in the morning
+        // the UTC day is still yesterday
+        var now = _clock.GetLocalNow();
 
         var invoice = new Invoice
         {
