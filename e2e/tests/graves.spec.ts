@@ -4,6 +4,7 @@ import { createRow, ensureRow, seedGrave as saveGrave, type SeedGraveLine } from
 import { GENERATION_LOCK_PATH } from "../stack";
 import { unique } from "../unique";
 import {
+  confirmation,
   dialog,
   drawer,
   fillDate,
@@ -1113,6 +1114,35 @@ test.describe("the half-year today falls in", () => {
     expect(new Set(seen).size).toBe(seen.length);
   });
 
+  // A poll that got no answer -- a dropped connection, a server restarting
+  // under the page -- used to end the wait: the overlay closed while the job
+  // ran on, the browser's English "Failed to fetch" was shown, and the result
+  // never was.
+  test("a generation outlasts answers lost while it runs (Story 13)", async ({ page }) => {
+    const marker = `GB-${unique()}`;
+    await seedGrave(page, marker, [`Anna ${marker}`]);
+    let lost = 0;
+    await page.route(/\/odata\/Jobs\(\d+\)/, (route) =>
+      lost++ < 2 ? route.abort("connectionreset") : route.continue(),
+    );
+    await page.goto("/graves");
+
+    await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
+    await waitForOverlayOpen(page);
+    await withGenerationLock(async () => {
+      await dialog(page, "Rechnungen erzeugen")
+        .getByRole("button", { name: "Jetzt erzeugen" })
+        .click();
+
+      const result = dialog(page, "Rechnungen erzeugen");
+      await expect(result).toContainText(/Erstellt: [1-9]/, { timeout: 90000 });
+      expect(lost).toBeGreaterThanOrEqual(2);
+      await expect(toasts(page)).toHaveCount(0);
+      await result.getByRole("button", { name: "OK" }).click();
+    });
+    await expect(page.getByRole("row").filter({ hasText: marker })).toContainText("erstellt");
+  });
+
   test("the grave detail page shows the grave, its status and its invoices", async ({ page }) => {
     const marker = `GD-${unique()}`;
     const names = [`Anna ${marker}`, `Bernd ${marker}`];
@@ -1278,4 +1308,105 @@ test.describe("the half-year today falls in", () => {
     await pickOption(page, page.getByRole("combobox", { name: "Zahlung" }), "Nur unbezahlte");
     await expect(page.getByRole("row").filter({ hasText: graveNumber })).toHaveCount(0);
   });
+});
+
+// The job's id lived only in the page that started it. Reloaded mid-run, the
+// page showed the overview as if nothing were running -- no block, "Jetzt
+// erzeugen" offered again -- and the result, the one place skipped graves are
+// named, was never shown. A real job cannot be held running until a reload has
+// landed, so the browser is given the job it started, as the page keeps it,
+// and the job's answers are stood in for: still running when the page loads,
+// finished on the third look.
+test("a generation still running when the page loads is shown and reported (Story 13)", async ({
+  page,
+}) => {
+  const job = (status: string, percent: number, resultJson: string | null) => ({
+    Id: 424242,
+    Type: "GraveInvoices",
+    Status: status,
+    ProgressPercent: percent,
+    TotalCount: 7,
+    ProcessedCount: Math.round((percent / 100) * 7),
+    PayloadJson: `{"Year":${CURRENT_YEAR},"Half":${CURRENT_HALF}}`,
+    ResultJson: resultJson,
+    Error: null,
+    CreatedAt: "2026-10-08T08:00:00Z",
+    StartedAt: "2026-10-08T08:00:01Z",
+    FinishedAt: null,
+  });
+  let looks = 0;
+  await page.route(/\/odata\/Jobs\(424242\)/, (route) =>
+    route.fulfill({
+      json:
+        ++looks < 3
+          ? job("Running", 40 + looks * 20, null)
+          : job("Succeeded", 100, '{"InvoicedGraves":7,"SkippedGraves":[]}'),
+    }),
+  );
+  // what the page that started the job kept, before it was reloaded
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("followedGenerationJob", "424242"));
+
+  await page.goto("/graves");
+
+  await expect(blocking(page)).toBeVisible();
+  const result = dialog(page, "Rechnungen erzeugen");
+  await expect(result).toContainText("Erstellt: 7");
+  await expect(blocking(page)).toBeHidden();
+  await result.getByRole("button", { name: "OK" }).click();
+
+  // shown once: the next visit has nothing left to report
+  const looked = looks;
+  await page.reload();
+  await expect(page.getByRole("table")).toBeVisible();
+  await expect(result).toHaveCount(0);
+  expect(looks).toBe(looked);
+});
+
+// The grave editor is the long form of the app, and every way out of it used
+// to drop what was typed without a word: a click beside the panel, Escape --
+// even an Escape meant for a list's search field -- and Cancel.
+test("the grave editor asks before it drops what was typed", async ({ page }) => {
+  await page.goto("/graves");
+  const editor = drawer(page);
+  const number = editor.getByLabel("Grabnummer");
+
+  // nothing typed yet: Escape just closes
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForOverlayOpen(page);
+  await number.press("Escape");
+  await expect(editor).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForOverlayOpen(page);
+  await number.fill(`ASK-${unique()}`);
+
+  // Escape in a list's search field closes the list, not the editor
+  await page.locator("#graveRecipient").click();
+  const list = page.locator(".p-select-overlay");
+  await list.locator("input.p-select-filter").press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(confirmation(page)).toHaveCount(0);
+  await expect(editor).toBeVisible();
+
+  // every way out asks, and "Abbrechen" keeps what was typed
+  const typed = await number.inputValue();
+  const ways: [string, () => Promise<void>][] = [
+    ["Escape", () => number.press("Escape")],
+    ["a click beside it", () => page.mouse.click(40, 360)],
+    ["Cancel", () => editor.getByRole("button", { name: "Abbrechen" }).click()],
+  ];
+  for (const [way, leave] of ways) {
+    await leave();
+    await expect(confirmation(page), way).toBeVisible();
+    await confirmation(page).getByRole("button", { name: "Abbrechen" }).click();
+    await expect(confirmation(page)).toHaveCount(0);
+    await expect(editor, way).toBeVisible();
+    await expect(number).toHaveValue(typed);
+  }
+
+  // and "Ja" lets it go
+  await editor.getByRole("button", { name: "Abbrechen" }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(editor).toHaveCount(0);
 });

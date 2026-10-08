@@ -12,7 +12,7 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 import {
@@ -23,6 +23,7 @@ import {
   pollJob,
   searchGraves,
 } from "@/api/endpoints";
+import { ApiError, isTransient } from "@/api/http";
 import { useGraveYearRange } from "@/api/queries";
 import { type Job, JobStatus } from "@/api/generated";
 import GenerateDialog from "@/components/GenerateDialog.vue";
@@ -33,6 +34,7 @@ import { useDebounced } from "@/composables/useDebounced";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
+import { forgetJob, rememberedJob, rememberJob } from "@/lib/followedJob";
 import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
 import { currentHalfYear, halfYearKey, halfYearText, parseHalfYearKey } from "@/lib/halfYear";
@@ -164,25 +166,56 @@ async function downloadZip(): Promise<void> {
 const generateOpen = ref(false);
 async function generate(year: number, half: number): Promise<void> {
   generateOpen.value = false;
-  let job: Job;
+  await follow(async () => (await generateGraveInvoices(year, half)).Id);
+}
+
+/** Waits for a generation behind the blocking overlay and reports its result.
+ *  `start` answers the job's id: a new job's, or that of one this browser
+ *  started before the page was loaded anew. */
+async function follow(start: () => Promise<number>): Promise<void> {
+  let started = false;
+  let job: Job | undefined;
   try {
     job = await run(t("generationRunning"), async (progress) => {
-      const started = await generateGraveInvoices(year, half);
-      return pollJob(started.Id, (percent) =>
-        progress(percent, t("generationProgress", [percent])),
-      );
+      const jobId = await start();
+      rememberJob(jobId);
+      started = true;
+      return pollJob(jobId, (percent) => progress(percent, t("generationProgress", [percent])));
     });
   } catch (error) {
-    showError(error);
+    if (started && isTransient(error)) {
+      // Lost from view, not failed: the job runs on in the server, and the
+      // page picks it up again once it is loaded anew.
+      showError(new ApiError("GenerationUnfollowed"));
+    } else {
+      forgetJob();
+      showError(error);
+    }
+  } finally {
+    // however the wait ended, some graves may have been invoiced meanwhile
+    await queryClient.invalidateQueries();
+  }
+  if (!job) {
     return;
   }
-  await queryClient.invalidateQueries();
+  forgetJob();
   if (job.Status === JobStatus.Failed) {
     showMessage(t("generateInvoices"), t("generationFailed"));
     return;
   }
   showMessage(t("generateInvoices"), generationSummary(job.ResultJson, translate), "info");
 }
+
+// A generation this browser started and has not shown the result of: still
+// running, it blocks the page loaded anew like the one that started it; done
+// meanwhile, its result -- the one place skipped graves are named -- is shown
+// now rather than never.
+onMounted(async () => {
+  const jobId = rememberedJob();
+  if (jobId !== undefined) {
+    await follow(() => Promise.resolve(jobId));
+  }
+});
 
 const editorOpen = ref(false);
 const editorGraveId = ref<number | null>(null);

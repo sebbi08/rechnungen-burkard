@@ -31,18 +31,25 @@ export function useDrawerFocus() {
       ?.focus();
   }
 
-  /** For the drawer's @keydown.capture. PrimeVue's Select stops every Escape,
-   *  open list or not, so with the focus on one -- where the drawer now puts
-   *  it -- Escape no longer closed the drawer. A closed Select's Escape is the
-   *  drawer's again; an open one still just closes its list. */
+  /** For the drawer's @keydown.capture, with the drawer's own Escape turned off
+   *  (`:close-on-escape="false"`). PrimeVue's Drawer listens for Escape on the
+   *  whole document, so an Escape meant for something else -- a list's search
+   *  field or a calendar, both drawn outside the drawer -- closed the editor
+   *  as well. Here only an Escape from inside the drawer is the drawer's, and
+   *  not one on a field whose list or calendar is open: that one closes just
+   *  its list.
+   *
+   *  The Escape is claimed: closing may ask first, and the question's dialog
+   *  is drawn between this listener and the next, so the same key travelling
+   *  on to the document reached the dialog's own Escape and dismissed it
+   *  before it was seen. */
   function onKeydown(event: KeyboardEvent, close: () => void): void {
     const target = event.target;
     if (
       event.key === "Escape" &&
-      target instanceof HTMLElement &&
-      target.getAttribute("role") === "combobox" &&
-      target.getAttribute("aria-expanded") !== "true"
+      !(target instanceof HTMLElement && target.getAttribute("aria-expanded") === "true")
     ) {
+      event.stopPropagation();
       close();
     }
   }

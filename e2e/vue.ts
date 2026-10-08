@@ -44,6 +44,14 @@ export function drawer(page: Page): Locator {
   return page.locator(".p-drawer");
 }
 
+/** Leaves an editor with something typed in it through Cancel, which asks
+ *  before it discards, and says yes. */
+export async function discardEditor(page: Page): Promise<void> {
+  await drawer(page).getByRole("button", { name: "Abbrechen" }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(drawer(page)).toHaveCount(0);
+}
+
 /**
  * A row's action button, by what it does. Every row carries the same buttons,
  * so each one's accessible name also says which row it acts on ("Details:
@@ -167,10 +175,13 @@ export async function fillNumber(field: Locator, value: string): Promise<void> {
 /**
  * Types a date into a DatePicker. The field takes the typed text as it goes,
  * but the calendar it opens stays over the fields beneath it until something
- * closes it; Escape does, without touching the value.
+ * closes it; Escape does, without touching the value -- once the calendar is
+ * open. Pressed before, the Escape is the editor's, which closes (or, with
+ * something typed, asks to discard) the whole editor instead.
  */
 export async function fillDate(page: Page, field: Locator, date: string): Promise<void> {
   await field.fill(date);
+  await expect(page.locator(".p-datepicker-panel")).toBeVisible();
   await field.press("Escape");
   await expect(page.locator(".p-datepicker-panel")).toHaveCount(0);
   await expect(field).toHaveValue(date);
@@ -182,6 +193,7 @@ export async function fillDate(page: Page, field: Locator, date: string): Promis
  */
 export async function fillYear(page: Page, field: Locator, year: string): Promise<void> {
   await field.fill(year);
+  await expect(page.locator(".p-datepicker-panel")).toBeVisible();
   await field.press("Escape");
   await expect(page.locator(".p-datepicker-panel")).toHaveCount(0);
   await expect(field).toHaveValue(year);

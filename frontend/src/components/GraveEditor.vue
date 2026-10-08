@@ -12,6 +12,7 @@ import { useI18n } from "vue-i18n";
 import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
 import { ApiError, toApiError } from "@/api/http";
 import { useItemsQuery, useRecipientsQuery } from "@/api/queries";
+import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
@@ -50,6 +51,18 @@ const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
 const loading = ref(false);
 const saving = ref(false);
+// What the user can change; the recipient picked for adding is not, until it
+// is added.
+const discard = useDiscardGuard(visible, () => ({
+  form,
+  lines: lines.value.map(({ itemId, count, unitPrice, priceIncludesVat }) => ({
+    itemId,
+    count,
+    unitPrice,
+    priceIncludesVat,
+  })),
+  recipients: recipients.value.map((recipient) => recipient.id),
+}));
 // Which opening a load belongs to. An answer that arrives after the drawer was
 // closed -- or reopened for another grave, or for a new one -- is dropped:
 // filled in, it turned a new grave into a copy of the old one.
@@ -76,6 +89,7 @@ watch(visible, async (open) => {
   recipients.value = [];
   linkRecipientId.value = null;
   if (props.graveId == null) {
+    discard.markClean();
     return;
   }
   loading.value = true;
@@ -105,6 +119,7 @@ watch(visible, async (open) => {
       id: link.Recipient.Id,
       name: link.Recipient.Name,
     }));
+    discard.markClean();
   } catch (error) {
     if (current === opening) {
       showError(error);
@@ -299,14 +314,16 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
 
 <template>
   <Drawer
-    v-model:visible="visible"
+    :visible="visible"
+    :close-on-escape="false"
     position="right"
     :header="graveId == null ? t('createGrave') : t('editGrave')"
     :aria-label="graveId == null ? t('createGrave') : t('editGrave')"
     :style="{ width: 'min(100vw, 60rem)' }"
     @after-show="drawerFocus.focusFirst(formEl)"
     @after-hide="drawerFocus.restore()"
-    @keydown.capture="drawerFocus.onKeydown($event, () => (visible = false))"
+    @update:visible="discard.onVisibleChange"
+    @keydown.capture="drawerFocus.onKeydown($event, discard.requestClose)"
   >
     <div v-if="loading" class="flex justify-center p-10"><ProgressSpinner /></div>
     <form ref="formEl" v-else id="graveForm" class="flex flex-col gap-6" @submit.prevent="save">
@@ -422,7 +439,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
     </form>
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button :label="t('cancel')" severity="secondary" text @click="visible = false" />
+        <Button :label="t('cancel')" severity="secondary" text @click="discard.requestClose" />
         <Button
           type="submit"
           form="graveForm"

@@ -3,6 +3,7 @@ import { createRow, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
   dialog,
+  discardEditor,
   drawer,
   fillDate,
   pickItem,
@@ -384,8 +385,7 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   expect(listBox.x + listBox.width, "the recipient list runs off the screen").toBeLessThanOrEqual(
     page.viewportSize()!.width + 1,
   );
-  // closed by the field that opened it: Escape in the list's search field
-  // reaches the drawer and closes the editor
+  // closed by the field that opened it, as a click would
   await page.locator("#graveRecipient").click();
   await expect(recipientList).toHaveCount(0);
 
@@ -402,8 +402,7 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   // the recipient list gets the editor's width too
   expect(await widthOf(added)).toBeGreaterThan((await widthOf(editor)) * 0.85);
 
-  await editor.getByRole("button", { name: "Abbrechen" }).click();
-  await expect(editor).toHaveCount(0);
+  await discardEditor(page);
 });
 
 // A test of its own, so the mark for its known bug cannot also swallow a
@@ -468,8 +467,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
 
   await corrections.getByRole("button", { name: "Abbrechen" }).click();
   await expect(corrections).toHaveCount(0);
-  await editor.getByRole("button", { name: "Abbrechen" }).click();
-  await expect(editor).toHaveCount(0);
+  await discardEditor(page);
 });
 
 test("invoices: the editor spends its width on the fields", async ({ page }) => {
@@ -489,8 +487,7 @@ test("invoices: the editor spends its width on the fields", async ({ page }) => 
   await expectPickerGetsTheWidth(page, "invoiceRecipient");
   await expectNoSidewaysScrolling(page);
 
-  await editor.getByRole("button", { name: "Abbrechen" }).click();
-  await expect(editor).toHaveCount(0);
+  await discardEditor(page);
 });
 
 // The grave-invoice detail page is not swept here: reaching it needs a

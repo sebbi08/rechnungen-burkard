@@ -6,7 +6,7 @@
 import type { GravePositionName } from "@/lib/gravePosition";
 import type { QuarterName } from "@/lib/quarter";
 import { type InvoiceLine, type Job, JobStatus } from "./generated";
-import { ApiError, getBlob, getJson, postBlob, postJson, request } from "./http";
+import { ApiError, getBlob, getJson, isTransient, postBlob, postJson, request } from "./http";
 import { odata } from "./odata";
 
 // ---- invoices -------------------------------------------------------------
@@ -362,19 +362,38 @@ export function generateGraveInvoices(year: number, half: number): Promise<Start
 
 export const JOB_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** How many looks in a row may go unanswered before the wait gives up: at one
+ *  a second, long enough for the server to restart under the page. */
+const MAX_LOST_POLLS = 30;
+
 /** Polls the job once a second until it succeeds or fails; throws
- *  ApiError("JobTimeout") after ten minutes. */
+ *  ApiError("JobTimeout") after ten minutes. A look that got no answer is
+ *  tried again rather than ending the wait -- the job runs on in the server
+ *  either way, and one dropped answer used to close the overlay on it, show
+ *  an error and lose its result. Only a run of them gives up, with the code
+ *  of the last. */
 export async function pollJob(
   jobId: number,
   onProgress: (percent: number) => void,
   timeoutMs = JOB_TIMEOUT_MS,
 ): Promise<Job> {
   const deadline = Date.now() + timeoutMs;
+  let lost = 0;
   for (;;) {
     if (Date.now() > deadline) {
       throw new ApiError("JobTimeout");
     }
-    const job = (await odata.Jobs(jobId).query().execute()).data;
+    let job: Job;
+    try {
+      job = (await odata.Jobs(jobId).query().execute()).data;
+      lost = 0;
+    } catch (error) {
+      if (!isTransient(error) || ++lost > MAX_LOST_POLLS) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      continue;
+    }
     if (job.Status === JobStatus.Succeeded || job.Status === JobStatus.Failed) {
       return job;
     }

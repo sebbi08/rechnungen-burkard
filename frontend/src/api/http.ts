@@ -24,15 +24,30 @@ function codeOf(body: unknown, status: number | undefined): string {
   return typeof code === "string" && code ? code : `HTTP ${status ?? "?"}`;
 }
 
-/** Anything thrown by a call -- our own fetches or the generated client. */
+/** Anything thrown by a call -- our own fetches or the generated client. A
+ *  call that got no answer at all is `NetworkError`: fetch rejects with the
+ *  browser's own English sentence ("Failed to fetch"), which says nothing to
+ *  the user and is not German. */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) {
     return error;
   }
   if (error instanceof FetchClientError) {
-    return new ApiError(codeOf(error.responseData, error.status), error.status, error.responseData);
+    return error.status === undefined
+      ? new ApiError("NetworkError")
+      : new ApiError(codeOf(error.responseData, error.status), error.status, error.responseData);
+  }
+  if (error instanceof TypeError) {
+    return new ApiError("NetworkError");
   }
   return new ApiError(error instanceof Error ? error.message : String(error));
+}
+
+/** A failure worth asking again about: no answer, or the server failing --
+ *  a restart under the page answers 502 or 503 for a moment. */
+export function isTransient(error: unknown): boolean {
+  const { code, status } = toApiError(error);
+  return code === "NetworkError" || (status !== undefined && status >= 500);
 }
 
 export async function request(url: string, init?: RequestInit): Promise<Response> {

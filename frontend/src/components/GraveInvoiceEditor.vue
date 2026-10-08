@@ -11,6 +11,7 @@ import {
   type InvoiceLineInput,
 } from "@/api/endpoints";
 import { useBlocking } from "@/composables/useBlocking";
+import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
 import type { GraveInvoiceDraft } from "@/composables/useGraveInvoiceEdit";
@@ -31,11 +32,20 @@ const formEl = ref<HTMLFormElement | null>(null);
 const { run } = useBlocking();
 const queryClient = useQueryClient();
 const lines = ref<DraftLine[]>([]);
+const discard = useDiscardGuard(visible, () =>
+  lines.value.map(({ itemId, count, unitPrice, priceIncludesVat }) => ({
+    itemId,
+    count,
+    unitPrice,
+    priceIncludesVat,
+  })),
+);
 
 watch(visible, (open) => {
   if (open) {
     drawerFocus.remember();
     lines.value = props.draft?.lines ?? [];
+    discard.markClean();
   }
 });
 
@@ -80,14 +90,16 @@ async function save(): Promise<void> {
 
 <template>
   <Drawer
-    v-model:visible="visible"
+    :visible="visible"
+    :close-on-escape="false"
     position="right"
     :header="t('graveInvoiceEditTitle')"
     :aria-label="t('graveInvoiceEditTitle')"
     :style="{ width: 'min(100vw, 60rem)' }"
     @after-show="drawerFocus.focusFirst(formEl)"
     @after-hide="drawerFocus.restore()"
-    @keydown.capture="drawerFocus.onKeydown($event, () => (visible = false))"
+    @update:visible="discard.onVisibleChange"
+    @keydown.capture="drawerFocus.onKeydown($event, discard.requestClose)"
   >
     <form ref="formEl" id="graveInvoiceForm" class="flex flex-col gap-6" @submit.prevent="save">
       <Message v-if="draft" severity="warn">{{ draft.warning }}</Message>
@@ -95,7 +107,7 @@ async function save(): Promise<void> {
     </form>
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button :label="t('cancel')" severity="secondary" text @click="visible = false" />
+        <Button :label="t('cancel')" severity="secondary" text @click="discard.requestClose" />
         <Button type="submit" form="graveInvoiceForm" :label="t('save')" icon="pi pi-check" />
       </div>
     </template>
