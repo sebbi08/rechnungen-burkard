@@ -24,11 +24,15 @@ public static class Csv
 
     /// <summary>Splits the text into rows of fields. A trailing newline does not
     /// produce an extra row, and a row that is completely empty is dropped, so a
-    /// file with nothing but a header reads as "no data".</summary>
-    public static List<List<string>> Parse(string text)
+    /// file with nothing but a header reads as "no data". Each row keeps its
+    /// <see cref="CsvRow.Number"/> all the same, counted the way a spreadsheet
+    /// counts them -- a dropped row included, a quoted line break not -- so a
+    /// problem names the row the user sees.</summary>
+    public static List<CsvRow> Parse(string text)
     {
-        var rows = new List<List<string>>();
+        var rows = new List<CsvRow>();
         var row = new List<string>();
+        var number = 0;
         var field = new StringBuilder();
         var inQuotes = false;
         var fieldStarted = false;
@@ -72,7 +76,7 @@ public static class Csv
                     row.Add(field.ToString());
                     field.Clear();
                     fieldStarted = false;
-                    AddRow(rows, row);
+                    AddRow(rows, row, ++number);
                     row = new List<string>();
                     break;
                 default:
@@ -85,17 +89,17 @@ public static class Csv
         if (fieldStarted || field.Length > 0 || row.Count > 0)
         {
             row.Add(field.ToString());
-            AddRow(rows, row);
+            AddRow(rows, row, ++number);
         }
 
         return rows;
     }
 
-    private static void AddRow(List<List<string>> rows, List<string> row)
+    private static void AddRow(List<CsvRow> rows, List<string> row, int number)
     {
         if (row.Any(f => !string.IsNullOrWhiteSpace(f)))
         {
-            rows.Add(row);
+            rows.Add(new CsvRow(number, row));
         }
     }
 
@@ -120,4 +124,14 @@ public static class Csv
 
         return $"\"{value.Replace("\"", "\"\"")}\"";
     }
+}
+
+/// <summary>One row's fields, with the row's number in its file (the header is
+/// row 1).</summary>
+public sealed class CsvRow : List<string>
+{
+    public CsvRow(int number, IEnumerable<string> fields)
+        : base(fields) => Number = number;
+
+    public int Number { get; }
 }

@@ -10,6 +10,10 @@ public static class ImportArchiveLayout
     public const string GravesFile = "graves.csv";
     public const string MappingFile = "mapping.csv";
 
+    /// <summary>The most one file may unpack to: far beyond any business's
+    /// recipients, items and graves, and far below what would strain the app.</summary>
+    public const int MaxFileBytes = 16 * 1024 * 1024;
+
     public static readonly string[] RecipientsHeader = { "RecipientNumber", "Name", "Address" };
     public static readonly string[] ItemsHeader =
     {

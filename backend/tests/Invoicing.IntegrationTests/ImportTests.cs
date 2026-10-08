@@ -55,6 +55,25 @@ public class ImportTests
         return memory.ToArray();
     }
 
+    /// <summary>Like <see cref="Zip"/>, but with each file's bytes as given, for
+    /// files that are not UTF-8.</summary>
+    private static byte[] ZipBytes(params (string Name, byte[] Content)[] files)
+    {
+        using var memory = new MemoryStream();
+        using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, content) in files)
+            {
+                using var stream = zip.CreateEntry(name).Open();
+                stream.Write(content);
+            }
+        }
+
+        return memory.ToArray();
+    }
+
+    private static byte[] Utf8(string text) => new UTF8Encoding(false).GetBytes(text);
+
     /// <summary>A consistent archive: two recipients, three items (one of them
     /// without a price, which no grave links), one grave with both link kinds.
     /// The gross-priced 107.00 is 100.00 net at 7 %, so the grave divides.</summary>
@@ -948,6 +967,86 @@ public class ImportTests
             p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
         );
         await AssertNothingImportedAsync(host);
+    }
+
+    /// <summary>A spreadsheet leaves an empty row as ",,,," and a text editor as
+    /// an empty line. Neither is data, but both are rows the user counts, so
+    /// the problems after one still name the row the user sees.</summary>
+    [Fact]
+    public async Task A_problem_after_a_blank_row_names_the_row_the_user_sees()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            (
+                "items.csv",
+                ItemsHeader
+                    + "9001,Grabpflege,7,120,\r\n"
+                    + ",,,,\r\n"
+                    + "\r\n"
+                    + "9002,Gießdienst,abc,10,\r\n"
+            ),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = Assert.Single(await ProblemsAsync(response));
+        Assert.Equal(("items.csv", 5, "VatRateInvalid"), (problem.File, problem.Row, problem.Code));
+    }
+
+    /// <summary>Excel's plain "CSV" on Windows saves in Windows-1252. Read as
+    /// UTF-8, every umlaut became U+FFFD and was imported -- and printed on
+    /// invoices -- as such, with nothing reported.</summary>
+    [Fact]
+    public async Task A_file_that_is_not_utf8_is_refused_by_name()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        // "Müller" in Windows-1252: the ü is the single byte 0xFC
+        var recipients = Utf8(RecipientsHeader + "E-1000,M")
+            .Concat(new byte[] { 0xFC })
+            .Concat(Utf8("ller,Weg 1\r\n"))
+            .ToArray();
+        var archive = ZipBytes(
+            ("recipients.csv", recipients),
+            ("items.csv", Utf8(ItemsHeader)),
+            ("graves.csv", Utf8(GravesHeader)),
+            ("mapping.csv", Utf8(MappingHeader))
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = Assert.Single(await ProblemsAsync(response));
+        Assert.Equal(("recipients.csv", "EncodingInvalid"), (problem.File, problem.Code));
+        await AssertNothingImportedAsync(host);
+    }
+
+    /// <summary>The upload is capped, but a compressed entry is not: a few
+    /// megabytes of archive can unpack to far more than the app can hold.</summary>
+    [Fact]
+    public async Task A_file_too_large_to_be_a_template_is_refused_by_name()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + new string('a', 17 * 1024 * 1024)),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = Assert.Single(await ProblemsAsync(response));
+        Assert.Equal(("recipients.csv", "FileTooLarge"), (problem.File, problem.Code));
     }
 
     /// <summary>Templates are filled in by hand, and a German hand writes

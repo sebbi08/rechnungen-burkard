@@ -156,6 +156,8 @@
   "importProblemArchiveUnreadable": "Die Datei ist kein lesbares ZIP-Archiv.",
   "importProblemFileMissing": "Die Datei fehlt im Archiv.",
   "importProblemHeaderInvalid": "Die Kopfzeile muss lauten: {0}.",
+  "importProblemEncodingInvalid": "Die Datei ist nicht als UTF-8 gespeichert. Bitte in Excel „CSV UTF-8“ wählen und erneut speichern.",
+  "importProblemFileTooLarge": "Die Datei ist größer als {0} MB.",
   "importProblemDuplicateRecipientNumber": "Die Empfängernummer „{0}“ wird bereits in Zeile {1} verwendet.",
   "importProblemDuplicateItemNumber": "Die Leistungsnummer „{0}“ wird bereits in Zeile {1} verwendet.",
   "importProblemDuplicateGraveNumber": "Die Grabnummer „{0}“ wird bereits in Zeile {1} verwendet.",

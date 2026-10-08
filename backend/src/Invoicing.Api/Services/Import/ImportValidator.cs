@@ -26,10 +26,10 @@ public sealed class ImportValidator
     public async Task<ImportValidationResult> ValidateAsync(Stream archive, CancellationToken ct)
     {
         var problems = new List<ImportProblem>();
-        Dictionary<string, string> files;
+        Dictionary<string, string?> files;
         try
         {
-            files = ReadArchive(archive);
+            files = ReadArchive(archive, problems);
         }
         catch (InvalidDataException)
         {
@@ -68,10 +68,10 @@ public sealed class ImportValidator
         }
 
         // FR-056: the header row of every file must match exactly.
-        var tables = new Dictionary<string, List<List<string>>>(StringComparer.OrdinalIgnoreCase);
+        var tables = new Dictionary<string, List<CsvRow>>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, expectedHeader) in ImportArchiveLayout.Headers)
         {
-            var rows = Csv.Parse(files[name]);
+            var rows = Csv.Parse(files[name]!);
             if (rows.Count == 0 || !HeaderMatches(rows[0], expectedHeader))
             {
                 problems.Add(
@@ -125,9 +125,25 @@ public sealed class ImportValidator
         return byFile != 0 ? byFile : Comparer<int>.Default.Compare(a.Row ?? 0, b.Row ?? 0);
     }
 
-    private static Dictionary<string, string> ReadArchive(Stream archive)
+    // Strict: an invalid byte throws instead of turning into U+FFFD.
+    private static readonly UTF8Encoding StrictUtf8 = new(
+        encoderShouldEmitUTF8Identifier: false,
+        throwOnInvalidBytes: true
+    );
+
+    // spelled out: the strict encoding above emits none, so its Preamble is empty
+    private static readonly byte[] Utf8Bom = [0xEF, 0xBB, 0xBF];
+
+    /// <summary>The four files' texts by name. A file that is there but cannot
+    /// be read -- too large, or not UTF-8 -- is reported in
+    /// <paramref name="problems"/> and maps to null, so it is not also reported
+    /// as missing.</summary>
+    private static Dictionary<string, string?> ReadArchive(
+        Stream archive,
+        List<ImportProblem> problems
+    )
     {
-        var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var files = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
         foreach (var entry in zip.Entries)
         {
@@ -138,16 +154,75 @@ public sealed class ImportValidator
                 continue;
             }
 
-            using var stream = entry.Open();
-            using var reader = new StreamReader(
-                stream,
-                Encoding.UTF8,
-                detectEncodingFromByteOrderMarks: true
-            );
-            files[name] = reader.ReadToEnd();
+            files[name] = null;
+            // The upload is capped, a compressed entry is not: a few megabytes
+            // can unpack to more than the app can hold. The size the archive
+            // states could be anything, so the bytes are counted as they come.
+            var bytes = ReadAtMost(entry, ImportArchiveLayout.MaxFileBytes);
+            if (bytes is null)
+            {
+                problems.Add(
+                    new ImportProblem(
+                        name,
+                        null,
+                        "FileTooLarge",
+                        $"The file is larger than {ImportArchiveLayout.MaxFileBytes / (1024 * 1024)} MB.",
+                        "FileTooLarge",
+                        [
+                            (ImportArchiveLayout.MaxFileBytes / (1024 * 1024)).ToString(
+                                CultureInfo.InvariantCulture
+                            ),
+                        ]
+                    )
+                );
+                continue;
+            }
+
+            // Excel's plain "CSV" on Windows is Windows-1252, and read as UTF-8
+            // its umlauts became U+FFFD -- imported, and printed on invoices,
+            // without a word. Refused instead, so it can be saved as UTF-8.
+            // the template carries a BOM for Excel's sake; it is not text
+            var bom = bytes.AsSpan().StartsWith(Utf8Bom) ? Utf8Bom.Length : 0;
+            try
+            {
+                files[name] = StrictUtf8.GetString(bytes, bom, bytes.Length - bom);
+            }
+            catch (DecoderFallbackException)
+            {
+                problems.Add(
+                    new ImportProblem(
+                        name,
+                        null,
+                        "EncodingInvalid",
+                        "The file is not UTF-8 encoded.",
+                        "EncodingInvalid"
+                    )
+                );
+            }
         }
 
         return files;
+    }
+
+    /// <summary>The entry's bytes, or null once there are more than
+    /// <paramref name="limit"/>.</summary>
+    private static byte[]? ReadAtMost(ZipArchiveEntry entry, int limit)
+    {
+        using var stream = entry.Open();
+        using var content = new MemoryStream();
+        var buffer = new byte[81920];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            if (content.Length + read > limit)
+            {
+                return null;
+            }
+
+            content.Write(buffer, 0, read);
+        }
+
+        return content.ToArray();
     }
 
     private static bool HeaderMatches(
@@ -162,7 +237,7 @@ public sealed class ImportValidator
             .All(m => m);
 
     private static void ReadRecipients(
-        List<List<string>> rows,
+        List<CsvRow> rows,
         ImportData data,
         List<ImportProblem> problems
     )
@@ -172,7 +247,7 @@ public sealed class ImportValidator
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            var line = i + 1;
+            var line = row.Number;
             if (!HasColumns(row, 3, file, line, problems))
                 continue;
 
@@ -210,18 +285,14 @@ public sealed class ImportValidator
         }
     }
 
-    private static void ReadItems(
-        List<List<string>> rows,
-        ImportData data,
-        List<ImportProblem> problems
-    )
+    private static void ReadItems(List<CsvRow> rows, ImportData data, List<ImportProblem> problems)
     {
         const string file = ImportArchiveLayout.ItemsFile;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            var line = i + 1;
+            var line = row.Number;
             if (!HasColumns(row, 5, file, line, problems))
                 continue;
 
@@ -350,18 +421,14 @@ public sealed class ImportValidator
         }
     }
 
-    private static void ReadGraves(
-        List<List<string>> rows,
-        ImportData data,
-        List<ImportProblem> problems
-    )
+    private static void ReadGraves(List<CsvRow> rows, ImportData data, List<ImportProblem> problems)
     {
         const string file = ImportArchiveLayout.GravesFile;
         var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            var line = i + 1;
+            var line = row.Number;
             if (!HasColumns(row, 6, file, line, problems))
                 continue;
 
@@ -455,7 +522,7 @@ public sealed class ImportValidator
     }
 
     private static void ReadMapping(
-        List<List<string>> rows,
+        List<CsvRow> rows,
         ImportData data,
         List<ImportProblem> problems
     )
@@ -467,7 +534,7 @@ public sealed class ImportValidator
         for (var i = 1; i < rows.Count; i++)
         {
             var row = rows[i];
-            var line = i + 1;
+            var line = row.Number;
             if (!HasColumns(row, 5, file, line, problems))
                 continue;
 
