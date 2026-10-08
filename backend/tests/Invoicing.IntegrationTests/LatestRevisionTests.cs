@@ -201,16 +201,50 @@ public class LatestRevisionTests
     public async Task Bulk_download_leaves_out_superseded_revisions()
     {
         using var host = new ApiTestHost();
-        var (invoiceId, itemId, recipientId) = await SeedAsync(host);
+        var (_, itemId, recipientId) = await SeedAsync(host);
         using var client = host.CreateClient();
 
-        var revised = await client.PostAsync(
-            "/odata/CreateRevision",
+        // the bulk download serves a half-year's grave invoices (FR-045)
+        var saved = await client.PostAsync(
+            "/odata/SaveGrave",
             ODataJson.Body(
                 new
                 {
-                    invoiceId,
-                    recipientId,
+                    graveId = (long?)null,
+                    graveNumber = "L-1",
+                    fieldNumber = "1",
+                    siteName = "Grabstätte",
+                    position = "SingleInside",
+                    startDate = "2026-01",
+                    endDate = "2040-12",
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipientId },
+                }
+            )
+        );
+        saved.EnsureSuccessStatusCode();
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+        long graveInvoiceId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            graveInvoiceId = (await db.Invoices.SingleAsync(i => i.GraveId != null)).Id;
+        }
+
+        var revised = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId = graveInvoiceId,
                     lines = new[]
                     {
                         new
@@ -227,7 +261,14 @@ public class LatestRevisionTests
 
         var response = await client.PostAsync(
             "/odata/BulkDownloadDocuments",
-            ODataJson.Body(new { kind = "Normal" })
+            ODataJson.Body(
+                new
+                {
+                    kind = "Normal",
+                    year = 2026,
+                    half = 2,
+                }
+            )
         );
         response.EnsureSuccessStatusCode();
 

@@ -31,30 +31,48 @@ public class BulkDownloadController : ODataController
             );
         }
 
-        if (request.Kind is not ("Normal" or "Copy"))
+        // FR-047: a copy is downloaded on its own, never in bulk. The kind stays
+        // in the request so a client that asks for copies is told no.
+        if (request.Kind != "Normal")
         {
             return BadRequest(
                 new
                 {
-                    error = new { code = "InvalidKind", message = "Kind must be Normal or Copy." },
+                    error = new
+                    {
+                        code = "InvalidKind",
+                        message = "Only normal documents are downloaded in bulk.",
+                    },
                 }
             );
         }
 
-        var kind = request.Kind == "Normal" ? DocumentKind.Normal : DocumentKind.Copy;
-        // a superseded revision's documents were replaced; a bulk download must
-        // not put them next to the revision that replaced them
-        IQueryable<Document> query = _db.Documents.Where(d =>
-            d.Kind == kind && d.Invoice != null && d.Invoice.IsLatestRevision
-        );
-        if (request.Year is not null && request.Half is not null)
+        // FR-045: the grave invoices of one half-year. Without both parts the
+        // filter used to be dropped, and a year alone downloaded every invoice
+        // there is.
+        if (request.Year is not { } year || request.Half is not (1 or 2))
         {
-            query = query.Where(d =>
-                d.Invoice != null
-                && d.Invoice.PeriodYear == request.Year
-                && d.Invoice.PeriodHalf == request.Half
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidHalfYear",
+                        message = "A year and a half (1 or 2) are required.",
+                    },
+                }
             );
         }
+
+        // a superseded revision's documents were replaced; a bulk download must
+        // not put them next to the revision that replaced them
+        var query = _db.Documents.Where(d =>
+            d.Kind == DocumentKind.Normal
+            && d.Invoice != null
+            && d.Invoice.IsLatestRevision
+            && d.Invoice.PeriodYear == year
+            && d.Invoice.PeriodHalf == request.Half
+        );
 
         var documents = await query.OrderBy(d => d.FileName).ToListAsync();
 
@@ -70,8 +88,7 @@ public class BulkDownloadController : ODataController
         }
 
         var bytes = memory.ToArray();
-        var fileName = request.Kind == "Normal" ? "rechnungen.zip" : "kopien.zip";
-        return File(bytes, "application/zip", fileName);
+        return File(bytes, "application/zip", "rechnungen.zip");
     }
 
     public sealed class BulkDownloadRequest
