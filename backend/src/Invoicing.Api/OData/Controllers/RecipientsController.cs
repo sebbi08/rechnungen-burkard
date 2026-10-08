@@ -67,44 +67,37 @@ public class RecipientsController : ODataController
             );
         }
 
-        for (var attempt = 0; ; attempt++)
+        // SQLite opens the transaction with BEGIN IMMEDIATE, so it holds the
+        // write lock from before the next free number is read until the row is
+        // in: two creates at once take turns rather than read the same number.
+        // (They used to race and retry, and eight at once could run out of
+        // retries.)
+        using var tx = _db.Database.BeginTransaction();
+        if (assignNumber)
         {
-            if (assignNumber)
-            {
-                recipient.Number = _numbers.Next();
-            }
+            recipient.Number = _numbers.Next();
+        }
 
-            try
-            {
-                _db.Recipients.Add(recipient);
-                _db.SaveChanges();
-                return Created(recipient);
-            }
-            catch (DbUpdateException) when (assignNumber && attempt < 4)
-            {
-                // Two clients reading the next free number before either has
-                // saved both get the same one, and the unique index rejects the
-                // loser. Retry with a freshly read number, as InvoiceService
-                // does for the invoice sequence; without this the loser came
-                // back as an unhandled 500. The failed attempt leaves the
-                // entity tracked as Added, which would poison every retry.
-                _db.ChangeTracker.Clear();
-            }
-            catch (DbUpdateException)
-            {
-                // an explicit number that survived the check above, or a race
-                // that outlasted the retries
-                return BadRequest(
-                    new
+        try
+        {
+            _db.Recipients.Add(recipient);
+            _db.SaveChanges();
+            tx.Commit();
+            return Created(recipient);
+        }
+        catch (DbUpdateException)
+        {
+            // an explicit number another create took after the check above
+            return BadRequest(
+                new
+                {
+                    error = new
                     {
-                        error = new
-                        {
-                            code = "RecipientNumberExists",
-                            message = "This recipient number already exists.",
-                        },
-                    }
-                );
-            }
+                        code = "RecipientNumberExists",
+                        message = "This recipient number already exists.",
+                    },
+                }
+            );
         }
     }
 
