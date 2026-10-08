@@ -113,12 +113,20 @@ public static class GraveShare
     /// 100,26 as two of 50,13. Only one of those is ever paid.
     ///
     /// Expects lines that <see cref="Problems"/> passes; every rate subtotal
-    /// divides exactly, so each share is a whole number of cents.</summary>
+    /// divides exactly, so each share is a whole number of cents. Lines that do
+    /// not are refused rather than answered with the odd cents dropped.</summary>
     public static long CollectedCents(IReadOnlyList<GraveLine> lines, int recipients)
     {
         if (recipients <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(recipients));
+        }
+
+        if (lines.GroupBy(l => l.VatRate).Any(rate => rate.Sum(NetCents) % recipients != 0))
+        {
+            throw new InvalidOperationException(
+                "The lines do not divide across the recipients; check them with Problems first."
+            );
         }
 
         return lines

@@ -47,10 +47,12 @@ public sealed class GraveInvoiceGenerator
             .Select(r => r.Recipient)
             .ToListAsync(ct);
 
-        // ordered explicitly for the same reason: line order decides which line
-        // takes a cent under GraveShare's tie-break, so leaving it to SQLite's
-        // unspecified row order would make the split depend on something outside
-        // our own code, which is exactly what the tie-break exists to avoid.
+        // ordered explicitly for the same reason: a price that does not divide is
+        // raised on the first line of its rate that can take it
+        // (GraveBillingCheck.Correct), so the order decides which line carries
+        // the correction. Left to SQLite's unspecified row order, it would depend
+        // on something outside our own code -- and it has to match the order the
+        // save stored the corrections in, which reads the links by id too.
         var graveItems = await _db
             .GraveItems.Where(i => i.GraveId == grave.Id)
             .OrderBy(i => i.Id)

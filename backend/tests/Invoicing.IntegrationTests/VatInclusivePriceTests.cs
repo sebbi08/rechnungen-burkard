@@ -47,10 +47,10 @@ public class VatInclusivePriceTests
     [InlineData(19)]
     public void Nothing_is_added_to_the_net_here(decimal rate)
     {
-        // A gross that cannot be billed exactly is refused when the grave is
-        // saved -- see GraveShareTests -- rather than rounded into something
-        // else here. So this only ever divides and rounds, and the result is
-        // always the plain two-decimal quotient.
+        // A grave whose prices then do not divide is corrected openly, with the
+        // user's confirmation -- see GraveBillingCorrectionTests -- rather than
+        // rounded into something else here. So this only ever divides and
+        // rounds, and the result is always the plain two-decimal quotient.
         for (var cents = 1; cents <= 4000; cents++)
         {
             var gross = cents / 100m;

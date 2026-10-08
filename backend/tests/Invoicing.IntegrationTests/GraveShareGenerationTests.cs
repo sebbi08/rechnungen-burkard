@@ -9,9 +9,9 @@ using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
-/// <summary>Generation now bills every recipient the grave's own lines at 100 %,
-/// raised by whole cents where a VAT subtotal would not divide, instead of
-/// dividing each line across the recipients.</summary>
+/// <summary>Generation bills every recipient the grave's own lines at 100 %,
+/// instead of dividing each line across the recipients. The grave seeded here
+/// divides as it is, so nothing is corrected.</summary>
 public class GraveShareGenerationTests
 {
     private static async Task SeedAsync(ApiTestHost host)
@@ -41,9 +41,9 @@ public class GraveShareGenerationTests
             VatRate = 19m,
             // 47,81 rather than 47,80: with Blumenschmuck's 49,90 the 19 %
             // subtotal comes to 97,71, which divides by three. At 47,80 it would
-            // be 97,70, and the grave could not be saved at all -- see
-            // GraveShareTests. The figures below are unchanged, because the rule
-            // that used to raise this price landed on the same 47,81.
+            // be 97,70, and the save would ask to raise a price first -- see
+            // GraveBillingCorrectionTests. Seeded as it divides, the figures below
+            // are the prices as entered.
             DefaultPrice = 47.81m,
         };
         var giessdienst = new InvoiceItem
@@ -129,8 +129,8 @@ public class GraveShareGenerationTests
         Assert.Equal(3, invoices.Count);
         Assert.All(invoices, i => Assert.Equal(3, i.RecipientCount));
 
-        // the 19 % subtotal is 97,70, which does not divide by three, so one
-        // cent goes on the cheapest line to bump — the count-1 Grabstein
+        // the prices as entered: the 19 % subtotal, 49,90 + 47,81 = 97,71,
+        // divides by three as it is
         foreach (var invoice in invoices)
         {
             var lines = invoice.Lines.OrderBy(l => l.LineNumber).ToList();

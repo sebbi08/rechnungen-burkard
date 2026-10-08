@@ -7,9 +7,10 @@ namespace Burkard.Invoicing.Domain;
 public static class VatInclusivePrice
 {
     /// <summary>The net has two decimals, like every other price this
-    /// application prints, and nothing is added to it: a gross that cannot be
-    /// billed exactly is refused when the grave is saved rather than quietly
-    /// rounded into something else.
+    /// application prints, and nothing is added to it here. A grave whose prices
+    /// then do not divide across its recipients is corrected elsewhere, openly:
+    /// GraveBillingCheck raises a price by the cents it needs, and the user
+    /// confirms that before the grave is saved.
     ///
     /// The gross is rounded to the cent before it is divided, because a gross is
     /// an amount someone pays.</summary>

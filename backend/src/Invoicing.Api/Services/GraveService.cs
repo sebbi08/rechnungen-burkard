@@ -125,6 +125,10 @@ public sealed class GraveService
         // are inserted, or the unique indexes reject a re-added row
         await _db.SaveChangesAsync(ct);
 
+        // Inserted in the order the editor sent them, and read back by id
+        // (GraveBilling.LinksByGraveAsync, GraveInvoiceGenerator): that order
+        // decides which line a correction lands on, so the corrections stored
+        // below are only billed as shown while ids follow the insert order.
         foreach (var input in items)
         {
             grave.Items.Add(

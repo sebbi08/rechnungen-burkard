@@ -7,9 +7,9 @@ using Xunit;
 namespace Burkard.Invoicing.IntegrationTests;
 
 /// <summary>The split rule reports what does not come out even; it never adjusts
-/// a price. Raising prices automatically was tried and abandoned — it put
-/// figures on the page nobody had typed, and left the grave's worth and what the
-/// recipients paid a cent apart.</summary>
+/// a price itself. Where one has to change, GraveBillingCheck raises it by the
+/// cents it needs, and the user confirms the raise before the grave is saved
+/// (see GraveBillingCorrectionTests).</summary>
 public class GraveShareTests
 {
     private static GraveLine Net(int count, decimal unitPrice, decimal vatRate) =>
@@ -123,6 +123,16 @@ public class GraveShareTests
     {
         // 84,24 over two: 42,12 each plus 8,00 VAT each
         Assert.Equal(10024, GraveShare.CollectedCents(new[] { Net(1, 84.24m, 19m) }, 2));
+    }
+
+    /// <summary>Asked about lines that do not divide, it used to drop the odd
+    /// cents without a word and answer an amount nobody is billed.</summary>
+    [Fact]
+    public void What_the_recipients_collect_is_not_answered_for_lines_that_do_not_divide()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            GraveShare.CollectedCents(new[] { Net(1, 84.25m, 19m) }, 2)
+        );
     }
 
     [Theory]

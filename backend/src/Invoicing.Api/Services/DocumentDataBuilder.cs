@@ -64,8 +64,9 @@ public sealed class DocumentDataBuilder
 
         // A grave invoice generated since the lines became the grave's own: the
         // recipient pays a share of them, and their VAT is worked out from that
-        // share rather than from the whole. The save refuses a grave unless each rate's
-        // net divides exactly, so no rounding happens here.
+        // share rather than from the whole. The prices were corrected until each
+        // rate's net divides exactly before anything was billed, so no rounding
+        // happens here.
         InvoiceDocumentData.ShareData? share = null;
         if (invoice.RecipientCount is { } recipients && recipients > 0)
         {

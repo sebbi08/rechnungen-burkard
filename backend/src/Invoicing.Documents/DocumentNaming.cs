@@ -1,8 +1,8 @@
 namespace Burkard.Invoicing.Documents;
 
-/// <summary>File names of the generated document pair. The suffix is a fixed
-/// marker rather than a translated word, so a bulk download stays recognisable
-/// no matter which language the documents were generated in.</summary>
+/// <summary>File names of the generated document pair. The copy's suffix is
+/// fixed rather than the configurable stamp word, so a copy's file name stays
+/// the same whatever the stamp on it says.</summary>
 public static class DocumentNaming
 {
     public const string CopySuffix = "-Kopie";

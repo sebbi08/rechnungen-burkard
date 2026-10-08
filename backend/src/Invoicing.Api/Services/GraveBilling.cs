@@ -7,11 +7,11 @@ namespace Burkard.Invoicing.Api.Services;
 
 /// <summary>Turns a grave's item links into what the half-year rule bills.
 ///
-/// One place, because three callers have to agree exactly: the save that
-/// refuses a grave whose prices do not divide, the dialog's check that says so
-/// before the save is attempted, and the generation that bills them. Any
-/// disagreement between those would show up as a grave that saves and then
-/// cannot be invoiced.</summary>
+/// One place, because its callers have to agree exactly: the save that stores
+/// the corrections a grave's prices need to divide, the dialog's check that
+/// shows them before the save, the import, the check before a generation, and
+/// the generation that bills them. Any disagreement between those would show up
+/// as a grave that saves and then cannot be invoiced.</summary>
 public static class GraveBilling
 {
     /// <summary>How many recipients a grave may split its bill across.</summary>

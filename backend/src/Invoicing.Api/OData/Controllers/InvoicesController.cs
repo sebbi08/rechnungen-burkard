@@ -83,8 +83,8 @@ public class InvoicesController : ODataController
                             // the lines' full gross, not divided by
                             // RecipientCount: this search only serves the
                             // invoice list, whose every query pins
-                            // "GraveId eq null" (Invoices.view.xml and
-                            // Invoices.controller.ts), and the matches are
+                            // "GraveId eq null" (frontend/src/pages/InvoicesPage.vue),
+                            // and the matches are
                             // re-filtered by it below. No grave invoice can
                             // reach a user through here, so there is no share
                             // to take.
