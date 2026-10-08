@@ -2,7 +2,8 @@ using System.Text;
 
 namespace Burkard.Invoicing.Api.Services.Import;
 
-/// <summary>Minimal RFC 4180 reader and writer: comma separated, double quotes
+/// <summary>Minimal RFC 4180 reader and writer: comma separated (a reader can
+/// be given another delimiter), double quotes
 /// around fields that need them, "" for an embedded quote. Addresses span
 /// several lines, so quoted line breaks must survive a round trip.</summary>
 public static class Csv
@@ -28,7 +29,7 @@ public static class Csv
     /// <see cref="CsvRow.Number"/> all the same, counted the way a spreadsheet
     /// counts them -- a dropped row included, a quoted line break not -- so a
     /// problem names the row the user sees.</summary>
-    public static List<CsvRow> Parse(string text)
+    public static List<CsvRow> Parse(string text, char delimiter = ',')
     {
         var rows = new List<CsvRow>();
         var row = new List<string>();
@@ -59,16 +60,19 @@ public static class Csv
                 continue;
             }
 
+            if (c == delimiter)
+            {
+                row.Add(field.ToString());
+                field.Clear();
+                fieldStarted = false;
+                continue;
+            }
+
             switch (c)
             {
                 case '"':
                     inQuotes = true;
                     fieldStarted = true;
-                    break;
-                case ',':
-                    row.Add(field.ToString());
-                    field.Clear();
-                    fieldStarted = false;
                     break;
                 case '\r':
                     break;

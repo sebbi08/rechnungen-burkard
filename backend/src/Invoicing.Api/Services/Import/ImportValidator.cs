@@ -72,6 +72,17 @@ public sealed class ImportValidator
         foreach (var (name, expectedHeader) in ImportArchiveLayout.Headers)
         {
             var rows = Csv.Parse(files[name]!);
+            // Excel in German saves CSV with semicolons, "CSV UTF-8" included:
+            // a file whose header is the expected one that way is read that way
+            if (rows.Count > 0 && !HeaderMatches(rows[0], expectedHeader))
+            {
+                var semicolons = Csv.Parse(files[name]!, ';');
+                if (semicolons.Count > 0 && HeaderMatches(semicolons[0], expectedHeader))
+                {
+                    rows = semicolons;
+                }
+            }
+
             if (rows.Count == 0 || !HeaderMatches(rows[0], expectedHeader))
             {
                 problems.Add(

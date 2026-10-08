@@ -858,7 +858,8 @@ non-interactive until completion, and the task runs exactly once.
   revisions.
 - Version 1 assumes a single shared user; role-based permissions are out of scope.
 - The user interface and the generated documents are German only.
-- CSV files use comma separation with a header row and standard quoting/escaping.
+- CSV files use comma separation with a header row and standard quoting/escaping;
+  a file separated by semicolons, as Excel saves CSV in German, is read as well.
 - The mapping CSV carries both link types — grave↔item (with count) and
   grave↔recipient — distinguished by a type column; the exact column syntax is
   finalized during planning.

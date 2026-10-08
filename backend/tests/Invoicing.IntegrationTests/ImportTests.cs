@@ -969,6 +969,45 @@ public class ImportTests
         await AssertNothingImportedAsync(host);
     }
 
+    /// <summary>Excel in German saves CSV with semicolons, "CSV UTF-8" included,
+    /// and a German decimal comma then needs no quotes. A file whose header row
+    /// is the expected one, separated by semicolons, is read that way.</summary>
+    [Fact]
+    public async Task A_semicolon_separated_archive_imports_like_a_comma_separated_one()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        static string Semicolons(string header) => header.Replace(',', ';');
+        var archive = Zip(
+            (
+                "recipients.csv",
+                Semicolons(RecipientsHeader)
+                    + "E-1000;Anna Beispiel;\"Hauptstraße 1; Hinterhaus\"\r\n"
+            ),
+            ("items.csv", Semicolons(ItemsHeader) + "9001;Grabpflege;7;120,50;\r\n"),
+            (
+                "graves.csv",
+                Semicolons(GravesHeader) + "IMP-1;27;Grabstätte Import;DoubleOutside;2026-01;\r\n"
+            ),
+            (
+                "mapping.csv",
+                Semicolons(MappingHeader)
+                    + "Item;IMP-1;9001;2;\r\n"
+                    + "Recipient;IMP-1;E-1000;;\r\n"
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(120.50m, (await db.InvoiceItems.SingleAsync()).DefaultPrice);
+        Assert.Equal("Hauptstraße 1; Hinterhaus", (await db.Recipients.SingleAsync()).Address);
+        Assert.Equal(2, (await db.GraveItems.SingleAsync()).Count);
+    }
+
     /// <summary>A spreadsheet leaves an empty row as ",,,," and a text editor as
     /// an empty line. Neither is data, but both are rows the user counts, so
     /// the problems after one still name the row the user sees.</summary>
