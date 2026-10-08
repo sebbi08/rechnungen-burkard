@@ -101,19 +101,23 @@ fi
 entry=$(cd "$preview" && scripts/changelog-entry.sh "$version")
 
 # The release workflow builds and pushes the image without running the tests
-# again, so the checks CI left on the commit are all there is to go on.
+# again, so the checks CI left on the commit are all there is to go on -- and
+# the workflow refuses a commit whose checks are not all green, so a commit
+# that would be refused is stopped here rather than a minute into a run.
 checks="could not be read"
-if counts=$(gh api "repos/{owner}/{repo}/commits/${remote_sha}/check-runs" \
-  --jq '"\(.check_runs | length) \([.check_runs[] | select(.status != "completed")] | length) \([.check_runs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")] | length)"' 2> /dev/null); then
+green=0
+if counts=$(gh api "repos/{owner}/{repo}/commits/${remote_sha}/check-runs?per_page=100" \
+  --jq '"\(.check_runs | length) \([.check_runs[] | select(.status != "completed")] | length) \([.check_runs[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length)"' 2> /dev/null); then
   read -r total running red <<< "$counts"
   if [ "$total" -eq 0 ]; then
     checks="no checks ran on this commit"
   elif [ "$red" -gt 0 ]; then
-    checks="${red} of ${total} FAILED"
+    checks="${red} of ${total} NOT GREEN"
   elif [ "$running" -gt 0 ]; then
     checks="${running} of ${total} still running"
   else
     checks="all ${total} green"
+    green=1
   fi
 fi
 
@@ -123,6 +127,12 @@ printf 'from      origin/%s (%s)\n' "$ref" "$(git rev-parse --short "$remote_sha
 printf 'checks    %s\n' "$checks"
 printf 'image     ghcr.io/%s:v%s and :latest\n' \
   "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" "$version"
+
+if [ "$green" -eq 0 ]; then
+  printf '\nnot releasing: checks %s -- the workflow only releases a commit with every check green\n' \
+    "$checks" >&2
+  exit 1
+fi
 
 if [ "$assume_yes" -eq 0 ]; then
   if [ ! -t 0 ]; then

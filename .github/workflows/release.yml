@@ -3,12 +3,19 @@ name: Release
 on:
   workflow_dispatch:
 
+# One release at a time. Two runs would work out the same next version and
+# race each other to the tag and the image.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
+      checks: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,6 +32,30 @@ jobs:
           scripts/changelog-entry.sh "$VERSION" > "$RUNNER_TEMP/entry.md"
           cat "$RUNNER_TEMP/entry.md"
 
+      # The tests are not run again here; the checks CI left on the commit are
+      # what says it can be released. A commit with a check that is red or
+      # still running, or with none at all because CI never saw it, is refused
+      # before anything is built -- the "Run workflow" button offers no other
+      # guard.
+      - name: Require green checks on the commit
+        run: |
+          counts=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs?per_page=100" \
+            --jq '"\(.check_runs | length) \([.check_runs[] | select(.status != "completed")] | length) \([.check_runs[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length)"')
+          read -r total running red <<< "$counts"
+          if [ "$total" -eq 0 ]; then
+            echo "no checks ran on ${{ github.sha }}" >&2
+            exit 1
+          elif [ "$running" -gt 0 ]; then
+            echo "${running} of ${total} checks are still running" >&2
+            exit 1
+          elif [ "$red" -gt 0 ]; then
+            echo "${red} of ${total} checks are not green" >&2
+            exit 1
+          fi
+          echo "all ${total} checks green"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
@@ -33,18 +64,22 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # One image: the app is deployed as a single container, frontend and
-      # backend together.
-      - name: Build and push the image
+      # backend together. It is pushed under the commit's own tag first, so
+      # that nothing anyone pulls by version exists until the git state below is
+      # secured, and a build that fails leaves no trace in git. The version and
+      # `latest` tags are added to this same image at the end, so what the tag
+      # names and what the image holds cannot differ.
+      - name: Build and push the image under the commit's tag
         run: |
           IMAGE="ghcr.io/${{ github.repository }}"
-          VERSION="${{ env.NEW_VERSION }}"
           docker build --build-arg VERSION="${{ env.BUILD_VERSION }}" \
-            -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
-          docker push "$IMAGE:$VERSION"
-          docker push "$IMAGE:latest"
+            -t "$IMAGE:sha-${GITHUB_SHA::7}" .
+          docker push "$IMAGE:sha-${GITHUB_SHA::7}"
 
       # The changelog is committed before the tag is cut, so the tag points at
-      # the commit that carries its own entry.
+      # the commit that carries its own entry. A push to the branch since the
+      # checkout rejects this one, and the run stops here: no tag, no versioned
+      # image, nothing to undo -- the next run starts over from the new tip.
       - name: Record the release in the changelog
         run: |
           git config user.name "github-actions[bot]"
@@ -54,10 +89,16 @@ jobs:
           git commit -m "chore: release ${{ env.NEW_VERSION }}"
           git push origin HEAD:${{ github.ref_name }}
 
-      - name: Create tag and GitHub release
+      - name: Create tag, version the image, and publish the GitHub release
         run: |
           git tag "${{ env.NEW_VERSION }}"
           git push origin "${{ env.NEW_VERSION }}"
+          IMAGE="ghcr.io/${{ github.repository }}"
+          VERSION="${{ env.NEW_VERSION }}"
+          docker tag "$IMAGE:sha-${GITHUB_SHA::7}" "$IMAGE:$VERSION"
+          docker tag "$IMAGE:sha-${GITHUB_SHA::7}" "$IMAGE:latest"
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
           gh release create "${{ env.NEW_VERSION }}" \
             --title "${{ env.NEW_VERSION }}" \
             --notes-file "$RUNNER_TEMP/entry.md"
