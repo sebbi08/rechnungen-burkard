@@ -116,4 +116,40 @@ public static class GraveBilling
             priceIncludesVat ? entered : null
         );
     }
+
+    /// <summary>What a generation of this half-year has still to do: the graves
+    /// due in it that have no invoices for it yet, in the order a run invoices
+    /// them, and how many graves already have theirs. A grave outside its term,
+    /// or with nothing to bill in the half-year, is not due and counts for
+    /// neither. The generate action and the run read the same answer, so the
+    /// refusal of a run with nothing left to do and the run itself agree.</summary>
+    public static async Task<(List<Grave> Open, int Invoiced)> OpenForHalfYearAsync(
+        AppDbContext db,
+        int year,
+        int half,
+        CancellationToken ct
+    )
+    {
+        var invoiced = await db
+            .GraveInvoiceRuns.Where(r => r.Year == year && r.Half == half)
+            .Select(r => r.GraveId)
+            .Distinct()
+            .ToListAsync(ct);
+        var invoicedIds = invoiced.ToHashSet();
+        var graves = await db.Graves.OrderBy(g => g.GraveNumber).ToListAsync(ct);
+        var links = await LinksByGraveAsync(db, ct);
+        var open = graves
+            .Where(g =>
+                !invoicedIds.Contains(g.Id)
+                && IsDue(
+                    g.StartDate,
+                    g.EndDate,
+                    links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
+                    year,
+                    half
+                )
+            )
+            .ToList();
+        return (open, invoicedIds.Count);
+    }
 }

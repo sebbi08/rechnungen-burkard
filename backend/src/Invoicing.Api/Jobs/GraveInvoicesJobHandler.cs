@@ -30,29 +30,10 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var generator = scope.ServiceProvider.GetRequiredService<GraveInvoiceGenerator>();
 
-        var invoiced = db
-            .GraveInvoiceRuns.Where(r => r.Year == payload.Year && r.Half == payload.Half)
-            .Select(r => r.GraveId)
-            .ToHashSet();
-
-        var graves = await db.Graves.OrderBy(g => g.GraveNumber).ToListAsync(ct);
-
-        var links = await GraveBilling.LinksByGraveAsync(db, ct);
-
         // a grave outside its term for this half-year, or with nothing to bill
         // in it, is not "skipped", it is simply not due
-        var todo = graves
-            .Where(g =>
-                !invoiced.Contains(g.Id)
-                && GraveBilling.IsDue(
-                    g.StartDate,
-                    g.EndDate,
-                    links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
-                    payload.Year,
-                    payload.Half
-                )
-            )
-            .ToList();
+        var (todo, _) = await GraveBilling.OpenForHalfYearAsync(db, payload.Year, payload.Half, ct);
+        job.TotalCount = todo.Count;
         var skipped = new List<GraveSkip>();
         var processed = 0;
 

@@ -411,6 +411,48 @@ public class GraveGenerationTests
         );
     }
 
+    /// <summary>A grave whose term ended before the half-year is not due in it,
+    /// so it does not keep the half-year open: once every grave that is due has
+    /// its invoices, another run is refused. It used to count every grave there
+    /// is, so any ended grave turned the refusal into an empty run.</summary>
+    [Fact]
+    public async Task Second_generation_is_rejected_although_a_grave_is_not_due()
+    {
+        using var host = new ApiTestHost();
+        var (_, _, graveNoRecipients) = await SeedAsync(host);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = await db.Graves.SingleAsync(g => g.Id == graveNoRecipients);
+            db.Graves.Remove(grave);
+            db.Graves.Add(
+                new Grave
+                {
+                    GraveNumber = "G-ENDED",
+                    StartDate = new DateOnly(2020, 1, 1),
+                    EndDate = new DateOnly(2025, 12, 1),
+                    CreatedAt = new DateOnly(2020, 1, 1),
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        using var client = host.CreateClient();
+        var first = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        using var firstJson = await ODataJson.ReadAsync(first);
+        await PollJobAsync(client, firstJson.RootElement.GetProperty("Id").GetInt64());
+
+        var second = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+    }
+
     [Fact]
     public async Task Concurrent_generation_is_rejected_with_409()
     {

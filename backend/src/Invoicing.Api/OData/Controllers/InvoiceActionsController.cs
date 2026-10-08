@@ -306,12 +306,15 @@ public class InvoiceActionsController : ODataController
             );
         }
 
-        var alreadyInvoicedCount = _db
-            .GraveInvoiceRuns.Where(r => r.Year == request.Year && r.Half == request.Half)
-            .Select(r => r.GraveId)
-            .Distinct()
-            .Count();
-        if (alreadyInvoicedCount > 0 && alreadyInvoicedCount >= _db.Graves.Count())
+        // refused once every grave due in the half-year has its invoices; a
+        // grave outside its term does not keep it open
+        var (open, invoiced) = await GraveBilling.OpenForHalfYearAsync(
+            _db,
+            request.Year,
+            request.Half,
+            HttpContext.RequestAborted
+        );
+        if (open.Count == 0 && invoiced > 0)
         {
             return Conflict(
                 new
@@ -339,11 +342,10 @@ public class InvoiceActionsController : ODataController
             );
         }
 
-        var total = _db.Graves.Count();
         var job = await _jobs.EnqueueAsync(
             "GraveInvoices",
             JsonSerializer.Serialize(new GraveInvoicesPayload(request.Year, request.Half)),
-            total,
+            open.Count,
             HttpContext.RequestAborted
         );
         return Accepted(job);
