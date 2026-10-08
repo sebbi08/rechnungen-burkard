@@ -308,6 +308,18 @@ async function countInvoices(page: Page, recipientId: number): Promise<number> {
   return ((await response.json()).value as unknown[]).length;
 }
 
+async function countInvoicesBilling(
+  page: Page,
+  recipientId: number,
+  itemNumber: string,
+): Promise<number> {
+  const response = await page.request.get(
+    `/odata/Invoices?$filter=RecipientId eq ${recipientId}&$select=Id&$expand=Lines($select=ItemNumber)`,
+  );
+  const invoices = (await response.json()).value as { Lines: { ItemNumber: string }[] }[];
+  return invoices.filter((i) => i.Lines.some((l) => l.ItemNumber === itemNumber)).length;
+}
+
 async function fillLine(page: Page, itemNumber: string): Promise<void> {
   await pickItem(page, 1, itemNumber);
   await fillNumber(drawer(page).getByRole("spinbutton", { name: "Preis 1" }), "120");
@@ -399,7 +411,10 @@ test("a double click on save creates one invoice, not two", async ({ page }) => 
 
   await expect(invoiceRow(page, recipientName)).toBeVisible();
   expect(created).toBe(1);
-  await expect.poll(() => countInvoices(page, recipientId)).toBe(1);
+  // Only the invoices billing this test's own item: a fresh draft in a test
+  // running beside this one starts on the newest recipient, which may be this
+  // one, and an invoice it saves is no second click of this one's.
+  await expect.poll(() => countInvoicesBilling(page, recipientId, itemNumber)).toBe(1);
 });
 
 test("the list shows non-grave invoices only and searches them (Story 9)", async ({ page }) => {
