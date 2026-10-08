@@ -520,7 +520,7 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
 
   // the breadcrumb leads back to the grave, not to the grave list
   await page
-    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("navigation", { name: "Seitenpfad" })
     .getByRole("link", { name: marker })
     .click();
   await expect(page).toHaveURL(new RegExp(`/graves/${graveId}$`));
