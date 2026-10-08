@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow } from "../seed";
 import { unique } from "../unique";
-import { drawer, pickItem, pickRecipient, rowAction, saveEditor, waitForOverlayOpen } from "../vue";
+import { drawer, pickItem, pickRecipient, saveEditor, waitForOverlayOpen } from "../vue";
 
 // Unique per worker, and each test seeds under names of its own: every test
 // shares the one stack and writes into it at the same time as the others.
@@ -37,12 +37,15 @@ test("a line ticked as VAT-included bills the price that was entered", async ({ 
   await editor.getByRole("checkbox", { name: "inkl. MwSt." }).check();
   // the estimate takes the price as a gross now: 100,84 net + 19 % = 120,00
   await expect(editor).toContainText("Summe ca.: 100,84 € netto, 120,00 € brutto");
+  const created = page.waitForResponse((response) =>
+    response.url().endsWith("/odata/CreateInvoice"),
+  );
   await saveEditor(editor);
+  const { InvoiceNumber } = await (await created).json();
 
   // the invoices list shows no totals, only the invoice detail page does — open
-  // it from the row this test just created
-  const row = page.getByRole("row").filter({ hasText: recipientName });
-  await row.getByRole("button", { name: rowAction("Details") }).click();
+  // it from the row of the invoice this test just created, found by its number
+  await page.getByRole("button", { name: `Details: ${InvoiceNumber}` }).click();
 
   // 120,00 gross in, 100,84 net + 19 % = 120,00 out
   await expect(page.locator("dl")).toContainText("Netto100,84 €");

@@ -326,7 +326,11 @@ async function fillLine(page: Page, itemNumber: string): Promise<void> {
 }
 
 test("the second invoice goes to the recipient the reopened editor shows", async ({ page }) => {
-  const { itemNumber, recipientName } = await seedOwnMasterData(page, `Wieder ${unique()}`);
+  const {
+    itemNumber,
+    recipientName,
+    recipientId: ownId,
+  } = await seedOwnMasterData(page, `Wieder ${unique()}`);
   await page.goto("/invoices");
 
   // first invoice: the recipient is picked from the list, as a user would
@@ -372,6 +376,15 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   expect(onScreen, "the recipient shown is the newest of a list the editor loaded").toBeDefined();
 
   await fillLine(page, itemNumber);
+  // Saved for real only when the recipient shown is this test's own. If it is
+  // another spec's, the save is answered here instead: an invoice written to
+  // that recipient would be one more row in a list the other spec reads, which
+  // fails it. What is checked holds either way -- what the save sends.
+  await page.route(/\/odata\/CreateInvoice$/, (route) =>
+    createInvoicePayload(route.request()).recipientId === ownId
+      ? route.continue()
+      : route.fulfill({ status: 201, body: "" }),
+  );
   const created = page.waitForRequest((request) => request.url().endsWith("/odata/CreateInvoice"));
   await saveEditor(drawer(page));
   const { recipientId } = createInvoicePayload(await created);
@@ -380,7 +393,9 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   // never picked up the selection it showed
   expect(recipientId).toBeGreaterThan(0);
   expect(recipientId).toBe(onScreen!.Id);
-  await expect.poll(() => countInvoices(page, recipientId)).toBeGreaterThan(0);
+  if (recipientId === ownId) {
+    await expect.poll(() => countInvoices(page, recipientId)).toBe(2);
+  }
 });
 
 test("a double click on save creates one invoice, not two", async ({ page }) => {
