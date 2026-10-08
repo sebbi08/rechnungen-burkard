@@ -372,6 +372,23 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
 
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
   await pickItem(page, 1, ITEM_NUMBER);
+
+  // The recipient list opens within the screen. Its options do not wrap, so a
+  // long name widened it past a phone's edge, which zoomed the page out, slid
+  // the editor under the list and left the option behind the editor's text.
+  await page.locator("#graveRecipient").click();
+  const recipientList = page.locator(".p-select-overlay");
+  await expect(recipientList.getByRole("option", { name: RECIPIENT_NAME })).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+  const listBox = (await recipientList.boundingBox())!;
+  expect(listBox.x + listBox.width, "the recipient list runs off the screen").toBeLessThanOrEqual(
+    page.viewportSize()!.width + 1,
+  );
+  // closed by the field that opened it: Escape in the list's search field
+  // reaches the drawer and closes the editor
+  await page.locator("#graveRecipient").click();
+  await expect(recipientList).toHaveCount(0);
+
   await pickRecipient(page, "graveRecipient", RECIPIENT_NAME);
   await editor.getByRole("button", { name: "Hinzufügen", exact: true }).click();
   const added = editor.getByRole("listitem").filter({ hasText: RECIPIENT_NAME });

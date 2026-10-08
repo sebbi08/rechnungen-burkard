@@ -46,9 +46,13 @@ function onCreated(id: number): void {
       :placeholder="t('selectRecipient')"
       :loading="recipients.isFetching.value"
       class="min-w-0 flex-1 basis-64"
+      overlay-class="max-w-[calc(100vw-1rem)]"
     >
+      <!-- An option does not wrap on its own. Without the width limit and the
+           break, a long name widened the list past the screen of a phone, which
+           then zoomed the whole page out and slid the editor under it. -->
       <template #option="{ option }">
-        <div class="flex flex-col">
+        <div class="flex min-w-0 flex-col [overflow-wrap:anywhere] whitespace-normal">
           <span>{{ option.Name }}</span>
           <small class="text-muted-color">{{ formatAddressLine(option.Address) }}</small>
         </div>
