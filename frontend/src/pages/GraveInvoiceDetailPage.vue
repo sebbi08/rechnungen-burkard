@@ -8,6 +8,7 @@ import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { fetchGraveInvoiceGroup } from "@/api/endpoints";
+import { isNotFound } from "@/api/http";
 import { loadChain } from "@/api/queries";
 import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
@@ -84,6 +85,9 @@ const halfYear = computed(() =>
   </PageHeader>
 
   <div v-if="chain.isPending.value" class="flex justify-center p-10"><ProgressSpinner /></div>
+  <Message v-else-if="chain.isError.value && !isNotFound(chain.error.value)" severity="error">
+    {{ t("loadFailed") }}
+  </Message>
   <Message v-else-if="!latest" severity="warn">{{ t("notFound") }}</Message>
   <div v-else class="flex flex-col gap-6">
     <Card>
@@ -93,10 +97,13 @@ const halfYear = computed(() =>
             <div class="text-lg font-semibold">{{ latest.RecipientName }}</div>
             <div class="whitespace-pre-line text-muted-color">{{ latest.RecipientAddress }}</div>
           </div>
-          <dl class="m-0 grid grid-cols-3 gap-6">
-            <div>
+          <!-- three across from a tablet up, stacked on a phone: a long grave
+               number has no space to break at, and fixed columns pushed the
+               card past a phone's edge -->
+          <dl class="m-0 grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-3">
+            <div class="min-w-0">
               <dt class="text-sm text-muted-color">{{ t("graveNumber") }}</dt>
-              <dd class="m-0">{{ group.data.value?.GraveNumber }}</dd>
+              <dd class="m-0 [overflow-wrap:anywhere]">{{ group.data.value?.GraveNumber }}</dd>
             </div>
             <div>
               <dt class="text-sm text-muted-color">{{ t("halfYear") }}</dt>

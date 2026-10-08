@@ -10,6 +10,7 @@ import { useItemsQuery } from "@/api/queries";
 import { formatAmount, formatVatRate } from "@/lib/format";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
+import { lineNet, roundCents } from "@/lib/money";
 import { quarterLabelKey } from "@/lib/quarter";
 
 const lines = defineModel<DraftLine[]>({ required: true });
@@ -56,26 +57,27 @@ function removeLine(key: number): void {
   lines.value = lines.value.filter((line) => line.key !== key);
 }
 
-/** An estimate while typing; the invoice's own totals come from the backend. */
+/** An estimate while typing; the invoice's own totals come from the backend.
+ *  Rounded line by line as an invoice is -- a VAT-included price back to its
+ *  net per unit, each line's net and VAT to the cent -- so it matches the
+ *  saved invoice in the usual case rather than drifting by a cent or two. */
 const totals = computed(() => {
   let net = 0;
-  let gross = 0;
+  let vat = 0;
   for (const line of lines.value) {
     const rate = item(line)?.VatRate;
     const price = line.unitPrice ?? item(line)?.DefaultPrice ?? null;
     if (rate == null || price == null || line.count == null) {
       continue;
     }
-    const amount = line.count * price;
-    if (line.priceIncludesVat) {
-      gross += amount;
-      net += amount / (1 + rate / 100);
-    } else {
-      net += amount;
-      gross += amount * (1 + rate / 100);
-    }
+    const unitNet = line.priceIncludesVat
+      ? roundCents(roundCents(price) / (1 + rate / 100))
+      : price;
+    const lineNetValue = lineNet(line.count, unitNet);
+    net += lineNetValue;
+    vat += roundCents((lineNetValue * rate) / 100);
   }
-  return { net: Math.round(net * 100) / 100, gross: Math.round(gross * 100) / 100 };
+  return { net: roundCents(net), gross: roundCents(net + vat) };
 });
 </script>
 

@@ -17,10 +17,17 @@ function stored(): "light" | "dark" | null {
   }
 }
 
-/** Before mount: the remembered choice, else the system's. */
+/** Before mount: the remembered choice, else the system's -- and the system's
+ *  again whenever it changes, as long as nothing was chosen here. */
 export function applyStoredTheme(): void {
+  const system = window.matchMedia("(prefers-color-scheme: dark)");
   const choice = stored();
-  apply(choice ? choice === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches);
+  apply(choice ? choice === "dark" : system.matches);
+  system.addEventListener("change", (event) => {
+    if (!stored()) {
+      apply(event.matches);
+    }
+  });
 }
 
 export function useTheme() {

@@ -9,6 +9,7 @@ import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
 import { computed, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
+import { isNotFound } from "@/api/http";
 import { loadGraveDetail } from "@/api/queries";
 import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
@@ -95,6 +96,9 @@ const {
   </PageHeader>
 
   <div v-if="detail.isPending.value" class="flex justify-center p-10"><ProgressSpinner /></div>
+  <Message v-else-if="detail.isError.value && !isNotFound(detail.error.value)" severity="error">
+    {{ t("loadFailed") }}
+  </Message>
   <Message v-else-if="detail.isError.value || !grave || !detail.data.value" severity="warn">
     {{ t("notFound") }}
   </Message>
@@ -140,6 +144,7 @@ const {
                 :severity="
                   detail.data.value.currentInvoiced ? 'success' : inTerm ? 'danger' : 'secondary'
                 "
+                role="img"
                 :aria-label="
                   detail.data.value.currentInvoiced
                     ? t('statusInvoicedAnnouncement')

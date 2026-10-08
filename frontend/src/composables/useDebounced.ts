@@ -1,4 +1,4 @@
-import { ref, type Ref, watch } from "vue";
+import { onScopeDispose, ref, type Ref, watch } from "vue";
 
 /** `source`, but only once it has stopped changing for `ms`. */
 export function useDebounced<T>(source: Ref<T>, ms = 300): Ref<T> {
@@ -10,5 +10,6 @@ export function useDebounced<T>(source: Ref<T>, ms = 300): Ref<T> {
       value.value = next;
     }, ms);
   });
+  onScopeDispose(() => clearTimeout(timer));
   return value;
 }

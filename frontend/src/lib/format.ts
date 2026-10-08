@@ -49,9 +49,10 @@ export function formatAddressLine(value: string | null | undefined): string {
   return (value ?? "").split("\n")[0].trim();
 }
 
-/** "33,3 %": a recipient's share, one decimal. */
+/** "33,33 %", "50 %": a recipient's share as the invoice prints it, with up
+ *  to two decimals and none that say nothing. */
 export function formatShare(value: number | null | undefined): string {
-  return value == null ? "" : `${value.toFixed(1).replace(".", ",")} %`;
+  return value == null ? "" : `${value.toLocaleString("de-DE", { maximumFractionDigits: 2 })} %`;
 }
 
 /** An Edm.Date ("2026-01-31") as local midnight, for a DatePicker. */

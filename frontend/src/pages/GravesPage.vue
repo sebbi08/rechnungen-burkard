@@ -349,6 +349,7 @@ function openEditor(graveId: number | null): void {
                 :value="data.Invoiced ? t('statusInvoiced') : t('statusOpen')"
                 :severity="data.Invoiced ? 'success' : 'danger'"
                 :icon="data.Invoiced ? 'pi pi-check' : 'pi pi-exclamation-circle'"
+                role="img"
                 :aria-label="
                   data.Invoiced ? t('statusInvoicedAnnouncement') : t('statusOpenAnnouncement')
                 "
@@ -364,6 +365,7 @@ function openEditor(graveId: number | null): void {
               <Tag
                 :value="paymentTag(data)?.value"
                 :severity="paymentTag(data)?.severity"
+                role="img"
                 :aria-label="paymentTag(data)?.label"
               />
             </div>
@@ -379,6 +381,7 @@ function openEditor(graveId: number | null): void {
               v-if="paymentTag(data)"
               :value="paymentTag(data)?.value"
               :severity="paymentTag(data)?.severity"
+              role="img"
               :aria-label="paymentTag(data)?.label"
             />
           </template>

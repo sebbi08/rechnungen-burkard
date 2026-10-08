@@ -19,13 +19,17 @@ export function useErrorToast() {
     // text is chosen by how many there are, e.g. errorGraveNumberInUse2.
     const args = (body as { error?: { args?: unknown } } | undefined)?.error?.args;
     const list = Array.isArray(args) ? args.map(String) : undefined;
-    const key = list ? `error${code}${list.length}` : `error${code}`;
-    toast.add({
-      severity: "error",
-      summary: t("errorTitle"),
-      detail: i18n.te(key) ? (list ? t(key, list) : t(key)) : `${t("errorGeneric")} (${code})`,
-      life: 8000,
-    });
+    // a text for this many args if there is one, else the code's own text:
+    // an arg the backend adds later should not lose the message altogether
+    const counted = list ? `error${code}${list.length}` : undefined;
+    const plain = `error${code}`;
+    let detail = `${t("errorGeneric")} (${code})`;
+    if (counted && i18n.te(counted)) {
+      detail = t(counted, list ?? []);
+    } else if (i18n.te(plain)) {
+      detail = list ? t(plain, list) : t(plain);
+    }
+    toast.add({ severity: "error", summary: t("errorTitle"), detail, life: 8000 });
   }
 
   return { showError };

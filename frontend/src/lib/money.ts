@@ -89,7 +89,17 @@ export function priceFieldValue(net: number, priceIncludesVat: boolean, vatRate:
   return priceIncludesVat ? grossFromNet(net, vatRate) : net;
 }
 
-/** Count × price as the document prints it: rounded to the cent. */
+/** Count × price as the document prints it: rounded to the cent, a half cent
+ *  away from zero, as the backend's decimals do. Worked in whole ten-thousandths
+ *  of a euro -- a price has at most four decimals -- since a binary float rounds
+ *  3 × 1,005 to 3,01 where the document says 3,02. */
 export function lineNet(count: number, unitPrice: number): number {
-  return Math.round(count * unitPrice * 100) / 100;
+  const total = count * Math.round(unitPrice * 10000);
+  const cents = Math.sign(total) * Math.floor((Math.abs(total) + 50) / 100);
+  return cents / 100;
+}
+
+/** An amount rounded to the cent, a half cent away from zero. */
+export function roundCents(amount: number): number {
+  return lineNet(1, amount);
 }

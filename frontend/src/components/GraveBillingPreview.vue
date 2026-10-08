@@ -101,7 +101,7 @@ function problemText(problem: GraveBillingProblem): string {
               <td
                 class="py-0.5 text-right align-top tabular-nums whitespace-nowrap"
                 :class="
-                  line.Corrected ? 'text-orange-600 dark:text-orange-400 font-semibold' : undefined
+                  line.Corrected ? 'text-orange-700 dark:text-orange-400 font-semibold' : undefined
                 "
               >
                 {{ formatAmount(line.Price) }}

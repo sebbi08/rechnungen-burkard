@@ -11,6 +11,7 @@ import {
   fetchInvoiceLines,
   type InvoiceLineInput,
 } from "@/api/endpoints";
+import { ApiError } from "@/api/http";
 import { loadItemVatRates } from "@/api/queries";
 import { useBlocking } from "@/composables/useBlocking";
 import { useDiscardGuard } from "@/composables/useDiscardGuard";
@@ -117,7 +118,13 @@ async function save(): Promise<void> {
     return;
   }
   const target = props.target;
-  const recipient = recipientId.value ?? 0;
+  // with no recipient chosen the backend answered "not found", which blamed
+  // a record instead of the missing choice
+  if (recipientId.value == null) {
+    showError(new ApiError("RecipientRequired"));
+    return;
+  }
+  const recipient = recipientId.value;
   try {
     // The refetch runs under the overlay too: a drawer left open while the lists
     // reload, with the busy guard already released, takes a second Save and

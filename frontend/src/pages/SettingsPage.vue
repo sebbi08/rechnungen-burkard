@@ -74,7 +74,15 @@ async function save(): Promise<void> {
 const vatRates = useVatRatesQuery();
 const newRate = ref<number | null>(null);
 
+// one change at a time: a double click posted the rate twice, or deleted it
+// twice, and the second answer showed as an error
+const vatBusy = ref(false);
+
 async function addVatRate(): Promise<void> {
+  if (vatBusy.value) {
+    return;
+  }
+  vatBusy.value = true;
   try {
     if (newRate.value == null || !(newRate.value > 0 && newRate.value < 100)) {
       throw new ApiError("InvalidVatRate");
@@ -84,18 +92,23 @@ async function addVatRate(): Promise<void> {
     await queryClient.invalidateQueries();
   } catch (error) {
     showError(error);
+  } finally {
+    vatBusy.value = false;
   }
 }
 
 async function deleteVatRate(id: number, rate: number): Promise<void> {
-  if (!(await ask(t("confirmDeleteVatRate", [formatVatRate(rate)])))) {
+  if (vatBusy.value || !(await ask(t("confirmDeleteVatRate", [formatVatRate(rate)])))) {
     return;
   }
+  vatBusy.value = true;
   try {
     await odata.VatRates(id).delete().execute();
     await queryClient.invalidateQueries();
   } catch (error) {
     showError(error);
+  } finally {
+    vatBusy.value = false;
   }
 }
 </script>
@@ -163,7 +176,13 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
               :input-style="{ width: '8rem' }"
             />
           </div>
-          <Button type="submit" :label="t('addVatRate')" icon="pi pi-plus" outlined />
+          <Button
+            type="submit"
+            :label="t('addVatRate')"
+            icon="pi pi-plus"
+            outlined
+            :loading="vatBusy"
+          />
         </form>
       </template>
     </Card>

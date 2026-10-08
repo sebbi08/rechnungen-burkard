@@ -439,7 +439,13 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
     </form>
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button :label="t('cancel')" severity="secondary" text @click="discard.requestClose" />
+        <Button
+          :label="t('cancel')"
+          severity="secondary"
+          text
+          :disabled="saving"
+          @click="discard.requestClose"
+        />
         <Button
           type="submit"
           form="graveForm"

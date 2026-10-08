@@ -508,7 +508,7 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   const facts = page.locator("dl").first();
   await expect(facts).toContainText(marker);
   await expect(facts).toContainText("H2 2037");
-  await expect(facts).toContainText("50,0 %");
+  await expect(facts).toContainText("50 %");
   await expect(page.getByText(names[0], { exact: true })).toBeVisible();
 
   // the other recipient of the same half-year is listed, and leads to their

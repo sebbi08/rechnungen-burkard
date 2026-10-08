@@ -7,6 +7,7 @@ import ProgressSpinner from "primevue/progressspinner";
 import { computed, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+import { isNotFound } from "@/api/http";
 import { loadChain } from "@/api/queries";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
@@ -74,6 +75,9 @@ const editorOpen = ref(false);
   </PageHeader>
 
   <div v-if="chain.isPending.value" class="flex justify-center p-10"><ProgressSpinner /></div>
+  <Message v-else-if="chain.isError.value && !isNotFound(chain.error.value)" severity="error">
+    {{ t("loadFailed") }}
+  </Message>
   <Message v-else-if="!latest" severity="warn">{{ t("notFound") }}</Message>
   <div v-else class="flex flex-col gap-6">
     <Card>

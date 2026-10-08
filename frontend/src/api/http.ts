@@ -43,6 +43,12 @@ export function toApiError(error: unknown): ApiError {
   return new ApiError(error instanceof Error ? error.message : String(error));
 }
 
+/** A 404: the thing asked for is not there, which a detail page says as
+ *  such -- unlike any other failure, which says nothing about whether it is. */
+export function isNotFound(error: unknown): boolean {
+  return error != null && toApiError(error).status === 404;
+}
+
 /** A failure worth asking again about: no answer, or the server failing --
  *  a restart under the page answers 502 or 503 for a moment. */
 export function isTransient(error: unknown): boolean {

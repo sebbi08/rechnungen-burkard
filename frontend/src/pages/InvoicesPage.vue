@@ -62,6 +62,17 @@ const invoices = useQuery({
   placeholderData: keepPreviousData,
 });
 
+// a page that emptied -- its last unpaid invoice marked paid under "unpaid
+// only" -- moves back to the last page that has rows
+watch(
+  () => invoices.data.value?.total,
+  (total) => {
+    if (total != null && total > 0 && first.value >= total) {
+      first.value = Math.floor((total - 1) / PAGE_SIZE) * PAGE_SIZE;
+    }
+  },
+);
+
 // "1–50 von 63": PrimeVue fills in its own placeholders, so they pass through
 const pageReport = computed(() =>
   t("pageReport", { first: "{first}", last: "{last}", total: "{totalRecords}" }),

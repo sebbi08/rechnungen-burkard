@@ -10,7 +10,12 @@ interface GenerationResult {
 /** "Erstellt: 3 (Übersprungen: 12 (keine Empfänger), 14)": what a generation
  *  job reports, for the message shown when it ends. */
 export function generationSummary(resultJson: string | null | undefined, t: Translate): string {
-  const result = JSON.parse(resultJson ?? "{}") as GenerationResult;
+  let result: GenerationResult = {};
+  try {
+    result = JSON.parse(resultJson ?? "{}") as GenerationResult;
+  } catch {
+    // a result that cannot be read still ends the run with a message
+  }
   const skipped = (result.SkippedGraves ?? [])
     .map((entry) => {
       const number = typeof entry === "string" ? entry : entry.Number;

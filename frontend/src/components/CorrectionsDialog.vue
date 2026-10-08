@@ -47,7 +47,7 @@ const { t } = useI18n();
               {{ formatAmount(row.entered) }}
             </td>
             <td
-              class="py-1 text-right font-semibold tabular-nums whitespace-nowrap text-orange-600 dark:text-orange-400"
+              class="py-1 text-right font-semibold tabular-nums whitespace-nowrap text-orange-700 dark:text-orange-400"
             >
               {{ formatAmount(row.corrected) }}
             </td>
