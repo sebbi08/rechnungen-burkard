@@ -1042,15 +1042,30 @@ public sealed class ImportValidator
     }
 
     // Templates are filled in by hand, so both the invariant "12.5" and the
-    // German "12,5" have to be understood.
-    private static bool TryParseDecimal(string raw, out decimal value) =>
-        decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out value)
-        || decimal.TryParse(
+    // German "12,5" have to be understood. No thousands separator in either:
+    // "1.234,50" and "1,234.50" are one amount in two spellings, and allowing
+    // the invariant one (NumberStyles.Number does) read "12,50" as 12 050 -- a
+    // price a hundred times too high that passed every later check.
+    private static bool TryParseDecimal(string raw, out decimal value)
+    {
+        const NumberStyles plain =
+            NumberStyles.AllowLeadingWhite
+            | NumberStyles.AllowTrailingWhite
+            | NumberStyles.AllowLeadingSign
+            | NumberStyles.AllowDecimalPoint;
+        if (raw.Contains('.') && raw.Contains(','))
+        {
+            value = 0;
+            return false;
+        }
+
+        return decimal.TryParse(
             raw.Replace(',', '.'),
-            NumberStyles.Number,
+            plain,
             CultureInfo.InvariantCulture,
             out value
         );
+    }
 
     // Templates are filled in by hand, in German and in English, so both
     // spellings have to be understood. An empty cell is the common case and

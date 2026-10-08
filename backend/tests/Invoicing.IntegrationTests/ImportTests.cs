@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -236,7 +237,8 @@ public class ImportTests
             .SingleAsync();
 
         Assert.Equal("IMP-1", grave.GraveNumber);
-        Assert.NotEqual(default, grave.CreatedAt);
+        // the day of the import by the app's clock, not by the UTC day
+        Assert.Equal(DateOnly.FromDateTime(host.Now), grave.CreatedAt);
         Assert.Equal(new DateOnly(2026, 1, 1), grave.StartDate);
 
         // the grave's item uses the imported item's number, text, VAT rate and price
@@ -936,6 +938,66 @@ public class ImportTests
                 "mapping.csv",
                 MappingHeader + "Item,IMP-1,9001,3,\r\n" + "Recipient,IMP-1,E-1000,,\r\n"
             )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
+        );
+        await AssertNothingImportedAsync(host);
+    }
+
+    /// <summary>Templates are filled in by hand, and a German hand writes
+    /// "120,50" -- quoted, since the comma is also the file's separator. Read
+    /// with the invariant culture's thousands separator allowed, that was
+    /// 12 050: a price a hundred times too high that passed every later check
+    /// and was billed.</summary>
+    [Theory]
+    [InlineData("120.50", "120.50")]
+    [InlineData("\"120,50\"", "120.50")]
+    [InlineData("\"12,5\"", "12.5")]
+    [InlineData("120", "120")]
+    public async Task A_price_is_read_at_its_value_in_either_spelling(string raw, string expected)
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + $"9001,Grabpflege,7,{raw},\r\n"),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var item = await db.InvoiceItems.SingleAsync();
+        Assert.Equal(decimal.Parse(expected, CultureInfo.InvariantCulture), item.DefaultPrice);
+    }
+
+    /// <summary>A thousands separator is ambiguous between the two spellings
+    /// ("1.234,50" and "1,234.50" are the same amount), so neither is read.</summary>
+    [Theory]
+    [InlineData("\"1.234,50\"")]
+    [InlineData("\"1,234.50\"")]
+    [InlineData("\"1,234\"")]
+    public async Task A_price_with_a_thousands_separator_is_refused(string raw)
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + $"9001,Grabpflege,7,{raw},\r\n"),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", MappingHeader)
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
