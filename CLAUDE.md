@@ -142,8 +142,10 @@ hook is simply absent — nothing warns you.
 The format is not cosmetic: `scripts/next-version.sh` reads these messages to
 decide whether the next release is a major, minor or patch, and
 `scripts/changelog-entry.sh` turns them into the changelog. `feat` gives a
-minor, `fix`/`perf`/`refactor` a patch, a `!` or a `BREAKING CHANGE:` footer a
-major, and docs/test/chore/ci/style/build release nothing on their own.
+minor, `fix`/`perf`/`refactor`/`revert` a patch, a `!` or a `BREAKING CHANGE:`
+footer a major, and docs/test/chore/ci/style/build release nothing on their own.
+A subject that is not a Conventional Commit at all counts as a patch; merge
+commits are skipped, since their branches' commits already count.
 
 Preview what a release would do, without releasing anything:
 

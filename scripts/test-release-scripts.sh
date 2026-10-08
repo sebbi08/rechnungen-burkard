@@ -72,6 +72,14 @@ commit() { # dir subject [body]
 
 next_version() { (cd "$1" && "$NEXT_VERSION" 2>&1); }
 
+merge_docs_branch() { # dir -- a docs-only branch merged with a merge commit
+  local dir=$1
+  git -C "$dir" checkout -qb side
+  commit "$dir" "docs: explain a thing"
+  git -C "$dir" checkout -q main
+  git -C "$dir" merge -q --no-ff -m "Merge branch 'side'" side
+}
+
 # Commit hashes differ on every run, so compare against a placeholder.
 changelog() {
   local dir=$1
@@ -124,6 +132,14 @@ d=$(new_repo); git -C "$d" tag v1.0.0
 commit "$d" 'Revert "feat: add a thing"'
 assert_eq "an unparseable subject counts as a patch" "1.0.1" "$(next_version "$d")"
 
+# A merge commit carries no change of its own -- its branch's commits are
+# counted already -- and "Merge branch ..." is off-format, which would make
+# every merged docs branch a patch release.
+d=$(new_repo); git -C "$d" tag v1.0.0
+merge_docs_branch "$d"
+next_version "$d" > /dev/null; status=$?
+assert_eq "a merged docs branch is not a release" "1" "$status"
+
 d=$(new_repo); git -C "$d" tag v1.0.0
 commit "$d" "fix: correct a thing"
 commit "$d" "feat: add a thing"
@@ -171,6 +187,15 @@ expected='## v2.0.0 — 2026-01-02
 ### Breaking changes
 - change a thing (SHA)'
 assert_eq "breaking changes lead" "$expected" "$(changelog "$d" 2.0.0 2026-01-02)"
+
+d=$(new_repo); git -C "$d" tag v1.0.0
+commit "$d" "fix: correct a thing"
+merge_docs_branch "$d"
+expected='## v1.0.1 — 2026-01-02
+
+### Fixes
+- correct a thing (SHA)'
+assert_eq "a merge commit is not an entry" "$expected" "$(changelog "$d" 1.0.1 2026-01-02)"
 
 d=$(new_repo); git -C "$d" tag v1.0.0
 commit "$d" "feat(invoices): add a thing"

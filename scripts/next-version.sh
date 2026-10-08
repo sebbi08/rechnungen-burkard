@@ -51,6 +51,9 @@ if [ -z "$last_tag" ]; then
 fi
 
 highest=0
+# --no-merges: a merge commit carries no change of its own -- its branch's
+# commits are counted -- and its off-format "Merge branch ..." subject would
+# otherwise make every merged docs branch a patch release.
 while IFS= read -r sha; do
   [ -n "$sha" ] || continue
 
@@ -79,7 +82,7 @@ while IFS= read -r sha; do
 
   rank=$(rank_of "$bump")
   [ "$rank" -gt "$highest" ] && highest=$rank
-done < <(git log --format=%H "$last_tag..HEAD")
+done < <(git log --no-merges --format=%H "$last_tag..HEAD")
 
 if [ "$highest" -eq 0 ]; then
   echo "no releasable commits since $last_tag" >&2

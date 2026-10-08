@@ -31,6 +31,7 @@ features=()
 fixes=()
 other=()
 
+# no merge commits: their branches' commits are the entries (see next-version.sh)
 while IFS= read -r sha; do
   [ -n "$sha" ] || continue
 
@@ -73,7 +74,7 @@ while IFS= read -r sha; do
       *) other+=("$entry") ;;
     esac
   fi
-done < <(git log --format=%H "$range")
+done < <(git log --no-merges --format=%H "$range")
 
 lines=("## v${version} — ${date}")
 
