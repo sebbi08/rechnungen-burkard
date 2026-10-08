@@ -103,11 +103,12 @@ entry=$(cd "$preview" && scripts/changelog-entry.sh "$version")
 # The release workflow builds and pushes the image without running the tests
 # again, so the checks CI left on the commit are all there is to go on -- and
 # the workflow refuses a commit whose checks are not all green, so a commit
-# that would be refused is stopped here rather than a minute into a run.
+# that would be refused is stopped here rather than a minute into a run. An
+# earlier release run's own check, "release", is not one of them.
 checks="could not be read"
 green=0
 if counts=$(gh api "repos/{owner}/{repo}/commits/${remote_sha}/check-runs?per_page=100" \
-  --jq '"\(.check_runs | length) \([.check_runs[] | select(.status != "completed")] | length) \([.check_runs[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length)"' 2> /dev/null); then
+  --jq '[.check_runs[] | select(.name != "release")] | "\(length) \([.[] | select(.status != "completed")] | length) \([.[] | select(.status == "completed" and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")] | length)"' 2> /dev/null); then
   read -r total running red <<< "$counts"
   if [ "$total" -eq 0 ]; then
     checks="no checks ran on this commit"
