@@ -362,7 +362,6 @@ async function expectPickerGetsTheWidth(page: Page, recipientPicker: string): Pr
 }
 
 test("graves: the editor spends its width on the fields", async ({ page }) => {
-  test.fail(onPhone(), PICKER_SQUEEZED);
   await seed(page);
   await page.goto("/graves");
   await expect(page.locator("tbody tr").first()).toBeVisible();
@@ -386,7 +385,24 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   // the recipient list gets the editor's width too
   expect(await widthOf(added)).toBeGreaterThan((await widthOf(editor)) * 0.85);
 
-  // last, since on a phone it is where this test stops (see PICKER_SQUEEZED)
+  await editor.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(editor).toHaveCount(0);
+});
+
+// A test of its own, so the mark for its known bug cannot also swallow a
+// regression in the test above: `test.fail` is satisfied by whatever fails
+// first, and the picker's assertion used to be the last of several.
+test("graves: the editor gives the recipient picker its width", async ({ page }) => {
+  test.fail(onPhone(), PICKER_SQUEEZED);
+  await seed(page);
+  await page.goto("/graves");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Grab anlegen", exact: true }).click();
+  await waitForOverlayOpen(page);
+  const editor = drawer(page);
+  await pickRecipient(page, "graveRecipient", RECIPIENT_NAME);
+
   await expectPickerGetsTheWidth(page, "graveRecipient");
 
   await editor.getByRole("button", { name: "Abbrechen" }).click();

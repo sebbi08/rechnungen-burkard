@@ -18,6 +18,9 @@ export default defineConfig({
   // Playwright's default of half the cores leaves a single worker. Two keep
   // both busy while a test waits on the app.
   workers: process.env.CI ? 2 : undefined,
+  // A `test.only` left in a spec would shrink a CI shard to that one test and
+  // report it green; CI refuses to run with one.
+  forbidOnly: !!process.env.CI,
   // Every test writes into the one SQLite database at once, and a grave
   // generation renders each grave's documents inside its write. A dialog that
   // closes once its row is saved has been seen to wait more than the default
