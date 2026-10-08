@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
 
 defineProps<{
   title: string;
   crumbs?: { label: string; to?: RouteLocationRaw }[];
 }>();
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -12,7 +15,7 @@ defineProps<{
     <div class="min-w-0">
       <nav
         v-if="crumbs?.length"
-        aria-label="Breadcrumb"
+        :aria-label="t('breadcrumb')"
         class="mb-1 flex flex-wrap items-center gap-1 text-sm text-muted-color"
       >
         <template v-for="(crumb, index) in crumbs" :key="index">

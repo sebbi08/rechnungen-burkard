@@ -46,6 +46,7 @@
   "errorAllYearItemRequired": "Ein Grab braucht mindestens eine ganzjährige Leistung.",
   "errorNoRecipients": "Das Grab braucht mindestens einen Empfänger.",
   "errorArchiveRequired": "Bitte wählen Sie zuerst eine ZIP-Datei aus.",
+  "breadcrumb": "Seitenpfad",
   "errorGeneric": "Ein Fehler ist aufgetreten.",
   "errorNetworkError": "Der Server ist nicht erreichbar. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.",
   "errorGenerationUnfollowed": "Der Server ist nicht erreichbar. Die Rechnungserstellung läuft dort weiter; das Ergebnis wird angezeigt, sobald die Seite neu geladen ist.",

@@ -43,6 +43,19 @@ export const primeLocaleDe = {
   accept: "Ja",
   reject: "Nein",
   choose: "Auswählen",
+  // what the calendar's buttons and a list's live region announce
+  chooseYear: "Jahr wählen",
+  chooseMonth: "Monat wählen",
+  chooseDate: "Datum wählen",
+  prevDecade: "Vorheriges Jahrzehnt",
+  nextDecade: "Nächstes Jahrzehnt",
+  prevYear: "Vorheriges Jahr",
+  nextYear: "Nächstes Jahr",
+  prevMonth: "Vorheriger Monat",
+  nextMonth: "Nächster Monat",
+  searchMessage: "{0} Treffer",
+  selectionMessage: "{0} ausgewählt",
+  emptySelectionMessage: "Nichts ausgewählt",
 };
 
 /** PrimeVue's screen-reader texts in German: drawer and dialog close buttons,

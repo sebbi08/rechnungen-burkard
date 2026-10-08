@@ -10,6 +10,8 @@ public static class DocumentTexts
     public static CultureInfo Culture { get; } = CultureInfo.GetCultureInfo("de-DE");
 
     public const string Title = "**** RECHNUNG ****";
+    public const string MetadataTitle = "Rechnung";
+    public const string MetadataAuthor = "Blumen Burkard";
     public const string LabelNumber = "NUMMER:";
     public const string LabelCustomerNumber = "KUNDEN-NR:";
     public const string LabelGraveNumber = "LAUFWEG-NR:";

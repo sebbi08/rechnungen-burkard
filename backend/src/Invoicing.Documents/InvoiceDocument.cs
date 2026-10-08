@@ -24,9 +24,11 @@ internal sealed class InvoiceDocument : IDocument
     public DocumentMetadata GetMetadata() =>
         new()
         {
-            Title = $"Invoice {_data.InvoiceNumber}",
-            Author = "Burkard Invoicing",
-            Creator = "Burkard Invoicing",
+            // a browser shows the title in the tab of an opened PDF: German,
+            // like everything else on the document
+            Title = $"{DocumentTexts.MetadataTitle} {_data.InvoiceNumber}",
+            Author = DocumentTexts.MetadataAuthor,
+            Creator = DocumentTexts.MetadataAuthor,
             Producer = "QuestPDF",
             CreationDate = _data.GeneratedAt,
             ModifiedDate = _data.GeneratedAt,

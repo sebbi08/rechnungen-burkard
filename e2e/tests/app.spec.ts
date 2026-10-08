@@ -78,9 +78,54 @@ test("a detail page keeps its section marked and leads back through its breadcru
   );
 
   await page
-    .getByRole("navigation", { name: "Breadcrumb" })
+    .getByRole("navigation", { name: "Seitenpfad" })
     .getByRole("link", { name: "Gräber" })
     .click();
   await expect(page).toHaveURL(/\/graves$/);
   await expect(page.getByRole("heading", { level: 1, name: "Gräber" })).toBeVisible();
+});
+
+// What a screen reader hears is part of the UI too, and German only like the
+// rest (constitution VII). PrimeVue ships English texts for the calendar's
+// buttons and a list's announcements; any left at its default shows up here.
+test("the screen-reader texts are German too", async ({ page }) => {
+  const recipientName = `Leser ${unique()}`;
+  await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Weg 1" });
+  const english = [
+    "Choose Year",
+    "Choose Month",
+    "Choose Date",
+    "Previous Decade",
+    "Next Decade",
+    "Previous Year",
+    "Next Year",
+    "Previous Month",
+    "Next Month",
+    "results are available",
+    "items selected",
+    "No selected item",
+    "Breadcrumb",
+  ];
+  const leftovers = () =>
+    page.evaluate(
+      (phrases) => phrases.filter((phrase) => document.body.innerHTML.includes(phrase)),
+      english,
+    );
+
+  // the overview's year calendar, and a detail page's breadcrumb
+  await page.goto("/graves");
+  await page.locator("#gravesYear").click();
+  await expect(page.locator(".p-datepicker-panel")).toBeVisible();
+  expect(await leftovers()).toEqual([]);
+  await page.keyboard.press("Escape");
+
+  // a month calendar and a searched list, in the grave editor
+  await page.getByRole("button", { name: "Grab anlegen", exact: true }).click();
+  await page.locator("#graveStart").click();
+  await expect(page.locator(".p-datepicker-panel")).toBeVisible();
+  expect(await leftovers()).toEqual([]);
+  await page.locator("#graveRecipient").click();
+  await page.locator(".p-select-overlay input.p-select-filter").fill(recipientName);
+  await expect(page.locator(".p-select-overlay").getByRole("option")).toHaveCount(1);
+  expect(await leftovers()).toEqual([]);
 });

@@ -45,6 +45,19 @@ public class GermanDocumentTests
         return string.Join("\n", document.GetPages().Select(p => p.Text));
     }
 
+    /// <summary>The title is what a browser shows in the tab of an opened PDF,
+    /// and the document's properties show the rest: German like the page.</summary>
+    [Fact]
+    public void The_documents_properties_are_german_too()
+    {
+        using var document = PdfDocument.Open(
+            DocumentService.GeneratePdf(SampleData(), isCopy: false)
+        );
+
+        Assert.Equal("Rechnung 2026-0004", document.Information.Title);
+        Assert.Equal("Blumen Burkard", document.Information.Author);
+    }
+
     [Fact]
     public void Documents_use_german_labels_and_number_format()
     {
