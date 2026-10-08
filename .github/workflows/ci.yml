@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch or PR makes a running check pointless; it is
+# cancelled so the runners go to the commit that counts. Each push to main
+# keeps its own run: a release reads the checks of the commit it releases.
+concurrency:
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -172,9 +179,11 @@ jobs:
             FROM="${{ github.event.before }}"
             TO="${{ github.sha }}"
           fi
-          # A branch's first push reports an all-zero "before"; there is no
-          # range to check then, so look at the tip commit only.
-          if [ -z "$FROM" ] || [ "$FROM" = "0000000000000000000000000000000000000000" ]; then
+          # A branch's first push reports an all-zero "before", and a forced
+          # push one this checkout may not have; there is no range to check
+          # then, so look at the tip commit only.
+          if [ -z "$FROM" ] || [ "$FROM" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "$FROM^{commit}" 2> /dev/null; then
             npx commitlint --last --verbose
           else
             npx commitlint --from "$FROM" --to "$TO" --verbose

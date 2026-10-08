@@ -4,10 +4,11 @@ import type { Page } from "@playwright/test";
  * Creates a row and returns it.
  *
  * The whole suite writes to one SQLite file, and under the load of the parallel
- * specs a write can fail. A failed attempt is retried, and a permanent failure
- * names the status — otherwise a dropped seed write surfaces much later as a
- * test timing out on a row that was never created, which reads like a race in
- * the feature under test rather than a lost insert.
+ * specs a write can fail. A server failure (5xx) is retried, and a permanent
+ * failure names the status — otherwise a dropped seed write surfaces much later
+ * as a test timing out on a row that was never created, which reads like a race
+ * in the feature under test rather than a lost insert. A refusal (4xx) is the
+ * seed's own mistake and fails at once: asking again only delays the message.
  */
 export async function createRow(
   page: Page,
@@ -22,6 +23,9 @@ export async function createRow(
       return JSON.parse(body);
     }
     failure = `HTTP ${response.status()} ${body}`;
+    if (response.status() < 500) {
+      break;
+    }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`POST ${path} failed: ${failure}`);
@@ -53,6 +57,9 @@ export async function ensureRow(
     }
 
     failure = `HTTP ${response.status()} ${body}`;
+    if (response.status() < 500) {
+      break;
+    }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`POST ${path} failed: ${failure}`);

@@ -4,7 +4,9 @@
 
 **Created**: 2026-08-15
 
-**Status**: Draft
+**Status**: Current — describes the released application. The design documents
+in `docs/superpowers/specs/` record how individual requirements came to read as
+they do.
 
 **Input**: User description: "Combine spec 001 (invoice generation & grave management), 002 (data import & export), 003 (invoice copies with diagonal stamp) into one feature specification."
 
@@ -13,7 +15,7 @@
 ### Session 2026-08-15
 
 - Q: How is a VAT percentage assigned to an individual invoice line? → A: VAT rate is a fixed property of each invoice item; every invoice line always uses the item's rate.
-- Q: When a grave has multiple recipients and the half-year amount is split evenly, what is generated? → A: One invoice per recipient, each containing only that recipient's share; the document states above the item list that it represents only XX% of the total invoice.
+- Q: When a grave has multiple recipients and the half-year amount is split evenly, what is generated? → A: One invoice per recipient, each containing only that recipient's share; the document states above the item list that it represents only XX% of the total invoice. _(Superseded on 2026-09-01: every recipient's invoice now carries the grave's lines in full and states its share in the VAT block — see FR-037e. Invoices generated before keep their old layout.)_
 - Q: Can a generated invoice be edited or deleted afterwards? → A: Not deletable, but editable; each edit saves a new revision while the old version is kept, and the invoice number clearly marks the new revision.
 - Q: How are a grave's multiple invoicing items (with counts) and recipients represented in the import CSV files? → A: A separate mapping CSV with grave-id/item-id links, covering both link types (grave↔item with count and grave↔recipient).
 - Q: By which identifier does the mapping CSV reference recipients? → A: A recipient number column is added to the recipients CSV; the mapping CSV references it.

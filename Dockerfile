@@ -13,11 +13,18 @@ RUN npm run build
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 ARG VERSION=0.0.0
 WORKDIR /src
-COPY backend/ ./
+# The packages first, from the project files and their lock files alone, so the
+# restore is its own layer and a change to the code does not repeat it.
 # Locked: the image ships exactly the packages the lock files name, the ones CI
 # tested (see backend/Directory.Build.props).
-RUN dotnet publish src/Invoicing.Api/Invoicing.Api.csproj -c Release -o /out \
-  -p:Version=${VERSION} -p:RestoreLockedMode=true
+COPY backend/Directory.Build.props ./
+COPY backend/src/Invoicing.Api/*.csproj backend/src/Invoicing.Api/packages.lock.json src/Invoicing.Api/
+COPY backend/src/Invoicing.Domain/*.csproj backend/src/Invoicing.Domain/packages.lock.json src/Invoicing.Domain/
+COPY backend/src/Invoicing.Documents/*.csproj backend/src/Invoicing.Documents/packages.lock.json src/Invoicing.Documents/
+RUN dotnet restore src/Invoicing.Api/Invoicing.Api.csproj -p:RestoreLockedMode=true
+COPY backend/ ./
+RUN dotnet publish src/Invoicing.Api/Invoicing.Api.csproj -c Release -o /out --no-restore \
+  -p:Version=${VERSION}
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

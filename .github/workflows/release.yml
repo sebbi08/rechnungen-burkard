@@ -96,9 +96,12 @@ jobs:
           IMAGE="ghcr.io/${{ github.repository }}"
           VERSION="${{ env.NEW_VERSION }}"
           docker tag "$IMAGE:sha-${GITHUB_SHA::7}" "$IMAGE:$VERSION"
-          docker tag "$IMAGE:sha-${GITHUB_SHA::7}" "$IMAGE:latest"
           docker push "$IMAGE:$VERSION"
-          docker push "$IMAGE:latest"
+          # `latest` is main's newest release, not whichever branch ran last
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            docker tag "$IMAGE:sha-${GITHUB_SHA::7}" "$IMAGE:latest"
+            docker push "$IMAGE:latest"
+          fi
           gh release create "${{ env.NEW_VERSION }}" \
             --title "${{ env.NEW_VERSION }}" \
             --notes-file "$RUNNER_TEMP/entry.md"

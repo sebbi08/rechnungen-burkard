@@ -11,3 +11,10 @@
 data
 e2e/test-results
 e2e/playwright-report
+# nothing the image is built from: only frontend/ and backend/ are copied in
+.claude
+.github
+.husky
+docs
+e2e
+scripts

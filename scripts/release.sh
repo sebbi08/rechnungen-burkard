@@ -125,8 +125,10 @@ printf '\n%s\n\n' "$entry"
 printf 'release   v%s\n' "$version"
 printf 'from      origin/%s (%s)\n' "$ref" "$(git rev-parse --short "$remote_sha")"
 printf 'checks    %s\n' "$checks"
-printf 'image     ghcr.io/%s:v%s and :latest\n' \
-  "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" "$version"
+latest=""
+[ "$ref" = "main" ] && latest=" and :latest"
+printf 'image     ghcr.io/%s:v%s%s\n' \
+  "$(gh repo view --json nameWithOwner --jq .nameWithOwner)" "$version" "$latest"
 
 if [ "$green" -eq 0 ]; then
   printf '\nnot releasing: checks %s -- the workflow only releases a commit with every check green\n' \
