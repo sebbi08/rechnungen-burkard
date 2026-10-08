@@ -70,7 +70,7 @@ public class InvoiceActionsController : ODataController
                 request.Lines,
                 HttpContext.RequestAborted
             );
-            return Created($"odata/Invoices({invoice.Id})", invoice);
+            return Created($"/odata/Invoices({invoice.Id})", invoice);
         }
         catch (ValidationException ex)
         {
@@ -123,7 +123,7 @@ public class InvoiceActionsController : ODataController
                 request.Lines,
                 HttpContext.RequestAborted
             );
-            return Created($"odata/Invoices({invoice.Id})", invoice);
+            return Created($"/odata/Invoices({invoice.Id})", invoice);
         }
         catch (ValidationException ex)
         {

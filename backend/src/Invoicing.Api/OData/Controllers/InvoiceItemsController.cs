@@ -39,6 +39,7 @@ public class InvoiceItemsController : ODataController
             );
         }
 
+        item.Id = 0; // see IdReadOnly
         item.VatRate = VatRateNormalizer.Normalize(item.VatRate);
 
         var error = Validate(item);
@@ -82,6 +83,9 @@ public class InvoiceItemsController : ODataController
                 }
             );
         }
+
+        if (IdReadOnly.Changes(delta))
+            return BadRequest(IdReadOnly.Error());
 
         var item = _db.InvoiceItems.Find(key);
         if (item is null)

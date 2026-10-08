@@ -36,7 +36,7 @@ public class GraveBillingValidationController : ODataController
     [HttpPost("ValidateGraveBilling")]
     public async Task<IActionResult> Validate([FromBody] ValidateGraveBillingRequest? request)
     {
-        if (request is null || request.Lines.Count == 0)
+        if (request?.Lines is not { Count: > 0 })
         {
             return BadRequest(
                 Error("InvalidRequest", "The request body must carry at least one line.")
@@ -176,7 +176,7 @@ public class GraveBillingValidationController : ODataController
     [HttpPost("PreviewGraveBilling")]
     public async Task<IActionResult> Preview([FromBody] PreviewGraveBillingRequest? request)
     {
-        if (request is null || request.Lines.Count == 0)
+        if (request?.Lines is not { Count: > 0 })
         {
             return BadRequest(
                 Error("InvalidRequest", "The request body must carry at least one line.")

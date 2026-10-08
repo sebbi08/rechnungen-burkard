@@ -45,6 +45,7 @@ public class RecipientsController : ODataController
             );
         }
 
+        recipient.Id = 0; // see IdReadOnly
         var error = Validate(recipient);
         if (error is not null)
             return BadRequest(error);
@@ -116,6 +117,9 @@ public class RecipientsController : ODataController
                 }
             );
         }
+
+        if (IdReadOnly.Changes(delta))
+            return BadRequest(IdReadOnly.Error());
 
         var recipient = _db.Recipients.Find(key);
         if (recipient is null)

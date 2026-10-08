@@ -36,6 +36,9 @@ public class SettingsController : ODataController
             );
         }
 
+        if (IdReadOnly.Changes(delta))
+            return BadRequest(IdReadOnly.Error());
+
         var settings =
             _db.GlobalSettings.FirstOrDefault()
             ?? throw new InvalidOperationException("GlobalSettings not seeded.");
