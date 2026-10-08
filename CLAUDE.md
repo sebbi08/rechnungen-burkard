@@ -24,7 +24,8 @@ in `e2e/seed.ts`), since the Graves, GraveItems and GraveRecipients sets take no
 writes.
 
 To start over on the dev database — an explicitly destructive step, so ask
-first and commit before it: `scripts/reset-dev-db.sh`.
+first and commit before it: `scripts/reset-dev-db.sh`. It asks too, and moves
+the old database into `data/backup-<time>/` rather than deleting it.
 
 ## A dialog takes focus when it finishes opening
 
