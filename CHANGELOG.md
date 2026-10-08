@@ -5,6 +5,32 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.1.0 — 2026-10-08
+
+### Features
+- **import**: read CSV files that Excel saved with semicolons (b99ae00)
+- report the running version and the database's health (c5fa1f3)
+
+### Fixes
+- **frontend**: small fixes from the review (f6deeab)
+- **api**: answer malformed requests with a refusal instead of a 500 (a446def)
+- **api**: refuse a second generation once every due grave has its invoices (d15ed4b)
+- **api**: number recipients created at once without a race (8aa30fd)
+- **api**: download exactly one half-year's grave invoices in bulk (1da2cca)
+- say the screen-reader texts and the PDF's properties in German (9d22788)
+- **frontend**: keep a running generation in view and ask before an editor drops input (7ee484d)
+- **import**: refuse a file that is not UTF-8 and keep row numbers true (eb4f6cf)
+- revalidate the page on every load so a release never shows a blank one (49f2230)
+- **jobs**: end a job failed when its outcome cannot be written (59b284b)
+- **frontend**: keep the recipient list within a phone's screen (087fa14)
+- **import**: read a German decimal price at its value, not a hundred times it (9e7fdc2)
+- date invoices by the local day and hold a revised grave price to the cent (173d777)
+- **frontend**: let long item numbers wrap in the grave billing preview (bbc46b0)
+- **frontend**: let long item and grave numbers wrap on small screens (e1f58aa)
+
+### Other changes
+- bring stale comments up to date and guard the share division (320ed26)
+
 ## v3.0.0 — 2026-10-07
 
 ### Breaking changes
