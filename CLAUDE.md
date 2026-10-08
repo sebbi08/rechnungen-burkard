@@ -75,6 +75,11 @@ page one.
 - **Dev stack**: `env "UID=$(id -u)" "GID=$(id -g)" docker compose up -d`
   (frontend on 8080, proxying `/odata` to the backend container).
 - **Backend tests**: `scripts/dotnet.sh test Invoicing.sln`.
+- **NuGet packages** are pinned by each project's `packages.lock.json`, and CI and
+  the image build restore in locked mode. After adding or changing a
+  `PackageReference`, or to take newer versions within its range, run
+  `scripts/dotnet.sh restore Invoicing.sln --force-evaluate` and commit the lock
+  files.
 - **Frontend** (`frontend/`, Vue 3 and PrimeVue): `cd frontend && npm run
 typecheck`, then `npm run lint` (ESLint, scoped to `src`) and `npm run build`.
   All three must be clean. For probing with hot reload, run it on the host

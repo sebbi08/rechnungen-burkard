@@ -14,7 +14,10 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
 ARG VERSION=0.0.0
 WORKDIR /src
 COPY backend/ ./
-RUN dotnet publish src/Invoicing.Api/Invoicing.Api.csproj -c Release -o /out -p:Version=${VERSION}
+# Locked: the image ships exactly the packages the lock files name, the ones CI
+# tested (see backend/Directory.Build.props).
+RUN dotnet publish src/Invoicing.Api/Invoicing.Api.csproj -c Release -o /out \
+  -p:Version=${VERSION} -p:RestoreLockedMode=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

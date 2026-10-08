@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "QuestPDF": {
+        "type": "Direct",
+        "requested": "[2025.*, )",
+        "resolved": "2025.12.4",
+        "contentHash": "dDeLlrj/7dxZFUDzmGYqmWW9VWrD30+6SztusBMvDGlz0w2MaA9WVW2ISLGL8ufUjinJr97yHDkdIl3ueMgmow=="
+      },
+      "invoicing.domain": {
+        "type": "Project"
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    The package versions are ranges (QuestPDF 2025.*, EF Core 10.*), and a range
+    resolves to whatever is newest at restore time. So two builds of one commit
+    could ship different packages (a different QuestPDF lays out a different
+    PDF), and CI could test other binaries than the image ships. Each project's
+    packages.lock.json records what the ranges resolved to, and a restore uses
+    that until someone refreshes it on purpose: run a restore of Invoicing.sln
+    through scripts/dotnet.sh with the force-evaluate option.
+
+    Where a build must not move at all (CI, which sets CI=true, and the image
+    build) the restore is locked: it fails rather than change the lock.
+  -->
+  <PropertyGroup>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
+</Project>
