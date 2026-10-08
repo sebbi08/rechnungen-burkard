@@ -87,7 +87,23 @@ if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
             return next(context);
         }
     );
-    app.UseStaticFiles();
+    // index.html names the build's hashed files. Left to heuristic caching, a
+    // browser could keep an old one after a release and ask for files the new
+    // image no longer has: a blank page until a hard reload. So the page is
+    // revalidated every time, and the hashed files, which never change under
+    // their name, are kept for good.
+    app.UseStaticFiles(
+        new StaticFileOptions
+        {
+            OnPrepareResponse = context =>
+            {
+                var headers = context.Context.Response.Headers;
+                headers.CacheControl = context.Context.Request.Path.StartsWithSegments("/assets")
+                    ? "public, max-age=31536000, immutable"
+                    : "no-cache";
+            },
+        }
+    );
 }
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
