@@ -1,3 +1,4 @@
+using System.Reflection;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
@@ -106,7 +107,33 @@ if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
     );
 }
 
-app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+// The container's health check asks this, so it reads the database rather
+// than only proving the process answers; and it says which release runs, which
+// is otherwise nowhere to be read.
+var version =
+    typeof(Program)
+        .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+        ?.InformationalVersion.Split('+')[0]
+    ?? "0.0.0";
+app.MapGet(
+    "/healthz",
+    async (AppDbContext db, CancellationToken ct) =>
+    {
+        try
+        {
+            await db.GlobalSettings.AnyAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Results.Json(
+                new { status = "unavailable", version },
+                statusCode: StatusCodes.Status503ServiceUnavailable
+            );
+        }
+
+        return Results.Ok(new { status = "ok", version });
+    }
+);
 app.MapControllers();
 
 app.Run();

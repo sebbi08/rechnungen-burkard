@@ -30,4 +30,9 @@ ENV ASPNETCORE_URLS="http://0.0.0.0:8080"
 ENV TZ=Europe/Berlin
 VOLUME ["/data"]
 EXPOSE 8080
+# Healthy when /healthz answers 200, which it does only once the database can be
+# read. The runtime image has neither curl nor wget, so bash asks over its own
+# /dev/tcp.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /healthz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
 ENTRYPOINT ["dotnet", "Invoicing.Api.dll"]
