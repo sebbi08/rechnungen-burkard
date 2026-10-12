@@ -18,7 +18,7 @@ import { useErrorToast } from "@/composables/useErrorToast";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
 import { billingTitle, MAX_RECIPIENTS, previewLines } from "@/lib/billing";
 import { parseIsoDate, toIsoMonth } from "@/lib/format";
-import { GRAVE_POSITIONS, type GravePositionName } from "@/lib/gravePosition";
+import { type GravePositionName, OFFERED_GRAVE_POSITIONS } from "@/lib/gravePosition";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
 import CorrectionsDialog, { type CorrectionRow } from "./CorrectionsDialog.vue";
 import GraveBillingPreview from "./GraveBillingPreview.vue";
@@ -43,9 +43,18 @@ const form = reactive({
   StartDate: null as Date | null,
   EndDate: null as Date | null,
 });
-const positionOptions = computed(() =>
-  GRAVE_POSITIONS.map((value) => ({ value, label: t(`gravePosition${value}`) })),
-);
+// The position the grave was stored with. One the editor does not offer
+// (imported from the old program) is listed as well, so that the grave can be
+// saved unchanged; the save refuses it for any other grave.
+const storedPosition = ref<GravePositionName | null>(null);
+const positionOptions = computed(() => {
+  const offered: GravePositionName[] = [...OFFERED_GRAVE_POSITIONS];
+  const stored = storedPosition.value;
+  return (stored && !offered.includes(stored) ? [...offered, stored] : offered).map((value) => ({
+    value,
+    label: t(`gravePosition${value}`),
+  }));
+});
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
@@ -85,6 +94,7 @@ watch(visible, async (open) => {
     StartDate: null,
     EndDate: null,
   });
+  storedPosition.value = null;
   lines.value = [];
   recipients.value = [];
   linkRecipientId.value = null;
@@ -106,6 +116,7 @@ watch(visible, async (open) => {
       StartDate: parseIsoDate(grave.StartDate),
       EndDate: parseIsoDate(grave.EndDate),
     });
+    storedPosition.value = grave.Position;
     // a link price is shown as stored -- already the gross on a VAT-included line
     lines.value = grave.Items.map((link) =>
       newLine({

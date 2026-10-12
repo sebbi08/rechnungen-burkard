@@ -506,7 +506,9 @@ non-interactive until completion, and the task runs exactly once.
 
 **Recipients**
 
-- **FR-014**: A recipient MUST have a name and an address.
+- **FR-014**: A recipient MUST have a name and an address, and MAY have an
+  e-mail address; one that is given MUST look like an address (one "@" with
+  text on both sides, a dot in the domain, no whitespace).
 - **FR-015**: Users MUST be able to manage recipients in a separate section.
 - **FR-016**: Users MUST be able to add recipients while creating a grave or an
   invoice.
@@ -522,6 +524,11 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
   a term runs from its start month through its end month, or indefinitely without
   one. Field numbers may repeat.
+- **FR-018b**: Graves imported from the old program MAY carry further positions:
+  single, double, urn, triple, quadruple, child, lawn, lawn urn, tree, honorary
+  and slab graves inside, outside or with the side unknown, and graves whose kind
+  is unknown. The editor MUST NOT offer them for a grave; a grave that has one
+  MUST keep it when it is saved unchanged.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
@@ -634,8 +641,8 @@ non-interactive until completion, and the task runs exactly once.
   customer number and the page.
 - **FR-037b**: A grave invoice MUST show, in bold above its lines, the site name
   ("GRABSTÄTTE") and the field number with the position's short form
-  ("FELD-GRAB-NR", e.g. "27 dGr.a"). A line whose values are missing MUST be left
-  out.
+  ("FELD-GRAB-NR", e.g. "27 dGr.a"; kinds without an abbreviation are spelled
+  out, "27 Rasengrab außen"). A line whose values are missing MUST be left out.
 - **FR-037c**: The line table MUST have the columns item number, description,
   count, unit price, total and VAT rate ("19 %"). A line whose price includes VAT
   MUST read "7 % Incl." and print the gross unit price and gross total.
@@ -674,8 +681,9 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-049**: The system MUST provide a downloadable ZIP archive containing
   exactly four CSV files with header rows: recipients, invoice items, graves, and
   a mapping file.
-- **FR-050**: The recipients CSV MUST capture a recipient number, a name, and an
-  address.
+- **FR-050**: The recipients CSV MUST capture a recipient number, a name, an
+  address and an optional e-mail address. A file without the `Email` column
+  (header included) is read as having no e-mail addresses.
 - **FR-051**: The items CSV MUST capture item number, text, VAT rate, an
   optional price and an optional quarter, in that order. The quarter is written
   as `Spring`, `Summer`, `Autumn` or `Winter` or left empty; any other value is
@@ -684,8 +692,11 @@ non-interactive until completion, and the task runs exactly once.
   name, position, start month and an optional end month, in six columns. Months
   are written as YYYY-MM.
 - **FR-053**: The mapping CSV MUST link each grave to its invoicing items (item
-  identifier with count) and to its recipients (recipient number), covering both
-  link types.
+  identifier with count, VAT-included flag and an optional unit price for this
+  grave) and to its recipients (recipient number, the other three columns
+  empty), covering both link types. A link's unit price is billed instead of the
+  item's price, exactly as one set in the grave editor; a file without the
+  `UnitPrice` column (header included) bills every item at its own price.
 - **FR-054**: The system MUST validate an archive before importing any data.
 - **FR-055**: Validation MUST check that all four CSV files are present.
 - **FR-056**: Validation MUST check that each CSV file has a correct header row.
@@ -695,10 +706,11 @@ non-interactive until completion, and the task runs exactly once.
   and recipient referenced in the mapping CSV MUST be defined in the items or
   recipients CSV file.
 - **FR-058a**: Validation MUST refuse a grave that could not be billed: a grave
-  without a recipient, a link to an item without a price, or prices that do not
-  divide across the grave's recipients even after a rounding correction
-  (FR-021a; the first failing invoice of a grave is reported with its label), a
-  grave without an item billed all year, or more than four recipients (FR-020).
+  without a recipient, a link to an item without a price of its own or on the
+  link, or prices that do not divide across the grave's recipients even after a
+  rounding correction (FR-021a; the first failing invoice of a grave is reported
+  with its label), a grave without an item billed all year, or more than four
+  recipients (FR-020).
   A price that merely needs a correction is accepted; the correction is stored
   with the grave without a confirmation. The archive is refused as a
   whole, so nothing imports that the dialog would have refused to save.

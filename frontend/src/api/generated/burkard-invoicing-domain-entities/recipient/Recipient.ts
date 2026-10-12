@@ -40,9 +40,20 @@ export interface Recipient {
    * | Nullable | `false` |
    */
   Address: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `Email` |
+   * | Type | `Edm.String` |
+   */
+  Email: string | null;
 }
 
 export type RecipientId = number | { Id: number };
 
 export interface EditableRecipient
-  extends Pick<Recipient, "Number" | "Name" | "Address">, Partial<Pick<Recipient, "Id">> {}
+  extends
+    Pick<Recipient, "Number" | "Name" | "Address">,
+    Partial<Pick<Recipient, "Id" | "Email">> {}

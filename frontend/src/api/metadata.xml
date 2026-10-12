@@ -31,6 +31,7 @@
                 <Property Name="Number" Type="Edm.String" Nullable="false" />
                 <Property Name="Name" Type="Edm.String" Nullable="false" />
                 <Property Name="Address" Type="Edm.String" Nullable="false" />
+                <Property Name="Email" Type="Edm.String" />
             </EntityType>
             <EntityType Name="Grave">
                 <Key>
@@ -217,6 +218,36 @@
                 <Member Name="SingleOutside" Value="3" />
                 <Member Name="UrnInside" Value="4" />
                 <Member Name="UrnOutside" Value="5" />
+                <Member Name="Single" Value="6" />
+                <Member Name="Double" Value="7" />
+                <Member Name="Urn" Value="8" />
+                <Member Name="TripleInside" Value="9" />
+                <Member Name="TripleOutside" Value="10" />
+                <Member Name="Triple" Value="11" />
+                <Member Name="QuadrupleInside" Value="12" />
+                <Member Name="QuadrupleOutside" Value="13" />
+                <Member Name="Quadruple" Value="14" />
+                <Member Name="ChildInside" Value="15" />
+                <Member Name="ChildOutside" Value="16" />
+                <Member Name="Child" Value="17" />
+                <Member Name="LawnInside" Value="18" />
+                <Member Name="LawnOutside" Value="19" />
+                <Member Name="Lawn" Value="20" />
+                <Member Name="LawnUrnInside" Value="21" />
+                <Member Name="LawnUrnOutside" Value="22" />
+                <Member Name="LawnUrn" Value="23" />
+                <Member Name="TreeInside" Value="24" />
+                <Member Name="TreeOutside" Value="25" />
+                <Member Name="Tree" Value="26" />
+                <Member Name="HonoraryInside" Value="27" />
+                <Member Name="HonoraryOutside" Value="28" />
+                <Member Name="Honorary" Value="29" />
+                <Member Name="SlabInside" Value="30" />
+                <Member Name="SlabOutside" Value="31" />
+                <Member Name="Slab" Value="32" />
+                <Member Name="UnknownInside" Value="33" />
+                <Member Name="UnknownOutside" Value="34" />
+                <Member Name="Unknown" Value="35" />
             </EnumType>
             <EnumType Name="DocumentKind">
                 <Member Name="Normal" Value="0" />

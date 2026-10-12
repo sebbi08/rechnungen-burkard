@@ -81,6 +81,7 @@ export async function createRecipient(input: {
   Number?: string;
   Name: string;
   Address: string;
+  Email?: string | null;
 }): Promise<number> {
   const body = await postJson<{ Id?: number; id?: number } | undefined>("/odata/Recipients", input);
   return Number(body?.Id ?? body?.id);
@@ -193,7 +194,9 @@ export interface GraveDetails {
   EndDate: string | null;
   CreatedAt: string;
   Items: GraveItemLink[];
-  Recipients: { Recipient: { Id: number; Name: string; Address: string } }[];
+  Recipients: {
+    Recipient: { Id: number; Name: string; Address: string; Email: string | null };
+  }[];
 }
 
 /** Graves(id) answers hand-built JSON with the links already expanded. */

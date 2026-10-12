@@ -1374,4 +1374,96 @@ public class SaveGraveTests
             await db.GraveBillingCorrections.Where(c => c.GraveId == graveId).ToListAsync()
         );
     }
+
+    /// <summary>The positions beyond the editor's six come from the old
+    /// program's data, through the import. None of them is chosen for a new
+    /// grave.</summary>
+    [Fact]
+    public async Task Save_refuses_a_position_the_editor_does_not_offer_for_a_new_grave()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+
+        var response = await PostGraveAsync(
+            client,
+            "P-NEW",
+            "2026-01",
+            null,
+            item,
+            recipient,
+            position: "LawnUrnOutside"
+        );
+
+        Assert.Equal("PositionNotOffered", await ErrorCodeAsync(response));
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Graves.AnyAsync(g => g.GraveNumber == "P-NEW"));
+    }
+
+    /// <summary>A grave imported with such a position is saved unchanged with
+    /// it, or moved to one of the six, but not to another one of them.</summary>
+    [Fact]
+    public async Task Save_keeps_a_position_the_grave_already_has_but_chooses_no_other()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+        using var created = await ODataJson.ReadAsync(
+            await PostGraveAsync(client, "P-OLD", "2026-01", null, item, recipient)
+        );
+        var id = created.RootElement.GetProperty("Id").GetInt64();
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = await db.Graves.SingleAsync(g => g.Id == id);
+            grave.Position = GravePosition.Tree;
+            await db.SaveChangesAsync();
+        }
+
+        var kept = await PostGraveAsync(
+            client,
+            "P-OLD",
+            "2026-01",
+            null,
+            item,
+            recipient,
+            graveId: id,
+            position: "Tree"
+        );
+        Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+
+        var other = await PostGraveAsync(
+            client,
+            "P-OLD",
+            "2026-01",
+            null,
+            item,
+            recipient,
+            graveId: id,
+            position: "SlabInside"
+        );
+        Assert.Equal("PositionNotOffered", await ErrorCodeAsync(other));
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(
+                GravePosition.Tree,
+                (await db.Graves.SingleAsync(g => g.Id == id)).Position
+            );
+        }
+
+        var offered = await PostGraveAsync(
+            client,
+            "P-OLD",
+            "2026-01",
+            null,
+            item,
+            recipient,
+            graveId: id,
+            position: "SingleInside"
+        );
+        Assert.Equal(HttpStatusCode.OK, offered.StatusCode);
+    }
 }

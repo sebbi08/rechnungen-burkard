@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
@@ -92,5 +93,113 @@ public class RecipientTests : IClassFixture<ApiTestHost>
             .ToList();
         Assert.Equal(8, numbers.Count);
         Assert.Equal(8, numbers.Distinct().Count());
+    }
+
+    private async Task<long> CreateAsync(HttpClient client, object body)
+    {
+        var response = await client.PostAsync("/odata/Recipients", ODataJson.Body(body));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("Id").GetInt64();
+    }
+
+    private async Task<string?> EmailOfAsync(HttpClient client, long id)
+    {
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/Recipients({id})")
+        );
+        return json.RootElement.GetProperty("Email").GetString();
+    }
+
+    private static Task<HttpResponseMessage> PatchAsync(HttpClient client, long id, object body) =>
+        client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Patch, $"/odata/Recipients({id})")
+            {
+                Content = ODataJson.Body(body),
+            }
+        );
+
+    [Fact]
+    public async Task An_email_address_is_stored_trimmed_and_an_empty_one_as_none()
+    {
+        using var client = _host.CreateClient();
+        var withEmail = await CreateAsync(
+            client,
+            new
+            {
+                Name = "Mit E-Mail",
+                Address = "Hauptstraße 1",
+                Email = "  anna@example.de ",
+            }
+        );
+        var blank = await CreateAsync(
+            client,
+            new
+            {
+                Name = "Leere E-Mail",
+                Address = "Hauptstraße 1",
+                Email = " ",
+            }
+        );
+        var without = await CreateAsync(
+            client,
+            new { Name = "Ohne E-Mail", Address = "Hauptstraße 1" }
+        );
+
+        Assert.Equal("anna@example.de", await EmailOfAsync(client, withEmail));
+        Assert.Null(await EmailOfAsync(client, blank));
+        Assert.Null(await EmailOfAsync(client, without));
+
+        // and a patch can change or clear it
+        Assert.True(
+            (
+                await PatchAsync(client, withEmail, new { Email = "bert@example.de" })
+            ).IsSuccessStatusCode
+        );
+        Assert.Equal("bert@example.de", await EmailOfAsync(client, withEmail));
+        Assert.True((await PatchAsync(client, withEmail, new { Email = "" })).IsSuccessStatusCode);
+        Assert.Null(await EmailOfAsync(client, withEmail));
+    }
+
+    [Theory]
+    [InlineData("anna")]
+    [InlineData("anna@")]
+    [InlineData("@example.de")]
+    [InlineData("anna@example")]
+    [InlineData("anna@example.")]
+    [InlineData("an na@example.de")]
+    [InlineData("anna@b@example.de")]
+    public async Task A_malformed_email_address_is_rejected(string email)
+    {
+        using var client = _host.CreateClient();
+        var created = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(
+                new
+                {
+                    Name = "Falsche E-Mail",
+                    Address = "Hauptstraße 1",
+                    Email = email,
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+        using (var json = await ODataJson.ReadAsync(created))
+        {
+            Assert.Equal(
+                "RecipientEmailInvalid",
+                json.RootElement.GetProperty("error").GetProperty("code").GetString()
+            );
+        }
+
+        var id = await CreateAsync(client, new { Name = "Richtige E-Mail", Address = "Weg 1" });
+        var patched = await PatchAsync(client, id, new { Email = email });
+        Assert.Equal(HttpStatusCode.BadRequest, patched.StatusCode);
+        using var patchJson = await ODataJson.ReadAsync(patched);
+        Assert.Equal(
+            "RecipientEmailInvalid",
+            patchJson.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+        Assert.Null(await EmailOfAsync(client, id));
     }
 }

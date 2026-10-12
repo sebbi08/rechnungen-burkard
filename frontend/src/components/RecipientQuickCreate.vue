@@ -15,11 +15,11 @@ const emit = defineEmits<{ created: [id: number] }>();
 const { t } = useI18n();
 const { showError } = useErrorToast();
 const queryClient = useQueryClient();
-const form = reactive({ Name: "", Address: "" });
+const form = reactive({ Name: "", Address: "", Email: "" });
 
 watch(visible, (open) => {
   if (open) {
-    Object.assign(form, { Name: "", Address: "" });
+    Object.assign(form, { Name: "", Address: "", Email: "" });
   }
 });
 
@@ -27,7 +27,11 @@ const saving = ref(false);
 async function save(): Promise<void> {
   saving.value = true;
   try {
-    const id = await createRecipient({ Name: form.Name.trim(), Address: form.Address.trim() });
+    const id = await createRecipient({
+      Name: form.Name.trim(),
+      Address: form.Address.trim(),
+      Email: form.Email.trim() || null,
+    });
     await queryClient.invalidateQueries({ queryKey: ["recipients"] });
     emit("created", id);
     visible.value = false;
@@ -55,6 +59,15 @@ async function save(): Promise<void> {
       <div class="flex flex-col gap-2">
         <label for="quickAddress" class="font-medium">{{ t("recipientAddress") }}</label>
         <Textarea id="quickAddress" v-model="form.Address" rows="4" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="quickEmail" class="font-medium">{{ t("recipientEmail") }}</label>
+        <InputText
+          id="quickEmail"
+          v-model="form.Email"
+          inputmode="email"
+          :placeholder="t('recipientEmailHint')"
+        />
       </div>
     </form>
     <template #footer>

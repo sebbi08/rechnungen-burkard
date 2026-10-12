@@ -1,11 +1,16 @@
-/** The backend's GravePosition members, in the order the editor offers them. */
-export const GRAVE_POSITIONS = [
+import type { GravePosition } from "@/api/generated";
+
+/** The backend's GravePosition members a grave can be given in the editor, in
+ *  the order it offers them. The others come from the old program's data
+ *  through the import; a grave keeps one of those but none is chosen anew. */
+export const OFFERED_GRAVE_POSITIONS = [
   "DoubleInside",
   "DoubleOutside",
   "SingleInside",
   "SingleOutside",
   "UrnInside",
   "UrnOutside",
-] as const;
+] as const satisfies readonly `${GravePosition}`[];
 
-export type GravePositionName = (typeof GRAVE_POSITIONS)[number];
+/** Any of the backend's GravePosition members, by name. */
+export type GravePositionName = `${GravePosition}`;

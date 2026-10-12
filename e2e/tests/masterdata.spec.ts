@@ -245,6 +245,35 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   await expect(table).not.toContainText(second);
 });
 
+test("recipients: an e-mail address is optional and checked", async ({ page }) => {
+  const ts = unique();
+  const name = `Mit E-Mail ${ts}`;
+  const email = `post.${ts}@example.de`;
+  await page.goto("/recipients");
+
+  await page.getByRole("button", { name: "Empfänger anlegen" }).click();
+  await waitForOverlayOpen(page);
+  const createDialog = dialog(page, "Empfänger anlegen");
+  await createDialog.getByLabel("Name", { exact: true }).fill(name);
+  await createDialog.getByLabel("Adresse").fill("Musterstraße 1");
+  await createDialog.getByLabel("E-Mail").fill(` ${email} `);
+  await createDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(createDialog).toHaveCount(0);
+  const row = page.getByRole("row").filter({ hasText: name });
+  await expect(row).toContainText(email);
+
+  // a malformed one is refused and the dialog stays open with it
+  await row.getByRole("button", { name: "Bearbeiten" }).click();
+  await waitForOverlayOpen(page);
+  const editDialog = dialog(page, "Empfänger bearbeiten");
+  await expect(editDialog.getByLabel("E-Mail")).toHaveValue(email);
+  await editDialog.getByLabel("E-Mail").fill("post at example.de");
+  await editDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(toasts(page).filter({ hasText: "Die E-Mail-Adresse ist ungültig." })).toBeVisible();
+  await expect(editDialog).toBeVisible();
+  await expect(row).toContainText(email);
+});
+
 test("recipients: edit an existing recipient via the row dialog (Story 3)", async ({ page }) => {
   const ts = unique();
   const name = `Vorher ${ts}`;

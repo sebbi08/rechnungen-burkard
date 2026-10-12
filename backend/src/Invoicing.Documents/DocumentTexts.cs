@@ -56,18 +56,68 @@ public static class DocumentTexts
         );
 
     /// <summary>The old system's abbreviation of a grave position, from the
-    /// position's member name; null for none or an unknown name.</summary>
-    public static string? PositionShortForm(string? position) =>
-        position switch
+    /// position's member name: the kind, then ".i" or ".a" for inside or
+    /// outside ("dGr.a"), or nothing where the side is not known ("dGr"). Kinds
+    /// the old system had no abbreviation for are spelled out ("Rasengrab
+    /// außen"). Null for none, for <c>Unknown</c> (nothing known to print) and
+    /// for a name that is not a position.</summary>
+    public static string? PositionShortForm(string? position)
+    {
+        if (position is null)
         {
-            "DoubleInside" => "dGr.i",
-            "DoubleOutside" => "dGr.a",
-            "SingleInside" => "eGr.i",
-            "SingleOutside" => "eGr.a",
-            "UrnInside" => "uGr.i",
-            "UrnOutside" => "uGr.a",
-            _ => null,
-        };
+            return null;
+        }
+
+        var side =
+            position.EndsWith(Inside, StringComparison.Ordinal) ? Inside
+            : position.EndsWith(Outside, StringComparison.Ordinal) ? Outside
+            : "";
+        var kind = position[..^side.Length];
+        if (AbbreviatedKinds.TryGetValue(kind, out var abbreviation))
+        {
+            return side switch
+            {
+                Inside => abbreviation + ".i",
+                Outside => abbreviation + ".a",
+                _ => kind == "Unknown" ? null : abbreviation,
+            };
+        }
+
+        if (SpelledKinds.TryGetValue(kind, out var word))
+        {
+            return side switch
+            {
+                Inside => word + " innen",
+                Outside => word + " außen",
+                _ => word,
+            };
+        }
+
+        return null;
+    }
+
+    private const string Inside = "Inside";
+    private const string Outside = "Outside";
+
+    private static readonly Dictionary<string, string> AbbreviatedKinds = new()
+    {
+        ["Single"] = "eGr",
+        ["Double"] = "dGr",
+        ["Urn"] = "uGr",
+        ["Triple"] = "3fGr",
+        ["Quadruple"] = "4fGr",
+        ["Child"] = "kGr",
+        ["Unknown"] = "Gr",
+    };
+
+    private static readonly Dictionary<string, string> SpelledKinds = new()
+    {
+        ["Lawn"] = "Rasengrab",
+        ["LawnUrn"] = "Rasen-Urne",
+        ["Tree"] = "Baumgrab",
+        ["Honorary"] = "Ehrengrab",
+        ["Slab"] = "Plattengrab",
+    };
 
     /// <summary>"19 %", or "7,65 %" for a rate with decimals: the line's ST cell.</summary>
     public static string VatRate(decimal rate) => $"{rate.ToString("0.##", Culture)} %";

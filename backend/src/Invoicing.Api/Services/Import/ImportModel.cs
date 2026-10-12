@@ -27,7 +27,13 @@ public sealed record ImportSummary(
     int CorrectedGraves
 );
 
-public sealed record RecipientRow(int Row, string Number, string Name, string Address);
+public sealed record RecipientRow(
+    int Row,
+    string Number,
+    string Name,
+    string Address,
+    string? Email
+);
 
 public sealed record ItemRow(
     int Row,
@@ -53,7 +59,8 @@ public sealed record ItemLinkRow(
     string GraveNumber,
     string ItemNumber,
     int Count,
-    bool PriceIncludesVat
+    bool PriceIncludesVat,
+    decimal? UnitPrice
 );
 
 public sealed record RecipientLinkRow(int Row, string GraveNumber, string RecipientNumber);

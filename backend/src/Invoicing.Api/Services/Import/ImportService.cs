@@ -65,6 +65,7 @@ public sealed class ImportService
                 Number = row.Number,
                 Name = row.Name,
                 Address = row.Address,
+                Email = row.Email,
             },
             StringComparer.OrdinalIgnoreCase
         );
@@ -112,6 +113,7 @@ public sealed class ImportService
                     GraveId = graves[link.GraveNumber].Id,
                     ItemId = items[link.ItemNumber].Id,
                     Count = link.Count,
+                    UnitPrice = link.UnitPrice,
                     PriceIncludesVat = link.PriceIncludesVat,
                 }
             );
@@ -144,7 +146,12 @@ public sealed class ImportService
                     string.Equals(l.GraveNumber, number, StringComparison.OrdinalIgnoreCase)
                 )
                 .Select(l =>
-                    GraveBilling.LinkFor(items[l.ItemNumber], l.Count, null, l.PriceIncludesVat)
+                    GraveBilling.LinkFor(
+                        items[l.ItemNumber],
+                        l.Count,
+                        l.UnitPrice,
+                        l.PriceIncludesVat
+                    )
                 )
                 .ToList();
             if (count == 0 || links.Count == 0)

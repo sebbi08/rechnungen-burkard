@@ -74,6 +74,13 @@ function open(recipient: Recipient | null): void {
         >
           <template #body="{ data }">{{ data.Address }}</template>
         </Column>
+        <Column
+          :header="t('recipientEmail')"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell [overflow-wrap:anywhere]"
+        >
+          <template #body="{ data }">{{ data.Email ?? "" }}</template>
+        </Column>
         <Column class="w-16 text-right">
           <template #body="{ data }">
             <Button

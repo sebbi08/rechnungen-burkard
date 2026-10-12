@@ -227,6 +227,26 @@ public sealed class GraveService
             throw new ValidationException("PositionRequired", "The grave position is required.");
         }
 
+        // The positions beyond the editor's six come from the old program's
+        // data, through the import. A grave keeps the one it has, so it can be
+        // saved unchanged, but none of them is chosen anew.
+        if (!GravePositions.Offered.Contains(fields.Position.Value))
+        {
+            var stored = graveId is { } id
+                ? await _db
+                    .Graves.Where(g => g.Id == id)
+                    .Select(g => g.Position)
+                    .FirstOrDefaultAsync(ct)
+                : null;
+            if (stored != fields.Position)
+            {
+                throw new ValidationException(
+                    "PositionNotOffered",
+                    "This grave position can only be kept, not chosen."
+                );
+            }
+        }
+
         // the import refuses the same (DateRangeInvalid)
         if (fields.EndDate < fields.StartDate)
         {

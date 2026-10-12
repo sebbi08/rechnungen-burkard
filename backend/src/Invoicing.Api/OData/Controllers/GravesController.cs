@@ -79,6 +79,7 @@ public class GravesController : ODataController
                         r.Recipient.Id,
                         r.Recipient.Name,
                         r.Recipient.Address,
+                        r.Recipient.Email,
                     },
                 })
                 .ToList(),
@@ -171,7 +172,8 @@ public class GravesController : ODataController
             request.GraveNumber ?? "",
             request.FieldNumber ?? "",
             request.SiteName ?? "",
-            // an unknown name is reported as missing: the editor only offers the six
+            // an unknown name is reported as missing; a known one the editor
+            // does not offer is the save's to judge
             GraveTerm.TryParsePosition(request.Position, out var position)
                 ? position
                 : null,

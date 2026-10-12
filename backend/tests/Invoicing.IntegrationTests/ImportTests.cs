@@ -20,11 +20,19 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class ImportTests
 {
+    // Recipients and mapping without their optional last column (Email,
+    // UnitPrice), as archives were written before those existed: most tests
+    // need neither, and these still have to import.
     private const string RecipientsHeader = "RecipientNumber,Name,Address\r\n";
     private const string ItemsHeader = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
     private const string GravesHeader =
         "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
     private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
+
+    // the full headers, as the template has them
+    private const string FullRecipientsHeader = "RecipientNumber,Name,Address,Email\r\n";
+    private const string FullMappingHeader =
+        "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
 
     private static async Task ConfigureVatAsync(ApiTestHost host, params decimal[] rates)
     {
@@ -195,10 +203,10 @@ public class ImportTests
         foreach (
             var (name, header) in new[]
             {
-                ("recipients.csv", RecipientsHeader),
+                ("recipients.csv", FullRecipientsHeader),
                 ("items.csv", ItemsHeader),
                 ("graves.csv", GravesHeader),
-                ("mapping.csv", MappingHeader),
+                ("mapping.csv", FullMappingHeader),
             }
         )
         {
@@ -274,6 +282,10 @@ public class ImportTests
         // the address keeps the line break the quoted CSV field carried
         var anna = grave.Recipients.Select(r => r.Recipient).Single(r => r.Number == "E-1000");
         Assert.Equal("Hauptstraße 1\n99999 Musterdorf", anna.Address);
+
+        // a file without the Email and UnitPrice columns has neither
+        Assert.Null(anna.Email);
+        Assert.All(grave.Items, link => Assert.Null(link.UnitPrice));
     }
 
     [Fact]
@@ -1263,5 +1275,343 @@ public class ImportTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
         Assert.Contains(problems, p => p.File == "graves.csv" && p.Code == "HeaderInvalid");
+    }
+
+    /// <summary>One grave with a recipient and an item at 7 %; the mapping's
+    /// item row is <paramref name="itemLink"/>, under the full header.</summary>
+    private static byte[] ArchiveWithItemLink(string items, string itemLink, int recipients = 1) =>
+        Zip(
+            (
+                "recipients.csv",
+                FullRecipientsHeader
+                    + string.Concat(
+                        Enumerable
+                            .Range(0, recipients)
+                            .Select(i => $"E-100{i},Empfänger {i},Weg {i},\r\n")
+                    )
+            ),
+            ("items.csv", ItemsHeader + items),
+            (
+                "graves.csv",
+                GravesHeader + "IMP-1,27,Grabstätte Import,DoubleOutside,2026-01,2040-12\r\n"
+            ),
+            (
+                "mapping.csv",
+                FullMappingHeader
+                    + itemLink
+                    + string.Concat(
+                        Enumerable
+                            .Range(0, recipients)
+                            .Select(i => $"Recipient,IMP-1,E-100{i},,,\r\n")
+                    )
+            )
+        );
+
+    [Fact]
+    public async Task A_recipients_email_address_is_imported_and_a_blank_one_is_none()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            (
+                "recipients.csv",
+                FullRecipientsHeader
+                    + "E-1000,Anna Beispiel,Hauptstraße 1, anna@example.de \r\n"
+                    + "E-1001,Bert Beispiel,Nebenweg 2,\r\n"
+            ),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", FullMappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(
+            "anna@example.de",
+            (await db.Recipients.SingleAsync(r => r.Number == "E-1000")).Email
+        );
+        Assert.Null((await db.Recipients.SingleAsync(r => r.Number == "E-1001")).Email);
+    }
+
+    [Fact]
+    public async Task A_malformed_email_address_is_reported_with_its_row()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            (
+                "recipients.csv",
+                FullRecipientsHeader
+                    + "E-1000,Anna Beispiel,Hauptstraße 1,anna@example.de\r\n"
+                    + "E-1001,Bert Beispiel,Nebenweg 2,bert at example.de\r\n"
+            ),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", FullMappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var problem = Assert.Single(json.RootElement.GetProperty("problems").EnumerateArray());
+        Assert.Equal("recipients.csv", problem.GetProperty("file").GetString());
+        Assert.Equal(3, problem.GetProperty("row").GetInt32());
+        Assert.Equal("EmailInvalid", problem.GetProperty("code").GetString());
+        Assert.Equal("EmailInvalid", problem.GetProperty("messageKey").GetString());
+        Assert.Equal("bert at example.de", problem.GetProperty("messageArgs")[0].GetString());
+        await AssertNothingImportedAsync(host);
+    }
+
+    /// <summary>The header decides how many columns a row has: under the full
+    /// header a row without the Email cell is short.</summary>
+    [Fact]
+    public async Task A_row_without_the_optional_column_under_the_full_header_is_reported()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", FullRecipientsHeader + "E-1000,Anna Beispiel,Hauptstraße 1\r\n"),
+            ("items.csv", ItemsHeader),
+            ("graves.csv", GravesHeader),
+            ("mapping.csv", FullMappingHeader)
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "ColumnCount"
+        );
+    }
+
+    [Fact]
+    public async Task An_item_links_unit_price_is_stored_and_a_blank_one_bills_the_items_price()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = ArchiveWithItemLink(
+            "9001,Grabpflege,7,120.00,\r\n9002,Gießen,7,30.00,\r\n",
+            "Item,IMP-1,9001,1,,\"80,50\"\r\nItem,IMP-1,9002,1,,\r\n"
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var links = await db.GraveItems.Include(l => l.Item).ToListAsync();
+        Assert.Equal(80.50m, links.Single(l => l.Item.Number == "9001").UnitPrice);
+        Assert.Null(links.Single(l => l.Item.Number == "9002").UnitPrice);
+    }
+
+    /// <summary>An item without a price of its own is fine for a grave that
+    /// brings its own; another grave linking it without one is refused.</summary>
+    [Fact]
+    public async Task An_item_without_a_price_needs_one_on_every_link()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var priced = ArchiveWithItemLink("9001,Grabpflege,7,,\r\n", "Item,IMP-1,9001,1,,95.00\r\n");
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(priced));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Null((await db.InvoiceItems.SingleAsync()).DefaultPrice);
+            Assert.Equal(95.00m, (await db.GraveItems.SingleAsync()).UnitPrice);
+        }
+
+        using var other = new ApiTestHost();
+        await ConfigureVatAsync(other, 7m);
+        using var otherClient = other.CreateClient();
+        var archive = Zip(
+            ("recipients.csv", FullRecipientsHeader + "E-1000,Anna Beispiel,Weg 1,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,,\r\n"),
+            (
+                "graves.csv",
+                GravesHeader
+                    + "IMP-1,27,Grabstätte,DoubleOutside,2026-01,\r\n"
+                    + "IMP-2,28,Grabstätte,DoubleOutside,2026-01,\r\n"
+            ),
+            (
+                "mapping.csv",
+                FullMappingHeader
+                    + "Item,IMP-1,9001,1,,95.00\r\n"
+                    + "Item,IMP-2,9001,1,,\r\n"
+                    + "Recipient,IMP-1,E-1000,,,\r\n"
+                    + "Recipient,IMP-2,E-1000,,,\r\n"
+            )
+        );
+        var refused = await otherClient.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        var problem = Assert.Single(await ProblemsAsync(refused));
+        Assert.Equal(
+            ("mapping.csv", (int?)3, "PriceRequired"),
+            (problem.File, problem.Row, problem.Code)
+        );
+    }
+
+    [Theory]
+    [InlineData("-1", "PriceInvalid")]
+    [InlineData("zehn", "PriceInvalid")]
+    [InlineData("80.505", "PriceInvalid")]
+    public async Task An_invalid_unit_price_is_reported(string raw, string code)
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = ArchiveWithItemLink(
+            "9001,Grabpflege,7,120.00,\r\n",
+            $"Item,IMP-1,9001,1,,{raw}\r\n"
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Row == 2 && p.Code == code);
+        await AssertNothingImportedAsync(host);
+    }
+
+    [Theory]
+    [InlineData("Recipient,IMP-1,E-1000,,,10.00", "UnitPrice")]
+    [InlineData("Recipient,IMP-1,E-1000,1,,", "Count")]
+    [InlineData("Recipient,IMP-1,E-1000,,true,", "PriceIncludesVat")]
+    public async Task A_recipient_link_with_an_item_links_value_is_reported(
+        string row,
+        string column
+    )
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var archive = Zip(
+            ("recipients.csv", FullRecipientsHeader + "E-1000,Anna Beispiel,Weg 1,\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,\r\n"),
+            ("graves.csv", GravesHeader + "IMP-1,27,Grabstätte,DoubleOutside,2026-01,\r\n"),
+            ("mapping.csv", FullMappingHeader + "Item,IMP-1,9001,1,,\r\n" + row + "\r\n")
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var problem = json
+            .RootElement.GetProperty("problems")
+            .EnumerateArray()
+            .Single(p => p.GetProperty("code").GetString() == "ValueNotAllowed");
+        Assert.Equal(3, problem.GetProperty("row").GetInt32());
+        Assert.Equal("RecipientLinkValue", problem.GetProperty("messageKey").GetString());
+        Assert.Equal(column, problem.GetProperty("messageArgs")[0].GetString());
+    }
+
+    /// <summary>The split is checked, and corrected, at the price the grave is
+    /// billed: the link's own where it has one. 120.01 net at 19 % does not
+    /// divide by two, 120.00 does -- whichever of the two the item has.</summary>
+    [Fact]
+    public async Task The_split_is_corrected_at_the_links_unit_price()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var raised = ArchiveWithItemLink(
+            "9001,Grabpflege,19,120.00,\r\n",
+            "Item,IMP-1,9001,1,,120.01\r\n",
+            recipients: 2
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(raised));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using (var json = await ODataJson.ReadAsync(response))
+        {
+            Assert.Equal(
+                1,
+                json.RootElement.GetProperty("summary").GetProperty("correctedGraves").GetInt32()
+            );
+        }
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var corrections = await db.GraveBillingCorrections.ToListAsync();
+            Assert.NotEmpty(corrections);
+            Assert.All(corrections, c => Assert.Equal(120.01m, c.EnteredPrice));
+            Assert.All(corrections, c => Assert.Equal(120.02m, c.CorrectedPrice));
+        }
+
+        // the generation's precheck agrees with what the import stored
+        var generate = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+        Assert.Equal(HttpStatusCode.Accepted, generate.StatusCode);
+
+        using var other = new ApiTestHost();
+        await ConfigureVatAsync(other, 19m);
+        using var otherClient = other.CreateClient();
+        var even = ArchiveWithItemLink(
+            "9001,Grabpflege,19,120.01,\r\n",
+            "Item,IMP-1,9001,1,,120.00\r\n",
+            recipients: 2
+        );
+        var evenResponse = await otherClient.PostAsync("/odata/ImportArchive", Upload(even));
+        Assert.True(
+            evenResponse.IsSuccessStatusCode,
+            await evenResponse.Content.ReadAsStringAsync()
+        );
+        using var evenJson = await ODataJson.ReadAsync(evenResponse);
+        Assert.Equal(
+            0,
+            evenJson.RootElement.GetProperty("summary").GetProperty("correctedGraves").GetInt32()
+        );
+    }
+
+    [Fact]
+    public async Task Every_grave_position_imports_by_its_name()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var positions = Enum.GetNames<GravePosition>();
+        var archive = Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Weg 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,\r\n"),
+            (
+                "graves.csv",
+                GravesHeader
+                    + string.Concat(
+                        positions.Select(p => $"IMP-{p},27,Grabstätte,{p},2026-01,\r\n")
+                    )
+            ),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + string.Concat(
+                        positions.Select(p =>
+                            $"Item,IMP-{p},9001,1,\r\nRecipient,IMP-{p},E-1000,,\r\n"
+                        )
+                    )
+            )
+        );
+        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stored = await db.Graves.ToDictionaryAsync(g => g.GraveNumber, g => g.Position);
+        Assert.Equal(36, stored.Count);
+        Assert.Equal(GravePosition.LawnUrnOutside, stored["IMP-LawnUrnOutside"]);
+        Assert.Equal(GravePosition.Unknown, stored["IMP-Unknown"]);
     }
 }

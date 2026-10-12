@@ -2,7 +2,7 @@ import AdmZip from "adm-zip";
 import { expect, type Page, test } from "@playwright/test";
 import { ensureRow } from "../seed";
 import { unique } from "../unique";
-import { dialog } from "../vue";
+import { dialog, discardEditor, drawer, pickOption, saveEditor, waitForOverlayOpen } from "../vue";
 
 // Unique per worker, and each test puts its own prefix in front: the import is
 // create-only, so a number another test or an earlier run already imported
@@ -13,6 +13,9 @@ const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
 const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
 const GRAVES_HEADER = "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
 const MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
+// the template's headers, with the optional last columns the ones above leave out
+const FULL_RECIPIENTS_HEADER = "RecipientNumber,Name,Address,Email\r\n";
+const FULL_MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
 
 function archive(files: Record<string, string>): Buffer {
   const zip = new AdmZip();
@@ -78,8 +81,8 @@ test("download the import template and read its four CSV files (Story 10)", asyn
     .sort();
   expect(names).toEqual(["graves.csv", "items.csv", "mapping.csv", "recipients.csv"]);
   // each file carries nothing but its header row
-  expect(zip.readAsText("recipients.csv").trim()).toContain("RecipientNumber");
-  expect(zip.readAsText("mapping.csv").trim()).toContain("Type,GraveNumber");
+  expect(zip.readAsText("recipients.csv").trim()).toContain(FULL_RECIPIENTS_HEADER.trim());
+  expect(zip.readAsText("mapping.csv").trim()).toContain(FULL_MAPPING_HEADER.trim());
 });
 
 test("importing without a file asks for one first", async ({ page }) => {
@@ -190,4 +193,65 @@ test("importing the same archive twice is rejected as already existing (Story 11
     await page.request.get(`/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'`)
   ).json();
   expect(graves.value).toHaveLength(1);
+});
+
+test("an archive with e-mail addresses, grave prices and an old position imports and edits", async ({
+  page,
+}) => {
+  const suffix = `OLD-${RUN}`;
+  const graveNumber = `IMP-G-${suffix}`;
+  const email = `anna.${suffix.toLowerCase()}@example.de`;
+  const buffer = archive({
+    "recipients.csv":
+      FULL_RECIPIENTS_HEADER + `IMP-R-${suffix},Anna Altbestand,Hauptstraße 1,${email}\r\n`,
+    // no price of its own: the grave brings one
+    "items.csv": ITEMS_HEADER + `IMP-I-${suffix},Grabpflege alt,7,,\r\n`,
+    "graves.csv":
+      GRAVES_HEADER + `${graveNumber},27,Grabstätte Alt,LawnUrnOutside,2026-01,2040-12\r\n`,
+    "mapping.csv":
+      FULL_MAPPING_HEADER +
+      `Item,${graveNumber},IMP-I-${suffix},1,,"80,50"\r\n` +
+      `Recipient,${graveNumber},IMP-R-${suffix},,,\r\n`,
+  });
+
+  await page.goto("/import-export");
+  await importArchive(page, buffer);
+  const result = dialog(page, "Import abgeschlossen");
+  await expect(result).toContainText("Gräber: 1", { timeout: 30000 });
+  await result.getByRole("button", { name: "OK" }).click();
+
+  const graves = await (
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'&$select=Id`)
+  ).json();
+  const graveId = graves.value[0].Id;
+  const links = await (
+    await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${graveId}`)
+  ).json();
+  expect(Number(links.value[0].UnitPrice)).toBe(80.5);
+
+  // the detail page names the position and shows the e-mail address
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByText("Rasen-Urnengrab außen")).toBeVisible();
+  await expect(page.getByRole("table").filter({ hasText: "Anna Altbestand" })).toContainText(email);
+
+  // the editor keeps the position beside the six it offers, and saves it unchanged
+  await page.getByRole("button", { name: "Grab bearbeiten" }).click();
+  await waitForOverlayOpen(page);
+  const editor = drawer(page);
+  const position = page.locator("#gravePosition");
+  await expect(position).toContainText("Rasen-Urnengrab außen");
+  await position.click();
+  await expect(page.locator(".p-select-overlay").getByRole("option")).toHaveCount(7);
+  await pickOption(page, position, "Rasen-Urnengrab außen");
+  await saveEditor(editor);
+  await expect(page.getByText("Rasen-Urnengrab außen")).toBeVisible();
+
+  // a new grave is offered the six alone
+  await page.goto("/graves");
+  await page.getByRole("button", { name: "Grab anlegen" }).click();
+  await waitForOverlayOpen(page);
+  await page.locator("#gravePosition").click();
+  await expect(page.locator(".p-select-overlay").getByRole("option")).toHaveCount(6);
+  await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
+  await discardEditor(page);
 });

@@ -9,4 +9,7 @@ public sealed class Recipient
     public string Number { get; set; } = "";
     public string Name { get; set; } = "";
     public string Address { get; set; } = "";
+
+    /// <summary>Optional; null when there is none, never empty.</summary>
+    public string? Email { get; set; }
 }

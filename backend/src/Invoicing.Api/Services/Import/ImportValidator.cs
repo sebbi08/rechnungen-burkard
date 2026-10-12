@@ -67,23 +67,26 @@ public sealed class ImportValidator
             return new ImportValidationResult(problems, null);
         }
 
-        // FR-056: the header row of every file must match exactly.
+        // FR-056: the header row of every file must match exactly -- the full
+        // one, or the one without the file's optional trailing columns. The
+        // header that matched says how many columns every row has.
         var tables = new Dictionary<string, List<CsvRow>>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, expectedHeader) in ImportArchiveLayout.Headers)
         {
+            var accepted = ImportArchiveLayout.AcceptedHeaders(name).ToList();
             var rows = Csv.Parse(files[name]!);
             // Excel in German saves CSV with semicolons, "CSV UTF-8" included:
             // a file whose header is the expected one that way is read that way
-            if (rows.Count > 0 && !HeaderMatches(rows[0], expectedHeader))
+            if (rows.Count > 0 && !HeaderMatches(rows[0], accepted))
             {
                 var semicolons = Csv.Parse(files[name]!, ';');
-                if (semicolons.Count > 0 && HeaderMatches(semicolons[0], expectedHeader))
+                if (semicolons.Count > 0 && HeaderMatches(semicolons[0], accepted))
                 {
                     rows = semicolons;
                 }
             }
 
-            if (rows.Count == 0 || !HeaderMatches(rows[0], expectedHeader))
+            if (rows.Count == 0 || !HeaderMatches(rows[0], accepted))
             {
                 problems.Add(
                     new ImportProblem(
@@ -238,14 +241,22 @@ public sealed class ImportValidator
 
     private static bool HeaderMatches(
         IReadOnlyList<string> actual,
-        IReadOnlyList<string> expected
+        IEnumerable<IReadOnlyList<string>> accepted
     ) =>
-        actual.Count == expected.Count
-        && actual
-            .Select(
-                (value, i) => value.Trim().Equals(expected[i], StringComparison.OrdinalIgnoreCase)
-            )
-            .All(m => m);
+        accepted.Any(expected =>
+            actual.Count == expected.Count
+            && actual
+                .Select(
+                    (value, i) =>
+                        value.Trim().Equals(expected[i], StringComparison.OrdinalIgnoreCase)
+                )
+                .All(m => m)
+        );
+
+    /// <summary>The cell trimmed, or empty where the row has no such column: an
+    /// optional trailing column the file's header leaves out.</summary>
+    private static string Cell(IReadOnlyList<string> row, int index) =>
+        index < row.Count ? row[index].Trim() : "";
 
     private static void ReadRecipients(
         List<CsvRow> rows,
@@ -259,12 +270,13 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = row.Number;
-            if (!HasColumns(row, 3, file, line, problems))
+            if (!HasColumns(row, rows[0].Count, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
             var name = row[1].Trim();
             var address = row[2].Trim();
+            var email = EmailAddress.Normalize(Cell(row, 3));
             if (number.Length > 0)
                 data.DeclaredRecipients.Add(number);
             if (
@@ -273,6 +285,21 @@ public sealed class ImportValidator
                 | Missing(address, file, line, "Address", problems)
             )
             {
+                continue;
+            }
+
+            if (email is not null && !EmailAddress.IsPlausible(email))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "EmailInvalid",
+                        $"'{email}' is not a valid e-mail address.",
+                        "EmailInvalid",
+                        [email]
+                    )
+                );
                 continue;
             }
 
@@ -292,7 +319,7 @@ public sealed class ImportValidator
             }
 
             seen[number] = line;
-            data.Recipients.Add(new RecipientRow(line, number, name, address));
+            data.Recipients.Add(new RecipientRow(line, number, name, address, email));
         }
     }
 
@@ -304,7 +331,7 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = row.Number;
-            if (!HasColumns(row, 5, file, line, problems))
+            if (!HasColumns(row, rows[0].Count, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
@@ -341,35 +368,8 @@ public sealed class ImportValidator
             decimal? price = null;
             if (rawPrice.Length > 0)
             {
-                if (!TryParseDecimal(rawPrice, out var parsedPrice) || parsedPrice < 0)
+                if (!TryReadPrice(rawPrice, file, line, problems, out var parsedPrice))
                 {
-                    problems.Add(
-                        new ImportProblem(
-                            file,
-                            line,
-                            "PriceInvalid",
-                            $"'{rawPrice}' is not a valid price.",
-                            "PriceInvalid",
-                            [rawPrice]
-                        )
-                    );
-                    continue;
-                }
-
-                // prices are cents: a third decimal would be judged rounded by
-                // the split check and billed unrounded by generation
-                if (!GraveBilling.IsWholeCents(parsedPrice))
-                {
-                    problems.Add(
-                        new ImportProblem(
-                            file,
-                            line,
-                            "PriceInvalid",
-                            $"'{rawPrice}' has more than two decimals.",
-                            "PriceDecimals",
-                            [rawPrice]
-                        )
-                    );
                     continue;
                 }
 
@@ -440,7 +440,7 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = row.Number;
-            if (!HasColumns(row, 6, file, line, problems))
+            if (!HasColumns(row, rows[0].Count, file, line, problems))
                 continue;
 
             var number = row[0].Trim();
@@ -546,7 +546,7 @@ public sealed class ImportValidator
         {
             var row = rows[i];
             var line = row.Number;
-            if (!HasColumns(row, 5, file, line, problems))
+            if (!HasColumns(row, rows[0].Count, file, line, problems))
                 continue;
 
             var type = row[0].Trim();
@@ -554,6 +554,7 @@ public sealed class ImportValidator
             var reference = row[2].Trim();
             var rawCount = row[3].Trim();
             var rawIncludesVat = row[4].Trim();
+            var rawUnitPrice = Cell(row, 5);
             if (
                 Missing(type, file, line, "Type", problems)
                 | Missing(graveNumber, file, line, "GraveNumber", problems)
@@ -603,6 +604,19 @@ public sealed class ImportValidator
                     continue;
                 }
 
+                // the grave's own price, as the editor sets one; empty bills the
+                // item's price from items.csv
+                decimal? unitPrice = null;
+                if (rawUnitPrice.Length > 0)
+                {
+                    if (!TryReadPrice(rawUnitPrice, file, line, problems, out var parsedPrice))
+                    {
+                        continue;
+                    }
+
+                    unitPrice = parsedPrice;
+                }
+
                 var key = (graveNumber.ToUpperInvariant(), reference.ToUpperInvariant());
                 if (itemLinks.TryGetValue(key, out var firstItemRow))
                 {
@@ -625,7 +639,14 @@ public sealed class ImportValidator
 
                 itemLinks[key] = line;
                 data.ItemLinks.Add(
-                    new ItemLinkRow(line, graveNumber, reference, count, priceIncludesVat)
+                    new ItemLinkRow(
+                        line,
+                        graveNumber,
+                        reference,
+                        count,
+                        priceIncludesVat,
+                        unitPrice
+                    )
                 );
             }
             else if (
@@ -635,6 +656,35 @@ public sealed class ImportValidator
                 )
             )
             {
+                // a recipient link has no count, VAT flag or price: a value in
+                // one was meant for an item row, and is not silently dropped
+                var filled = new[]
+                {
+                    ("Count", rawCount),
+                    ("PriceIncludesVat", rawIncludesVat),
+                    ("UnitPrice", rawUnitPrice),
+                }.Where(cell => cell.Item2.Length > 0);
+                var rejected = false;
+                foreach (var (column, _) in filled)
+                {
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "ValueNotAllowed",
+                            $"The column '{column}' must be empty on a recipient link.",
+                            "RecipientLinkValue",
+                            [column]
+                        )
+                    );
+                    rejected = true;
+                }
+
+                if (rejected)
+                {
+                    continue;
+                }
+
                 var key = (graveNumber.ToUpperInvariant(), reference.ToUpperInvariant());
                 if (recipientLinks.TryGetValue(key, out var firstRecipientRow))
                 {
@@ -690,8 +740,9 @@ public sealed class ImportValidator
     /// no line can fix within 1,00 €; an archive carrying one is refused as a
     /// whole, since generation would otherwise skip that grave.
     ///
-    /// The import never sets a link's own price, so what is billed is the
-    /// item's default price from items.csv. The problems are reported against
+    /// What is billed is the link's UnitPrice from mapping.csv where it has one,
+    /// and the item's price from items.csv otherwise -- as for a grave saved
+    /// through the editor. The problems are reported against
     /// the grave's row, because the grave is what does not add up. A grave over
     /// the recipient cap is left to <see cref="CheckGraveRecipients"/>.</summary>
     private void CheckGraveSplits(ImportData data, List<ImportProblem> problems)
@@ -736,7 +787,7 @@ public sealed class ImportValidator
                             Quarter = item.Quarter,
                         },
                         link.Count,
-                        null,
+                        link.UnitPrice,
                         link.PriceIncludesVat
                     );
                 })
@@ -893,22 +944,28 @@ public sealed class ImportValidator
 
     /// <summary>An item may come without a price (FR-051), but a grave cannot be
     /// billed for one: SaveGrave refuses such a link, and generation would skip
-    /// the grave. Refused on the mapping row, so the item itself still imports as
-    /// long as no grave links it. A link to an item row that was rejected on its
-    /// own carries that problem already and is left alone here.</summary>
+    /// the grave. A link that brings its own UnitPrice needs none from the item.
+    /// Refused on the mapping row, so the item itself still imports as long as
+    /// no grave links it without a price. A link to an item row that was
+    /// rejected on its own carries that problem already and is left alone
+    /// here.</summary>
     private static void CheckLinkedItemPrices(ImportData data, List<ImportProblem> problems)
     {
         var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
         foreach (var link in data.ItemLinks)
         {
-            if (items.TryGetValue(link.ItemNumber, out var item) && item.Price is null)
+            if (
+                link.UnitPrice is null
+                && items.TryGetValue(link.ItemNumber, out var item)
+                && item.Price is null
+            )
             {
                 problems.Add(
                     new ImportProblem(
                         ImportArchiveLayout.MappingFile,
                         link.Row,
                         "PriceRequired",
-                        $"A price is required for item '{item.Number}': a grave links it.",
+                        $"A price is required for item '{item.Number}': a grave links it without a UnitPrice.",
                         "PriceRequired",
                         [item.Number]
                     )
@@ -1116,6 +1173,51 @@ public sealed class ImportValidator
                 [column]
             )
         );
+        return true;
+    }
+
+    /// <summary>A price cell that is not empty: a decimal of at least zero in
+    /// whole cents. A problem is reported where it is not.</summary>
+    private static bool TryReadPrice(
+        string raw,
+        string file,
+        int line,
+        List<ImportProblem> problems,
+        out decimal price
+    )
+    {
+        if (!TryParseDecimal(raw, out price) || price < 0)
+        {
+            problems.Add(
+                new ImportProblem(
+                    file,
+                    line,
+                    "PriceInvalid",
+                    $"'{raw}' is not a valid price.",
+                    "PriceInvalid",
+                    [raw]
+                )
+            );
+            return false;
+        }
+
+        // prices are cents: a third decimal would be judged rounded by the
+        // split check and billed unrounded by generation
+        if (!GraveBilling.IsWholeCents(price))
+        {
+            problems.Add(
+                new ImportProblem(
+                    file,
+                    line,
+                    "PriceInvalid",
+                    $"'{raw}' has more than two decimals.",
+                    "PriceDecimals",
+                    [raw]
+                )
+            );
+            return false;
+        }
+
         return true;
     }
 

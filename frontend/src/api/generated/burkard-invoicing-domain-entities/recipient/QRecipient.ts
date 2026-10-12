@@ -12,6 +12,7 @@ export class QRecipient extends QueryObject {
   public readonly Number = new QStringPath(this.withPrefix("Number"));
   public readonly Name = new QStringPath(this.withPrefix("Name"));
   public readonly Address = new QStringPath(this.withPrefix("Address"));
+  public readonly Email = new QStringPath(this.withPrefix("Email"));
 }
 
 export const qRecipient = new QRecipient();

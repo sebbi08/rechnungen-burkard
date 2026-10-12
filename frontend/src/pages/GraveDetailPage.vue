@@ -221,6 +221,13 @@ const {
           <Column :header="t('recipientAddress')" body-class="whitespace-pre-line">
             <template #body="{ data }">{{ data.Address }}</template>
           </Column>
+          <Column
+            :header="t('recipientEmail')"
+            header-class="hidden md:table-cell"
+            body-class="hidden md:table-cell [overflow-wrap:anywhere]"
+          >
+            <template #body="{ data }">{{ data.Email ?? "" }}</template>
+          </Column>
         </DataTable>
       </template>
     </Card>

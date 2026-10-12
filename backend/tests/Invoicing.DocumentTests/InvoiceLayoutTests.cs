@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Burkard.Invoicing.Documents;
+using Burkard.Invoicing.Domain.Entities;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
 using Xunit;
@@ -175,12 +176,53 @@ public class InvoiceLayoutTests
     [InlineData("SingleOutside", "eGr.a")]
     [InlineData("UrnInside", "uGr.i")]
     [InlineData("UrnOutside", "uGr.a")]
+    [InlineData("Single", "eGr")]
+    [InlineData("Double", "dGr")]
+    [InlineData("Urn", "uGr")]
+    [InlineData("TripleInside", "3fGr.i")]
+    [InlineData("QuadrupleOutside", "4fGr.a")]
+    [InlineData("Child", "kGr")]
+    [InlineData("LawnInside", "Rasengrab innen")]
+    [InlineData("LawnUrnOutside", "Rasen-Urne außen")]
+    [InlineData("LawnUrn", "Rasen-Urne")]
+    [InlineData("TreeOutside", "Baumgrab außen")]
+    [InlineData("HonoraryInside", "Ehrengrab innen")]
+    [InlineData("Slab", "Plattengrab")]
+    [InlineData("UnknownInside", "Gr.i")]
+    [InlineData("UnknownOutside", "Gr.a")]
     public void Each_position_prints_its_short_form(string position, string shortForm)
     {
         var data = GraveData();
         data.GravePosition = position;
 
         Assert.Contains($"FELD-GRAB-NR: 27 {shortForm}", Text(data));
+    }
+
+    /// <summary>Every position has a short form but the one that says nothing
+    /// is known; that one prints the field number alone.</summary>
+    [Fact]
+    public void Every_position_but_unknown_has_a_short_form()
+    {
+        foreach (var position in Enum.GetNames<GravePosition>())
+        {
+            var shortForm = DocumentTexts.PositionShortForm(position);
+            if (position == nameof(GravePosition.Unknown))
+            {
+                Assert.Null(shortForm);
+            }
+            else
+            {
+                Assert.False(string.IsNullOrWhiteSpace(shortForm), position);
+            }
+        }
+
+        Assert.Equal(
+            "FELD-GRAB-NR: 27",
+            DocumentTexts.GraveField(
+                "27",
+                DocumentTexts.PositionShortForm(nameof(GravePosition.Unknown))
+            )
+        );
     }
 
     [Fact]

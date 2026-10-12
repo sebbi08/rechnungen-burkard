@@ -19,7 +19,7 @@ const { t } = useI18n();
 const { showError } = useErrorToast();
 const toast = useToast();
 const queryClient = useQueryClient();
-const form = reactive({ Number: "", Name: "", Address: "" });
+const form = reactive({ Number: "", Name: "", Address: "", Email: "" });
 
 watch(visible, (open) => {
   if (open) {
@@ -27,6 +27,7 @@ watch(visible, (open) => {
       Number: props.recipient?.Number ?? "",
       Name: props.recipient?.Name ?? "",
       Address: props.recipient?.Address ?? "",
+      Email: props.recipient?.Email ?? "",
     });
   }
 });
@@ -35,17 +36,25 @@ const saving = ref(false);
 async function save(): Promise<void> {
   saving.value = true;
   const number = form.Number.trim();
+  // an empty address is none; the backend stores it as null either way
+  const email = form.Email.trim() || null;
   try {
     if (props.recipient) {
       await odata
         .Recipients(props.recipient.Id)
-        .patch({ Number: number, Name: form.Name.trim(), Address: form.Address.trim() })
+        .patch({
+          Number: number,
+          Name: form.Name.trim(),
+          Address: form.Address.trim(),
+          Email: email,
+        })
         .execute();
     } else {
       // an empty number is left out: the backend assigns the next one
       await createRecipient({
         Name: form.Name.trim(),
         Address: form.Address.trim(),
+        Email: email,
         ...(number ? { Number: number } : {}),
       });
     }
@@ -84,6 +93,15 @@ async function save(): Promise<void> {
       <div class="flex flex-col gap-2">
         <label for="recipientAddress" class="font-medium">{{ t("recipientAddress") }}</label>
         <Textarea id="recipientAddress" v-model="form.Address" rows="4" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="recipientEmail" class="font-medium">{{ t("recipientEmail") }}</label>
+        <InputText
+          id="recipientEmail"
+          v-model="form.Email"
+          inputmode="email"
+          :placeholder="t('recipientEmailHint')"
+        />
       </div>
     </form>
     <template #footer>

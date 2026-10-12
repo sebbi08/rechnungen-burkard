@@ -46,6 +46,7 @@ public class RecipientsController : ODataController
         }
 
         recipient.Id = 0; // see IdReadOnly
+        recipient.Email = EmailAddress.Normalize(recipient.Email);
         var error = Validate(recipient);
         if (error is not null)
             return BadRequest(error);
@@ -126,6 +127,7 @@ public class RecipientsController : ODataController
             return NotFound();
 
         delta.Patch(recipient);
+        recipient.Email = EmailAddress.Normalize(recipient.Email);
         var error = Validate(recipient);
         if (error is not null)
             return BadRequest(error);
@@ -208,6 +210,18 @@ public class RecipientsController : ODataController
                 {
                     code = "RecipientAddressRequired",
                     message = "The address is required.",
+                },
+            };
+        }
+
+        if (r.Email is not null && !EmailAddress.IsPlausible(r.Email))
+        {
+            return new
+            {
+                error = new
+                {
+                    code = "RecipientEmailInvalid",
+                    message = "The e-mail address is not valid.",
                 },
             };
         }
