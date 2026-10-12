@@ -18,9 +18,9 @@ import InvoiceRowActions from "@/components/InvoiceRowActions.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
 import { useDebounced } from "@/composables/useDebounced";
+import { usePageReport } from "@/composables/usePageReport";
 import { formatDate, formatInvoiceNumber, formatRevisionBadge } from "@/lib/format";
-
-const PAGE_SIZE = 50;
+import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 
 const { t } = useI18n();
 const search = ref("");
@@ -68,15 +68,12 @@ watch(
   () => invoices.data.value?.total,
   (total) => {
     if (total != null && total > 0 && first.value >= total) {
-      first.value = Math.floor((total - 1) / PAGE_SIZE) * PAGE_SIZE;
+      first.value = lastPageStart(total);
     }
   },
 );
 
-// "1–50 von 63": PrimeVue fills in its own placeholders, so they pass through
-const pageReport = computed(() =>
-  t("pageReport", { first: "{first}", last: "{last}", total: "{totalRecords}" }),
-);
+const pageReport = usePageReport();
 
 const editorOpen = ref(false);
 const editorTarget = ref<{ invoiceId: number; recipientId: number } | null>(null);
@@ -124,7 +121,7 @@ function openEditor(invoice: Invoice | null): void {
         :rows="PAGE_SIZE"
         :first="first"
         :total-records="invoices.data.value?.total ?? 0"
-        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
+        :paginator-template="PAGINATOR_TEMPLATE"
         :current-page-report-template="pageReport"
         :loading="invoices.isFetching.value"
         striped-rows

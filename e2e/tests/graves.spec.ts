@@ -532,6 +532,65 @@ function halfButton(scope: Page | Locator, half: number): Locator {
   return scope.getByRole("group", { name: "Halbjahr" }).getByRole("button", { name: `H${half}` });
 }
 
+test("the overview shows a hundred graves a page, of those the search leaves", async ({ page }) => {
+  const marker = `GS-${unique()}`;
+  // A half-year far ahead that no test generates: a generation renders the
+  // documents of every grave due in its half-year, and 101 more of them would
+  // slow down whichever test started it.
+  const year = CURRENT_YEAR + 9;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Paula ${marker}`,
+    Address: "Musterweg 1",
+  });
+  const numbers = Array.from(
+    { length: 101 },
+    (_, i) => `${marker}-${String(i + 1).padStart(3, "0")}`,
+  );
+  for (let start = 0; start < numbers.length; start += 10) {
+    await Promise.all(
+      numbers.slice(start, start + 10).map((graveNumber) =>
+        saveGrave(page, {
+          graveNumber,
+          ...term(year, 1),
+          items: [{ itemId: item.Id }],
+          recipientIds: [recipient.Id],
+        }),
+      ),
+    );
+  }
+
+  await page.goto("/graves");
+  await fillYear(page, page.locator("#gravesYear"), String(year));
+  await halfButton(page, 1).click();
+  await expect(halfButton(page, 1)).toHaveAttribute("aria-pressed", "true");
+
+  // the pages are cut from the graves the search leaves, not from all of them
+  const search = page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" });
+  await search.fill(marker);
+  const rows = page.getByRole("row").filter({ hasText: marker });
+  await expect(rows).toHaveCount(100);
+  await expect(page.getByText("1–100 von 101")).toBeVisible();
+
+  // a hundred rows are taller than the window, and the paginator stays in it
+  const next = page.getByRole("button", { name: "Nächste Seite" });
+  await expect(next).toBeInViewport();
+  await next.click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByText("101–101 von 101")).toBeVisible();
+
+  // a narrower search starts on page one again: 001 to 009
+  await search.fill(`${marker}-00`);
+  await expect(rows).toHaveCount(9);
+  await expect(page.getByText("1–9 von 9")).toBeVisible();
+});
+
 test("overview and generate dialog open on the half-year today falls in", async ({ page }) => {
   await page.goto("/graves");
 

@@ -35,6 +35,18 @@ body {
   }
 }
 
+/* A page of a hundred rows is taller than the window. The paginator stays at
+   the window's lower edge while the rows scroll, rather than under the last
+   of them; the line above it sets it off from the rows passing beneath. It is
+   the table's own wrapper that sticks: the paginator inside fills it, and an
+   element cannot stick within a parent of its own height. */
+.p-datatable-paginator-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  border-top: 1px solid var(--p-datatable-border-color);
+}
+
 /* A numeric column's header sits over its right-aligned figures. PrimeVue
    wraps the header text in a flex box, which text-right does not move. */
 .col-num .p-datatable-column-header-content {

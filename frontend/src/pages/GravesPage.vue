@@ -32,11 +32,13 @@ import { useBlocking } from "@/composables/useBlocking";
 import { useDebounced } from "@/composables/useDebounced";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
+import { usePageReport } from "@/composables/usePageReport";
 import { downloadBlob } from "@/lib/download";
 import { forgetJob, rememberedJob, rememberJob } from "@/lib/followedJob";
 import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
 import { currentHalfYear, halfYearKey, halfYearText, parseHalfYearKey } from "@/lib/halfYear";
+import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
@@ -116,6 +118,25 @@ const rows = computed(() => {
   }
   return list;
 });
+
+// The half-year's list arrives whole and is searched and filtered here, so the
+// pages are cut from what is left of it.
+const first = ref(0);
+// a new search, filter or half-year starts on page one
+watch([term, payment, halfYear], () => {
+  first.value = 0;
+});
+// a page that emptied -- its last unpaid grave marked paid under "unpaid
+// only" -- moves back to the last page that has rows
+watch(
+  () => rows.value.length,
+  (total) => {
+    if (first.value >= total) {
+      first.value = lastPageStart(total);
+    }
+  },
+);
+const pageReport = usePageReport();
 
 function paymentTag(
   row: GraveStatusRow,
@@ -286,8 +307,13 @@ function openEditor(graveId: number | null): void {
 
       <!-- the search narrows the status list, so its own fetch is loading too -->
       <DataTable
+        v-model:first="first"
         :value="rows"
         data-key="Id"
+        paginator
+        :rows="PAGE_SIZE"
+        :paginator-template="PAGINATOR_TEMPLATE"
+        :current-page-report-template="pageReport"
         :loading="status.isFetching.value || searchResult.isFetching.value"
         striped-rows
       >

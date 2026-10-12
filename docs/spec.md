@@ -739,6 +739,11 @@ non-interactive until completion, and the task runs exactly once.
   a grave invoice, each showing every revision of the invoices it covers.
 - **FR-068**: Users MUST be able to search invoices by invoice number, recipient
   name, recipient address, invoice date, and invoice total.
+- **FR-068a**: The invoice list, the grave overview and the recipient list MUST
+  show 100 entries per page. The pages MUST be cut from the list as searched
+  and filtered, and a changed search or filter MUST start on the first page.
+  The paginator MUST stay visible at the lower edge of the window while the
+  rows of a page scroll.
 
 **Payment status**
 

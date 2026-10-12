@@ -245,6 +245,41 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   await expect(table).not.toContainText(second);
 });
 
+test("recipients: the list shows a hundred a page, of those the search leaves", async ({
+  page,
+}) => {
+  const ts = unique();
+  const names = Array.from(
+    { length: 101 },
+    (_, i) => `Seite ${ts} ${String(i + 1).padStart(3, "0")}`,
+  );
+  for (let start = 0; start < names.length; start += 10) {
+    await Promise.all(
+      names
+        .slice(start, start + 10)
+        .map((name) => createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" })),
+    );
+  }
+
+  await page.goto("/recipients");
+  await search(
+    page,
+    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
+    `Seite ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`seite ${ts}`),
+  );
+  const rows = page.getByRole("row").filter({ hasText: `Seite ${ts}` });
+  await expect(rows).toHaveCount(100);
+  await expect(page.getByText("1–100 von 101")).toBeVisible();
+
+  // a hundred rows are taller than the window, and the paginator stays in it
+  const next = page.getByRole("button", { name: "Nächste Seite" });
+  await expect(next).toBeInViewport();
+  await next.click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByText("101–101 von 101")).toBeVisible();
+});
+
 test("recipients: an e-mail address is optional and checked", async ({ page }) => {
   const ts = unique();
   const name = `Mit E-Mail ${ts}`;

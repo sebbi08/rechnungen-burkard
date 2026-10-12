@@ -1,21 +1,22 @@
-import { type QueryClient, useQuery } from "@tanstack/vue-query";
+import { keepPreviousData, type QueryClient, useQuery } from "@tanstack/vue-query";
 import type { Ref } from "vue";
 import { currentHalfYear } from "@/lib/halfYear";
 import { priceFieldValue } from "@/lib/money";
+import { PAGE_SIZE } from "@/lib/paging";
 import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
 import type { Invoice, InvoiceItem, Recipient } from "./generated";
 import { odata } from "./odata";
 
 /** The backend caps $top at 200 (Program.cs, SetMaxTop). */
-const PAGE_SIZE = 200;
+const READ_ALL_CHUNK = 200;
 
 /** Reads a whole collection in pages the server accepts. */
 export async function readAll<T>(page: (skip: number, top: number) => Promise<T[]>): Promise<T[]> {
   const rows: T[] = [];
-  for (let skip = 0; ; skip += PAGE_SIZE) {
-    const chunk = await page(skip, PAGE_SIZE);
+  for (let skip = 0; ; skip += READ_ALL_CHUNK) {
+    const chunk = await page(skip, READ_ALL_CHUNK);
     rows.push(...chunk);
-    if (chunk.length < PAGE_SIZE) {
+    if (chunk.length < READ_ALL_CHUNK) {
       return rows;
     }
   }
@@ -106,6 +107,28 @@ export function useRecipientsQuery(term: Ref<string>) {
   return useQuery({
     queryKey: ["recipients", "list", term],
     queryFn: () => fetchRecipients(term.value),
+  });
+}
+
+/** One page of the recipients a term leaves, newest first, and how many it
+ *  leaves in all. `first` is the index of the page's first row. */
+export function useRecipientsPageQuery(term: Ref<string>, first: Ref<number>) {
+  return useQuery({
+    queryKey: ["recipients", "page", term, first],
+    queryFn: async () => {
+      const literal = searchLiteral(term.value);
+      const response = await odata
+        .Recipients()
+        .query((b, q) => {
+          if (literal) {
+            b.filter(q.Name.toLower().contains(literal).or(q.Number.toLower().contains(literal)));
+          }
+          b.orderBy(q.Id.desc()).skip(first.value).top(PAGE_SIZE).count();
+        })
+        .execute();
+      return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
+    },
+    placeholderData: keepPreviousData,
   });
 }
 
