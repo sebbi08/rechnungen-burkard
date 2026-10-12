@@ -602,9 +602,6 @@ non-interactive until completion, and the task runs exactly once.
   half-year first.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
-- **FR-029a**: Each grave with rounding corrections MUST carry the tag
-  "angepasst" in the overview, and a switch "Nur mit Rundungsanpassungen" MUST
-  narrow the list to those graves.
 
 **Non-grave invoices**
 

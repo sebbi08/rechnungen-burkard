@@ -317,8 +317,6 @@
   "correctionsEntered": "eingegeben",
   "correctionsCorrected": "angepasst",
   "correctionsConfirm": "Mit Anpassungen speichern",
-  "gravesFilterCorrected": "Nur mit Rundungsanpassungen",
-  "graveCorrectedTag": "angepasst",
   "errorHalfYearTooOld1": "Rechnungen lassen sich höchstens zwei Halbjahre zurück erzeugen, frühestens für {0}.",
   "errorCorrectionsOutdated1": "Bei diesen Gräbern haben sich die Rundungsanpassungen geändert. Bitte öffnen, prüfen und speichern: {0}",
   "importCorrectedGraves": "Gräber mit Rundungsanpassungen: {0}",

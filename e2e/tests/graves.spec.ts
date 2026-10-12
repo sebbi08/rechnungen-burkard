@@ -815,10 +815,6 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
   for (const name of names) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
-  // a grave that divides as it is, to be hidden by the overview filter
-  const plainMarker = `GP-${unique()}`;
-  await seedGrave(page, plainMarker, [`Dora ${plainMarker}`]);
-
   await page.goto("/graves");
   const editor = await startNewGrave(page, marker);
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
@@ -854,15 +850,7 @@ test("a grave whose prices do not divide is saved with confirmed corrections", a
   await confirm.getByRole("button", { name: "Mit Anpassungen speichern" }).click();
   await expect(editor).toHaveCount(0);
 
-  // the overview's switch keeps the graves with corrections
   await expect(page.getByRole("table")).toContainText(marker);
-  // both graves are listed before the switch is on, so the absence below is the filter's
-  await expect(page.getByRole("row").filter({ hasText: plainMarker })).toHaveCount(1);
-  await page.getByLabel("Nur mit Rundungsanpassungen").check();
-  const row = page.getByRole("row").filter({ hasText: marker });
-  await expect(row).toHaveCount(1);
-  await expect(row).toContainText("angepasst");
-  await expect(page.getByRole("row").filter({ hasText: plainMarker })).toHaveCount(0);
 });
 
 test("the grave editor previews a prorated start and a seasonal item", async ({ page }) => {

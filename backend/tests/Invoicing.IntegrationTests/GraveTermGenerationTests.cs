@@ -585,56 +585,6 @@ public class GraveTermGenerationTests
     }
 
     [Fact]
-    public async Task The_status_counts_stored_corrections()
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var two = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
-        var one = await SeedAsync(host, new DateOnly(2026, 3, 1), null, ("Pflege", null, 60m));
-        using (var scope = host.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            foreach (var (graveId, count) in new[] { (two, 2), (one, 1) })
-            {
-                var itemId = (await db.GraveItems.FirstAsync(i => i.GraveId == graveId)).ItemId;
-                for (var n = 0; n < count; n++)
-                {
-                    db.GraveBillingCorrections.Add(
-                        new GraveBillingCorrection
-                        {
-                            GraveId = graveId,
-                            Kind =
-                                n == 0
-                                    ? BillingExampleKind.Start
-                                    : BillingExampleKind.FullSecondHalf,
-                            Year = n == 0 ? 2026 : null,
-                            Half = n == 0 ? 1 : 2,
-                            VatRate = 19m,
-                            ItemId = itemId,
-                            EnteredPrice = 40m,
-                            CorrectedPrice = 40.02m,
-                        }
-                    );
-                }
-            }
-
-            await db.SaveChangesAsync();
-        }
-
-        using var json = await ODataJson.ReadAsync(
-            await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
-        );
-
-        var rows = json.RootElement.GetProperty("value").EnumerateArray().ToList();
-        int CountOf(long id) =>
-            rows.Single(g => g.GetProperty("Id").GetInt64() == id)
-                .GetProperty("CorrectionCount")
-                .GetInt32();
-        Assert.Equal(2, CountOf(two));
-        Assert.Equal(1, CountOf(one));
-    }
-
-    [Fact]
     public async Task Generation_bills_each_block_its_own_correction()
     {
         using var host = new ApiTestHost();
