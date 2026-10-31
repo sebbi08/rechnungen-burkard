@@ -17,14 +17,14 @@ services:
   # the volume is created afresh: a new worktree (a new project name), or
   # `docker compose down -v`. Hand it to UID:GID before the frontend starts.
   node-modules-owner:
-    image: node:22
+    image: node:26
     user: root
     volumes:
       - frontend-node-modules:/volumes/frontend
     command: ["chown", "${UID:-1000}:${GID:-1000}", "/volumes/frontend"]
   # The Vite dev server, proxying /odata to the backend container.
   frontend:
-    image: node:22
+    image: node:26
     user: "${UID:-1000}:${GID:-1000}"
     depends_on:
       node-modules-owner:
