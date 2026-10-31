@@ -10,7 +10,7 @@
     <ProjectReference Include="../../src/Invoicing.Api/Invoicing.Api.csproj" />
     <ProjectReference Include="../../src/Invoicing.Documents/Invoicing.Documents.csproj" />
     <ProjectReference Include="../../src/Invoicing.Domain/Invoicing.Domain.csproj" />
-    <PackageReference Include="PdfPig" Version="0.1.*" />
+    <PackageReference Include="PdfPig" Version="0.1.1*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="xunit" Version="2.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.*" />
