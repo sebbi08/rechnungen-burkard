@@ -710,7 +710,12 @@ test("the list searches each column on its own", async ({ page }) => {
   await searchColumn(page, "Betrag", "12,50", answered("total"));
   await expect(invoiceRow(page, karl)).toBeVisible();
   await expect(invoiceRow(page, hanna)).toHaveCount(0);
-  await searchColumn(page, "Betrag", "", (url) => !url.includes("total="));
+  await searchColumn(
+    page,
+    "Betrag",
+    "",
+    (url) => url.includes("/odata/Invoices") && !url.includes("total="),
+  );
 
   // today's date, as the list shows it, keeps both
   const today = new Date().toISOString().slice(0, 10).split("-").reverse().join(".");
@@ -725,6 +730,55 @@ test("the list searches each column on its own", async ({ page }) => {
   await filterColumn(page, "Zahlung", "Nur bezahlte");
   await expect(invoiceRow(page, karl)).toBeVisible();
   await expect(invoiceRow(page, hanna)).toHaveCount(0);
+});
+
+test("coming back from an invoice keeps the list's filters", async ({ page }) => {
+  const marker = `Zurück ${unique()}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  // 50 net is 53,50 gross at 7 %
+  await seedInvoice(page, marker, itemNumber, 50);
+
+  // the page's clock, held below while a total is typed and a row clicked
+  await page.clock.install();
+  await page.goto("/invoices");
+  const answered = (key: string) => (url: string) =>
+    url.includes("/odata/Invoices") && url.includes(`${key}=`);
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
+  const row = invoiceRow(page, marker);
+  await expect(row).toBeVisible();
+  const details = row.getByRole("button", { name: rowAction("Details") });
+
+  // The list takes a term once it has rested for 300 ms, and only then
+  // writes it into the URL. With the clock held, the click into the invoice
+  // comes before that: leaving the list has to write the total itself.
+  const typeAndLeave = async (total: string) => {
+    // the table's loading mask fades on timers, and would lie over the row
+    await expect(page.locator(".p-datatable-mask")).toHaveCount(0);
+    await page.clock.pauseAt(Date.now() + 1_000);
+    await page.getByRole("textbox", { name: "Betrag durchsuchen" }).fill(total);
+    await details.click();
+    await expect(page).toHaveURL(/\/invoices\/\d+$/);
+    await page.clock.resume();
+  };
+  const kept = async (total: string) => {
+    await expect(page.getByRole("textbox", { name: "Empfänger durchsuchen" })).toHaveValue(marker);
+    await expect(page.getByRole("textbox", { name: "Betrag durchsuchen" })).toHaveValue(total);
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(row).toBeVisible();
+  };
+
+  // through the browser's back button ...
+  await typeAndLeave("53,50 €");
+  await page.goBack();
+  await kept("53,50 €");
+
+  // ... and through the breadcrumb
+  await typeAndLeave("53.50");
+  await page
+    .getByRole("navigation", { name: "Seitenpfad" })
+    .getByRole("link", { name: "Rechnungen" })
+    .click();
+  await kept("53.50");
 });
 
 test("the Betrag column shows the gross total", async ({ page }) => {

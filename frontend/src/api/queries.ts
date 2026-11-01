@@ -122,7 +122,8 @@ export async function loadItemVatRates(queryClient: QueryClient): Promise<Map<nu
 /** How many recipients a picker offers at a time. */
 export const RECIPIENT_PICKER_SIZE = 20;
 
-/** The fields every recipient search looks in, the list's and the picker's. */
+/** The fields the recipient picker searches; the recipient list searches each
+ *  column on its own, on the server. */
 function recipientSearchFields(q: QRecipient): QStringPath[] {
   return [q.Name, q.Number, q.Address];
 }

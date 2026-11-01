@@ -1245,15 +1245,28 @@ test("coming back from a grave keeps the half-year and the filters", async ({ pa
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText(marker);
 
+  const kept = async () => {
+    await expect(page.locator("#gravesYear")).toHaveValue(String(year));
+    await expect(halfButton(page, half)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("textbox", { name: "Grabnummer durchsuchen" })).toHaveValue(marker);
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toContainText(marker);
+  };
+
+  // through the browser's back button
   await rows.getByRole("link", { name: marker }).click();
   await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
   await page.goBack();
+  await kept();
 
-  await expect(page.locator("#gravesYear")).toHaveValue(String(year));
-  await expect(halfButton(page, half)).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("textbox", { name: "Grabnummer durchsuchen" })).toHaveValue(marker);
-  await expect(rows).toHaveCount(1);
-  await expect(rows).toContainText(marker);
+  // through the breadcrumb
+  await rows.getByRole("link", { name: marker }).click();
+  await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Seitenpfad" })
+    .getByRole("link", { name: "Gräber" })
+    .click();
+  await kept();
 });
 
 test("a grave lies in a cemetery, which the overview shows and searches", async ({ page }) => {
