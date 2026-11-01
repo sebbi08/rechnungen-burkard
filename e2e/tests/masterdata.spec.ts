@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { createRow, ensureRow, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
-import { dialog, pickOption, search, toasts, waitForOverlayOpen } from "../vue";
+import { confirmation, dialog, pickOption, search, toasts, waitForOverlayOpen } from "../vue";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/settings");
@@ -41,6 +41,86 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
   await page.reload();
   await expect(page.getByLabel("Schlusstext")).toHaveValue(endingText);
   await expect(page.getByLabel("Stempelwort")).toHaveValue("Kopie");
+});
+
+test("settings: a cemetery is added, renamed for its graves and kept while they lie there", async ({
+  page,
+}) => {
+  const ts = unique();
+  const name = `Südfriedhof ${ts}`;
+  const renamed = `Hauptfriedhof ${ts}`;
+  const unused = `Leerer Friedhof ${ts}`;
+  await page.goto("/settings");
+  const cemeteries = page.locator("table", {
+    has: page.getByRole("columnheader", { name: "Name", exact: true }),
+  });
+  const field = page.getByLabel("Name", { exact: true });
+
+  await field.fill(name);
+  await page.getByRole("button", { name: "Friedhof hinzufügen" }).click();
+  await expect(cemeteries.getByRole("row").filter({ hasText: name })).toBeVisible();
+  await expect(field).toHaveValue("");
+
+  // the same name in other letters is the same cemetery, umlauts included
+  await field.fill(name.toUpperCase());
+  await page.getByRole("button", { name: "Friedhof hinzufügen" }).click();
+  await expect(
+    toasts(page).filter({ hasText: "Ein Friedhof mit diesem Namen existiert bereits." }),
+  ).toBeVisible();
+
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `FH-${ts}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 10,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Friedhof Beispiel ${ts}`,
+    Address: "Friedhofsweg 1",
+  });
+  const graveId = await seedGrave(page, {
+    graveNumber: `FH-${ts}`,
+    cemeteryId: await ensureCemetery(page, name),
+    items: [{ itemId: item.Id }],
+    recipientIds: [recipient.Id],
+  });
+
+  // a rename is the grave's new cemetery name too: it refers to the cemetery
+  await cemeteries
+    .getByRole("row")
+    .filter({ hasText: name })
+    .getByRole("button", { name: `Friedhof umbenennen: ${name}` })
+    .click();
+  await waitForOverlayOpen(page);
+  const renameDialog = dialog(page, "Friedhof umbenennen");
+  await expect(renameDialog.getByLabel("Name")).toHaveValue(name);
+  await renameDialog.getByLabel("Name").fill(renamed);
+  await renameDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(renameDialog).toHaveCount(0);
+  const row = cemeteries.getByRole("row").filter({ hasText: renamed });
+  await expect(row).toBeVisible();
+  await expect(cemeteries).not.toContainText(name);
+
+  // refused while the grave lies there, and asked about first
+  await row.getByRole("button", { name: `Löschen: ${renamed}` }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(
+    toasts(page).filter({ hasText: "Auf diesem Friedhof liegen noch Gräber." }),
+  ).toBeVisible();
+  await expect(row).toBeVisible();
+
+  // one without graves goes
+  await createRow(page, "/odata/Cemeteries", { Name: unused });
+  await page.reload();
+  const unusedRow = cemeteries.getByRole("row").filter({ hasText: unused });
+  await unusedRow.getByRole("button", { name: `Löschen: ${unused}` }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(unusedRow).toHaveCount(0);
+  await expect(row).toBeVisible();
+
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByText(renamed, { exact: true })).toBeVisible();
 });
 
 test("items: create an item without default price (Story 2)", async ({ page }) => {

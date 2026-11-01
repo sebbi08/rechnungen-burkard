@@ -114,6 +114,7 @@ export interface GraveStatusRow {
   GraveNumber: string;
   FieldNumber: string;
   SiteName: string;
+  CemeteryName: string;
   StartDate: string;
   EndDate: string | null;
   Invoiced: boolean;
@@ -142,6 +143,7 @@ export interface SaveGraveInput {
   graveNumber: string;
   fieldNumber: string;
   siteName: string;
+  cemeteryId: number | null;
   position: GravePositionName | null;
   /** "yyyy-MM" */
   startDate: string | null;
@@ -187,6 +189,8 @@ export interface GraveDetails {
   GraveNumber: string;
   FieldNumber: string;
   SiteName: string;
+  CemeteryId: number;
+  Cemetery: { Id: number; Name: string };
   Position: GravePositionName | null;
   StartDate: string;
   EndDate: string | null;
@@ -200,7 +204,7 @@ export interface GraveDetails {
 /** Graves(id) answers hand-built JSON with the links already expanded. */
 export function fetchGraveDetails(graveId: number): Promise<GraveDetails> {
   return getJson<GraveDetails>(
-    `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`,
+    `/odata/Graves(${graveId})?$expand=Cemetery,Items($expand=Item),Recipients($expand=Recipient)`,
   );
 }
 

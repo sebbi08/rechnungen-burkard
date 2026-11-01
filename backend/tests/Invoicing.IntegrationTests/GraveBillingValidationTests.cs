@@ -289,6 +289,7 @@ public class GraveBillingValidationTests
                     graveNumber = $"CV-{price}",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",

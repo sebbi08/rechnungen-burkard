@@ -262,6 +262,7 @@ public class RevisionTests : IClassFixture<ApiTestHost>
             var grave = new Grave
             {
                 GraveNumber = "R-001",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

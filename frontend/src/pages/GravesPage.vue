@@ -338,6 +338,13 @@ function openEditor(graveId: number | null): void {
           <template #body="{ data }">{{ data.SiteName || "–" }}</template>
         </Column>
         <Column
+          :header="t('graveCemetery')"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell"
+        >
+          <template #body="{ data }">{{ data.CemeteryName }}</template>
+        </Column>
+        <Column
           :header="t('graveFieldNumber')"
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"

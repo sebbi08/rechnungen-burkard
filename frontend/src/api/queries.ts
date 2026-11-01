@@ -38,6 +38,24 @@ export function useVatRatesQuery() {
   });
 }
 
+/** Every cemetery, by name. The settings keep them, and they are few: the
+ *  grave editor offers them all and searches them itself. */
+export function useCemeteriesQuery() {
+  return useQuery({
+    queryKey: ["cemeteries"],
+    queryFn: () =>
+      readAll(async (skip, top) => {
+        const response = await odata
+          .Cemeteries()
+          .query((b, q) => {
+            b.orderBy(q.Name.asc()).skip(skip).top(top);
+          })
+          .execute();
+        return response.data.value;
+      }),
+  });
+}
+
 /** A search term as the words it is made of, each one the inside of an OData
  *  string literal for comparing against tolower(field). odata2ts only wraps a
  *  value in quotes, so a quote in a word ("O'Brien") would end the literal and

@@ -12,7 +12,7 @@ import { useI18n } from "vue-i18n";
 import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
 import type { Recipient } from "@/api/generated";
 import { ApiError, toApiError } from "@/api/http";
-import { useItemsQuery } from "@/api/queries";
+import { useCemeteriesQuery, useItemsQuery } from "@/api/queries";
 import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
@@ -39,6 +39,7 @@ const form = reactive({
   GraveNumber: "",
   FieldNumber: "",
   SiteName: "",
+  CemeteryId: null as number | null,
   Position: null as GravePositionName | null,
   StartDate: null as Date | null,
   EndDate: null as Date | null,
@@ -55,6 +56,7 @@ const positionOptions = computed(() => {
     label: t(`gravePosition${value}`),
   }));
 });
+const cemeteries = useCemeteriesQuery();
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
@@ -83,6 +85,9 @@ watch(visible, async (open) => {
   const current = ++opening;
   if (open) {
     drawerFocus.remember();
+    // loaded with the page, which may be older than a cemetery added since;
+    // the item and recipient pickers load anew as the drawer opens anyway
+    void cemeteries.refetch();
   }
   if (!open) {
     loading.value = false;
@@ -92,6 +97,7 @@ watch(visible, async (open) => {
     GraveNumber: "",
     FieldNumber: "",
     SiteName: "",
+    CemeteryId: null,
     Position: null,
     StartDate: null,
     EndDate: null,
@@ -114,6 +120,7 @@ watch(visible, async (open) => {
       GraveNumber: grave.GraveNumber,
       FieldNumber: grave.FieldNumber,
       SiteName: grave.SiteName,
+      CemeteryId: grave.CemeteryId,
       Position: grave.Position,
       StartDate: parseIsoDate(grave.StartDate),
       EndDate: parseIsoDate(grave.EndDate),
@@ -212,6 +219,10 @@ async function focusFailingInvoice(): Promise<void> {
 }
 
 async function save(): Promise<void> {
+  if (form.CemeteryId == null) {
+    showError(new ApiError("CemeteryRequired"));
+    return;
+  }
   try {
     toLineInputs(lines.value);
   } catch (error) {
@@ -222,6 +233,7 @@ async function save(): Promise<void> {
     showError(new ApiError("AllYearItemRequired"));
     return;
   }
+
   saving.value = true;
   try {
     const corrections: BillingCorrection[] = [];
@@ -292,6 +304,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       graveNumber: form.GraveNumber,
       fieldNumber: form.FieldNumber,
       siteName: form.SiteName,
+      cemeteryId: form.CemeteryId,
       position: form.Position,
       startDate: toIsoMonth(form.StartDate),
       endDate: toIsoMonth(form.EndDate),
@@ -350,6 +363,23 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
         <div class="flex flex-col gap-2">
           <label for="graveSiteName" class="font-medium">{{ t("graveSiteName") }}</label>
           <InputText id="graveSiteName" v-model="form.SiteName" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="graveCemetery" class="font-medium">{{ t("graveCemetery") }}</label>
+          <!-- the settings keep a handful, so all of them are offered and
+               searched here rather than by the server -->
+          <Select
+            v-model="form.CemeteryId"
+            input-id="graveCemetery"
+            :options="cemeteries.data.value ?? []"
+            option-label="Name"
+            option-value="Id"
+            filter
+            :placeholder="t('selectCemetery')"
+            :loading="cemeteries.isPending.value"
+            fluid
+            overlay-class="max-w-[calc(100vw-1rem)]"
+          />
         </div>
         <div class="flex flex-col gap-2">
           <label for="gravePosition" class="font-medium">{{ t("gravePosition") }}</label>

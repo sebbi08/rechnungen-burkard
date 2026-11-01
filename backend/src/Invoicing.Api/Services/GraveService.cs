@@ -29,6 +29,7 @@ public sealed record GraveFields(
     string GraveNumber,
     string FieldNumber,
     string SiteName,
+    long? CemeteryId,
     GravePosition? Position,
     DateOnly StartDate,
     DateOnly? EndDate
@@ -117,6 +118,7 @@ public sealed class GraveService
         grave.GraveNumber = fields.GraveNumber.Trim();
         grave.FieldNumber = fields.FieldNumber.Trim();
         grave.SiteName = fields.SiteName.Trim();
+        grave.CemeteryId = fields.CemeteryId!.Value;
         grave.Position = fields.Position;
         grave.StartDate = fields.StartDate;
         grave.EndDate = fields.EndDate;
@@ -220,6 +222,16 @@ public sealed class GraveService
         if (string.IsNullOrWhiteSpace(fields.SiteName))
         {
             throw new ValidationException("SiteNameRequired", "The grave site name is required.");
+        }
+
+        if (fields.CemeteryId is not { } cemeteryId)
+        {
+            throw new ValidationException("CemeteryRequired", "The cemetery is required.");
+        }
+
+        if (!await _db.Cemeteries.AnyAsync(c => c.Id == cemeteryId, ct))
+        {
+            throw new ValidationException("CemeteryNotFound", "The cemetery does not exist.");
         }
 
         if (fields.Position is null)

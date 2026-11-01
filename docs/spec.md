@@ -49,6 +49,12 @@ exactly those values.
 5. **Given** the user changes the VAT rates, ending text, or stamp word, **When**
    a new invoice is generated, **Then** only invoices generated after the change
    use the new values; previously generated invoices are unchanged.
+6. **Given** a cemetery "Südfriedhof" in the settings, **When** the user adds
+   "SÜDFRIEDHOF", **Then** it is refused as already existing; **When** they
+   rename "Südfriedhof", **Then** every grave in it shows the new name.
+7. **Given** a cemetery that a grave lies in, **When** the user deletes it,
+   **Then** the deletion is refused with a clear message; a cemetery without
+   graves is deleted.
 
 ---
 
@@ -136,7 +142,7 @@ and that a normal document and a stamped copy both result.
 ### User Story 5 - Manage Graves (Priority: P2)
 
 A user manages graves, each with a grave number, a field number, a site name, a
-position, a start month and an optional end month, a creation date, one or more
+cemetery, a position, a start month and an optional end month, a creation date, one or more
 invoicing items (each with a count and an optional price that
 overrides the item's default), and one to four recipients.
 
@@ -144,18 +150,18 @@ overrides the item's default), and one to four recipients.
 needed before half-year invoices can be generated.
 
 **Independent Test**: Can be fully tested by creating a grave with a number, field
-number, site name, position, months, one invoicing item, and two recipients, then
-listing and searching it.
+number, site name, cemetery, position, months, one invoicing item, and two
+recipients, then listing and searching it.
 
 **Acceptance Scenarios**:
 
 1. **Given** the grave section is opened, **When** the user saves a grave with a
-   number, field number, site name, position, start month, one item with count,
+   number, field number, site name, cemetery, position, start month, one item with count,
    and one to four recipients, **Then** the grave is stored with a creation date
    and is searchable. Saving without an end month is allowed.
 2. **Given** the user searches for a grave, **When** they enter a grave number,
-   field number, site name or recipient name, **Then** matching graves are
-   returned.
+   field number, site name, cemetery or recipient name, **Then** matching graves
+   are returned.
 3. **Given** a new grave that has not been saved yet, **When** the user adds items
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
@@ -460,6 +466,11 @@ non-interactive until completion, and the task runs exactly once.
 - What happens when the import is interrupted (e.g., connection loss)? No partial
   data remains; the import can be repeated from scratch.
 - What happens when a search returns no matches? A clear empty state is shown.
+- What happens when a cemetery that graves lie in is deleted? The deletion is
+  refused; the graves have to be moved to another cemetery first.
+- What happens when an archive names a cemetery the settings do not have? The
+  row is reported and nothing is imported; the cemetery has to be added in the
+  settings first.
 
 ## Requirements _(mandatory)_
 
@@ -469,6 +480,12 @@ non-interactive until completion, and the task runs exactly once.
 
 - **FR-001**: The system MUST allow configuring multiple VAT percentages globally.
 - **FR-002**: The system MUST allow configuring a multi-line ending text globally.
+- **FR-002a**: Users MUST be able to keep the cemeteries graves lie in, in the
+  settings: list, add, rename and delete them. A cemetery has a name, required
+  and trimmed, which MUST be unique ignoring case, umlauts included ("Südfriedhof"
+  and "SÜDFRIEDHOF" are one name). Graves refer to their cemetery, so a rename
+  MUST apply to every grave in it at once. Deleting a cemetery MUST be refused,
+  with a clear message, while any grave lies in it.
 - **FR-003**: Invoices MUST be generated from a template.
 - **FR-004**: Invoices MUST include mandatory fields, including the recipient
   address, and MUST block generation when a mandatory field is missing.
@@ -527,8 +544,9 @@ non-interactive until completion, and the task runs exactly once.
 **Graves**
 
 - **FR-018**: A grave MUST have a grave number, a field number, a site name, a
-  position (double, single or urn grave, inside or outside) and a start month; the
-  end month is optional.
+  cemetery, a position (double, single or urn grave, inside or outside) and a
+  start month; the end month is optional. The site name holds the site's own
+  name only; the cemetery is a field of its own.
 - **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
   a term runs from its start month through its end month, or indefinitely without
   one. Field numbers may repeat.
@@ -537,6 +555,11 @@ non-interactive until completion, and the task runs exactly once.
   and slab graves inside, outside or with the side unknown, and graves whose kind
   is unknown. The editor MUST NOT offer them for a grave; a grave that has one
   MUST keep it when it is saved unchanged.
+- **FR-018c**: A grave's cemetery MUST be one of those kept in the settings
+  (FR-002a). The grave editor MUST offer them all in a field that can be searched,
+  and MUST NOT save a grave without one; saving MUST be refused for a cemetery
+  that does not exist. The cemetery MUST NOT be printed on invoices, and
+  invoices MUST NOT keep a copy of it.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
@@ -589,7 +612,7 @@ non-interactive until completion, and the task runs exactly once.
   two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
 - **FR-024**: Users MUST be able to search graves by grave number, field number,
-  site name and recipient name.
+  site name, cemetery name and recipient name.
 
 **Half-year grave invoicing**
 
@@ -610,6 +633,8 @@ non-interactive until completion, and the task runs exactly once.
   half-year first.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
+- **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows
+  its site name, and the grave's detail page MUST name it.
 
 **Non-grave invoices**
 
@@ -694,8 +719,12 @@ non-interactive until completion, and the task runs exactly once.
   as `Spring`, `Summer`, `Autumn` or `Winter` or left empty; any other value is
   a problem. An archive whose items CSV lacks the `Quarter` column is refused.
 - **FR-052**: The graves CSV MUST capture the grave number, field number, site
-  name, position, start month and an optional end month, in six columns. Months
-  are written as YYYY-MM.
+  name, cemetery, position, start month and an optional end month, in seven
+  columns: `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate`.
+  Months are written as YYYY-MM. The cemetery is required and names one kept in
+  the settings (FR-002a), matched ignoring case; one that is not there is a
+  problem naming the row and the value. The import MUST NOT create cemeteries.
+  An archive whose graves CSV lacks the `Cemetery` column is refused.
 - **FR-053**: The mapping CSV MUST link each grave to its invoicing items (item
   identifier with count, VAT-included flag and an optional unit price for this
   grave) and to its recipients (recipient number, the other three columns
@@ -787,7 +816,7 @@ non-interactive until completion, and the task runs exactly once.
 - **Invoice Item**: A catalogue entry identified by a number, with a text, a VAT
   rate, an optional default price and an optional quarter.
 - **Grave**: Identified by a grave number (unique among graves whose terms
-  overlap); has a field number, a site name, a position, a start month, an
+  overlap); has a field number, a site name, a cemetery, a position, a start month, an
   optional end month, a creation date, one or more invoicing items (with counts), and one to four recipients,
   fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
@@ -812,6 +841,8 @@ non-interactive until completion, and the task runs exactly once.
   applied to their line totals.
 - **Global Settings**: Holds the VAT rates, the multi-line ending text, and the
   copy stamp word (default "Kopie").
+- **Cemetery**: Kept in the settings; has a name, unique ignoring case. Graves
+  refer to it; it is not part of any invoice.
 - **Import Template**: A ZIP archive with four CSV files (recipients, items,
   graves, mapping), each with a header row; downloadable even when no data exists.
 - **Validation Report**: A list of problems found before import, each locating the
@@ -883,6 +914,10 @@ non-interactive until completion, and the task runs exactly once.
 - Graves that existed before the field number, site name and position were
   introduced keep them empty until edited; the editor then requires them, and
   invoice generation does not.
+- Graves that existed before the cemetery was introduced are put in one
+  cemetery named "Unbekannt" when the database is upgraded, to be corrected in
+  the editor; their site names, which may still name the cemetery, are left as
+  they were. An empty database gets no cemetery.
 - Generated documents are PDFs.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.

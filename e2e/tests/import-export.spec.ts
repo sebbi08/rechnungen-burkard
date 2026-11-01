@@ -1,6 +1,6 @@
 import AdmZip from "adm-zip";
 import { expect, type Page, test } from "@playwright/test";
-import { ensureRow } from "../seed";
+import { ensureCemetery, ensureRow, SEED_CEMETERY } from "../seed";
 import { unique } from "../unique";
 import { dialog, discardEditor, drawer, pickOption, saveEditor, waitForOverlayOpen } from "../vue";
 
@@ -11,7 +11,7 @@ const RUN = unique();
 
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
 const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
-const GRAVES_HEADER = "GraveNumber,FieldNumber,SiteName,Position,StartDate,EndDate\r\n";
+const GRAVES_HEADER = "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate\r\n";
 const MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 // the template's headers, with the optional last columns the ones above leave out
 const FULL_RECIPIENTS_HEADER = "RecipientNumber,Name,Address,Email\r\n";
@@ -33,7 +33,9 @@ function validArchive(suffix: string): Buffer {
       `IMP-R2-${suffix},Bert Import,"Nebenweg 2\n99999 Musterdorf"\r\n`,
     "items.csv": ITEMS_HEADER + `IMP-I1-${suffix},Grabpflege importiert,7,120.00,\r\n`,
     "graves.csv":
-      GRAVES_HEADER + `IMP-G1-${suffix},27,Grabstätte Import,DoubleOutside,2026-01,2040-12\r\n`,
+      GRAVES_HEADER +
+      // the settings' cemetery, matched ignoring case
+      `IMP-G1-${suffix},27,Grabstätte Import,${SEED_CEMETERY.toUpperCase()},DoubleOutside,2026-01,2040-12\r\n`,
     "mapping.csv":
       MAPPING_HEADER +
       `Item,IMP-G1-${suffix},IMP-I1-${suffix},2,\r\n` +
@@ -62,8 +64,10 @@ function problems(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   // the imported item's VAT rate has to be configured, exactly as it must be
-  // when an item is created through the item section
+  // when an item is created through the item section; the graves' cemetery is
+  // the settings' too, which the import links to rather than creates
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureCemetery(page);
 });
 
 test("download the import template and read its four CSV files (Story 10)", async ({ page }) => {
@@ -83,6 +87,7 @@ test("download the import template and read its four CSV files (Story 10)", asyn
   // each file carries nothing but its header row
   expect(zip.readAsText("recipients.csv").trim()).toContain(FULL_RECIPIENTS_HEADER.trim());
   expect(zip.readAsText("mapping.csv").trim()).toContain(FULL_MAPPING_HEADER.trim());
+  expect(zip.readAsText("graves.csv").trim()).toContain(GRAVES_HEADER.trim());
 });
 
 test("importing without a file asks for one first", async ({ page }) => {
@@ -102,7 +107,8 @@ test("a defective archive is reported per file and row and imports nothing (Stor
     "recipients.csv": RECIPIENTS_HEADER + `BAD-R-${RUN},,Hauptstraße 1\r\n`,
     "items.csv": ITEMS_HEADER + `BAD-I-${RUN},Grabpflege,7,120,\r\n`,
     "graves.csv":
-      GRAVES_HEADER + `${graveNumber},27,Grabstätte Import,DoubleOutside,2026-01,2040-12\r\n`,
+      GRAVES_HEADER +
+      `${graveNumber},27,Grabstätte Import,${SEED_CEMETERY},DoubleOutside,2026-01,2040-12\r\n`,
     "mapping.csv": MAPPING_HEADER + `Item,${graveNumber},GIBTSNICHT,1,\r\n`,
   });
 
@@ -143,10 +149,13 @@ test("a valid archive imports recipients, items, graves and their links (Story 1
 
   // every reference resolves to an entry from the archive
   const graves = await (
-    await page.request.get(`/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'&$select=Id`)
+    await page.request.get(
+      `/odata/Graves?$filter=GraveNumber eq 'IMP-G1-${suffix}'&$select=Id,CemeteryId`,
+    )
   ).json();
   expect(graves.value).toHaveLength(1);
   const graveId = graves.value[0].Id;
+  expect(graves.value[0].CemeteryId).toBe(await ensureCemetery(page));
 
   const itemLinks = await (
     await page.request.get(`/odata/GraveItems?$filter=GraveId eq ${graveId}`)
@@ -207,7 +216,8 @@ test("an archive with e-mail addresses, grave prices and an old position imports
     // no price of its own: the grave brings one
     "items.csv": ITEMS_HEADER + `IMP-I-${suffix},Grabpflege alt,7,,\r\n`,
     "graves.csv":
-      GRAVES_HEADER + `${graveNumber},27,Grabstätte Alt,LawnUrnOutside,2026-01,2040-12\r\n`,
+      GRAVES_HEADER +
+      `${graveNumber},27,Grabstätte Alt,${SEED_CEMETERY},LawnUrnOutside,2026-01,2040-12\r\n`,
     "mapping.csv":
       FULL_MAPPING_HEADER +
       `Item,${graveNumber},IMP-I-${suffix},1,,"80,50"\r\n` +
@@ -254,4 +264,43 @@ test("an archive with e-mail addresses, grave prices and an old position imports
   await expect(page.locator(".p-select-overlay").getByRole("option")).toHaveCount(6);
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
   await discardEditor(page);
+});
+
+test("an archive naming a cemetery the settings do not have is refused", async ({ page }) => {
+  const graveNumber = `CEM-G-${RUN}`;
+  const cemetery = `Unbekannter Friedhof ${RUN}`;
+  const buffer = archive({
+    "recipients.csv": RECIPIENTS_HEADER + `CEM-R-${RUN},Anna Friedhof,Hauptstraße 1\r\n`,
+    "items.csv": ITEMS_HEADER + `CEM-I-${RUN},Grabpflege,7,120.00,\r\n`,
+    "graves.csv":
+      GRAVES_HEADER + `${graveNumber},27,Grabstätte,${cemetery},DoubleOutside,2026-01,\r\n`,
+    "mapping.csv":
+      MAPPING_HEADER +
+      `Item,${graveNumber},CEM-I-${RUN},1,\r\n` +
+      `Recipient,${graveNumber},CEM-R-${RUN},,\r\n`,
+  });
+
+  await page.goto("/import-export");
+  await importArchive(page, buffer);
+  const refusal = dialog(page, "Archiv");
+  await expect(refusal).toContainText("abgelehnt");
+  await refusal.getByRole("button", { name: "OK" }).click();
+
+  const row = problems(page).locator("tbody tr").filter({ hasText: "graves.csv" });
+  await expect(row).toContainText(
+    `Der Friedhof „${cemetery}“ ist in den Einstellungen nicht angelegt.`,
+  );
+  await expect(row).toContainText("2");
+
+  // nothing imported, and the cemetery not created on the way
+  const graves = await (
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${graveNumber}'`)
+  ).json();
+  expect(graves.value).toHaveLength(0);
+  const cemeteries = await (
+    await page.request.get(
+      `/odata/Cemeteries?$filter=${encodeURIComponent(`Name eq '${cemetery}'`)}`,
+    )
+  ).json();
+  expect(cemeteries.value).toHaveLength(0);
 });

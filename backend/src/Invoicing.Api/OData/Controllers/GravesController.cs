@@ -28,11 +28,13 @@ public class GravesController : ODataController
     // The OData single-result $expand validator rejects collection navigations
     // ("The property 'Items' cannot be used in the $expand query option"), so
     // build the expected payload explicitly: same shape the EDM serializer
-    // would produce for $expand=Items($expand=Item),Recipients($expand=Recipient).
+    // would produce for
+    // $expand=Cemetery,Items($expand=Item),Recipients($expand=Recipient).
     public IActionResult Get([FromRoute] long key)
     {
         var grave = _db
-            .Graves.Include(g => g.Items)
+            .Graves.Include(g => g.Cemetery)
+            .Include(g => g.Items)
                 .ThenInclude(i => i.Item)
             .Include(g => g.Recipients)
                 .ThenInclude(r => r.Recipient)
@@ -47,6 +49,8 @@ public class GravesController : ODataController
             grave.GraveNumber,
             grave.FieldNumber,
             grave.SiteName,
+            grave.CemeteryId,
+            Cemetery = new { grave.Cemetery.Id, grave.Cemetery.Name },
             // by name; System.Text.Json would write the enum as a number
             Position = grave.Position?.ToString(),
             grave.StartDate,
@@ -114,6 +118,7 @@ public class GravesController : ODataController
                 g.GraveNumber,
                 g.FieldNumber,
                 g.SiteName,
+                CemeteryName = g.Cemetery.Name,
                 RecipientNames = g.Recipients.Select(r => r.Recipient.Name).ToList(),
             })
             .ToListAsync();
@@ -130,6 +135,7 @@ public class GravesController : ODataController
                         g.GraveNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
                         || g.SiteName.Contains(word, StringComparison.OrdinalIgnoreCase)
                         || g.FieldNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
+                        || g.CemeteryName.Contains(word, StringComparison.OrdinalIgnoreCase)
                         || g.RecipientNames.Any(n =>
                             n.Contains(word, StringComparison.OrdinalIgnoreCase)
                         )
@@ -180,6 +186,7 @@ public class GravesController : ODataController
             request.GraveNumber ?? "",
             request.FieldNumber ?? "",
             request.SiteName ?? "",
+            request.CemeteryId,
             // an unknown name is reported as missing; a known one the editor
             // does not offer is the save's to judge
             GraveTerm.TryParsePosition(request.Position, out var position)
@@ -281,6 +288,7 @@ public class GravesController : ODataController
         public string? GraveNumber { get; set; }
         public string? FieldNumber { get; set; }
         public string? SiteName { get; set; }
+        public long? CemeteryId { get; set; }
         public string? Position { get; set; }
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }

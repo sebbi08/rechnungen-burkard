@@ -115,6 +115,10 @@ const {
             <dd class="m-0">{{ grave.SiteName || "–" }}</dd>
           </div>
           <div>
+            <dt class="text-sm text-muted-color">{{ t("graveCemetery") }}</dt>
+            <dd class="m-0">{{ grave.Cemetery.Name }}</dd>
+          </div>
+          <div>
             <dt class="text-sm text-muted-color">{{ t("gravePosition") }}</dt>
             <dd class="m-0">{{ grave.Position ? t(`gravePosition${grave.Position}`) : "–" }}</dd>
           </div>

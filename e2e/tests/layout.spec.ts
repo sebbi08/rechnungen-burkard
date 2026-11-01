@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { createRow, ensureRow, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, SEED_CEMETERY, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
   dialog,
@@ -70,7 +70,14 @@ const LIST_SCREENS: ListScreen[] = [
     route: "graves",
     seeded: GRAVE_NUMBER,
     action: "Grab anlegen",
-    secondary: { Grabstätte: "lg", "Feld-Nr.": "lg", Beginn: "xl", Ende: "xl", Zahlung: "sm" },
+    secondary: {
+      Grabstätte: "lg",
+      Friedhof: "lg",
+      "Feld-Nr.": "lg",
+      Beginn: "xl",
+      Ende: "xl",
+      Zahlung: "sm",
+    },
   },
 ];
 
@@ -442,6 +449,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
   for (const name of names) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
+  await ensureCemetery(page);
 
   await page.goto("/graves");
   await page.getByRole("button", { name: "Grab anlegen", exact: true }).click();
@@ -450,6 +458,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
   await editor.getByLabel("Grabnummer").fill(`LK-${RUN}`);
   await editor.getByLabel("Feld-Nr.").fill("27");
   await editor.getByLabel("Grabstätte").fill("Schineller Bäcke");
+  await pickOption(page, page.locator("#graveCemetery"), SEED_CEMETERY, { filter: SEED_CEMETERY });
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
   await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
@@ -522,12 +531,15 @@ test("the grave detail page fits the viewport", async ({ page }) => {
   await expectNoSidewaysScrolling(page);
 });
 
-test("settings: the form and the VAT rate row fit the viewport", async ({ page }) => {
+test("settings: the form, the VAT rate row and the cemeteries fit the viewport", async ({
+  page,
+}) => {
   await seed(page);
   await page.goto("/settings");
 
   await expect(page.getByLabel("Stempelwort")).toBeVisible();
   await expect(page.getByRole("button", { name: "MwSt.-Satz hinzufügen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Friedhof hinzufügen" })).toBeVisible();
   await expectNoSidewaysScrolling(page);
 });
 
