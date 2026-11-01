@@ -7,11 +7,12 @@ import {
   drawer,
   fillNumber,
   pickItem,
-  pickOption,
   pickRecipient,
   rowAction,
   saveEditor,
   search,
+  searchColumn,
+  filterColumn,
   toasts,
   waitForOverlayOpen,
 } from "../vue";
@@ -546,25 +547,24 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await listRequest;
   await expect(invoiceRow(page, recipientName)).toBeVisible();
 
-  // the search reaches the backend as its own query option
-  const field = page.getByRole("textbox", { name: "Rechnung suchen" });
+  // each column's search reaches the backend as its own query option
   const searched = (term: string) => (url: string) =>
-    url.includes("/odata/Invoices") && url.includes(`search=${term}`);
-  await search(page, field, recipientName, searched(recipientName));
+    url.includes("/odata/Invoices") && url.includes(`recipient=${term}`);
+  await searchColumn(page, "Name", recipientName, searched(recipientName));
   await expect(invoiceRow(page, recipientName)).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
   // clearing the field restores the list
   const all = page.waitForResponse((response) => {
     const url = decodeURIComponent(response.url());
-    return url.includes("/odata/Invoices") && !url.includes("search=");
+    return url.includes("/odata/Invoices") && !url.includes("recipient=");
   });
-  await field.fill("");
+  await page.getByRole("textbox", { name: "Name durchsuchen" }).fill("");
   await all;
   await expect(invoiceRow(page, recipientName)).toBeVisible();
 
   // narrow it again for the row assertions below
-  await search(page, field, recipientName, searched(recipientName));
+  await searchColumn(page, "Name", recipientName, searched(recipientName));
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
   // the row actions are icon-only, named by their labels
@@ -633,12 +633,11 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   );
 
   // the unpaid filter drops it, the paid filter keeps it
-  const paymentFilter = page.getByRole("combobox", { name: "Zahlung" });
-  await pickOption(page, paymentFilter, "Nur unbezahlte");
+  await filterColumn(page, "Zahlung", "Nur unbezahlte");
   await expect(invoiceRow(page, recipientName)).toHaveCount(0);
-  await pickOption(page, paymentFilter, "Nur bezahlte");
+  await filterColumn(page, "Zahlung", "Nur bezahlte");
   await expect(invoiceRow(page, recipientName)).toHaveCount(1);
-  await pickOption(page, paymentFilter, "Alle");
+  await filterColumn(page, "Zahlung", "Alle");
 
   // taking the payment back asks first
   await row.getByRole("button", { name: rowAction("Zahlung zurücknehmen") }).click();
@@ -650,4 +649,95 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   expect((await unmarked).ok()).toBe(true);
   await expect(row).toContainText("unbezahlt");
   await expect(row.getByRole("button", { name: rowAction("Bearbeiten") })).toBeEnabled();
+});
+
+/** Seeds one invoice of one line, billed to a recipient of the given name. */
+async function seedInvoice(
+  page: Page,
+  recipientName: string,
+  itemNumber: string,
+  unitPrice: number,
+): Promise<{ Id: number; RootId: number }> {
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Suchweg 1\n12345 Suchstadt",
+  });
+  const item = await (
+    await page.request.get(`/odata/InvoiceItems?$filter=Number eq '${itemNumber}'`)
+  ).json();
+  return createRow(page, "/odata/CreateInvoice", {
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.value[0].Id, count: 1, unitPrice }],
+  });
+}
+
+async function seedSearchItem(page: Page, marker: string): Promise<string> {
+  const itemNumber = `${marker}-item`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "E2E",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  return itemNumber;
+}
+
+test("the list searches each column on its own", async ({ page }) => {
+  const marker = `Spalte ${unique()}`;
+  const hanna = `Hanna Bauer ${marker}`;
+  const karl = `Karl Weber ${marker}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  // 50 net is 53,50 gross at 7 %; 11,68 net is 12,50
+  await seedInvoice(page, hanna, itemNumber, 50);
+  const karlInvoice = await seedInvoice(page, karl, itemNumber, 11.68);
+
+  await page.goto("/invoices");
+  const answered = (key: string) => (url: string) =>
+    url.includes("/odata/Invoices") && url.includes(`${key}=`);
+
+  // both recipients carry the marker; the words may come in any order
+  await searchColumn(page, "Name", marker, answered("recipient"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await searchColumn(page, "Name", `bauer hanna ${marker}`, answered("recipient"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toHaveCount(0);
+
+  // the total, in the form the list shows it
+  await searchColumn(page, "Name", marker, answered("recipient"));
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await searchColumn(page, "Betrag", "12,50", answered("total"));
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await expect(invoiceRow(page, hanna)).toHaveCount(0);
+  await searchColumn(page, "Betrag", "", (url) => !url.includes("total="));
+
+  // today's date, as the list shows it, keeps both
+  const today = new Date().toISOString().slice(0, 10).split("-").reverse().join(".");
+  await searchColumn(page, "Datum", today, answered("date"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toBeVisible();
+
+  // paid only: mark Karl's invoice paid, then ask for the paid ones
+  await page.request.post("/odata/SetInvoicePaid", {
+    data: { invoiceId: karlInvoice.Id, paid: true },
+  });
+  await filterColumn(page, "Zahlung", "Nur bezahlte");
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await expect(invoiceRow(page, hanna)).toHaveCount(0);
+});
+
+test("the Betrag column shows the gross total", async ({ page }) => {
+  const marker = `Betrag ${unique()}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  const invoice = await seedInvoice(page, marker, itemNumber, 50);
+
+  await page.goto("/invoices");
+  await searchColumn(page, "Name", marker);
+  const cell = invoiceRow(page, marker).getByRole("cell", { name: "53,50", exact: false });
+  await expect(cell).toBeVisible();
+  const shown = (await cell.innerText()).trim();
+
+  await page.goto(`/invoices/${invoice.RootId ?? invoice.Id}`);
+  await expect(page.getByText(shown).first()).toBeVisible();
 });

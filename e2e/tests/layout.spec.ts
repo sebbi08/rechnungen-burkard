@@ -64,7 +64,7 @@ const LIST_SCREENS: ListScreen[] = [
     route: "invoices",
     seeded: RECIPIENT_NAME,
     action: "Rechnung erstellen",
-    secondary: { Name: "sm", Datum: "md", Zahlung: "sm" },
+    secondary: { Name: "sm", Datum: "md", Betrag: "md", Zahlung: "sm" },
   },
   {
     route: "graves",
