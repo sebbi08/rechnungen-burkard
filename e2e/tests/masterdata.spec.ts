@@ -4,6 +4,7 @@ import { unique } from "../unique";
 import {
   confirmation,
   dialog,
+  filterColumn,
   pickOption,
   search,
   searchColumn,
@@ -153,35 +154,52 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
   await expect(row).not.toContainText("€");
 });
 
-test("items: the search finds the words of a term in any order", async ({ page }) => {
+test("items: each column filters on its own", async ({ page }) => {
   const ts = unique();
-  const wanted = `SW-${ts}`;
-  const other = `SX-${ts}`;
+  const allYear = `SA-${ts}`;
+  const summer = `SB-${ts}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
   await createRow(page, "/odata/InvoiceItems", {
-    Number: wanted,
-    Description: "Grabpflege Sommer",
+    Number: allYear,
+    Description: "Grabpflege Ganzjahr",
     VatRate: 7,
-    DefaultPrice: null,
+    DefaultPrice: 12.5,
   });
   await createRow(page, "/odata/InvoiceItems", {
-    Number: other,
-    Description: "Grabpflege Winter",
-    VatRate: 7,
-    DefaultPrice: null,
+    Number: summer,
+    Description: "Bepflanzung Sommer",
+    VatRate: 19,
+    DefaultPrice: 40,
+    Quarter: "Summer",
   });
 
   await page.goto("/items");
-  // the description's word first, the number's after it
-  await search(
-    page,
-    page.getByRole("textbox", { name: "Nach Nummer oder Bezeichnung suchen" }),
-    `Sommer ${ts}`,
-    (url) => url.includes("/odata/InvoiceItems") && url.includes("sommer") && url.includes(ts),
-  );
+  // the marker narrows the shared catalogue to this test's two items
+  await searchColumn(page, "Nummer", ts);
   const table = page.getByRole("table");
-  await expect(table).toContainText(wanted);
-  await expect(table).not.toContainText(other);
+  await expect(table).toContainText(allYear);
+  await expect(table).toContainText(summer);
+
+  await filterColumn(page, "Quartal", "Sommer");
+  await expect(table).toContainText(summer);
+  await expect(table).not.toContainText(allYear);
+
+  await filterColumn(page, "Quartal", "Alle");
+  await filterColumn(page, "MwSt.-Satz", "7 %");
+  await expect(table).toContainText(allYear);
+  await expect(table).not.toContainText(summer);
+  await filterColumn(page, "MwSt.-Satz", "Alle");
+
+  // the words of a term match in any order
+  await searchColumn(page, "Bezeichnung", "Sommer Bepflanzung");
+  await expect(table).toContainText(summer);
+  await expect(table).not.toContainText(allYear);
+  await searchColumn(page, "Bezeichnung", "");
+
+  await searchColumn(page, "Standardpreis", "12,50");
+  await expect(table).toContainText(allYear);
+  await expect(table).not.toContainText(summer);
 });
 
 test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
