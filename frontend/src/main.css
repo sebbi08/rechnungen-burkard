@@ -35,6 +35,14 @@ body {
   }
 }
 
+/* The grave overview has more columns than any other list: with the theme's
+   padding its table outgrew the card on laptop screens and pushed the row
+   actions out of view. Its cells take the phone's tighter padding throughout. */
+.compact-cells {
+  --p-datatable-header-cell-padding: 0.75rem 0.5rem;
+  --p-datatable-body-cell-padding: 0.75rem 0.5rem;
+}
+
 /* A page of a hundred rows is taller than the window. The paginator stays at
    the window's lower edge while the rows scroll, rather than under the last
    of them; the line above it sets it off from the rows passing beneath. It is
@@ -55,7 +63,7 @@ body {
 
 /* A list shows its filter row (filter-display="row") only from the width at
    which all its columns are shown; below it, ColumnFilterSheet stands in. The
-   class on the DataTable names that width, like Tailwind's md, lg and xl.
+   class on the DataTable names that width, like Tailwind's md, lg, xl and 2xl.
    PrimeVue gives the filter row no class of its own: it is the header row
    that holds the inline filters. */
 @media (width < 48rem) {
@@ -72,6 +80,12 @@ body {
 
 @media (width < 80rem) {
   .column-filters-xl .p-datatable-thead > tr:has(.p-datatable-inline-filter) {
+    display: none;
+  }
+}
+
+@media (width < 96rem) {
+  .column-filters-2xl .p-datatable-thead > tr:has(.p-datatable-inline-filter) {
     display: none;
   }
 }

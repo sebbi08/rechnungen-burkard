@@ -15,7 +15,7 @@ import { useDrawerFocus } from "@/composables/useDrawerFocus";
  *  over. `clear` asks the page to empty every field. */
 const props = defineProps<{
   fields: ColumnFilterField[];
-  breakpoint: "md" | "lg" | "xl";
+  breakpoint: "md" | "lg" | "xl" | "2xl";
 }>();
 const values = defineModel<Record<K, string>>("values", { required: true });
 const emit = defineEmits<{ clear: [] }>();
@@ -24,7 +24,12 @@ const { t } = useI18n();
 const id = useId();
 
 // literal class names: Tailwind only generates the classes it finds written out
-const HIDDEN_FROM = { md: "md:hidden", lg: "lg:hidden", xl: "xl:hidden" } as const;
+const HIDDEN_FROM = {
+  md: "md:hidden",
+  lg: "lg:hidden",
+  xl: "xl:hidden",
+  "2xl": "2xl:hidden",
+} as const;
 
 function valueOf(field: ColumnFilterField): string {
   const all: Partial<Record<string, string>> = values.value;

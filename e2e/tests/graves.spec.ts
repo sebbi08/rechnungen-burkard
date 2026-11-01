@@ -76,6 +76,11 @@ function term(
 // other test's generation to finish, so a test has to be allowed longer.
 test.describe.configure({ timeout: 240_000 });
 
+// The overview shows its filter row, through which these tests search it, only
+// from Tailwind's 2xl on; narrower, the filter sheet stands in (layout.spec.ts).
+// The one test about narrower desktops sets its own widths.
+test.use({ viewport: { width: 1536, height: 720 } });
+
 /** The grave editor's recipient picker. */
 const RECIPIENT = "graveRecipient";
 
@@ -1139,6 +1144,89 @@ test("a grave with several recipients lists them in a popover", async ({ page })
   await button.click();
   await expect(popover).toHaveCount(0);
   await expect(button).toHaveAttribute("aria-expanded", "false");
+});
+
+test("the overview fits its card on a laptop and on a wide screen", async ({ page }) => {
+  const marker = `GW-${unique()}`;
+  const cemetery = `Waldfriedhof am Schwarzenstein ${unique()}`;
+  const cemeteryId = await ensureCemetery(page, cemetery);
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = async (name: string) =>
+    (
+      await createRow(page, "/odata/Recipients", {
+        Name: name,
+        Address: "Hohenberger Landstraße 117\n12345 Musterstadt-Schwarzenstein",
+      })
+    ).Id;
+  // as long as real ones get: a site and a name that take several lines
+  const siteName = "Schineller Bäcke an der alten Friedhofsmauer, Nordseite";
+  await saveGrave(page, {
+    graveNumber: `${marker}-EINZELGRABSTELLE-NORD`,
+    siteName,
+    cemeteryId,
+    startDate: "2026-01",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds: [await recipient(`Maria-Theresia von Hohenberg-Schwarzenstein ${marker}`)],
+  });
+  await saveGrave(page, {
+    graveNumber: `${marker}-DOPPELGRABSTELLE-SUED`,
+    siteName,
+    cemeteryId,
+    startDate: "2026-01",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds: [
+      await recipient(`Friedrich-Wilhelm Schwarzenstein ${marker}`),
+      await recipient(`Elisabeth Schwarzenstein-Hohenberg ${marker}`),
+    ],
+  });
+
+  for (const width of [1280, 1536]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/graves?period=2026-1&number=${marker}`);
+    const rows = page.locator("tbody tr");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toContainText(siteName);
+
+    // the filter row and the months come with the room for them
+    const filterRow = page.getByRole("textbox", { name: "Beginn durchsuchen" });
+    const months = page.getByRole("columnheader", { name: "Beginn", exact: true });
+    if (width < 1536) {
+      await expect(filterRow).toBeHidden();
+      await expect(months).toBeHidden();
+    } else {
+      await expect(filterRow).toBeVisible();
+      await expect(months).toBeVisible();
+    }
+
+    // the table needs no sideways scrolling inside its card
+    const container = page.locator(".p-datatable-table-container");
+    const sizes = await container.evaluate((el) => ({
+      scroll: el.scrollWidth,
+      client: el.clientWidth,
+      left: el.getBoundingClientRect().left,
+    }));
+    expect(sizes.scroll, `${width}px`).toBeLessThanOrEqual(sizes.client + 1);
+
+    // and every row's actions are inside the card
+    for (const row of await rows.all()) {
+      const actions = row.locator("td").last().getByRole("button");
+      expect(await actions.count()).toBe(2);
+      for (const action of await actions.all()) {
+        const box = (await action.boundingBox())!;
+        const name = `${width}px ${await action.getAttribute("aria-label")}`;
+        expect(box.x, name).toBeGreaterThanOrEqual(sizes.left - 1);
+        expect(box.x + box.width, name).toBeLessThanOrEqual(sizes.left + sizes.client + 1);
+      }
+    }
+  }
 });
 
 test("coming back from a grave keeps the half-year and the filters", async ({ page }) => {

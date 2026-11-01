@@ -183,28 +183,15 @@ export async function filterColumn(page: Page, header: string, option: string): 
 }
 
 /**
- * Opens a PrimeVue Popover with the button that toggles it (and that says so
- * in `aria-expanded`), and answers the popover. A popover closes as soon as
- * something around its button scrolls, and a click Playwright scrolls the
- * button into view for -- the grave overview's table is wider than its card --
- * can deliver that scroll's event just after the popover has opened, which
- * closes it again. So the button is pressed until the popover stays open; once
- * scrolled to, it needs no scroll any more.
+ * Opens a PrimeVue Popover with the button that toggles it (and says so in
+ * `aria-expanded`), and answers the popover once it has finished opening.
  */
 export async function openPopover(page: Page, button: Locator): Promise<Locator> {
-  await expect(async () => {
-    if ((await button.getAttribute("aria-expanded")) !== "true") {
-      await button.click({ timeout: 3000 });
-    }
-    // a scroll the click set off is delivered before the next frames
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    await expect(button).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
-  }).toPass({ timeout: 15_000 });
+  await button.click();
   const popover = page.locator(".p-popover");
   await expect(popover).toBeVisible();
   await expect(popover).not.toHaveClass(/p-popover-enter-active/);
+  await expect(button).toHaveAttribute("aria-expanded", "true");
   return popover;
 }
 

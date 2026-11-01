@@ -36,7 +36,7 @@ const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
 const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE-SCHINELLER-BAECKE-NORD`;
 
 /** Tailwind's breakpoints, from which a column a narrow screen drops comes back. */
-const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280 };
+const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280, "2xl": 1536 };
 
 interface ListScreen {
   route: string;
@@ -75,8 +75,8 @@ const LIST_SCREENS: ListScreen[] = [
       Grabstätte: "lg",
       Friedhof: "lg",
       "Feld-Nr.": "lg",
-      Beginn: "xl",
-      Ende: "xl",
+      Beginn: "2xl",
+      Ende: "2xl",
       Empfänger: "sm",
       Zahlung: "sm",
     },

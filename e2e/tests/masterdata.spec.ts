@@ -621,6 +621,8 @@ test("graves: search by number narrows the list and empty search shows nothing (
     recipientIds: [recipient.Id],
   });
 
+  // wide enough for the overview's filter row, which comes from Tailwind's 2xl on
+  await page.setViewportSize({ width: 1536, height: 720 });
   await page.goto("/graves");
   const table = page.getByRole("table");
   // graves still open for the selected half-year are listed first, so a

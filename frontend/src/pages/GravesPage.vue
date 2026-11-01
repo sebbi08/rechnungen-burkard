@@ -350,7 +350,7 @@ function openEditor(graveId: number | null): void {
       <ColumnFilterSheet
         v-model:values="filters.values"
         :fields="fields"
-        breakpoint="xl"
+        breakpoint="2xl"
         @clear="clearColumns"
       />
 
@@ -366,7 +366,7 @@ function openEditor(graveId: number | null): void {
         striped-rows
         filter-display="row"
         :filters="{}"
-        class="column-filters-xl"
+        class="column-filters-2xl compact-cells"
       >
         <template #empty>{{ t("noData") }}</template>
         <Column :header="t('graveNumber')" :show-filter-menu="false" :show-clear-button="false">
@@ -426,8 +426,8 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column
           :header="t('startDate')"
-          header-class="hidden xl:table-cell"
-          body-class="hidden xl:table-cell tabular-nums"
+          header-class="hidden 2xl:table-cell"
+          body-class="hidden 2xl:table-cell tabular-nums"
           :show-filter-menu="false"
           :show-clear-button="false"
         >
@@ -438,8 +438,8 @@ function openEditor(graveId: number | null): void {
         </Column>
         <Column
           :header="t('endDate')"
-          header-class="hidden xl:table-cell"
-          body-class="hidden xl:table-cell tabular-nums"
+          header-class="hidden 2xl:table-cell"
+          body-class="hidden 2xl:table-cell tabular-nums"
           :show-filter-menu="false"
           :show-clear-button="false"
         >
