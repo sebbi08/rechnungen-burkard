@@ -99,53 +99,6 @@ public class GravesController : ODataController
     // leave its invoices and runs pointing at nothing — those hold the id
     // without a foreign key.
 
-    [ODataAttributeRouting]
-    [HttpGet("odata/SearchGraves")]
-    public async Task<IActionResult> Search([FromQuery] string term)
-    {
-        if (string.IsNullOrWhiteSpace(term))
-        {
-            return new JsonResult(
-                new { value = Array.Empty<object>() },
-                ODataJsonDefaults.PascalCase
-            );
-        }
-
-        var graves = await _db
-            .Graves.Select(g => new
-            {
-                g.Id,
-                g.GraveNumber,
-                g.FieldNumber,
-                g.SiteName,
-                CemeteryName = g.Cemetery.Name,
-                RecipientNames = g.Recipients.Select(r => r.Recipient.Name).ToList(),
-            })
-            .ToListAsync();
-
-        // Match in memory: SQL-side lower() folds ASCII only and would miss
-        // non-ASCII case differences (e.g. 'ö' vs 'Ö'), which matters for German names.
-        // Word by word, and a word may be found in any field: "Hanna Bauer"
-        // finds the grave of "Bauer Hanna", "A-12 Bauer" the one numbered A-12.
-        var matches = graves
-            .Where(g =>
-                SearchWords.All(
-                    term,
-                    word =>
-                        g.GraveNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
-                        || g.SiteName.Contains(word, StringComparison.OrdinalIgnoreCase)
-                        || g.FieldNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
-                        || g.CemeteryName.Contains(word, StringComparison.OrdinalIgnoreCase)
-                        || g.RecipientNames.Any(n =>
-                            n.Contains(word, StringComparison.OrdinalIgnoreCase)
-                        )
-                )
-            )
-            .ToList();
-
-        return new JsonResult(new { value = matches }, ODataJsonDefaults.PascalCase);
-    }
-
     // The grave dialog collects the grave, its items and its recipients before
     // anything is saved, so the whole set arrives as one request.
     [ODataAttributeRouting]

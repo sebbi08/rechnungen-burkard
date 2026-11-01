@@ -138,8 +138,8 @@ public class CemeteriesController : ODataController
             };
         }
 
-        // Compared in memory, like SearchGraves: SQLite's NOCASE and lower()
-        // fold ASCII only, and "Südfriedhof" and "SÜDFRIEDHOF" are one name.
+        // Compared in memory: SQLite's NOCASE and lower() fold ASCII only,
+        // and "Südfriedhof" and "SÜDFRIEDHOF" are one name.
         var taken = _db
             .Cemeteries.Where(c => c.Id != cemetery.Id)
             .Select(c => c.Name)

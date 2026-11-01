@@ -311,26 +311,6 @@ public class CemeteryTests
         Assert.Equal(other, details.RootElement.GetProperty("CemeteryId").GetInt64());
     }
 
-    [Theory]
-    [InlineData("waldfriedhof")]
-    [InlineData("WALD")]
-    [InlineData("Bäcke Wald")]
-    public async Task The_grave_search_finds_a_grave_by_its_cemetery(string term)
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var wald = await CreateAsync(client, "Waldfriedhof");
-        var inWald = await SaveGraveIdAsync(client, "S-1", wald, "Anna Beispiel");
-        await SaveGraveIdAsync(client, "S-2", TestCemetery.Id, "Bert Beispiel");
-
-        using var json = await ODataJson.ReadAsync(
-            await client.GetAsync($"/odata/SearchGraves?term={Uri.EscapeDataString(term)}")
-        );
-
-        var found = json.RootElement.GetProperty("value").EnumerateArray().ToList();
-        Assert.Equal(inWald, Assert.Single(found).GetProperty("Id").GetInt64());
-    }
-
     [Fact]
     public async Task The_overview_rows_carry_the_cemetery()
     {

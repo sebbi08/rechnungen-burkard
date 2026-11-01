@@ -269,8 +269,8 @@ public sealed class GraveService
         }
 
         // A number may come back once its grave has ended, but two graves that
-        // run at the same time cannot share it. Compared in memory, like
-        // SearchGraves: SQLite's lower() folds ASCII only.
+        // run at the same time cannot share it. Compared in memory: SQLite's
+        // lower() folds ASCII only.
         var number = fields.GraveNumber.Trim();
         var others = await _db
             .Graves.Where(g => graveId == null || g.Id != graveId)

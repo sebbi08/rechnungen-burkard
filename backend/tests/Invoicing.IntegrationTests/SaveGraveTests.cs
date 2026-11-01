@@ -759,11 +759,6 @@ public class SaveGraveTests
         var row = status.RootElement.GetProperty("value")[0];
         Assert.Equal("Schineller Bäcke", row.GetProperty("SiteName").GetString());
         Assert.Equal("27", row.GetProperty("FieldNumber").GetString());
-
-        using var search = await ODataJson.ReadAsync(
-            await client.GetAsync("/odata/SearchGraves?term=bäcke")
-        );
-        Assert.Equal(1, search.RootElement.GetProperty("value").GetArrayLength());
     }
 
     [Fact]

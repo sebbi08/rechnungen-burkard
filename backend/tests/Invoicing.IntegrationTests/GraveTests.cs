@@ -110,7 +110,7 @@ public class GraveTests
         };
 
     [Fact]
-    public async Task Create_grave_with_item_and_recipient_and_search_by_number()
+    public async Task Create_grave_with_item_and_recipient_and_find_it_in_the_overview()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
@@ -140,78 +140,12 @@ public class GraveTests
             graveJson.RootElement.GetProperty("Items")[0].GetProperty("Count").GetInt32()
         );
 
-        var search = await client.GetAsync("/odata/SearchGraves?term=A-001");
-        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
-        using var searchJson = await ODataJson.ReadAsync(search);
-        Assert.Single(searchJson.RootElement.GetProperty("value").EnumerateArray());
-    }
-
-    [Fact]
-    public async Task Search_graves_by_recipient_name_matches_case_insensitively()
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var (itemId, recipientId) = await SeedAsync(client);
-        await SaveGraveAsync(client, "B-002", AllYearLink(itemId), recipientId);
-
-        var search = await client.GetAsync("/odata/SearchGraves?term=beispiel");
-        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
-        using var searchJson = await ODataJson.ReadAsync(search);
-        Assert.Single(searchJson.RootElement.GetProperty("value").EnumerateArray());
-    }
-
-    // "Anna Beispiel" is the recipient, "B-002" the grave: the words of a term
-    // are looked for one by one, in whichever field holds them.
-    [Theory]
-    [InlineData("Beispiel Anna", 1)]
-    [InlineData("b-002  beispiel", 1)]
-    [InlineData("Beispiel Schmidt", 0)]
-    public async Task Search_graves_takes_every_word_of_the_term_in_any_order(
-        string term,
-        int expected
-    )
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var (itemId, recipientId) = await SeedAsync(client);
-        await SaveGraveAsync(client, "B-002", AllYearLink(itemId), recipientId);
-
-        var search = await client.GetAsync(
-            "/odata/SearchGraves?term=" + Uri.EscapeDataString(term)
-        );
-        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
-        using var searchJson = await ODataJson.ReadAsync(search);
-        Assert.Equal(expected, searchJson.RootElement.GetProperty("value").GetArrayLength());
-    }
-
-    [Fact]
-    public async Task Search_graves_by_recipient_name_with_umlauts_matches_case_insensitively()
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var (itemId, _) = await SeedAsync(client);
-
-        var recipient = await client.PostAsync(
-            "/odata/Recipients",
-            ODataJson.Body(new { Name = "Özdemir", Address = "Umlautweg 1\n99999 Musterdorf" })
-        );
-        Assert.Equal(HttpStatusCode.Created, recipient.StatusCode);
-        using var recipientJson = await ODataJson.ReadAsync(recipient);
-        var recipientId = recipientJson.RootElement.GetProperty("Id").GetInt64();
-        var graveId = await SaveGraveAsync(client, "U-001", AllYearLink(itemId), recipientId);
-
-        foreach (var term in new[] { "özdemir", "ÖZDEMIR" })
-        {
-            var search = await client.GetAsync(
-                "/odata/SearchGraves?term=" + Uri.EscapeDataString(term)
-            );
-            Assert.Equal(HttpStatusCode.OK, search.StatusCode);
-            using var searchJson = await ODataJson.ReadAsync(search);
-            var value = searchJson.RootElement.GetProperty("value").EnumerateArray().ToList();
-            Assert.Single(value);
-            Assert.Equal(graveId, value[0].GetProperty("Id").GetInt64());
-            Assert.Equal("Özdemir", value[0].GetProperty("RecipientNames")[0].GetString());
-        }
+        var status = await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1");
+        Assert.Equal(HttpStatusCode.OK, status.StatusCode);
+        using var statusJson = await ODataJson.ReadAsync(status);
+        var row = Assert.Single(statusJson.RootElement.GetProperty("value").EnumerateArray());
+        Assert.Equal(graveId, row.GetProperty("Id").GetInt64());
+        Assert.Equal("A-001", row.GetProperty("GraveNumber").GetString());
     }
 
     [Fact]

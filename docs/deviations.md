@@ -9,10 +9,10 @@ follow the constitution as written.
 **Principle**: I — Full-Stack Web Application (OData v4 as the documented
 interface).
 
-**Deviation**: `SaveGrave`, `SearchGraves`, `GraveInvoicingStatus`,
-`BulkDownloadDocuments`, `ImportTemplate`, `ImportArchive`, `GraveInvoiceGroup`,
-`ItemGraves`, `ValidateGraveBilling` and `PreviewGraveBilling` are plain MVC
-routes mounted under the `/odata` prefix. They do not appear in `$metadata`.
+**Deviation**: `SaveGrave`, `GraveInvoicingStatus`, `BulkDownloadDocuments`,
+`ImportTemplate`, `ImportArchive`, `GraveInvoiceGroup`, `ItemGraves`,
+`ValidateGraveBilling` and `PreviewGraveBilling` are plain MVC routes mounted
+under the `/odata` prefix. They do not appear in `$metadata`.
 `Documents({key})/$value` is one too: it streams a document's PDF, while the
 EDM declares `Document` without a media stream and keeps its content out.
 
