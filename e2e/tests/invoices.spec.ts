@@ -754,7 +754,10 @@ test("coming back from an invoice keeps the list's filters", async ({ page }) =>
   const typeAndLeave = async (total: string) => {
     // the table's loading mask fades on timers, and would lie over the row
     await expect(page.locator(".p-datatable-mask")).toHaveCount(0);
-    await page.clock.pauseAt(Date.now() + 1_000);
+    // a second ahead of the page's clock, not this one: a hold leaves the
+    // page's clock ahead, and holding at a time it has passed fails
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 1_000);
     await page.getByRole("textbox", { name: "Betrag durchsuchen" }).fill(total);
     await details.click();
     await expect(page).toHaveURL(/\/invoices\/\d+$/);
