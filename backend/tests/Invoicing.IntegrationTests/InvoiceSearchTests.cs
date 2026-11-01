@@ -250,4 +250,174 @@ public class InvoiceSearchTests
         using var json = await ODataJson.ReadAsync(response);
         Assert.Equal(1, json.RootElement.GetProperty("value").GetArrayLength());
     }
+
+    private static async Task<long[]> SeedAsync(
+        ApiTestHost host,
+        params (string Number, string Name, string Address, DateTime Date, decimal Net)[] invoices
+    )
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var seeded = new System.Collections.Generic.List<Invoice>();
+        var n = 0;
+        foreach (var (number, name, address, date, net) in invoices)
+        {
+            var recipient = new Recipient
+            {
+                Number = $"C-{++n:0000}",
+                Name = name,
+                Address = address,
+            };
+            db.Recipients.Add(recipient);
+            await db.SaveChangesAsync();
+            var invoice = new Invoice
+            {
+                InvoiceNumber = number,
+                Year = date.Year,
+                Sequence = n,
+                RecipientId = recipient.Id,
+                RecipientName = name,
+                RecipientAddress = address,
+                GeneratedAt = date,
+                Lines =
+                {
+                    new InvoiceLine
+                    {
+                        Description = "Grabpflege",
+                        Count = 1,
+                        UnitPrice = net,
+                        VatRate = 0m,
+                        LineNumber = 1,
+                    },
+                },
+            };
+            db.Invoices.Add(invoice);
+            await db.SaveChangesAsync();
+            invoice.RootId = invoice.Id;
+            await db.SaveChangesAsync();
+            seeded.Add(invoice);
+        }
+
+        return seeded.Select(i => i.Id).ToArray();
+    }
+
+    private static async Task<string[]> NumbersAsync(ApiTestHost host, string query)
+    {
+        using var client = host.CreateClient();
+        var response = await client.GetAsync("/odata/Invoices?" + query);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(i => i.GetProperty("InvoiceNumber").GetString()!)
+            .OrderBy(x => x)
+            .ToArray();
+    }
+
+    private static readonly DateTime May = new(2025, 5, 19, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime June = new(2025, 6, 19, 10, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task Number_matches_the_number_only()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0007", "Hanna Bauer", "Ahornweg 1", May, 10m),
+            ("2026-0008", "0007er", "Ahornweg 2", May, 10m)
+        );
+        Assert.Equal(new[] { "2026-0007" }, await NumbersAsync(host, "number=0007"));
+    }
+
+    [Fact]
+    public async Task Recipient_matches_name_and_address_word_by_word()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0001", "Hanna Bauer", "Birkenallee 1", May, 10m),
+            ("2026-0002", "Karl Lang", "Ahornweg 2", May, 10m)
+        );
+        Assert.Equal(new[] { "2026-0001" }, await NumbersAsync(host, "recipient=Bauer%20Hanna"));
+        Assert.Equal(new[] { "2026-0002" }, await NumbersAsync(host, "recipient=Ahornweg"));
+    }
+
+    [Fact]
+    public async Task Date_matches_the_shown_date()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0001", "A", "x", May, 10m),
+            ("2026-0002", "B", "y", June, 10m)
+        );
+        Assert.Equal(new[] { "2026-0001" }, await NumbersAsync(host, "date=05.2025"));
+    }
+
+    [Theory]
+    [InlineData("1.234", "2026-0001")]
+    [InlineData("1234,56", "2026-0001")]
+    [InlineData("1234.56", "2026-0001")]
+    [InlineData("12,5", "2026-0002")]
+    public async Task Total_matches_with_comma_or_point(string term, string expected)
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0001", "A", "x", May, 1234.56m),
+            ("2026-0002", "B", "y", May, 12.50m)
+        );
+        Assert.Equal(new[] { expected }, await NumbersAsync(host, "total=" + term));
+    }
+
+    [Fact]
+    public async Task Columns_combine_with_and()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0001", "Hanna Bauer", "x", May, 10m),
+            ("2026-0002", "Hanna Bauer", "x", May, 10m),
+            ("2026-0003", "Karl Lang", "x", May, 10m)
+        );
+        Assert.Equal(
+            new[] { "2026-0002" },
+            await NumbersAsync(host, "number=0002&recipient=Bauer")
+        );
+    }
+
+    [Fact]
+    public async Task Terms_of_only_spaces_filter_nothing()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(host, ("2026-0001", "A", "x", May, 10m), ("2026-0002", "B", "y", May, 10m));
+        Assert.Equal(
+            new[] { "2026-0001", "2026-0002" },
+            await NumbersAsync(host, "recipient=%20%20")
+        );
+    }
+
+    [Fact]
+    public async Task Special_characters_arrive_intact()
+    {
+        using var host = new ApiTestHost();
+        await SeedAsync(
+            host,
+            ("2026-0001", "O'Brien & Söhne", "x", May, 10m),
+            ("2026-0002", "B", "y", May, 10m)
+        );
+        Assert.Equal(
+            new[] { "2026-0001" },
+            await NumbersAsync(host, "recipient=O'Brien%20%26%20s%C3%B6hne")
+        );
+    }
+
+    [Theory]
+    [InlineData("a b", true)]
+    [InlineData("a z", false)]
+    [InlineData("  ", true)]
+    [InlineData(null, true)]
+    public void InAny_needs_every_word_in_some_value(string? term, bool expected) =>
+        Assert.Equal(expected, SearchWords.InAny(term, "A", null, "b"));
 }

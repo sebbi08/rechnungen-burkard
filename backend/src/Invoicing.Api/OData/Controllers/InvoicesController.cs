@@ -20,8 +20,9 @@ public class InvoicesController : ODataController
     }
 
     /// <summary>The invoice set, optionally narrowed by the 'search' custom query
-    /// option. The term is read from the query string rather than taken as a
-    /// parameter so the OData routing convention still recognises this as the
+    /// option or by the per-column options 'number', 'recipient', 'date' and
+    /// 'total' (which combine with AND). The terms are read from the query string
+    /// rather than taken as parameters so the OData routing convention still recognises this as the
     /// entity set's Get.
     ///
     /// NetTotal, VatTotal and GrossTotal are computed here rather than projected
@@ -44,8 +45,15 @@ public class InvoicesController : ODataController
     public IQueryable<Invoice> Get()
     {
         var term = Request.Query["search"].ToString();
+        var filter = new InvoiceSearch.Filter(
+            Request.Query["number"].ToString(),
+            Request.Query["recipient"].ToString(),
+            Request.Query["date"].ToString(),
+            Request.Query["total"].ToString()
+        );
+        var hasTerm = !string.IsNullOrWhiteSpace(term);
         IQueryable<Invoice> query;
-        if (string.IsNullOrWhiteSpace(term))
+        if (!hasTerm && filter.IsEmpty)
         {
             query = _db.Invoices.AsNoTracking();
         }
@@ -73,28 +81,28 @@ public class InvoicesController : ODataController
 
             var matched = candidates
                 .Where(c =>
-                    InvoiceSearch.Matches(
-                        new InvoiceSearch.Row(
-                            c.Id,
-                            c.InvoiceNumber,
-                            c.RecipientName,
-                            c.RecipientAddress,
-                            c.GeneratedAt,
-                            // the lines' full gross, not divided by
-                            // RecipientCount: this search only serves the
-                            // invoice list, whose every query pins
-                            // "GraveId eq null" (frontend/src/pages/InvoicesPage.vue),
-                            // and the matches are
-                            // re-filtered by it below. No grave invoice can
-                            // reach a user through here, so there is no share
-                            // to take.
-                            InvoiceSearch.GrossTotal(
-                                c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
-                            )
-                        ),
-                        term
-                    )
-                )
+                {
+                    var row = new InvoiceSearch.Row(
+                        c.Id,
+                        c.InvoiceNumber,
+                        c.RecipientName,
+                        c.RecipientAddress,
+                        c.GeneratedAt,
+                        // the lines' full gross, not divided by
+                        // RecipientCount: this search only serves the
+                        // invoice list, whose every query pins
+                        // "GraveId eq null" (frontend/src/pages/InvoicesPage.vue),
+                        // and the matches are
+                        // re-filtered by it below. No grave invoice can
+                        // reach a user through here, so there is no share
+                        // to take.
+                        InvoiceSearch.GrossTotal(
+                            c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
+                        )
+                    );
+                    return (!hasTerm || InvoiceSearch.Matches(row, term))
+                        && InvoiceSearch.Matches(row, filter);
+                })
                 .Select(c => c.Id)
                 .ToHashSet();
 
