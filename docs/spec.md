@@ -795,7 +795,7 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-068**: The invoice list MUST offer a text search per column (FR-068c): the
   invoice number (a search for the base number finds every revision), the
   recipient (name and address), the invoice date (as shown, `dd.MM.yyyy`) and
-  the invoice total (gross, as shown; "12,5" and "12.50" both find 12,50).
+  the invoice total (gross; matched as an amount, FR-068b).
   These searches MUST be answered by the server, which pages the list.
 - **FR-068a**: The invoice list, the grave overview and the recipient list MUST
   show 100 entries per page. The pages MUST be cut from the list as filtered,
@@ -805,9 +805,14 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-068b**: Every search (each column's search in the four lists, and the
   item and recipient pickers) MUST take its term as words separated by
   whitespace and leave the entries that hold every one of them, in any order and
-  ignoring case, umlauts included ("ö" finds "Ö"). The words MAY be found in
-  different fields of those the search looks in: "Hanna Bauer" MUST find a recipient named "Bauer Hanna", and a name typed
-  together with a street the recipient who lives there.
+  ignoring case. The four lists' column searches MUST ignore the case of umlauts
+  too ("ö" finds "Ö"); the pickers fold the case of A–Z only. The words MAY be
+  found in different fields of those the search looks in: "Hanna Bauer" MUST
+  find a recipient named "Bauer Hanna", and a name typed together with a street
+  the recipient who lives there. A search for an amount (the invoice list's
+  total, the item list's price) MUST find it as shown ("1.234,56 €"), without
+  the "€", without the thousands separator ("1234,56") and with a point for the
+  decimal comma ("1234.56", "12.50"); "12,5" MUST find 12,50.
 - **FR-068c**: The invoice list, the grave overview, the item list and the
   recipient list MUST each offer a search per column instead of a single search
   field. Every column that holds data has its own: a text field, or a select
@@ -823,7 +828,8 @@ non-interactive until completion, and the task runs exactly once.
   The row and the sheet MUST edit the same searches, applied as the user types.
 - **FR-068d**: The column searches MUST live in the URL query of the list, so
   that leaving for a detail page and coming back, reloading, or sharing the
-  link shows the same filtered list. On the grave overview the selected
+  link shows the same filtered list; a breadcrumb back to the list MUST lead to
+  it as it was left. On the grave overview the selected
   half-year MUST live in the URL query too, though it is no column search:
   clearing the searches leaves it alone.
 

@@ -22,24 +22,24 @@ rows in which each of its words is found, in any order, ignoring case, so
 
 ## 2. Recorded Decisions
 
-| Topic                      | Decision                                                                                                                                                                                                                                      |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lists                      | Invoices, graves, items, recipients — all four                                                                                                                                                                                                |
-| Old search field           | Removed from all four lists, with its texts                                                                                                                                                                                                   |
-| Wide screens               | A filter row directly under the column headers: a text field for text columns, a select for columns with fixed values                                                                                                                         |
-| Within a field             | Word by word: every word of the field must be found in that column's value, in any order, ignoring case (umlauts included, as the backend's `OrdinalIgnoreCase` compares)                                                                     |
-| Across fields              | All filled fields apply together (AND)                                                                                                                                                                                                        |
-| Phone (variant A)          | A "Filter" button with the number of active filters opens a bottom sheet with one field per column, hidden columns included; active filters show as chips above the list, each removable with ✕                                               |
-| Which layout when          | The sheet wherever the list hides columns, so tablets too; the header row only from the width at which the list shows all its columns                                                                                                         |
-| Columns without search     | Columns holding only buttons (edit, download, row actions)                                                                                                                                                                                    |
-| Paging                     | The pages of 100 (FR-068a) are cut from the filtered list; any change to a filter starts on page one; the sticky paginator stays                                                                                                              |
-| Keeping the search         | The filters live in the page's URL query, so leaving a list for a detail page and coming back, reloading, or sharing a link shows the same filtered list (the builder's call made in conversation by Claude)                                  |
-| Half-year, year            | The graves overview keeps its half-year and year pickers above the table; they are not column filters, but they go into the URL query with the filters, so coming back from a grave shows the half-year that was being viewed (Claude's call) |
-| Case and umlauts           | Every filter of every list folds case including umlauts ("ö" finds "Ö"). SQLite's `lower()` folds A–Z only, so filters the server applies run in memory, as `InvoicesController`'s search already does (Claude's call)                        |
-| Invoices: new column       | "Betrag" (gross total), searchable, so the total stays findable                                                                                                                                                                               |
-| Invoices: recipient column | Shows the name; its filter searches the recipient's name and address                                                                                                                                                                          |
-| Graves: new column         | "Empfänger": one recipient shows its name; several show "mehrere" (wording below), which on a press opens a small popover listing all names. Its filter searches the names and addresses of all of the grave's recipients                     |
-| Not printed                | Nothing here changes invoice documents                                                                                                                                                                                                        |
+| Topic                      | Decision                                                                                                                                                                                                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lists                      | Invoices, graves, items, recipients — all four                                                                                                                                                                                                                         |
+| Old search field           | Removed from all four lists, with its texts                                                                                                                                                                                                                            |
+| Wide screens               | A filter row directly under the column headers: a text field for text columns, a select for columns with fixed values                                                                                                                                                  |
+| Within a field             | Word by word: every word of the field must be found in that column's value, in any order, ignoring case (umlauts included, as the backend's `OrdinalIgnoreCase` compares)                                                                                              |
+| Across fields              | All filled fields apply together (AND)                                                                                                                                                                                                                                 |
+| Phone (variant A)          | A "Filter" button with the number of active filters opens a bottom sheet with one field per column, hidden columns included; active filters show as chips above the list, each removable with ✕                                                                        |
+| Which layout when          | The sheet wherever the list hides columns, so tablets too; the header row only from the width at which the list shows all its columns                                                                                                                                  |
+| Columns without search     | Columns holding only buttons (edit, download, row actions)                                                                                                                                                                                                             |
+| Paging                     | The pages of 100 (FR-068a) are cut from the filtered list; any change to a filter starts on page one; the sticky paginator stays                                                                                                                                       |
+| Keeping the search         | The filters live in the page's URL query, so leaving a list for a detail page and coming back, reloading, or sharing a link shows the same filtered list; a breadcrumb back to the list leads to it as it was left (the builder's call made in conversation by Claude) |
+| Half-year, year            | The graves overview keeps its half-year and year pickers above the table; they are not column filters, but they go into the URL query with the filters, so coming back from a grave shows the half-year that was being viewed (Claude's call)                          |
+| Case and umlauts           | Every filter of every list folds case including umlauts ("ö" finds "Ö"). SQLite's `lower()` folds A–Z only, so filters the server applies run in memory, as `InvoicesController`'s search already does (Claude's call)                                                 |
+| Invoices: new column       | "Betrag" (gross total), searchable, so the total stays findable                                                                                                                                                                                                        |
+| Invoices: recipient column | Shows the name; its filter searches the recipient's name and address                                                                                                                                                                                                   |
+| Graves: new column         | "Empfänger": one recipient shows its name; several show "mehrere" (wording below), which on a press opens a small popover listing all names. Its filter searches the names and addresses of all of the grave's recipients                                              |
+| Not printed                | Nothing here changes invoice documents                                                                                                                                                                                                                                 |
 
 ## 3. The Lists and Their Filters
 
@@ -49,13 +49,13 @@ with "Alle" as its empty value.
 
 ### Invoices (`InvoicesPage.vue`, server-side paged)
 
-| Column           | Filter | Matches                                                                           |
-| ---------------- | ------ | --------------------------------------------------------------------------------- |
-| Rechnungsnummer  | Text   | the number as shown (incl. a revision's "-R1")                                    |
-| Empfänger        | Text   | recipient name and address (snapshot on the invoice)                              |
-| Datum            | Text   | the date as shown, `dd.MM.yyyy` ("05.2025" finds May 2025)                        |
-| **Betrag** (new) | Text   | the gross total as shown, `1.234,56` style; a typed "12,5" or "12.50" finds 12,50 |
-| Zahlung          | Select | Alle / Nur unbezahlte / Nur bezahlte (today's payment filter moves here)          |
+| Column           | Filter | Matches                                                                            |
+| ---------------- | ------ | ---------------------------------------------------------------------------------- |
+| Rechnungsnummer  | Text   | the number as shown (incl. a revision's "-R1")                                     |
+| Empfänger        | Text   | recipient name and address (snapshot on the invoice)                               |
+| Datum            | Text   | the date as shown, `dd.MM.yyyy` ("05.2025" finds May 2025)                         |
+| **Betrag** (new) | Text   | the gross total as an amount (FR-068b): "1.234,56 €", "1234,56", "1234.56", "12,5" |
+| Zahlung          | Select | Alle / Nur unbezahlte / Nur bezahlte (today's payment filter moves here)           |
 
 The `search` custom query option of `InvoicesController` becomes one option per
 column (shape left to the builder), each evaluated with `SearchWords` against
@@ -93,7 +93,7 @@ the owner may want plain "mehrere".)
 | Beschreibung | Text   | description                                             |
 | MwSt         | Select | the configured VAT rates                                |
 | Quartal      | Select | Alle / ganzjährig / Frühjahr / Sommer / Herbst / Winter |
-| Preis        | Text   | the default price as shown                              |
+| Preis        | Text   | the default price as an amount, matched as "Betrag" is  |
 
 ### Recipients (`RecipientsPage.vue`, server-side paged)
 
