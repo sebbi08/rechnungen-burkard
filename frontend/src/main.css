@@ -52,3 +52,26 @@ body {
 .col-num .p-datatable-column-header-content {
   justify-content: flex-end;
 }
+
+/* A list shows its filter row (filter-display="row") only from the width at
+   which all its columns are shown; below it, ColumnFilterSheet stands in. The
+   class on the DataTable names that width, like Tailwind's md, lg and xl.
+   PrimeVue gives the filter row no class of its own: it is the header row
+   that holds the inline filters. */
+@media (width < 48rem) {
+  .column-filters-md .p-datatable-thead > tr:has(.p-datatable-inline-filter) {
+    display: none;
+  }
+}
+
+@media (width < 64rem) {
+  .column-filters-lg .p-datatable-thead > tr:has(.p-datatable-inline-filter) {
+    display: none;
+  }
+}
+
+@media (width < 80rem) {
+  .column-filters-xl .p-datatable-thead > tr:has(.p-datatable-inline-filter) {
+    display: none;
+  }
+}

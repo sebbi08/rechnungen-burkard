@@ -358,5 +358,12 @@
   "year": "Jahr",
   "loadFailed": "Die Daten konnten nicht geladen werden. Bitte laden Sie die Seite neu.",
   "notFound": "Nichts gefunden.",
-  "noFileChosen": "Keine Datei ausgewählt"
+  "noFileChosen": "Keine Datei ausgewählt",
+  "filterButton": "Filter",
+  "filterReset": "Filter zurücksetzen",
+  "filterSheetTitle": "Filter",
+  "filterAll": "Alle",
+  "filterSearchColumn": "{0} durchsuchen",
+  "filterSelectColumn": "{0} filtern",
+  "filterRemove": "Filter {0} entfernen"
 }
