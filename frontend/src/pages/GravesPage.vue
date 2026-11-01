@@ -5,10 +5,6 @@ import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import DatePicker from "primevue/datepicker";
-import IconField from "primevue/iconfield";
-import InputIcon from "primevue/inputicon";
-import InputText from "primevue/inputtext";
-import Select from "primevue/select";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
 import { computed, onMounted, ref, watch } from "vue";
@@ -20,16 +16,18 @@ import {
   generateGraveInvoices,
   type GraveStatusRow,
   pollJob,
-  searchGraves,
 } from "@/api/endpoints";
 import { ApiError, isTransient } from "@/api/http";
-import { useGraveYearRange } from "@/api/queries";
+import { useCemeteriesQuery, useGraveYearRange } from "@/api/queries";
 import { type Job, JobStatus } from "@/api/generated";
+import ColumnFilterCell from "@/components/ColumnFilterCell.vue";
+import ColumnFilterSheet from "@/components/ColumnFilterSheet.vue";
 import GenerateDialog from "@/components/GenerateDialog.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
+import GraveRecipientsCell from "@/components/GraveRecipientsCell.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { useBlocking } from "@/composables/useBlocking";
-import { useDebounced } from "@/composables/useDebounced";
+import { type ColumnFilterField, useColumnFilters } from "@/composables/useColumnFilters";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { showMessage } from "@/composables/useMessage";
 import { usePageReport } from "@/composables/usePageReport";
@@ -39,6 +37,7 @@ import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
 import { currentHalfYear, halfYearKey, halfYearText, parseHalfYearKey } from "@/lib/halfYear";
 import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
+import { matchesWords } from "@/lib/searchWords";
 
 const { t } = useI18n();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
@@ -48,7 +47,36 @@ const { run } = useBlocking();
 const queryClient = useQueryClient();
 
 const [currentYear, currentHalf] = currentHalfYear();
-const halfYear = ref(halfYearKey(currentYear, currentHalf));
+const todaysHalfYear = halfYearKey(currentYear, currentHalf);
+
+// The half-year shown goes into the URL with the column filters, so coming
+// back from a grave shows the list that was left. It is no column of its own:
+// the year field and the H1/H2 buttons set it, it has no chip, and clearing
+// the filters leaves it alone.
+const filters = useColumnFilters({
+  period: todaysHalfYear,
+  number: "",
+  site: "",
+  cemetery: "",
+  field: "",
+  start: "",
+  end: "",
+  recipients: "",
+  status: "",
+  paid: "",
+});
+function clearColumns(): void {
+  for (const key of Object.keys(filters.values) as (keyof typeof filters.values)[]) {
+    if (key !== "period") {
+      filters.clear(key);
+    }
+  }
+}
+
+// a URL whose period is no half-year shows today's
+const halfYear = computed(() =>
+  /^\d{4}-[12]$/.test(filters.values.period) ? filters.values.period : todaysHalfYear,
+);
 const period = computed(() => parseHalfYearKey(halfYear.value));
 const halves = [
   { value: 1, label: "H1" },
@@ -72,7 +100,7 @@ watch(period, ([year]) => {
 });
 function setYear(value: Date | Date[] | (Date | null)[] | null | undefined): void {
   if (value instanceof Date) {
-    halfYear.value = halfYearKey(value.getFullYear(), period.value[1]);
+    filters.values.period = halfYearKey(value.getFullYear(), period.value[1]);
   }
 }
 // a field left empty shows the kept year again
@@ -84,46 +112,77 @@ function restoreYear(): void {
 const half = computed({
   get: () => period.value[1],
   set: (value: number) => {
-    halfYear.value = halfYearKey(period.value[0], value);
+    filters.values.period = halfYearKey(period.value[0], value);
   },
 });
-const payment = ref<"all" | "unpaid">("all");
-const paymentOptions = computed(() => [
-  { value: "all", label: t("paymentFilterAll") },
-  { value: "unpaid", label: t("paymentFilterUnpaid") },
+
+const cemeteries = useCemeteriesQuery();
+const cemeteryOptions = computed(() =>
+  (cemeteries.data.value ?? []).map((cemetery) => ({
+    value: String(cemetery.Id),
+    label: cemetery.Name,
+  })),
+);
+const statusOptions = computed(() => [
+  { value: "open", label: t("statusOpen") },
+  { value: "invoiced", label: t("statusInvoiced") },
+]);
+const paidOptions = computed(() => [{ value: "unpaid", label: t("paymentFilterUnpaid") }]);
+
+// the sheet lists every searchable column, the ones a narrow table hides too
+const fields = computed<ColumnFilterField[]>(() => [
+  { key: "number", header: t("graveNumber"), kind: "text" },
+  { key: "site", header: t("graveSiteName"), kind: "text" },
+  { key: "cemetery", header: t("graveCemetery"), kind: "select", options: cemeteryOptions.value },
+  { key: "field", header: t("graveFieldNumber"), kind: "text" },
+  { key: "start", header: t("startDate"), kind: "text" },
+  { key: "end", header: t("endDate"), kind: "text" },
+  { key: "recipients", header: t("graveRecipients"), kind: "text" },
+  { key: "status", header: t("invoicingStatus"), kind: "select", options: statusOptions.value },
+  { key: "paid", header: t("paidStatus"), kind: "select", options: paidOptions.value },
 ]);
 
-const search = ref("");
-const term = useDebounced(search);
+function field(key: string): ColumnFilterField {
+  return fields.value.find((each) => each.key === key)!;
+}
 
 // not-yet-invoiced graves first -- the server's order
 const status = useQuery({
   queryKey: ["graves", "status", halfYear],
   queryFn: () => fetchGraveStatus(period.value[0], period.value[1]),
 });
-const searchResult = useQuery({
-  queryKey: ["graves", "search", term],
-  queryFn: () => searchGraves(term.value.trim()),
-  enabled: computed(() => term.value.trim() !== ""),
-});
 
 const rows = computed(() => {
-  let list = status.data.value ?? [];
-  if (term.value.trim()) {
-    const ids = new Set((searchResult.data.value ?? []).map((result) => result.Id));
-    list = list.filter((row) => ids.has(row.Id));
-  }
-  if (payment.value === "unpaid") {
-    list = list.filter((row) => row.InvoiceCount > 0 && row.PaidCount < row.InvoiceCount);
-  }
-  return list;
+  const applied = filters.applied.value;
+  // a select value that is no option counts as "Alle"
+  const option = (options: { value: string }[], value: string) =>
+    options.find((each) => each.value === value)?.value;
+  const cemetery = option(cemeteryOptions.value, applied.cemetery);
+  const invoicing = option(statusOptions.value, applied.status);
+  const paid = option(paidOptions.value, applied.paid);
+  return (status.data.value ?? []).filter(
+    (row) =>
+      matchesWords(applied.number, row.GraveNumber) &&
+      matchesWords(applied.site, row.SiteName) &&
+      matchesWords(applied.field, row.FieldNumber) &&
+      matchesWords(applied.start, formatMonth(row.StartDate)) &&
+      matchesWords(applied.end, row.EndDate == null ? null : formatMonth(row.EndDate)) &&
+      matchesWords(
+        applied.recipients,
+        ...row.Recipients.flatMap((recipient) => [recipient.Name, recipient.Address]),
+      ) &&
+      (cemetery === undefined || String(row.CemeteryId) === cemetery) &&
+      (invoicing === undefined || row.Invoiced === (invoicing === "invoiced")) &&
+      (paid === undefined || (row.InvoiceCount > 0 && row.PaidCount < row.InvoiceCount)),
+  );
 });
 
 // The half-year's list arrives whole and is searched and filtered here, so the
 // pages are cut from what is left of it.
 const first = ref(0);
-// a new search, filter or half-year starts on page one
-watch([term, payment, halfYear], () => {
+// a new search, filter or half-year starts on page one; the half-year at once,
+// since its list is fetched at once too
+watch([filters.applied, halfYear], () => {
   first.value = 0;
 });
 // a page that emptied -- its last unpaid grave marked paid under "unpaid
@@ -265,15 +324,6 @@ function openEditor(graveId: number | null): void {
   <Card>
     <template #content>
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <IconField class="w-full md:w-[26rem]">
-          <InputIcon class="pi pi-search" />
-          <InputText
-            v-model="search"
-            :placeholder="t('searchGrave')"
-            :aria-label="t('searchGrave')"
-            class="w-full"
-          />
-        </IconField>
         <DatePicker
           v-model="yearField"
           input-id="gravesYear"
@@ -295,17 +345,15 @@ function openEditor(graveId: number | null): void {
           :allow-empty="false"
           :aria-label="t('halfYear')"
         />
-        <Select
-          v-model="payment"
-          :options="paymentOptions"
-          option-label="label"
-          option-value="value"
-          :aria-label="t('paymentFilter')"
-          class="w-full sm:w-56"
-        />
       </div>
 
-      <!-- the search narrows the status list, so its own fetch is loading too -->
+      <ColumnFilterSheet
+        v-model:values="filters.values"
+        :fields="fields"
+        breakpoint="xl"
+        @clear="clearColumns"
+      />
+
       <DataTable
         v-model:first="first"
         :value="rows"
@@ -314,11 +362,14 @@ function openEditor(graveId: number | null): void {
         :rows="PAGE_SIZE"
         :paginator-template="PAGINATOR_TEMPLATE"
         :current-page-report-template="pageReport"
-        :loading="status.isFetching.value || searchResult.isFetching.value"
+        :loading="status.isFetching.value"
         striped-rows
+        filter-display="row"
+        :filters="{}"
+        class="column-filters-xl"
       >
         <template #empty>{{ t("noData") }}</template>
-        <Column :header="t('graveNumber')">
+        <Column :header="t('graveNumber')" :show-filter-menu="false" :show-clear-button="false">
           <template #body="{ data }">
             <!-- may break anywhere: a grave number has no space to break at, and
                  a long one would otherwise push the row actions off the card -->
@@ -328,44 +379,90 @@ function openEditor(graveId: number | null): void {
             >
               {{ data.GraveNumber }}
             </RouterLink>
+            <!-- on a phone the recipients sit under the number instead of in their own column -->
+            <div v-if="data.Recipients.length > 0" class="mt-1 sm:hidden">
+              <GraveRecipientsCell :recipients="data.Recipients" />
+            </div>
+          </template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.number" :field="field('number')" />
           </template>
         </Column>
         <Column
           :header="t('graveSiteName')"
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">{{ data.SiteName || "–" }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.site" :field="field('site')" />
+          </template>
         </Column>
         <Column
           :header="t('graveCemetery')"
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">{{ data.CemeteryName }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.cemetery" :field="field('cemetery')" />
+          </template>
         </Column>
         <Column
           :header="t('graveFieldNumber')"
           header-class="hidden lg:table-cell"
           body-class="hidden lg:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">{{ data.FieldNumber || "–" }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.field" :field="field('field')" />
+          </template>
         </Column>
         <Column
           :header="t('startDate')"
           header-class="hidden xl:table-cell"
           body-class="hidden xl:table-cell tabular-nums"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">{{ formatMonth(data.StartDate) }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.start" :field="field('start')" />
+          </template>
         </Column>
         <Column
           :header="t('endDate')"
           header-class="hidden xl:table-cell"
           body-class="hidden xl:table-cell tabular-nums"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">{{ formatMonth(data.EndDate) || "–" }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.end" :field="field('end')" />
+          </template>
         </Column>
-        <Column :header="t('invoicingStatus')">
+        <Column
+          :header="t('graveRecipients')"
+          header-class="hidden sm:table-cell"
+          body-class="hidden sm:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
+        >
+          <template #body="{ data }">
+            <GraveRecipientsCell :recipients="data.Recipients" />
+          </template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.recipients" :field="field('recipients')" />
+          </template>
+        </Column>
+        <Column :header="t('invoicingStatus')" :show-filter-menu="false" :show-clear-button="false">
           <template #body="{ data }">
             <Tag
               :value="data.Invoiced ? t('statusInvoiced') : t('statusOpen')"
@@ -386,11 +483,16 @@ function openEditor(graveId: number | null): void {
               />
             </div>
           </template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.status" :field="field('status')" />
+          </template>
         </Column>
         <Column
           :header="t('paidStatus')"
           header-class="hidden sm:table-cell"
           body-class="hidden sm:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
         >
           <template #body="{ data }">
             <Tag
@@ -400,6 +502,9 @@ function openEditor(graveId: number | null): void {
               role="img"
               :aria-label="paymentTag(data)?.label"
             />
+          </template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.paid" :field="field('paid')" />
           </template>
         </Column>
         <Column class="w-0 whitespace-nowrap">

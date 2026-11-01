@@ -6,6 +6,7 @@ import {
   discardEditor,
   drawer,
   fillDate,
+  openPopover,
   pickItem,
   pickOption,
   pickRecipient,
@@ -76,6 +77,7 @@ const LIST_SCREENS: ListScreen[] = [
       "Feld-Nr.": "lg",
       Beginn: "xl",
       Ende: "xl",
+      Empfänger: "sm",
       Zahlung: "sm",
     },
   },
@@ -266,6 +268,74 @@ test("recipients: the filter sheet", async ({ page }) => {
   await page.getByRole("button", { name: "Filter Name entfernen" }).click();
   await expect(page.getByText("Name: ", { exact: false })).toHaveCount(0);
   await expect(button).not.toContainText("1");
+});
+
+test("graves: the filter sheet holds the selects as well", async ({ page }) => {
+  await seed(page);
+  await page.goto("/graves");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  // the filter row comes only with every column; below that the sheet stands in
+  await expect(page.getByRole("textbox", { name: "Grabnummer durchsuchen" })).toBeHidden();
+  const button = page.getByRole("button", { name: /^Filter( \d+)?$/ });
+  await button.click();
+  await waitForOverlayOpen(page);
+
+  const sheet = page.locator(".p-drawer");
+  await expect(sheet.getByRole("textbox", { name: "Empfänger durchsuchen" })).toBeVisible();
+  for (const header of ["Friedhof", "Status", "Zahlung"]) {
+    await expect(sheet.getByRole("combobox", { name: `${header} filtern` })).toBeVisible();
+  }
+  await pickOption(page, sheet.getByRole("combobox", { name: "Status filtern" }), "offen");
+  await expect(page.getByText("Status: offen")).toBeVisible();
+  await expect(button).toContainText("1");
+  await expectNoSidewaysScrolling(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expectNoSidewaysScrolling(page);
+});
+
+test("graves: the recipients popover stays on the screen", async ({ page }) => {
+  const marker = `LP-${unique()}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  // long names, which the popover has to wrap rather than run off the screen
+  const recipientIds: number[] = [];
+  for (const n of [1, 2, 3, 4]) {
+    const recipient = await createRow(page, "/odata/Recipients", {
+      Name: `Empfängerin ${n} ${marker} Hohenberg-Schwarzenstein-Waldenburg`,
+      Address: "Musterstraße 1",
+    });
+    recipientIds.push(recipient.Id);
+  }
+  // due in the first half of 2026 alone, which no test generates
+  await seedGrave(page, {
+    graveNumber: marker,
+    startDate: "2026-01",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds,
+  });
+
+  await page.goto(`/graves?period=2026-1&number=${marker}`);
+  const button = page
+    .locator("tbody tr")
+    .filter({ hasText: marker })
+    .getByRole("button", { name: "4 Empfänger" });
+  const popover = await openPopover(page, button);
+  await expect(popover.getByRole("listitem")).toHaveCount(4);
+
+  const viewport = page.viewportSize()!;
+  const box = (await popover.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+  await expectNoSidewaysScrolling(page);
 });
 
 test("invoices: every row action stays reachable", async ({ page }) => {

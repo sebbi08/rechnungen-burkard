@@ -109,33 +109,32 @@ export function getItemGraves(itemId: number): Promise<ItemGraves> {
 
 // ---- graves ---------------------------------------------------------------
 
+/** One of a grave's recipients, as the overview lists and searches them. */
+export interface GraveStatusRecipient {
+  Id: number;
+  Name: string;
+  Address: string;
+}
+
 export interface GraveStatusRow {
   Id: number;
   GraveNumber: string;
   FieldNumber: string;
   SiteName: string;
+  CemeteryId: number;
   CemeteryName: string;
   StartDate: string;
   EndDate: string | null;
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
+  /** In the order they were linked; empty for a grave without any. */
+  Recipients: GraveStatusRecipient[];
 }
 
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
   const url = `/odata/GraveInvoicingStatus?year=${year}&half=${half}`;
   return (await getJson<{ value: GraveStatusRow[] }>(url)).value;
-}
-
-export interface GraveSearchResult {
-  Id: number;
-  GraveNumber: string;
-  RecipientNames: string[];
-}
-
-export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
-  const url = `/odata/SearchGraves?term=${encodeURIComponent(term)}`;
-  return (await getJson<{ value: GraveSearchResult[] }>(url)).value;
 }
 
 export interface SaveGraveInput {

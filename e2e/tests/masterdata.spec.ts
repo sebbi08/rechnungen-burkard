@@ -6,7 +6,6 @@ import {
   dialog,
   filterColumn,
   pickOption,
-  search,
   searchColumn,
   toasts,
   waitForOverlayOpen,
@@ -602,10 +601,9 @@ test("graves: search by number narrows the list and empty search shows nothing (
 }) => {
   const ts = unique();
   const graveNumber = `SUCHE-${ts}`;
-  // a grave cannot be saved without a recipient. The search matches recipient
-  // names as well as numbers, so this one shares nothing with the terms below.
-  // It needs an item billed all year; a generation running alongside may
-  // invoice the grave, which leaves it in the list all the same
+  // a grave cannot be saved without a recipient, and needs an item billed all
+  // year; a generation running alongside may invoice the grave, which leaves
+  // it in the list all the same
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: `SUCHE-${ts}`,
@@ -629,17 +627,12 @@ test("graves: search by number narrows the list and empty search shows nothing (
   // freshly created one is in the table right away
   await expect(table).toContainText(graveNumber);
 
-  const field = page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" });
-  await search(page, field, graveNumber, (url) =>
-    url.includes(`/odata/SearchGraves?term=${graveNumber}`),
-  );
+  await searchColumn(page, "Grabnummer", graveNumber);
   // the unique number matches exactly this run's grave, nothing else
   await expect(table.locator("tbody tr")).toHaveCount(1);
   await expect(table.locator("tbody tr")).toContainText(graveNumber);
 
-  await search(page, field, `gibtsnicht${ts}`, (url) =>
-    url.includes(`/odata/SearchGraves?term=gibtsnicht${ts}`),
-  );
+  await searchColumn(page, "Grabnummer", `gibtsnicht${ts}`);
   // no match: the table renders its German empty state and this run's grave is gone
   await expect(table).toContainText("Keine Daten");
   await expect(table).not.toContainText(graveNumber);

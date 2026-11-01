@@ -17,12 +17,14 @@ import {
   fillDate,
   fillNumber,
   fillYear,
+  filterColumn,
+  openPopover,
   pickItem,
   pickOption,
   pickRecipient,
   rowAction,
   saveEditor,
-  search,
+  searchColumn,
   toasts,
   waitForOverlayOpen,
 } from "../vue";
@@ -606,8 +608,7 @@ test("the overview shows a hundred graves a page, of those the search leaves", a
   await expect(halfButton(page, 1)).toHaveAttribute("aria-pressed", "true");
 
   // the pages are cut from the graves the search leaves, not from all of them
-  const search = page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" });
-  await search.fill(marker);
+  await searchColumn(page, "Grabnummer", marker);
   const rows = page.getByRole("row").filter({ hasText: marker });
   await expect(rows).toHaveCount(100);
   await expect(page.getByText("1–100 von 101")).toBeVisible();
@@ -620,7 +621,7 @@ test("the overview shows a hundred graves a page, of those the search leaves", a
   await expect(page.getByText("101–101 von 101")).toBeVisible();
 
   // a narrower search starts on page one again: 001 to 009
-  await search.fill(`${marker}-00`);
+  await searchColumn(page, "Grabnummer", `${marker}-00`);
   await expect(rows).toHaveCount(9);
   await expect(page.getByText("1–9 von 9")).toBeVisible();
 });
@@ -1041,19 +1042,135 @@ test("the overview searches graves by recipient name as well", async ({ page }) 
   await seedGrave(page, marker, [`Suchname ${marker}`]);
 
   await page.goto("/graves");
-  await search(
-    page,
-    page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" }),
-    `Suchname ${marker}`,
-    (url) => url.includes(`/odata/SearchGraves?term=Suchname ${marker}`),
-  );
+  await searchColumn(page, "Empfänger", `Suchname ${marker}`);
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody tr")).toContainText(marker);
 });
 
+test("the overview searches each column on its own", async ({ page }) => {
+  const marker = `GK-${unique()}`;
+  // a cemetery of its own, so that picking it leaves this test's grave alone
+  const cemetery = `Spaltenfriedhof ${unique()}`;
+  const cemeteryId = await ensureCemetery(page, cemetery);
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  // the street carries the marker and the names do not: what finds the grave
+  // is its recipient's address
+  const ida = await createRow(page, "/odata/Recipients", {
+    Name: "Ida Spaltensuche",
+    Address: `${marker}-Weg 5\n12345 Musterstadt`,
+  });
+  const jan = await createRow(page, "/odata/Recipients", {
+    Name: "Jan Spaltensuche",
+    Address: "Birkenweg 7\n12345 Musterstadt",
+  });
+  // due in the first half of 2026 alone, which no test generates: both stay open
+  await saveGrave(page, {
+    graveNumber: `${marker}-A`,
+    cemeteryId,
+    startDate: "2026-01",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds: [ida.Id],
+  });
+  await saveGrave(page, {
+    graveNumber: `${marker}-B`,
+    startDate: "2026-03",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds: [jan.Id],
+  });
+
+  await page.goto("/graves");
+  await fillYear(page, page.locator("#gravesYear"), "2026");
+  await halfButton(page, 1).click();
+  await expect(halfButton(page, 1)).toHaveAttribute("aria-pressed", "true");
+  const rows = page.locator("tbody tr");
+
+  // the recipient's street, in another case, finds the grave -- and only the
+  // recipients are searched: the other grave's number holds the marker too
+  await searchColumn(page, "Empfänger", `${marker.toLowerCase()}-weg 5`);
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(`${marker}-A`);
+  // a grave with one recipient names it
+  await expect(rows).toContainText("Ida Spaltensuche");
+  await searchColumn(page, "Empfänger", "");
+
+  await filterColumn(page, "Friedhof", cemetery);
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(`${marker}-A`);
+  await filterColumn(page, "Friedhof", "Alle");
+
+  await searchColumn(page, "Grabnummer", marker);
+  await expect(rows).toHaveCount(2);
+  await filterColumn(page, "Status", "offen");
+  await expect(rows).toHaveCount(2);
+  await filterColumn(page, "Status", "erstellt");
+  await expect(page.getByRole("table")).toContainText("Keine Daten");
+  await filterColumn(page, "Status", "Alle");
+  await expect(rows).toHaveCount(2);
+
+  // the month as the column shows it: B starts in March
+  await searchColumn(page, "Beginn", "01/2026");
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(`${marker}-A`);
+});
+
+test("a grave with several recipients lists them in a popover", async ({ page }) => {
+  const marker = `GP-${unique()}`;
+  const names = [`Erste ${marker}`, `Zweite ${marker}`];
+  await seedGrave(page, marker, names, [{}], term(2026, 1));
+
+  await page.goto(`/graves?period=2026-1&number=${marker}`);
+  const row = page.locator("tbody tr").filter({ hasText: marker });
+  const button = row.getByRole("button", { name: "2 Empfänger" });
+  await expect(button).toBeVisible();
+  await expect(row).not.toContainText(names[0]);
+
+  const popover = await openPopover(page, button);
+  await expect(popover.getByRole("listitem")).toHaveText(names);
+
+  // pressed again, the button closes it
+  await button.click();
+  await expect(popover).toHaveCount(0);
+  await expect(button).toHaveAttribute("aria-expanded", "false");
+});
+
+test("coming back from a grave keeps the half-year and the filters", async ({ page }) => {
+  const marker = `GB-${unique()}`;
+  // not today's half-year, and years ahead
+  const year = CURRENT_YEAR + 7;
+  const half = CURRENT_HALF === 1 ? 2 : 1;
+  await seedGrave(page, marker, [`Rückweg ${marker}`], [{}], term(year, half));
+
+  await page.goto("/graves");
+  await fillYear(page, page.locator("#gravesYear"), String(year));
+  await halfButton(page, half).click();
+  await expect(halfButton(page, half)).toHaveAttribute("aria-pressed", "true");
+  await searchColumn(page, "Grabnummer", marker);
+  const rows = page.locator("tbody tr");
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(marker);
+
+  await rows.getByRole("link", { name: marker }).click();
+  await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+  await page.goBack();
+
+  await expect(page.locator("#gravesYear")).toHaveValue(String(year));
+  await expect(halfButton(page, half)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("textbox", { name: "Grabnummer durchsuchen" })).toHaveValue(marker);
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(marker);
+});
+
 test("a grave lies in a cemetery, which the overview shows and searches", async ({ page }) => {
   const marker = `GF-${unique()}`;
-  // a marker of its own: searched for, it can only be found through the cemetery
+  // a cemetery of its own: picked in the overview, it leaves this grave alone
   const cemetery = `Waldfriedhof ${unique()}`;
   const graveNumber = `F-${marker}`;
   const recipientName = `Friedhof Beispiel ${marker}`;
@@ -1099,13 +1216,8 @@ test("a grave lies in a cemetery, which the overview shows and searches", async 
   const row = page.getByRole("row").filter({ hasText: graveNumber });
   await expect(row.getByRole("cell", { name: cemetery, exact: true })).toBeVisible();
 
-  // the overview's search finds the grave by its cemetery as well
-  await search(
-    page,
-    page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" }),
-    cemetery,
-    (url) => url.includes(`/odata/SearchGraves?term=${cemetery}`),
-  );
+  // the overview's cemetery filter finds the grave as well
+  await filterColumn(page, "Friedhof", cemetery);
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody tr")).toContainText(graveNumber);
 
@@ -1362,6 +1474,15 @@ test.describe("the half-year today falls in", () => {
     // one it can count on, so it invoices it.
     await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
     await page.goto("/graves");
+
+    // invoiced now, the grave is among the "erstellt" ones and no longer an open one
+    await searchColumn(page, "Grabnummer", marker);
+    await filterColumn(page, "Status", "erstellt");
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator("tbody tr")).toContainText(marker);
+    await filterColumn(page, "Status", "offen");
+    await expect(page.getByRole("table")).toContainText("Keine Daten");
+
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();
     const download = await downloadPromise;
@@ -1451,7 +1572,7 @@ test.describe("the half-year today falls in", () => {
     await expect(row).not.toContainText("unbezahlt");
 
     // fully paid, so the unpaid filter drops it
-    await pickOption(page, page.getByRole("combobox", { name: "Zahlung" }), "Nur unbezahlte");
+    await filterColumn(page, "Zahlung", "Nur unbezahlte");
     await expect(page.getByRole("row").filter({ hasText: graveNumber })).toHaveCount(0);
   });
 });
