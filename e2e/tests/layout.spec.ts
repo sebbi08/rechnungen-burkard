@@ -237,6 +237,37 @@ for (const screen of LIST_SCREENS) {
   });
 }
 
+test("recipients: the filter sheet", async ({ page }) => {
+  await seed(page);
+  await page.goto("/recipients");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  // below the table's full width the filter row is hidden, the sheet stands in
+  await expect(page.getByRole("textbox", { name: "Name durchsuchen" })).toBeHidden();
+  const button = page.getByRole("button", { name: /^Filter( \d+)?$/ });
+  await button.click();
+  await waitForOverlayOpen(page);
+
+  const sheet = page.locator(".p-drawer");
+  const name = sheet.getByRole("textbox", { name: "Name durchsuchen" });
+  await name.fill(RECIPIENT_NAME);
+  await expect(page.getByText(`Name: ${RECIPIENT_NAME}`)).toBeVisible();
+  await expect(button).toContainText("1");
+
+  // a long term wraps instead of pushing the page sideways
+  await name.fill("x".repeat(60));
+  await expect(page.getByText(`Name: ${"x".repeat(60)}`)).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expectNoSidewaysScrolling(page);
+
+  await page.getByRole("button", { name: "Filter Name entfernen" }).click();
+  await expect(page.getByText("Name: ", { exact: false })).toHaveCount(0);
+  await expect(button).not.toContainText("1");
+});
+
 test("invoices: every row action stays reachable", async ({ page }) => {
   await seed(page);
   await page.goto("/invoices");

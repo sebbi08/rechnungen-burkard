@@ -161,22 +161,37 @@ export function useRecipientQuery(id: Ref<number | null>) {
   });
 }
 
-/** One page of the recipients a term leaves, newest first, and how many it
- *  leaves in all. `first` is the index of the page's first row. */
-export function useRecipientsPageQuery(term: Ref<string>, first: Ref<number>) {
+/** The columns of the recipient list that can be searched, one string each. */
+export interface RecipientFilters {
+  number: string;
+  name: string;
+  address: string;
+  email: string;
+}
+
+/** One page of the recipients the column filters leave, newest first, and how
+ *  many they leave in all. `first` is the index of the page's first row. The
+ *  filled filters go out as the backend's own query options (`number`, `name`,
+ *  `address`, `email`), trimmed; empty ones are left out. */
+export function useRecipientsPageQuery(
+  filters: Readonly<Ref<RecipientFilters>>,
+  first: Ref<number>,
+) {
   return useQuery({
-    queryKey: ["recipients", "page", term, first],
+    queryKey: ["recipients", "page", filters, first],
     queryFn: async () => {
+      const params: Record<string, string> = {};
+      for (const [key, value] of Object.entries(filters.value)) {
+        if (value.trim() !== "") {
+          params[key] = value.trim();
+        }
+      }
       const response = await odata
         .Recipients()
         .query((b, q) => {
-          b.filter(...wordsIn(term.value, recipientSearchFields(q)))
-            .orderBy(q.Id.desc())
-            .skip(first.value)
-            .top(PAGE_SIZE)
-            .count();
+          b.orderBy(q.Id.desc()).skip(first.value).top(PAGE_SIZE).count();
         })
-        .execute();
+        .execute({ params });
       return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
     },
     placeholderData: keepPreviousData,

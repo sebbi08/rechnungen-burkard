@@ -1,7 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
-import { confirmation, dialog, pickOption, search, toasts, waitForOverlayOpen } from "../vue";
+import {
+  confirmation,
+  dialog,
+  pickOption,
+  search,
+  searchColumn,
+  toasts,
+  waitForOverlayOpen,
+} from "../vue";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/settings");
@@ -344,12 +352,12 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   await expect(page.getByRole("row").filter({ hasText: first })).toContainText(/E-\d+/);
 
   // search must actually narrow the list: this term matches only the first one
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
-    `Mahr ${ts}`,
-    // the term goes out lower-cased, so the search ignores case
-    (url) => url.includes("/odata/Recipients") && url.includes("'mahr'") && url.includes(ts),
+    "Name",
+    `mahr ${ts}`,
+    // the search ignores case: the term is lower-cased, the names are not
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=mahr ${ts}`),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(first);
@@ -365,11 +373,11 @@ test("recipients: the search finds the words of a term in any order", async ({ p
   }
 
   await page.goto("/recipients");
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
+    "Name",
     `Hanna Bauer ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.includes("hanna") && url.includes(ts),
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=Hanna Bauer ${ts}`),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(wanted);
@@ -391,11 +399,78 @@ test("recipients: the search looks in the address as well as the name", async ({
 
   await page.goto("/recipients");
   // one word from the address, one from the name
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
-    `lindenallee ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.includes("lindenallee") && url.includes(ts),
+    "Adresse",
+    "lindenallee",
+    (url) => url.includes("/odata/Recipients") && url.includes("address=lindenallee"),
+  );
+  await searchColumn(
+    page,
+    "Name",
+    `Lindenweg-Test ${ts}`,
+    (url) => url.includes("address=lindenallee") && url.includes(`name=Lindenweg-Test ${ts}`),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
+});
+
+test("recipients: each column searches its own field", async ({ page }) => {
+  const ts = unique();
+  const inAddress = `Erna ‹m› ${ts}`;
+  const inName = `Ahorn ‹m› ${ts}`;
+  await createRow(page, "/odata/Recipients", { Name: inAddress, Address: `Ahornweg ‹m› ${ts}` });
+  await createRow(page, "/odata/Recipients", { Name: inName, Address: `Birkenweg ‹m› ${ts}` });
+
+  await page.goto("/recipients");
+  const table = page.getByRole("table");
+
+  // "ahorn" is in the first one's address and the second one's name
+  await searchColumn(
+    page,
+    "Name",
+    `ahorn ‹m› ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=ahorn ‹m› ${ts}`),
+  );
+  await expect(table).toContainText(inName);
+  await expect(table).not.toContainText(inAddress);
+  await expect(page).toHaveURL(/[?&]name=/);
+
+  // a reload shows the same filtered list
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Name durchsuchen" })).toHaveValue(
+    `ahorn ‹m› ${ts}`,
+  );
+  await expect(table).toContainText(inName);
+  await expect(table).not.toContainText(inAddress);
+
+  // the other column, the name filter cleared
+  await searchColumn(page, "Name", "");
+  await searchColumn(
+    page,
+    "Adresse",
+    `ahornweg ‹m› ${ts}`,
+    (url) => url.includes(`address=ahornweg ‹m› ${ts}`) && !url.includes("name="),
+  );
+  await expect(table).toContainText(inAddress);
+  await expect(table).not.toContainText(inName);
+});
+
+test("recipients: a filter with special characters", async ({ page }) => {
+  const ts = unique();
+  const wanted = `O'Brien & Söhne ‹m› ${ts}`;
+  const other = `Brandt & Söhne ‹m› ${ts}`;
+  for (const name of [wanted, other]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/recipients");
+  await searchColumn(
+    page,
+    "Name",
+    `o'brien söhne ‹m› ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes("name=o'brien söhne"),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(wanted);
@@ -419,11 +494,11 @@ test("recipients: the list shows a hundred a page, of those the search leaves", 
   }
 
   await page.goto("/recipients");
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
+    "Name",
     `Seite ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.includes("'seite'") && url.includes(ts),
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=Seite ${ts}`),
   );
   const rows = page.getByRole("row").filter({ hasText: `Seite ${ts}` });
   await expect(rows).toHaveCount(100);

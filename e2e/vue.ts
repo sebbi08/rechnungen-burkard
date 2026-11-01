@@ -152,6 +152,31 @@ export async function search(
 }
 
 /**
+ * Searches one column of a list through its filter row cell (or, on a phone,
+ * the filter sheet's field), named "{header} durchsuchen". Given `answer`, it
+ * waits for the response to the search like `search` does; without it the
+ * caller waits for what the search leaves on screen.
+ */
+export async function searchColumn(
+  page: Page,
+  header: string,
+  term: string,
+  answer?: (url: string) => boolean,
+): Promise<void> {
+  const field = page.getByRole("textbox", { name: `${header} durchsuchen` });
+  if (answer === undefined) {
+    await field.fill(term);
+  } else {
+    await search(page, field, term, answer);
+  }
+}
+
+/** Picks an option of a column's filter select, named "{header} filtern". */
+export async function filterColumn(page: Page, header: string, option: string): Promise<void> {
+  await pickOption(page, page.getByRole("combobox", { name: `${header} filtern` }), option);
+}
+
+/**
  * Saves the editor in a drawer and waits for it to close. Saving an invoice
  * renders its documents behind the blocking overlay before the drawer closes,
  * which on a slow machine takes longer than an assertion's default wait.
