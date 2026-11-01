@@ -131,7 +131,7 @@ function openEditor(invoice: Invoice | null): void {
         striped-rows
         filter-display="row"
         :filters="{}"
-        class="column-filters-md"
+        class="column-filters-md compact-cells"
         @page="first = $event.first"
       >
         <template #empty>{{ t("noData") }}</template>

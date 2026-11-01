@@ -37,7 +37,8 @@ body {
 
 /* The grave overview has more columns than any other list: with the theme's
    padding its table outgrew the card on laptop screens and pushed the row
-   actions out of view. Its cells take the phone's tighter padding throughout. */
+   actions out of view. The invoice list did the same on tablets, where its
+   filter row starts. Their cells take the phone's tighter padding throughout. */
 .compact-cells {
   --p-datatable-header-cell-padding: 0.75rem 0.5rem;
   --p-datatable-body-cell-padding: 0.75rem 0.5rem;
