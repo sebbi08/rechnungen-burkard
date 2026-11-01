@@ -459,22 +459,27 @@ test("recipients: each column searches its own field", async ({ page }) => {
 
 test("recipients: a filter with special characters", async ({ page }) => {
   const ts = unique();
-  const wanted = `O'Brien & Söhne ‹m› ${ts}`;
-  const other = `Brandt & Söhne ‹m› ${ts}`;
-  for (const name of [wanted, other]) {
+  // ' & % and + each have a meaning in a URL; the decoy differs from the
+  // wanted name only in the +, which a wrongly encoded query would read as a space
+  const wanted = `O'Brien & Söhne 100% a+b ‹m› ${ts}`;
+  const decoy = `O'Brien & Söhne 100% a b ‹m› ${ts}`;
+  for (const name of [wanted, decoy]) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
 
   await page.goto("/recipients");
+  const term = `o'brien & söhne 100% a+b ‹m› ${ts}`;
   await searchColumn(
     page,
     "Name",
-    `o'brien söhne ‹m› ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.includes("name=o'brien söhne"),
+    term,
+    // the helper reads a literal "+" on the wire as a space; a "+" that reaches
+    // the backend as itself was sent as %2B
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=${term}`),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(wanted);
-  await expect(table).not.toContainText(other);
+  await expect(table).not.toContainText(decoy);
 });
 
 test("recipients: the list shows a hundred a page, of those the search leaves", async ({

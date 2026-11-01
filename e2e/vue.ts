@@ -144,9 +144,15 @@ export async function search(
   answer: (url: string) => boolean,
 ): Promise<void> {
   // a query option's value spells its spaces as "+"
-  const answered = page.waitForResponse((response) =>
-    answer(decodeURIComponent(response.url().replace(/\+/g, " "))),
-  );
+  const answered = page.waitForResponse((response) => {
+    const url = response.url().replace(/\+/g, " ");
+    try {
+      return answer(decodeURIComponent(url));
+    } catch {
+      // a malformed escape belongs to some other request
+      return false;
+    }
+  });
   await field.fill(term);
   await answered;
 }
