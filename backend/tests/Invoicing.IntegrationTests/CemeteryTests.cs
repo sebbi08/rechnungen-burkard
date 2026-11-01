@@ -332,7 +332,7 @@ public class CemeteryTests
     }
 
     [Fact]
-    public async Task The_overview_rows_carry_the_cemetery_name()
+    public async Task The_overview_rows_carry_the_cemetery()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
@@ -348,6 +348,8 @@ public class CemeteryTests
             .EnumerateArray()
             .Single(r => r.GetProperty("Id").GetInt64() == graveId);
         Assert.Equal("Waldfriedhof", row.GetProperty("CemeteryName").GetString());
+        // the overview's cemetery filter picks by id, as the settings list them
+        Assert.Equal(wald, row.GetProperty("CemeteryId").GetInt64());
     }
 
     [Fact]
