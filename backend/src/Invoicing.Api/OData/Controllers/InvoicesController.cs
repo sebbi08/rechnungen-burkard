@@ -19,9 +19,9 @@ public class InvoicesController : ODataController
         _documentData = documentData;
     }
 
-    /// <summary>The invoice set, optionally narrowed by the 'search' custom query
-    /// option or by the per-column options 'number', 'recipient', 'date' and
-    /// 'total' (which combine with AND). The terms are read from the query string
+    /// <summary>The invoice set, optionally narrowed by the per-column custom
+    /// query options 'number', 'recipient', 'date' and 'total' (which combine
+    /// with AND). The terms are read from the query string
     /// rather than taken as parameters so the OData routing convention still recognises this as the
     /// entity set's Get.
     ///
@@ -30,7 +30,7 @@ public class InvoicesController : ODataController
     /// rounds each group to the cent and — for a grave invoice — divides by
     /// RecipientCount, none of which EF Core can translate to SQL. So, unlike the
     /// old version of this method, the narrowed set (the whole table, or the
-    /// search's matching ids) is loaded into memory here — with the lines the
+    /// column searches' matching ids) is loaded into memory here — with the lines the
     /// calculation needs — each invoice is stamped with its three totals, and
     /// what is returned is an in-memory queryable rather than one EF can still
     /// translate. [EnableQuery] runs afterwards exactly as before: $filter,
@@ -44,16 +44,14 @@ public class InvoicesController : ODataController
     [EnableQuery]
     public IQueryable<Invoice> Get()
     {
-        var term = Request.Query["search"].ToString();
         var filter = new InvoiceSearch.Filter(
             Request.Query["number"].ToString(),
             Request.Query["recipient"].ToString(),
             Request.Query["date"].ToString(),
             Request.Query["total"].ToString()
         );
-        var hasTerm = !string.IsNullOrWhiteSpace(term);
         IQueryable<Invoice> query;
-        if (!hasTerm && filter.IsEmpty)
+        if (filter.IsEmpty)
         {
             query = _db.Invoices.AsNoTracking();
         }
@@ -100,8 +98,7 @@ public class InvoicesController : ODataController
                             c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
                         )
                     );
-                    return (!hasTerm || InvoiceSearch.Matches(row, term))
-                        && InvoiceSearch.Matches(row, filter);
+                    return InvoiceSearch.Matches(row, filter);
                 })
                 .Select(c => c.Id)
                 .ToHashSet();

@@ -54,27 +54,6 @@ public static class InvoiceSearch
             );
     }
 
-    /// <summary>Whether every word of the term is found in one of the fields;
-    /// the words need not share a field.</summary>
-    public static bool Matches(Row row, string term) =>
-        SearchWords.All(
-            term,
-            word =>
-                Contains(row.InvoiceNumber, word)
-                || Contains(row.RecipientName, word)
-                || Contains(row.RecipientAddress, word)
-                // the date as the list shows it, so what the user reads is what they can type
-                || Contains(
-                    row.GeneratedAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                    word
-                )
-                // the total is rendered with a '.'; a German ',' in the term still matches
-                || Contains(
-                    row.GrossTotal.ToString("0.00", CultureInfo.InvariantCulture),
-                    word.Replace(',', '.')
-                )
-        );
-
     /// <summary>The invoice's gross total, rounded exactly the way
     /// DocumentDataBuilder rounds it, so the number the user reads on the
     /// document is the number they can search for.</summary>
@@ -101,7 +80,4 @@ public static class InvoiceSearch
 
         return (netCents + vatCents) / 100m;
     }
-
-    private static bool Contains(string haystack, string needle) =>
-        haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 }

@@ -14,12 +14,11 @@ builder
     .Services.AddControllers()
     .AddOData(o =>
     {
-        // Without this, the no-$-prefix alias for the built-in $search option claims our
-        // custom "search" query option (InvoicesController.Get reads it from Request.Query),
-        // and OData's own query-option parser then 400s on an empty "search=" before our
-        // action code ever runs. The same goes for the per-column options (number,
-        // recipient, date, total on Invoices; number, name, address, email on
-        // Recipients), which are read from Request.Query too.
+        // Without this, the no-$-prefix alias for the built-in $search option could claim
+        // a custom query option and OData's own parser would 400 on an empty value before
+        // our action code ever runs. The per-column options (number, recipient, date,
+        // total on Invoices; number, name, address, email on Recipients) are read from
+        // Request.Query.
         o.EnableNoDollarQueryOptions = false;
         // Expand() was missing until the invoice detail page's readList became the
         // first caller to pass $expand (Lines, Documents): without it every
