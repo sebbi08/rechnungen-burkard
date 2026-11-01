@@ -124,6 +124,36 @@ test("a recipient suggestion shows the first line of the address (Story 3)", asy
   await expect(option).not.toContainText("12345 Musterstadt");
 });
 
+test("the recipient picker offers the newest twenty and searches the rest", async ({ page }) => {
+  const marker = unique();
+  const earlier = `Frühere Kundin ${marker}`;
+  await createRow(page, "/odata/Recipients", { Name: earlier, Address: "Altweg 1" });
+  // twenty newer ones push it off the list, whatever the other tests create meanwhile
+  for (let start = 0; start < 20; start += 10) {
+    await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        createRow(page, "/odata/Recipients", {
+          Name: `Neuer ${marker} ${start + i}`,
+          Address: "Neuweg 1",
+        }),
+      ),
+    );
+  }
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  await page.locator(`#${RECIPIENT}`).click();
+  const overlay = page.locator(".p-select-overlay");
+  await expect(overlay.getByRole("option")).toHaveCount(20);
+  await expect(overlay.getByRole("option", { name: earlier })).toHaveCount(0);
+  await expect(overlay).toContainText("Nur die ersten 20 Treffer");
+
+  // the search reaches the recipients the list does not hold
+  await overlay.locator("input.p-select-filter").fill(earlier);
+  await overlay.getByRole("option", { name: earlier, exact: true }).click();
+  await expect(page.locator(`#${RECIPIENT}`)).toContainText(earlier);
+});
+
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
   const { recipientName, itemNumber } = await seedMasterData(page);
   await page.goto("/invoices");

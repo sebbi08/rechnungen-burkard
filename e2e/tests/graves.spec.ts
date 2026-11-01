@@ -202,6 +202,29 @@ async function addRecipient(page: Page, editor: Locator, name: string): Promise<
   await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
 }
 
+test("a recipient added to a grave is no longer offered for it", async ({ page }) => {
+  const marker = `GX-${unique()}`;
+  const [first, second] = [`Erna ${marker}`, `Fritz ${marker}`];
+  // Searched by an address the two share and their names do not hold: leaving
+  // a recipient out has to hold for every field the search looks in.
+  const street = `Sackgasse ${unique()}`;
+  for (const name of [first, second]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: street });
+  }
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  await addRecipient(page, editor, first);
+
+  // the field is empty again, rather than on the recipient just added or the next one
+  const picker = page.locator(`#${RECIPIENT}`);
+  await expect(picker).toHaveText("Empfänger wählen");
+  await picker.click();
+  const overlay = page.locator(".p-select-overlay");
+  await overlay.locator("input.p-select-filter").fill(street);
+  await expect(overlay.getByRole("option", { name: second })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: first })).toHaveCount(0);
+});
+
 test("create a grave with item, price and recipient in one save (Story 5)", async ({ page }) => {
   const itemNumber = `8002-${RUN}`;
   const recipientName = `Bert Beispiel ${RUN}`;

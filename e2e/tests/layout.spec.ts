@@ -379,6 +379,8 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   // the editor under the list and left the option behind the editor's text.
   await page.locator("#graveRecipient").click();
   const recipientList = page.locator(".p-select-overlay");
+  // searched for: the list holds the newest twenty, and other tests add recipients
+  await recipientList.locator("input.p-select-filter").fill(RECIPIENT_NAME);
   await expect(recipientList.getByRole("option", { name: RECIPIENT_NAME })).toBeVisible();
   await expectNoSidewaysScrolling(page);
   const listBox = (await recipientList.boundingBox())!;

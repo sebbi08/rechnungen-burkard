@@ -10,8 +10,9 @@ import Select from "primevue/select";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
+import type { Recipient } from "@/api/generated";
 import { ApiError, toApiError } from "@/api/http";
-import { useItemsQuery, useRecipientsQuery } from "@/api/queries";
+import { useItemsQuery } from "@/api/queries";
 import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
@@ -33,7 +34,6 @@ const { showError } = useErrorToast();
 const drawerFocus = useDrawerFocus();
 const formEl = ref<HTMLFormElement | null>(null);
 const queryClient = useQueryClient();
-const allRecipients = useRecipientsQuery(ref(""));
 
 const form = reactive({
   GraveNumber: "",
@@ -58,6 +58,8 @@ const positionOptions = computed(() => {
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
+// the recipient behind that id, as the picker knows it
+const linkRecipient = ref<Recipient | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 // What the user can change; the recipient picked for adding is not, until it
@@ -145,17 +147,13 @@ watch(visible, async (open) => {
 });
 
 function addRecipient(): void {
-  const id = linkRecipientId.value;
-  if (id == null) {
+  const recipient = linkRecipient.value;
+  if (recipient == null || recipient.Id !== linkRecipientId.value) {
     return;
   }
-  if (recipients.value.some((recipient) => recipient.id === id)) {
-    showError(new ApiError("GraveRecipientLinkExists"));
-    return;
-  }
-  const name =
-    allRecipients.data.value?.find((recipient) => recipient.Id === id)?.Name ?? String(id);
-  recipients.value = [...recipients.value, { id, name }];
+  recipients.value = [...recipients.value, { id: recipient.Id, name: recipient.Name }];
+  // the picker no longer offers a recipient the grave has
+  linkRecipientId.value = null;
 }
 
 function removeRecipient(id: number): void {
@@ -431,11 +429,15 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           v-if="graveId == null && recipients.length < MAX_RECIPIENTS"
           class="flex flex-wrap items-center gap-2"
         >
+          <!-- the newest recipient by default for the first one only: after an
+               add the field stays empty rather than move on to the next -->
           <RecipientPicker
             v-model="linkRecipientId"
             input-id="graveRecipient"
-            default-to-newest
+            :default-to-newest="recipients.length === 0"
+            :exclude="recipients.map((recipient) => recipient.id)"
             class="min-w-0 flex-1"
+            @selected="linkRecipient = $event"
           />
           <Button :label="t('add')" icon="pi pi-plus" outlined @click="addRecipient" />
         </div>

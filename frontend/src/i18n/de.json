@@ -340,6 +340,7 @@
   "linesTotal": "Summe ca.: {0} netto, {1} brutto",
   "selectItem": "Leistung wählen",
   "selectRecipient": "Empfänger wählen",
+  "recipientPickerMore": "Nur die ersten {0} Treffer. Suche eingrenzen, um weitere zu finden.",
   "year": "Jahr",
   "loadFailed": "Die Daten konnten nicht geladen werden. Bitte laden Sie die Seite neu.",
   "notFound": "Nichts gefunden.",

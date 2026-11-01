@@ -512,6 +512,10 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-015**: Users MUST be able to manage recipients in a separate section.
 - **FR-016**: Users MUST be able to add recipients while creating a grave or an
   invoice.
+- **FR-016a**: Where a recipient is picked, the list MUST offer the 20 newest
+  recipients and search all of them by name, number and address, never loading
+  every recipient. It MUST say so when a search leaves more than it shows. A
+  recipient the grave being edited already has MUST NOT be offered again.
 - **FR-017**: Changes to a recipient's name or address MUST only apply to future
   invoices; previously generated invoices MUST keep the values they were issued
   with.

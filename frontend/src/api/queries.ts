@@ -4,7 +4,7 @@ import { currentHalfYear } from "@/lib/halfYear";
 import { priceFieldValue } from "@/lib/money";
 import { PAGE_SIZE } from "@/lib/paging";
 import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
-import type { Invoice, InvoiceItem, Recipient } from "./generated";
+import type { Invoice, InvoiceItem } from "./generated";
 import { odata } from "./odata";
 
 /** The backend caps $top at 200 (Program.cs, SetMaxTop). */
@@ -86,27 +86,49 @@ export async function loadItemVatRates(queryClient: QueryClient): Promise<Map<nu
   return new Map(items.map((item) => [item.Id, item.VatRate]));
 }
 
-/** Recipients, newest first; a term filters on the name or the number. */
-export function fetchRecipients(term: string): Promise<Recipient[]> {
-  const literal = searchLiteral(term);
-  return readAll(async (skip, top) => {
-    const response = await odata
-      .Recipients()
-      .query((b, q) => {
-        if (literal) {
-          b.filter(q.Name.toLower().contains(literal).or(q.Number.toLower().contains(literal)));
-        }
-        b.orderBy(q.Id.desc()).skip(skip).top(top);
-      })
-      .execute();
-    return response.data.value;
+/** How many recipients a picker offers at a time. */
+export const RECIPIENT_PICKER_SIZE = 20;
+
+/** What a recipient picker offers: the newest recipients a term leaves (in the
+ *  name, the number or the address), without the ones already taken, and how
+ *  many it leaves in all. Never the whole list: there are thousands. */
+export function useRecipientPickerQuery(term: Ref<string>, exclude: Ref<readonly number[]>) {
+  return useQuery({
+    queryKey: ["recipients", "picker", term, exclude],
+    queryFn: async () => {
+      const literal = searchLiteral(term.value);
+      const response = await odata
+        .Recipients()
+        .query((b, q) => {
+          // left out by the server, so twenty others come in their place
+          b.filter(...exclude.value.map((id) => q.Id.ne(id)));
+          if (literal) {
+            // grouped: "and" binds tighter than "or", and without the brackets
+            // a recipient left out above came back through its number or address
+            b.filter(
+              q.Name.toLower()
+                .contains(literal)
+                .or(q.Number.toLower().contains(literal))
+                .or(q.Address.toLower().contains(literal))
+                .group(),
+            );
+          }
+          b.orderBy(q.Id.desc()).top(RECIPIENT_PICKER_SIZE).count();
+        })
+        .execute();
+      return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
+    },
+    placeholderData: keepPreviousData,
   });
 }
 
-export function useRecipientsQuery(term: Ref<string>) {
+/** One recipient, or nothing for no id: a picker's pick that is not among the
+ *  recipients it offers. */
+export function useRecipientQuery(id: Ref<number | null>) {
   return useQuery({
-    queryKey: ["recipients", "list", term],
-    queryFn: () => fetchRecipients(term.value),
+    queryKey: ["recipients", "one", id],
+    queryFn: async () => (await odata.Recipients(id.value!).query().execute()).data,
+    enabled: () => id.value != null,
   });
 }
 
