@@ -64,6 +64,24 @@ public class GraveInvoicingStatusController : ODataController
             })
             .ToListAsync();
 
+        // each grave's recipients, in the order they were linked, so the client
+        // can filter the overview by their names and addresses
+        var recipients = (
+            await _db
+                .GraveRecipients.OrderBy(gr => gr.Id)
+                .Select(gr => new
+                {
+                    gr.GraveId,
+                    Recipient = new
+                    {
+                        gr.Recipient.Id,
+                        gr.Recipient.Name,
+                        gr.Recipient.Address,
+                    },
+                })
+                .ToListAsync()
+        ).GroupBy(gr => gr.GraveId).ToDictionary(g => g.Key, g => g.Select(gr => gr.Recipient).ToList());
+
         var links = await GraveBilling.LinksByGraveAsync(_db);
 
         // a grave is due when its term reaches this half-year and its links bill
@@ -91,6 +109,7 @@ public class GraveInvoicingStatusController : ODataController
                 Invoiced = invoicedIds.Contains(g.Id),
                 InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
                 PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
+                Recipients = recipients.GetValueOrDefault(g.Id) ?? [],
             });
 
         return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);

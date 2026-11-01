@@ -767,6 +767,78 @@ public class SaveGraveTests
     }
 
     [Fact]
+    public async Task The_status_rows_carry_the_graves_recipients()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, other) = await SeedAsync(client);
+
+        var saved = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "R-100",
+                    fieldNumber = "1",
+                    siteName = "Test",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = "2026-01-01",
+                    endDate = (string?)null,
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = item,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient, other },
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        async Task<(long Id, string Name, string Address)[]> RecipientsOfRowAsync()
+        {
+            using var status = await ODataJson.ReadAsync(
+                await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
+            );
+            var row = status.RootElement.GetProperty("value")[0];
+            return row.GetProperty("Recipients")
+                .EnumerateArray()
+                .Select(r =>
+                    (
+                        r.GetProperty("Id").GetInt64(),
+                        r.GetProperty("Name").GetString()!,
+                        r.GetProperty("Address").GetString()!
+                    )
+                )
+                .ToArray();
+        }
+
+        Assert.Equal(
+            new[]
+            {
+                (recipient, "Anna Beispiel", "Hauptstraße 1\n99999 Musterdorf"),
+                (other, "Bert Beispiel", "Nebenweg 2\n99999 Musterdorf"),
+            },
+            await RecipientsOfRowAsync()
+        );
+
+        var rename = await client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Patch, $"/odata/Recipients({recipient})")
+            {
+                Content = ODataJson.Body(new { Name = "Anna Neu" }),
+            }
+        );
+        Assert.True(rename.IsSuccessStatusCode);
+        Assert.Equal("Anna Neu", (await RecipientsOfRowAsync())[0].Name);
+    }
+
+    [Fact]
     public async Task Save_compares_the_end_month_with_the_start_month()
     {
         using var host = new ApiTestHost();
