@@ -2,7 +2,6 @@
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputNumber from "primevue/inputnumber";
-import Select from "primevue/select";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { InvoiceItem } from "@/api/generated";
@@ -12,6 +11,7 @@ import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
 import { lineNet, roundCents } from "@/lib/money";
 import { quarterLabelKey } from "@/lib/quarter";
+import ItemPicker from "./ItemPicker.vue";
 
 const lines = defineModel<DraftLine[]>({ required: true });
 
@@ -100,29 +100,11 @@ const totals = computed(() => {
       class="grid grid-cols-2 gap-3 rounded-lg border border-surface p-3 md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem] md:items-start md:border-0 md:p-1"
     >
       <div class="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
-        <Select
+        <ItemPicker
           v-model="line.itemId"
-          :options="items.data.value ?? []"
-          option-value="Id"
-          option-label="Number"
-          filter
-          :filter-fields="['Number', 'Description']"
-          :placeholder="t('selectItem')"
           :aria-label="`${t('itemNumber')} ${index + 1}`"
-          fluid
-          overlay-class="max-w-[calc(100vw-1rem)]"
           @change="onItemPicked(line)"
-        >
-          <!-- A long number has no space to break at. Without the width limit and
-               the break, it widened the list past the screen of a phone, which
-               then zoomed the whole page out and slid the editor under it. -->
-          <template #option="{ option }">
-            <span class="min-w-0 [overflow-wrap:anywhere]">
-              <span class="font-medium">{{ option.Number }}</span>
-              <span class="ml-2 text-muted-color">{{ option.Description }}</span>
-            </span>
-          </template>
-        </Select>
+        />
         <small v-if="item(line)" class="px-1 text-muted-color">{{ caption(line) }}</small>
       </div>
       <!-- The column headers are hidden on a phone, so each field carries its own

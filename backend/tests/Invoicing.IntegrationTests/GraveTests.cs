@@ -159,6 +159,30 @@ public class GraveTests
         Assert.Single(searchJson.RootElement.GetProperty("value").EnumerateArray());
     }
 
+    // "Anna Beispiel" is the recipient, "B-002" the grave: the words of a term
+    // are looked for one by one, in whichever field holds them.
+    [Theory]
+    [InlineData("Beispiel Anna", 1)]
+    [InlineData("b-002  beispiel", 1)]
+    [InlineData("Beispiel Schmidt", 0)]
+    public async Task Search_graves_takes_every_word_of_the_term_in_any_order(
+        string term,
+        int expected
+    )
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (itemId, recipientId) = await SeedAsync(client);
+        await SaveGraveAsync(client, "B-002", AllYearLink(itemId), recipientId);
+
+        var search = await client.GetAsync(
+            "/odata/SearchGraves?term=" + Uri.EscapeDataString(term)
+        );
+        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+        using var searchJson = await ODataJson.ReadAsync(search);
+        Assert.Equal(expected, searchJson.RootElement.GetProperty("value").GetArrayLength());
+    }
+
     [Fact]
     public async Task Search_graves_by_recipient_name_with_umlauts_matches_case_insensitively()
     {

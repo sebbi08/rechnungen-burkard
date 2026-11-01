@@ -154,6 +154,64 @@ test("the recipient picker offers the newest twenty and searches the rest", asyn
   await expect(page.locator(`#${RECIPIENT}`)).toContainText(earlier);
 });
 
+test("the recipient picker finds the words of a search in any order", async ({ page }) => {
+  const marker = unique();
+  const wanted = `Bauer Hanna ${marker}`;
+  const other = `Bauer Fritz ${marker}`;
+  for (const name of [wanted, other]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  await page.locator(`#${RECIPIENT}`).click();
+  const overlay = page.locator(".p-select-overlay");
+  await overlay.locator("input.p-select-filter").fill(`Hanna Bauer ${marker}`);
+  await expect(overlay.getByRole("option", { name: wanted })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: other })).toHaveCount(0);
+  await overlay.getByRole("option", { name: wanted, exact: true }).click();
+  await expect(page.locator(`#${RECIPIENT}`)).toContainText(wanted);
+});
+
+test("the item picker searches on the server, the words of a search in any order", async ({
+  page,
+}) => {
+  const marker = unique();
+  const wanted = `SW-${marker}`;
+  const other = `SX-${marker}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: wanted,
+    Description: "Grabpflege Sommer",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: other,
+    Description: "Grabpflege Winter",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  const picker = page.getByRole("combobox", { name: "Nummer 1" });
+  await picker.click();
+  const overlay = page.locator(".p-select-overlay");
+  await expect(overlay).not.toHaveClass(/p-connected-overlay-enter-active/);
+  // the description's word first, the number's after it
+  await search(
+    page,
+    overlay.locator("input.p-select-filter"),
+    `Sommer ${marker}`,
+    (url) => url.includes("/odata/InvoiceItems") && url.includes("sommer") && url.includes(marker),
+  );
+  await expect(overlay.getByRole("option", { name: wanted })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: other })).toHaveCount(0);
+  await overlay.getByRole("option", { name: wanted, exact: true }).click();
+  await expect(picker).toContainText(wanted);
+});
+
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
   const { recipientName, itemNumber } = await seedMasterData(page);
   await page.goto("/invoices");

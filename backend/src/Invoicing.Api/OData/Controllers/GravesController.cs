@@ -120,12 +120,20 @@ public class GravesController : ODataController
 
         // Match in memory: SQL-side lower() folds ASCII only and would miss
         // non-ASCII case differences (e.g. 'ö' vs 'Ö'), which matters for German names.
+        // Word by word, and a word may be found in any field: "Hanna Bauer"
+        // finds the grave of "Bauer Hanna", "A-12 Bauer" the one numbered A-12.
         var matches = graves
             .Where(g =>
-                g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.SiteName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.FieldNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase))
+                SearchWords.All(
+                    term,
+                    word =>
+                        g.GraveNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
+                        || g.SiteName.Contains(word, StringComparison.OrdinalIgnoreCase)
+                        || g.FieldNumber.Contains(word, StringComparison.OrdinalIgnoreCase)
+                        || g.RecipientNames.Any(n =>
+                            n.Contains(word, StringComparison.OrdinalIgnoreCase)
+                        )
+                )
             )
             .ToList();
 

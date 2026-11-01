@@ -495,6 +495,8 @@ non-interactive until completion, and the task runs exactly once.
   price they bill.
 - **FR-010**: Users MUST be able to select invoice items by their number when
   composing invoices.
+- **FR-010a**: Users MUST be able to search invoice items by number and
+  description, in the item list and where an item is picked.
 
 **Invoice lines and totals**
 
@@ -516,6 +518,8 @@ non-interactive until completion, and the task runs exactly once.
   recipients and search all of them by name, number and address, never loading
   every recipient. It MUST say so when a search leaves more than it shows. A
   recipient the grave being edited already has MUST NOT be offered again.
+- **FR-016b**: Every recipient search, the recipient list's and the picker's,
+  MUST look in the name, the number and the address.
 - **FR-017**: Changes to a recipient's name or address MUST only apply to future
   invoices; previously generated invoices MUST keep the values they were issued
   with.
@@ -748,6 +752,12 @@ non-interactive until completion, and the task runs exactly once.
   and filtered, and a changed search or filter MUST start on the first page.
   The paginator MUST stay visible at the lower edge of the window while the
   rows of a page scroll.
+- **FR-068b**: Every search (items, recipients, graves, invoices, and the item
+  and recipient pickers) MUST take its term as words separated by whitespace and
+  leave the entries that hold every one of them, in any order and ignoring
+  case. The words MAY be found in different fields of those the search looks
+  in: "Hanna Bauer" MUST find a recipient named "Bauer Hanna", and a name typed
+  together with a street the recipient who lives there.
 
 **Payment status**
 

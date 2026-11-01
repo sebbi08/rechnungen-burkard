@@ -7,6 +7,7 @@ import type { Recipient } from "@/api/generated";
 import { RECIPIENT_PICKER_SIZE, useRecipientPickerQuery, useRecipientQuery } from "@/api/queries";
 import { useDebounced } from "@/composables/useDebounced";
 import { formatAddressLine } from "@/lib/format";
+import { SERVER_FILTER } from "@/lib/serverFilter";
 import RecipientQuickCreate from "./RecipientQuickCreate.vue";
 
 const props = defineProps<{
@@ -23,7 +24,7 @@ const { t } = useI18n();
 const quickOpen = ref(false);
 
 // The Select's own filter field searches on the server: it only ever holds the
-// newest few of the recipients, and narrows them by what is typed.
+// newest few of the recipients, and the server narrows them by what is typed.
 const filter = ref("");
 const term = useDebounced(filter);
 const offered = useRecipientPickerQuery(
@@ -44,6 +45,11 @@ const options = computed(() => {
   const extra = picked.data.value;
   return extra && extra.Id === pickedElsewhere.value ? [extra, ...rows] : rows;
 });
+// While a search is typed the list is what the search found: the pick is not
+// put on top of hits it is not one of.
+const shown = computed(() =>
+  filter.value.trim() === "" ? options.value : (offered.data.value?.rows ?? []),
+);
 const more = computed(
   () => (offered.data.value?.total ?? 0) > (offered.data.value?.rows.length ?? 0),
 );
@@ -84,11 +90,11 @@ function onCreated(id: number): void {
     <Select
       v-model="model"
       :input-id="inputId"
-      :options="options"
+      :options="shown"
       option-value="Id"
       option-label="Name"
       filter
-      :filter-fields="['Name', 'Address', 'Number']"
+      :filter-match-mode="SERVER_FILTER"
       :placeholder="t('selectRecipient')"
       :loading="offered.isFetching.value && filter === ''"
       class="min-w-0 flex-1 basis-64"

@@ -1,10 +1,11 @@
+import type { QFilterExpression, QStringPath } from "@odata2ts/odata-query-objects";
 import { keepPreviousData, type QueryClient, useQuery } from "@tanstack/vue-query";
 import type { Ref } from "vue";
 import { currentHalfYear } from "@/lib/halfYear";
 import { priceFieldValue } from "@/lib/money";
 import { PAGE_SIZE } from "@/lib/paging";
 import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
-import type { Invoice, InvoiceItem } from "./generated";
+import type { Invoice, InvoiceItem, QRecipient } from "./generated";
 import { odata } from "./odata";
 
 /** The backend caps $top at 200 (Program.cs, SetMaxTop). */
@@ -37,31 +38,44 @@ export function useVatRatesQuery() {
   });
 }
 
-/** A search term as the inside of an OData string literal, for comparing
- *  against tolower(field). odata2ts only wraps a value in quotes, so a quote in
- *  the term ("O'Brien") would end the literal and the backend would answer 400;
- *  OData escapes it by doubling. Only A-Z is lowered: SQLite's lower() leaves
- *  every other letter alone, so a lowered "Ä" would no longer match its own. */
-function searchLiteral(term: string): string {
+/** A search term as the words it is made of, each one the inside of an OData
+ *  string literal for comparing against tolower(field). odata2ts only wraps a
+ *  value in quotes, so a quote in a word ("O'Brien") would end the literal and
+ *  the backend would answer 400; OData escapes it by doubling. Only A-Z is
+ *  lowered: SQLite's lower() leaves every other letter alone, so a lowered "Ä"
+ *  would no longer match its own. */
+function searchWords(term: string): string[] {
   return term
-    .trim()
-    .replace(/[A-Z]/g, (letter) => letter.toLowerCase())
-    .replaceAll("'", "''");
+    .split(/\s+/)
+    .filter((word) => word !== "")
+    .map((word) => word.replace(/[A-Z]/g, (letter) => letter.toLowerCase()).replaceAll("'", "''"));
 }
 
-/** Items, newest first; a term filters on number or description, ignoring case. */
+/** One filter per word of a term, to be joined by "and": the word is in one of
+ *  the fields, ignoring case. A word may be found in any of them, so "Hanna
+ *  Bauer" finds "Bauer Hanna" and a name typed with a street finds the one who
+ *  lives there. Each is grouped: "and" binds tighter than "or", and without the
+ *  brackets a word's last field would stand in for every word after it. */
+function wordsIn(term: string, fields: QStringPath[]): QFilterExpression[] {
+  return searchWords(term).map((word) =>
+    fields
+      .map((field) => field.toLower().contains(word))
+      .reduce((any, next) => any.or(next))
+      .group(),
+  );
+}
+
+/** Items, newest first; a term leaves the ones that hold each of its words in
+ *  the number or the description, ignoring case. */
 export function fetchItems(term: string): Promise<InvoiceItem[]> {
-  const literal = searchLiteral(term);
   return readAll(async (skip, top) => {
     const response = await odata
       .InvoiceItems()
       .query((b, q) => {
-        if (literal) {
-          b.filter(
-            q.Number.toLower().contains(literal).or(q.Description.toLower().contains(literal)),
-          );
-        }
-        b.orderBy(q.Id.desc()).skip(skip).top(top);
+        b.filter(...wordsIn(term, [q.Number, q.Description]))
+          .orderBy(q.Id.desc())
+          .skip(skip)
+          .top(top);
       })
       .execute();
     return response.data.value;
@@ -73,6 +87,7 @@ export function useItemsQuery(term: Ref<string>) {
   return useQuery({
     queryKey: ["items", "list", term],
     queryFn: () => fetchItems(term.value),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -89,31 +104,27 @@ export async function loadItemVatRates(queryClient: QueryClient): Promise<Map<nu
 /** How many recipients a picker offers at a time. */
 export const RECIPIENT_PICKER_SIZE = 20;
 
-/** What a recipient picker offers: the newest recipients a term leaves (in the
- *  name, the number or the address), without the ones already taken, and how
- *  many it leaves in all. Never the whole list: there are thousands. */
+/** The fields every recipient search looks in, the list's and the picker's. */
+function recipientSearchFields(q: QRecipient): QStringPath[] {
+  return [q.Name, q.Number, q.Address];
+}
+
+/** What a recipient picker offers: the newest recipients a term leaves, without
+ *  the ones already taken, and how many it leaves in all. Never the whole list:
+ *  there are thousands. */
 export function useRecipientPickerQuery(term: Ref<string>, exclude: Ref<readonly number[]>) {
   return useQuery({
     queryKey: ["recipients", "picker", term, exclude],
     queryFn: async () => {
-      const literal = searchLiteral(term.value);
       const response = await odata
         .Recipients()
         .query((b, q) => {
           // left out by the server, so twenty others come in their place
-          b.filter(...exclude.value.map((id) => q.Id.ne(id)));
-          if (literal) {
-            // grouped: "and" binds tighter than "or", and without the brackets
-            // a recipient left out above came back through its number or address
-            b.filter(
-              q.Name.toLower()
-                .contains(literal)
-                .or(q.Number.toLower().contains(literal))
-                .or(q.Address.toLower().contains(literal))
-                .group(),
-            );
-          }
-          b.orderBy(q.Id.desc()).top(RECIPIENT_PICKER_SIZE).count();
+          b.filter(...exclude.value.map((id) => q.Id.ne(id)))
+            .filter(...wordsIn(term.value, recipientSearchFields(q)))
+            .orderBy(q.Id.desc())
+            .top(RECIPIENT_PICKER_SIZE)
+            .count();
         })
         .execute();
       return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
@@ -138,14 +149,14 @@ export function useRecipientsPageQuery(term: Ref<string>, first: Ref<number>) {
   return useQuery({
     queryKey: ["recipients", "page", term, first],
     queryFn: async () => {
-      const literal = searchLiteral(term.value);
       const response = await odata
         .Recipients()
         .query((b, q) => {
-          if (literal) {
-            b.filter(q.Name.toLower().contains(literal).or(q.Number.toLower().contains(literal)));
-          }
-          b.orderBy(q.Id.desc()).skip(first.value).top(PAGE_SIZE).count();
+          b.filter(...wordsIn(term.value, recipientSearchFields(q)))
+            .orderBy(q.Id.desc())
+            .skip(first.value)
+            .top(PAGE_SIZE)
+            .count();
         })
         .execute();
       return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };

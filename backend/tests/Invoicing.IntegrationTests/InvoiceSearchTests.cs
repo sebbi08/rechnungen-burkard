@@ -54,6 +54,24 @@ public class InvoiceSearchTests
     public void Does_not_match_an_unrelated_term() =>
         Assert.False(InvoiceSearch.Matches(Row(), "Schmidt"));
 
+    [Theory]
+    [InlineData("Hanna Bauer")]
+    [InlineData("bauer hanna")]
+    [InlineData("  Hanna   Bauer ")]
+    public void Matches_the_words_of_a_term_in_any_order(string term) =>
+        Assert.True(InvoiceSearch.Matches(Row(name: "Bauer Hanna"), term));
+
+    [Theory]
+    [InlineData("Müller Hauptstraße")]
+    [InlineData("musterstadt 0001 müller")]
+    [InlineData("Müller 214,00 14.03.2026")]
+    public void Matches_words_that_are_found_in_different_fields(string term) =>
+        Assert.True(InvoiceSearch.Matches(Row(), term));
+
+    [Fact]
+    public void Does_not_match_when_one_word_of_the_term_is_found_nowhere() =>
+        Assert.False(InvoiceSearch.Matches(Row(), "Müller Schmidt"));
+
     [Fact]
     public void Gross_total_rounds_each_line_the_way_the_document_does()
     {

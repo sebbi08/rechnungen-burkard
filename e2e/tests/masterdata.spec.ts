@@ -65,6 +65,37 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
   await expect(row).not.toContainText("€");
 });
 
+test("items: the search finds the words of a term in any order", async ({ page }) => {
+  const ts = unique();
+  const wanted = `SW-${ts}`;
+  const other = `SX-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: wanted,
+    Description: "Grabpflege Sommer",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: other,
+    Description: "Grabpflege Winter",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+
+  await page.goto("/items");
+  // the description's word first, the number's after it
+  await search(
+    page,
+    page.getByRole("textbox", { name: "Nach Nummer oder Bezeichnung suchen" }),
+    `Sommer ${ts}`,
+    (url) => url.includes("/odata/InvoiceItems") && url.includes("sommer") && url.includes(ts),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
+});
+
 test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
   const ts = unique();
   const number = `E2E-ITEM-${ts}`;
@@ -235,14 +266,60 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   // search must actually narrow the list: this term matches only the first one
   await search(
     page,
-    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
+    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
     `Mahr ${ts}`,
     // the term goes out lower-cased, so the search ignores case
-    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`mahr ${ts}`),
+    (url) => url.includes("/odata/Recipients") && url.includes("'mahr'") && url.includes(ts),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(first);
   await expect(table).not.toContainText(second);
+});
+
+test("recipients: the search finds the words of a term in any order", async ({ page }) => {
+  const ts = unique();
+  const wanted = `Bauer Hanna ${ts}`;
+  const other = `Bauer Fritz ${ts}`;
+  for (const name of [wanted, other]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/recipients");
+  await search(
+    page,
+    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
+    `Hanna Bauer ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes("hanna") && url.includes(ts),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
+});
+
+test("recipients: the search looks in the address as well as the name", async ({ page }) => {
+  const ts = unique();
+  const wanted = `Lina Lindenweg-Test ${ts}`;
+  const other = `Anton Amselweg-Test ${ts}`;
+  await createRow(page, "/odata/Recipients", {
+    Name: wanted,
+    Address: "Lindenallee 5\n97070 Würzburg",
+  });
+  await createRow(page, "/odata/Recipients", {
+    Name: other,
+    Address: "Amselgasse 1\n97070 Würzburg",
+  });
+
+  await page.goto("/recipients");
+  // one word from the address, one from the name
+  await search(
+    page,
+    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
+    `lindenallee ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes("lindenallee") && url.includes(ts),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
 });
 
 test("recipients: the list shows a hundred a page, of those the search leaves", async ({
@@ -264,9 +341,9 @@ test("recipients: the list shows a hundred a page, of those the search leaves", 
   await page.goto("/recipients");
   await search(
     page,
-    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
+    page.getByRole("textbox", { name: "Nach Name, Nummer oder Adresse suchen" }),
     `Seite ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`seite ${ts}`),
+    (url) => url.includes("/odata/Recipients") && url.includes("'seite'") && url.includes(ts),
   );
   const rows = page.getByRole("row").filter({ hasText: `Seite ${ts}` });
   await expect(rows).toHaveCount(100);

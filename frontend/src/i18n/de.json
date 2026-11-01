@@ -83,7 +83,7 @@
   "itemPriceOwn": "Eigener Preis {0}",
   "itemPriceNone": "ohne Preis",
   "priceIncludesVatShort": "inkl. MwSt.",
-  "searchByName": "Nach Name oder Nummer suchen",
+  "searchByName": "Nach Name, Nummer oder Adresse suchen",
   "createRecipient": "Empfänger anlegen",
   "recipientNumber": "Empfängernummer",
   "recipientNumberHint": "Leer lassen für automatische Vergabe",
