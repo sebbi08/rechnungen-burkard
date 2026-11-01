@@ -550,7 +550,7 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   // each column's search reaches the backend as its own query option
   const searched = (term: string) => (url: string) =>
     url.includes("/odata/Invoices") && url.includes(`recipient=${term}`);
-  await searchColumn(page, "Name", recipientName, searched(recipientName));
+  await searchColumn(page, "Empfänger", recipientName, searched(recipientName));
   await expect(invoiceRow(page, recipientName)).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
@@ -559,12 +559,12 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
     const url = decodeURIComponent(response.url());
     return url.includes("/odata/Invoices") && !url.includes("recipient=");
   });
-  await page.getByRole("textbox", { name: "Name durchsuchen" }).fill("");
+  await page.getByRole("textbox", { name: "Empfänger durchsuchen" }).fill("");
   await all;
   await expect(invoiceRow(page, recipientName)).toBeVisible();
 
   // narrow it again for the row assertions below
-  await searchColumn(page, "Name", recipientName, searched(recipientName));
+  await searchColumn(page, "Empfänger", recipientName, searched(recipientName));
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
   // the row actions are icon-only, named by their labels
@@ -697,15 +697,15 @@ test("the list searches each column on its own", async ({ page }) => {
     url.includes("/odata/Invoices") && url.includes(`${key}=`);
 
   // both recipients carry the marker; the words may come in any order
-  await searchColumn(page, "Name", marker, answered("recipient"));
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
   await expect(invoiceRow(page, hanna)).toBeVisible();
   await expect(invoiceRow(page, karl)).toBeVisible();
-  await searchColumn(page, "Name", `bauer hanna ${marker}`, answered("recipient"));
+  await searchColumn(page, "Empfänger", `bauer hanna ${marker}`, answered("recipient"));
   await expect(invoiceRow(page, hanna)).toBeVisible();
   await expect(invoiceRow(page, karl)).toHaveCount(0);
 
   // the total, in the form the list shows it
-  await searchColumn(page, "Name", marker, answered("recipient"));
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
   await expect(invoiceRow(page, karl)).toBeVisible();
   await searchColumn(page, "Betrag", "12,50", answered("total"));
   await expect(invoiceRow(page, karl)).toBeVisible();
@@ -733,7 +733,7 @@ test("the Betrag column shows the gross total", async ({ page }) => {
   const invoice = await seedInvoice(page, marker, itemNumber, 50);
 
   await page.goto("/invoices");
-  await searchColumn(page, "Name", marker);
+  await searchColumn(page, "Empfänger", marker);
   const cell = invoiceRow(page, marker).getByRole("cell", { name: "53,50", exact: false });
   await expect(cell).toBeVisible();
   const shown = (await cell.innerText()).trim();

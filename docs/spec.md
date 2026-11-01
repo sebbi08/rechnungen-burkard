@@ -151,7 +151,7 @@ needed before half-year invoices can be generated.
 
 **Independent Test**: Can be fully tested by creating a grave with a number, field
 number, site name, cemetery, position, months, one invoicing item, and two
-recipients, then listing and searching it.
+recipients, then listing it and searching it by column.
 
 **Acceptance Scenarios**:
 
@@ -159,9 +159,10 @@ recipients, then listing and searching it.
    number, field number, site name, cemetery, position, start month, one item with count,
    and one to four recipients, **Then** the grave is stored with a creation date
    and is searchable. Saving without an end month is allowed.
-2. **Given** the user searches for a grave, **When** they enter a grave number,
-   field number, site name, cemetery or recipient name, **Then** matching graves
-   are returned.
+2. **Given** the user fills the search of a column of the grave overview,
+   **When** they enter a grave number, field number, site name, month, or a
+   recipient's name or address, or pick a cemetery, **Then** only matching graves
+   are listed.
 3. **Given** a new grave that has not been saved yet, **When** the user adds items
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
@@ -283,17 +284,17 @@ that copy results.
 
 ### User Story 9 - Browse Invoices and Bulk-Download Grave Invoices (Priority: P3)
 
-A user browses the invoices that are not tied to a grave in a searchable list,
-one row per invoice chain, finding them by invoice number, recipient, date, or
-total. Grave invoices are browsed through their grave instead; from the grave
+A user browses the invoices that are not tied to a grave in a list that can be
+searched by column, one row per invoice chain, finding them by invoice number,
+recipient, date, or total. Grave invoices are browsed through their grave instead; from the grave
 overview, a user bulk-downloads the normal documents of a selected half-year's
 grave invoices.
 
 **Why this priority**: These conveniences build on the core flows and improve
 day-to-day efficiency.
 
-**Independent Test**: Can be fully tested by searching the invoice overview by
-each of the four criteria, then selecting a half-year on the grave overview and
+**Independent Test**: Can be fully tested by searching the invoice overview in
+each of its four text columns, then selecting a half-year on the grave overview and
 bulk-downloading its normal invoices.
 
 **Acceptance Scenarios**:
@@ -301,9 +302,9 @@ bulk-downloading its normal invoices.
 1. **Given** non-grave invoices with several revisions exist, **When** the user
    opens the invoice overview, **Then** each invoice chain is listed once, showing
    its latest revision.
-2. **Given** the user searches the invoice overview, **When** they enter an
-   invoice number, a recipient's name or address, a date, or a total, **Then**
-   matching invoices are returned.
+2. **Given** the user fills the search of a column of the invoice overview,
+   **When** they enter an invoice number, a recipient's name or address, a date,
+   or a total, **Then** only matching invoices are listed.
 3. **Given** a half-year is selected on the grave overview, **When** the user
    triggers the bulk download, **Then** the normal documents of that half-year's
    grave invoices are downloaded, with no copies included.
@@ -512,8 +513,13 @@ non-interactive until completion, and the task runs exactly once.
   price they bill.
 - **FR-010**: Users MUST be able to select invoice items by their number when
   composing invoices.
-- **FR-010a**: Users MUST be able to search invoice items by number and
-  description, in the item list and where an item is picked.
+- **FR-010a**: Where an item is picked, users MUST be able to search invoice
+  items by number and description.
+- **FR-010b**: The item list MUST offer a search per column (FR-068c): text
+  fields for the number, the description and the default price (as the list
+  shows it), and selects for the VAT rate (among the configured rates) and the
+  quarter (all, whole year, or one of the quarters by the name the list shows,
+  such as "Frühling" for spring).
 
 **Invoice lines and totals**
 
@@ -535,8 +541,11 @@ non-interactive until completion, and the task runs exactly once.
   recipients and search all of them by name, number and address, never loading
   every recipient. It MUST say so when a search leaves more than it shows. A
   recipient the grave being edited already has MUST NOT be offered again.
-- **FR-016b**: Every recipient search, the recipient list's and the picker's,
-  MUST look in the name, the number and the address.
+- **FR-016b**: The recipient picker's search MUST look in the name, the number
+  and the address.
+- **FR-016c**: The recipient list MUST offer a text search per column (FR-068c):
+  number, name, address (all its lines) and e-mail. It MUST be answered by the
+  server, which pages the list.
 - **FR-017**: Changes to a recipient's name or address MUST only apply to future
   invoices; previously generated invoices MUST keep the values they were issued
   with.
@@ -611,8 +620,13 @@ non-interactive until completion, and the task runs exactly once.
   worked out per rate from that share. The percentage MUST be shown to at most
   two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
-- **FR-024**: Users MUST be able to search graves by grave number, field number,
-  site name, cemetery name and recipient name.
+- **FR-024**: The grave overview MUST offer a search per column (FR-068c): text
+  fields for the grave number, the site name, the field number, the start and
+  end month (as shown, `MM/yyyy`) and the recipients, a select for the
+  cemetery (among those in the settings), and selects for the invoicing status
+  (open or invoiced) and the payment status (FR-077). The recipients search
+  MUST look in the names and addresses of all of the grave's recipients. The
+  list is filtered in the browser, folding case including umlauts.
 
 **Half-year grave invoicing**
 
@@ -635,6 +649,10 @@ non-interactive until completion, and the task runs exactly once.
   past or future half-years.
 - **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows
   its site name, and the grave's detail page MUST name it.
+- **FR-029b**: The grave overview MUST show each grave's recipients in a column
+  of their own: the name of a grave's only recipient, and for two to four
+  recipients a button "{n} Empfänger" that opens a popover with all their names,
+  one per line.
 
 **Non-grave invoices**
 
@@ -774,19 +792,40 @@ non-interactive until completion, and the task runs exactly once.
   earlier revisions MUST remain visible on the invoice's detail page.
 - **FR-067**: The system MUST provide detail pages for an invoice, a grave, and
   a grave invoice, each showing every revision of the invoices it covers.
-- **FR-068**: Users MUST be able to search invoices by invoice number, recipient
-  name, recipient address, invoice date, and invoice total.
+- **FR-068**: The invoice list MUST offer a text search per column (FR-068c): the
+  invoice number (a search for the base number finds every revision), the
+  recipient (name and address), the invoice date (as shown, `dd.MM.yyyy`) and
+  the invoice total (gross, as shown; "12,5" and "12.50" both find 12,50).
+  These searches MUST be answered by the server, which pages the list.
 - **FR-068a**: The invoice list, the grave overview and the recipient list MUST
-  show 100 entries per page. The pages MUST be cut from the list as searched
-  and filtered, and a changed search or filter MUST start on the first page.
+  show 100 entries per page. The pages MUST be cut from the list as filtered,
+  and a changed column search MUST start on the first page.
   The paginator MUST stay visible at the lower edge of the window while the
   rows of a page scroll.
-- **FR-068b**: Every search (items, recipients, graves, invoices, and the item
-  and recipient pickers) MUST take its term as words separated by whitespace and
-  leave the entries that hold every one of them, in any order and ignoring
-  case. The words MAY be found in different fields of those the search looks
-  in: "Hanna Bauer" MUST find a recipient named "Bauer Hanna", and a name typed
+- **FR-068b**: Every search (each column's search in the four lists, and the
+  item and recipient pickers) MUST take its term as words separated by
+  whitespace and leave the entries that hold every one of them, in any order and
+  ignoring case, umlauts included ("ö" finds "Ö"). The words MAY be found in
+  different fields of those the search looks in: "Hanna Bauer" MUST find a recipient named "Bauer Hanna", and a name typed
   together with a street the recipient who lives there.
+- **FR-068c**: The invoice list, the grave overview, the item list and the
+  recipient list MUST each offer a search per column instead of a single search
+  field. Every column that holds data has its own: a text field, or a select
+  for a column of fixed values, "Alle" being its empty choice; columns that hold
+  only buttons have none. All searches that are filled MUST apply together.
+  On a screen wide enough to show every column of the list (the grave overview
+  from 1536 px, so Beginn and Ende stay hidden below it), the searches MUST sit
+  in a row directly under the column headers. On a narrower screen the list
+  MUST show a "Filter" button with the number of active searches instead, which
+  opens a sheet from the bottom with a labelled field for every searchable
+  column, hidden columns included, and a button to clear them all. The active
+  searches MUST also show as chips above the list, each removable on its own.
+  The row and the sheet MUST edit the same searches, applied as the user types.
+- **FR-068d**: The column searches MUST live in the URL query of the list, so
+  that leaving for a detail page and coming back, reloading, or sharing the
+  link shows the same filtered list. On the grave overview the selected
+  half-year MUST live in the URL query too, though it is no column search:
+  clearing the searches leaves it alone.
 
 **Payment status**
 
@@ -801,12 +840,14 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-074**: The system MUST refuse to edit a grave invoice while any recipient
   of that grave and half-year is marked paid, and MUST name those recipients.
 - **FR-075**: Only the latest revision of an invoice MUST be markable as paid.
-- **FR-076**: The invoice list MUST be filterable by payment status.
+- **FR-076**: The invoice list MUST offer a payment status search (FR-068c): all
+  invoices, only unpaid ones, or only paid ones.
 - **FR-077**: The grave overview MUST show, for the selected half-year, whether a
   grave's invoices are unpaid, partly paid or paid; for a half-year with no
   invoice at all, this MUST show nothing, since the invoicing-status column
-  beside it already reports that. The overview MUST be filterable to the
-  graves that still have an unpaid invoice in that half-year.
+  beside it already reports that. The overview's payment status search
+  (FR-068c) MUST be able to narrow the list to the graves that still have an
+  unpaid invoice in that half-year.
 
 ### Key Entities _(include if feature involves data)_
 

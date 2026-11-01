@@ -37,7 +37,7 @@ const paymentOptions = computed(() => [
 // the sheet lists every searchable column, the ones a narrow table hides too
 const fields = computed<ColumnFilterField[]>(() => [
   { key: "number", header: t("invoiceNumber"), kind: "text" },
-  { key: "recipient", header: t("recipientName"), kind: "text" },
+  { key: "recipient", header: t("graveRecipients"), kind: "text" },
   { key: "date", header: t("invoiceDate"), kind: "text" },
   { key: "total", header: t("invoiceTotal"), kind: "text" },
   { key: "paid", header: t("paidStatus"), kind: "select", options: paymentOptions.value },
@@ -158,7 +158,7 @@ function openEditor(invoice: Invoice | null): void {
         </Column>
         <Column
           field="RecipientName"
-          :header="t('recipientName')"
+          :header="t('graveRecipients')"
           header-class="hidden sm:table-cell"
           body-class="hidden sm:table-cell [overflow-wrap:anywhere]"
           :show-filter-menu="false"
