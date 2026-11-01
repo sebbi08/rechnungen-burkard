@@ -201,6 +201,44 @@ test("items: each column filters on its own", async ({ page }) => {
   await expect(table).not.toContainText(summer);
 });
 
+test("items: the price is found as shown and as typed", async ({ page }) => {
+  const ts = unique();
+  const large = `PG-${ts}`;
+  const small = `PK-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: large,
+    Description: "Grabanlage",
+    VatRate: 7,
+    DefaultPrice: 1234.56,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: small,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 12.5,
+  });
+
+  await page.goto("/items");
+  // the marker narrows the shared catalogue to this test's two items
+  await searchColumn(page, "Nummer", ts);
+  const table = page.getByRole("table");
+  await expect(table).toContainText(large);
+  await expect(table).toContainText(small);
+
+  // the same forms the invoice list's total takes
+  for (const term of ["1.234,56 €", "1.234,56", "1234,56", "1234.56"]) {
+    await searchColumn(page, "Standardpreis", term);
+    await expect(table, term).toContainText(large);
+    await expect(table, term).not.toContainText(small);
+  }
+  for (const term of ["12,50 €", "12.50", "12,5"]) {
+    await searchColumn(page, "Standardpreis", term);
+    await expect(table, term).toContainText(small);
+    await expect(table, term).not.toContainText(large);
+  }
+});
+
 test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
   const ts = unique();
   const number = `E2E-ITEM-${ts}`;

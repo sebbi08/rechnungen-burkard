@@ -27,31 +27,20 @@ public static class InvoiceSearch
             SearchWords.Of(Number ?? "").Length == 0
             && SearchWords.Of(Recipient ?? "").Length == 0
             && SearchWords.Of(Date ?? "").Length == 0
-            && SearchWords.Of(Total ?? "").Length == 0;
+            && SearchWords.OfAmount(Total).Length == 0;
     }
-
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
 
     /// <summary>Whether the row passes every part of the filter, each part
     /// against its own column only: number, recipient (name and address),
-    /// the date as shown, and the total as shown ("1.234,56") or as typed
-    /// without grouping ("1234,56"). A '.' in the term also stands for the
-    /// decimal comma.</summary>
+    /// the date as shown, and the total the way
+    /// <see cref="SearchWords.InAmount"/> matches an amount.</summary>
     public static bool Matches(Row row, Filter filter)
     {
         var date = row.GeneratedAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
         return SearchWords.InAny(filter.Number, row.InvoiceNumber)
             && SearchWords.InAny(filter.Recipient, row.RecipientName, row.RecipientAddress)
             && SearchWords.InAny(filter.Date, date)
-            && SearchWords.All(
-                filter.Total ?? "",
-                word =>
-                    SearchWords.InAny(word, row.GrossTotal.ToString("N2", German))
-                    || SearchWords.InAny(
-                        word.Replace('.', ','),
-                        row.GrossTotal.ToString("0.00", German)
-                    )
-            );
+            && SearchWords.InAmount(filter.Total, row.GrossTotal);
     }
 
     /// <summary>The invoice's gross total, rounded exactly the way

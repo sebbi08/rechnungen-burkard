@@ -14,7 +14,7 @@ import PageHeader from "@/components/PageHeader.vue";
 import { type ColumnFilterField, useColumnFilters } from "@/composables/useColumnFilters";
 import { formatAmount, formatVatRate } from "@/lib/format";
 import { QUARTERS, quarterLabelKey } from "@/lib/quarter";
-import { matchesWords } from "@/lib/searchWords";
+import { matchesAmount, matchesWords } from "@/lib/searchWords";
 
 const { t } = useI18n();
 const filters = useColumnFilters({
@@ -62,10 +62,7 @@ const rows = computed(() => {
     (item) =>
       matchesWords(applied.number, item.Number) &&
       matchesWords(applied.description, item.Description) &&
-      matchesWords(
-        applied.price,
-        item.DefaultPrice == null ? null : formatAmount(item.DefaultPrice),
-      ) &&
+      matchesAmount(applied.price, item.DefaultPrice) &&
       (vat === undefined || String(item.VatRate) === vat) &&
       (quarter === undefined || String(item.Quarter ?? "none") === quarter),
   );

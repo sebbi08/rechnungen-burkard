@@ -181,10 +181,15 @@ public class InvoiceSearchTests
 
     [Theory]
     [InlineData("1.234", "2026-0001")]
+    [InlineData("1.234,56 €", "2026-0001")]
+    [InlineData("1.234,56€", "2026-0001")]
+    [InlineData("1.234,56", "2026-0001")]
     [InlineData("1234,56", "2026-0001")]
     [InlineData("1234.56", "2026-0001")]
+    [InlineData("12,50 €", "2026-0002")]
+    [InlineData("12.50", "2026-0002")]
     [InlineData("12,5", "2026-0002")]
-    public async Task Total_matches_with_comma_or_point(string term, string expected)
+    public async Task Total_matches_as_shown_or_as_typed(string term, string expected)
     {
         using var host = new ApiTestHost();
         await SeedAsync(
@@ -192,8 +197,26 @@ public class InvoiceSearchTests
             ("2026-0001", "A", "x", May, 1234.56m),
             ("2026-0002", "B", "y", May, 12.50m)
         );
-        Assert.Equal(new[] { expected }, await NumbersAsync(host, "total=" + term));
+        Assert.Equal(
+            new[] { expected },
+            await NumbersAsync(host, "total=" + Uri.EscapeDataString(term))
+        );
     }
+
+    [Theory]
+    [InlineData("1.234,56 €", 1234.56, true)]
+    [InlineData("1234,56", 1234.56, true)]
+    [InlineData("1234.56", 1234.56, true)]
+    [InlineData("12.50", 12.50, true)]
+    [InlineData("12,5", 12.50, true)]
+    [InlineData("€", 12.50, true)]
+    [InlineData("12,50 €", 1234.56, false)]
+    [InlineData("1234,56", 12.50, false)]
+    public void InAmount_reads_the_shown_and_the_typed_forms(
+        string term,
+        double amount,
+        bool expected
+    ) => Assert.Equal(expected, SearchWords.InAmount(term, (decimal)amount));
 
     [Fact]
     public async Task Columns_combine_with_and()
