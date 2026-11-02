@@ -74,6 +74,7 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository }}"
           docker build --build-arg VERSION="${{ env.BUILD_VERSION }}" \
+            --build-arg PRIMEUI_LICENSE="${{ vars.PRIMEUI_LICENSE }}" \
             -t "$IMAGE:sha-${GITHUB_SHA::7}" .
           docker push "$IMAGE:sha-${GITHUB_SHA::7}"
 
