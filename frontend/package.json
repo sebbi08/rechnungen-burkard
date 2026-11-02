@@ -23,7 +23,7 @@
     "primevue": "~4.5.5",
     "vue": "^3.5.43",
     "vue-i18n": "^11.4.12",
-    "vue-router": "^4.6.4"
+    "vue-router": "^5.0.0"
   },
   "devDependencies": {
     "@odata2ts/odata2ts": "^0.45.0",
