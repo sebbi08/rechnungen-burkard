@@ -1,6 +1,9 @@
 import "primeicons/primeicons.css";
 import "./main.css";
-import Aura from "@primeuix/themes/aura";
+// The compat variant of Aura: @primeuix/themes 3 made Aura's default sizes
+// smaller (14px text, tighter padding); the compat variant keeps the sizes the
+// layout was built with.
+import Aura from "@primeuix/themes/aura-compat";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import PrimeVue from "primevue/config";
 import ConfirmationService from "primevue/confirmationservice";
