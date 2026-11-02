@@ -1,11 +1,12 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { createRow, ensureRow, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, SEED_CEMETERY, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
   dialog,
   discardEditor,
   drawer,
   fillDate,
+  openPopover,
   pickItem,
   pickOption,
   pickRecipient,
@@ -35,7 +36,7 @@ const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
 const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE-SCHINELLER-BAECKE-NORD`;
 
 /** Tailwind's breakpoints, from which a column a narrow screen drops comes back. */
-const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280 };
+const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280, "2xl": 1536 };
 
 interface ListScreen {
   route: string;
@@ -64,13 +65,21 @@ const LIST_SCREENS: ListScreen[] = [
     route: "invoices",
     seeded: RECIPIENT_NAME,
     action: "Rechnung erstellen",
-    secondary: { Name: "sm", Datum: "md", Zahlung: "sm" },
+    secondary: { Empfänger: "sm", Datum: "md", Betrag: "md", Zahlung: "sm" },
   },
   {
     route: "graves",
     seeded: GRAVE_NUMBER,
     action: "Grab anlegen",
-    secondary: { Grabstätte: "lg", "Feld-Nr.": "lg", Beginn: "xl", Ende: "xl", Zahlung: "sm" },
+    secondary: {
+      Grabstätte: "lg",
+      Friedhof: "lg",
+      "Feld-Nr.": "lg",
+      Beginn: "2xl",
+      Ende: "2xl",
+      Empfänger: "sm",
+      Zahlung: "sm",
+    },
   },
 ];
 
@@ -230,6 +239,105 @@ for (const screen of LIST_SCREENS) {
   });
 }
 
+test("recipients: the filter sheet", async ({ page }) => {
+  await seed(page);
+  await page.goto("/recipients");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  // below the table's full width the filter row is hidden, the sheet stands in
+  await expect(page.getByRole("textbox", { name: "Name durchsuchen" })).toBeHidden();
+  const button = page.getByRole("button", { name: /^Filter( \d+)?$/ });
+  await button.click();
+  await waitForOverlayOpen(page);
+
+  const sheet = page.locator(".p-drawer");
+  const name = sheet.getByRole("textbox", { name: "Name durchsuchen" });
+  await name.fill(RECIPIENT_NAME);
+  await expect(page.getByText(`Name: ${RECIPIENT_NAME}`)).toBeVisible();
+  await expect(button).toContainText("1");
+
+  // a long term wraps instead of pushing the page sideways
+  await name.fill("x".repeat(60));
+  await expect(page.getByText(`Name: ${"x".repeat(60)}`)).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expectNoSidewaysScrolling(page);
+
+  await page.getByRole("button", { name: "Filter Name entfernen" }).click();
+  await expect(page.getByText("Name: ", { exact: false })).toHaveCount(0);
+  await expect(button).not.toContainText("1");
+});
+
+test("graves: the filter sheet holds the selects as well", async ({ page }) => {
+  await seed(page);
+  await page.goto("/graves");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  // the filter row comes only with every column; below that the sheet stands in
+  await expect(page.getByRole("textbox", { name: "Grabnummer durchsuchen" })).toBeHidden();
+  const button = page.getByRole("button", { name: /^Filter( \d+)?$/ });
+  await button.click();
+  await waitForOverlayOpen(page);
+
+  const sheet = page.locator(".p-drawer");
+  await expect(sheet.getByRole("textbox", { name: "Empfänger durchsuchen" })).toBeVisible();
+  for (const header of ["Friedhof", "Status", "Zahlung"]) {
+    await expect(sheet.getByRole("combobox", { name: `${header} filtern` })).toBeVisible();
+  }
+  await pickOption(page, sheet.getByRole("combobox", { name: "Status filtern" }), "offen");
+  await expect(page.getByText("Status: offen")).toBeVisible();
+  await expect(button).toContainText("1");
+  await expectNoSidewaysScrolling(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expectNoSidewaysScrolling(page);
+});
+
+test("graves: the recipients popover stays on the screen", async ({ page }) => {
+  const marker = `LP-${unique()}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  // long names, which the popover has to wrap rather than run off the screen
+  const recipientIds: number[] = [];
+  for (const n of [1, 2, 3, 4]) {
+    const recipient = await createRow(page, "/odata/Recipients", {
+      Name: `Empfängerin ${n} ${marker} Hohenberg-Schwarzenstein-Waldenburg`,
+      Address: "Musterstraße 1",
+    });
+    recipientIds.push(recipient.Id);
+  }
+  // due in the first half of 2026 alone, which no test generates
+  await seedGrave(page, {
+    graveNumber: marker,
+    startDate: "2026-01",
+    endDate: "2026-06",
+    items: [{ itemId: item.Id }],
+    recipientIds,
+  });
+
+  await page.goto(`/graves?period=2026-1&number=${marker}`);
+  const button = page
+    .locator("tbody tr")
+    .filter({ hasText: marker })
+    .getByRole("button", { name: "4 Empfänger" });
+  const popover = await openPopover(page, button);
+  await expect(popover.getByRole("listitem")).toHaveCount(4);
+
+  const viewport = page.viewportSize()!;
+  const box = (await popover.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+  await expectNoSidewaysScrolling(page);
+});
+
 test("invoices: every row action stays reachable", async ({ page }) => {
   await seed(page);
   await page.goto("/invoices");
@@ -379,6 +487,8 @@ test("graves: the editor spends its width on the fields", async ({ page }) => {
   // the editor under the list and left the option behind the editor's text.
   await page.locator("#graveRecipient").click();
   const recipientList = page.locator(".p-select-overlay");
+  // searched for: the list holds the newest twenty, and other tests add recipients
+  await recipientList.locator("input.p-select-filter").fill(RECIPIENT_NAME);
   await expect(recipientList.getByRole("option", { name: RECIPIENT_NAME })).toBeVisible();
   await expectNoSidewaysScrolling(page);
   const listBox = (await recipientList.boundingBox())!;
@@ -440,6 +550,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
   for (const name of names) {
     await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
   }
+  await ensureCemetery(page);
 
   await page.goto("/graves");
   await page.getByRole("button", { name: "Grab anlegen", exact: true }).click();
@@ -448,6 +559,7 @@ test("graves: the rounding corrections dialog fits the viewport", async ({ page 
   await editor.getByLabel("Grabnummer").fill(`LK-${RUN}`);
   await editor.getByLabel("Feld-Nr.").fill("27");
   await editor.getByLabel("Grabstätte").fill("Schineller Bäcke");
+  await pickOption(page, page.locator("#graveCemetery"), SEED_CEMETERY, { filter: SEED_CEMETERY });
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
   await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
@@ -520,12 +632,15 @@ test("the grave detail page fits the viewport", async ({ page }) => {
   await expectNoSidewaysScrolling(page);
 });
 
-test("settings: the form and the VAT rate row fit the viewport", async ({ page }) => {
+test("settings: the form, the VAT rate row and the cemeteries fit the viewport", async ({
+  page,
+}) => {
   await seed(page);
   await page.goto("/settings");
 
   await expect(page.getByLabel("Stempelwort")).toBeVisible();
   await expect(page.getByRole("button", { name: "MwSt.-Satz hinzufügen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Friedhof hinzufügen" })).toBeVisible();
   await expectNoSidewaysScrolling(page);
 });
 

@@ -54,6 +54,23 @@ SEASONS = {
 }
 # The reduced rates of the second half of 2020, billed at today's rates.
 VAT_NOW = {Decimal(16): Decimal(19), Decimal(5): Decimal(7)}
+# FriedWin prints the cemetery after the grave's name ("GRABSTÄTTE: Name  Speyer")
+# but stores it nowhere the export holds, so it is read off the invoices. Its
+# spelling changed over the years; the app's name for each spelling:
+CEMETERIES = {
+    "FRIEDHOF SPEYER": "Speyer",
+    "Speyer": "Speyer",
+    "FRIEDHOF DUDENH": "Dudenhofen",
+    "Harthausen": "Harthausen",
+}
+CEMETERY_SUFFIX = re.compile(
+    r"\s+(" + "|".join(re.escape(c) for c in sorted(CEMETERIES, key=len, reverse=True)) + r")$"
+)
+# From 2018 to 2025 the invoices of a grave in Speyer named no cemetery at all,
+# while those in Dudenhofen and Harthausen kept naming theirs.
+SILENT_YEARS = range(2018, 2026)
+SILENT_CEMETERY = "Speyer"
+
 # Suffix of an item number when one FriedWin article is billed in several quarters.
 QUARTER_SUFFIX = {"Spring": "F", "Summer": "S", "Autumn": "H", "Winter": "W"}
 
@@ -427,6 +444,24 @@ def plan(invoices):
 # --------------------------------------------------------------------------- output
 
 
+def split_site(site):
+    """(name, FriedWin's cemetery text or None) of a "GRABSTÄTTE:" text."""
+    site = " ".join(site.split())
+    m = CEMETERY_SUFFIX.search(site)
+    return (site[: m.start()], m.group(1)) if m else (site, None)
+
+
+def cemetery_of(invoices):
+    """(the app's cemetery, how it was found) for a grave, or (None, None)."""
+    for inv in sorted(invoices, key=lambda i: (i.date, i.number), reverse=True):
+        _, printed = split_site(inv.site)
+        if printed:
+            return CEMETERIES[printed], "printed"
+    if invoices and all(i.date.year in SILENT_YEARS for i in invoices):
+        return SILENT_CEMETERY, "inferred"
+    return None, None
+
+
 def csv_text(header, rows):
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
@@ -511,10 +546,20 @@ def main():
             )
             attention["never billed for care, see the separate report (left out)"].append(number)
             continue
-        site = newest.site or g.site
+        # the printed name, which the grave record may hold cut short, without the cemetery
+        site = split_site(newest.site)[0] or g.site
         if not site:
             attention["no site name (left out)"].append(number)
             continue
+        cemetery, found = cemetery_of(invoices[g.customer])
+        if not cemetery:
+            attention["no cemetery on any invoice (left out)"].append(number)
+            continue
+        if found == "inferred":
+            attention[
+                f"no cemetery printed, {SILENT_CEMETERY} taken (only invoiced {SILENT_YEARS.start}-"
+                f"{SILENT_YEARS.stop - 1}, when {SILENT_CEMETERY} went unprinted)"
+            ].append(number)
         start = g.start
         if not start:
             start = min(i.date for i in invoices[g.customer]).strftime("%Y-%m")
@@ -552,7 +597,8 @@ def main():
             attention["billed in shares to several payers in FriedWin, imported with full prices "
                       "and one recipient (add the others in the app)"].append(number)
         report["graves converted"] += 1
-        grave_rows.append([number, field_number, site, position, start, g.end or ""])
+        report[f"cemetery {cemetery}"] += 1
+        grave_rows.append([number, field_number, site, cemetery, position, start, g.end or ""])
         plans[number] = (g.customer, items, active)
 
     # ---- items: one per FriedWin article and quarter
@@ -599,7 +645,8 @@ def main():
         "recipients.csv": csv_text(["RecipientNumber", "Name", "Address", "Email"], recipient_rows),
         "items.csv": csv_text(["ItemNumber", "Description", "VatRate", "Price", "Quarter"], item_rows),
         "graves.csv": csv_text(
-            ["GraveNumber", "FieldNumber", "SiteName", "Position", "StartDate", "EndDate"], grave_rows
+            ["GraveNumber", "FieldNumber", "SiteName", "Cemetery", "Position", "StartDate", "EndDate"],
+            grave_rows,
         ),
         "mapping.csv": csv_text(
             ["Type", "GraveNumber", "Reference", "Count", "PriceIncludesVat", "UnitPrice"], mapping_rows
@@ -622,6 +669,7 @@ def main():
         f"  recipients {len(recipient_rows)}, items {len(item_rows)}, graves {len(grave_rows)}, "
         f"links {len(mapping_rows)}",
         f"  VAT rates used: {sorted({r[2] for r in item_rows})} (must exist in the app before importing)",
+        f"  cemeteries used: {sorted({r[3] for r in grave_rows})} (must exist in the settings before importing)",
     ]
     lines += [f"  {key}: {value}" for key, value in sorted(report.items())]
     if attention:

@@ -5,11 +5,13 @@ using Burkard.Invoicing.Api;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
@@ -47,6 +49,19 @@ public class ApiTestHost : WebApplicationFactory<Program>
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(new FixedClock(Now, UtcNow));
         });
+    }
+
+    /// <summary>Starts the app, which migrates the database, and puts
+    /// <see cref="TestCemetery"/> in it: every grave needs a cemetery, and most
+    /// tests are about something else.</summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Cemeteries.Add(new Cemetery { Id = TestCemetery.Id, Name = TestCemetery.Name });
+        db.SaveChanges();
+        return host;
     }
 
     protected override void Dispose(bool disposing)

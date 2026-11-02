@@ -17,6 +17,24 @@ namespace Burkard.Invoicing.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Cemetery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Cemeteries");
+                });
+
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Document", b =>
                 {
                     b.Property<long>("Id")
@@ -72,6 +90,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<long>("CemeteryId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateOnly>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -97,6 +118,8 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CemeteryId");
 
                     b.ToTable("Graves");
                 });
@@ -492,6 +515,17 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Grave", b =>
+                {
+                    b.HasOne("Burkard.Invoicing.Domain.Entities.Cemetery", "Cemetery")
+                        .WithMany()
+                        .HasForeignKey("CemeteryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Cemetery");
                 });
 
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.GraveBillingCorrection", b =>

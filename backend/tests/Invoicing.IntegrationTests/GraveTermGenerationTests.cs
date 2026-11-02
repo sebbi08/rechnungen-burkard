@@ -42,6 +42,7 @@ public class GraveTermGenerationTests
         var grave = new Grave
         {
             GraveNumber = $"T-{Guid.NewGuid():N}",
+            CemeteryId = TestCemetery.Id,
             StartDate = start,
             EndDate = end,
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

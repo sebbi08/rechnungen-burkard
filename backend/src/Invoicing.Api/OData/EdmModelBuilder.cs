@@ -12,6 +12,7 @@ public static class EdmModelBuilder
         b.EntitySet<VatRate>("VatRates");
         b.EntitySet<InvoiceItem>("InvoiceItems");
         b.EntitySet<Recipient>("Recipients");
+        b.EntitySet<Cemetery>("Cemeteries");
         b.EntitySet<Grave>("Graves");
         b.EntitySet<GraveItem>("GraveItems");
         b.EntitySet<GraveRecipient>("GraveRecipients");

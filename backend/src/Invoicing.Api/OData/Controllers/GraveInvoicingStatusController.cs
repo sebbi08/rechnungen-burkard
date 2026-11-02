@@ -58,10 +58,30 @@ public class GraveInvoicingStatusController : ODataController
                 g.GraveNumber,
                 g.FieldNumber,
                 g.SiteName,
+                g.CemeteryId,
+                CemeteryName = g.Cemetery.Name,
                 g.StartDate,
                 g.EndDate,
             })
             .ToListAsync();
+
+        // each grave's recipients, in the order they were linked, so the client
+        // can filter the overview by their names and addresses
+        var recipients = (
+            await _db
+                .GraveRecipients.OrderBy(gr => gr.Id)
+                .Select(gr => new
+                {
+                    gr.GraveId,
+                    Recipient = new
+                    {
+                        gr.Recipient.Id,
+                        gr.Recipient.Name,
+                        gr.Recipient.Address,
+                    },
+                })
+                .ToListAsync()
+        ).GroupBy(gr => gr.GraveId).ToDictionary(g => g.Key, g => g.Select(gr => gr.Recipient).ToList());
 
         var links = await GraveBilling.LinksByGraveAsync(_db);
 
@@ -84,11 +104,14 @@ public class GraveInvoicingStatusController : ODataController
                 g.GraveNumber,
                 g.FieldNumber,
                 g.SiteName,
+                g.CemeteryId,
+                g.CemeteryName,
                 g.StartDate,
                 g.EndDate,
                 Invoiced = invoicedIds.Contains(g.Id),
                 InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
                 PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
+                Recipients = recipients.GetValueOrDefault(g.Id) ?? [],
             });
 
         return new JsonResult(new { value }, ODataJsonDefaults.PascalCase);

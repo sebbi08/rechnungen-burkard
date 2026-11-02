@@ -10,6 +10,7 @@ import type { QGrave } from "./QGrave.js";
 import type { GraveItemId } from "../grave-item/GraveItem.js";
 import type { GraveRecipientId } from "../grave-recipient/GraveRecipient.js";
 import { qGrave, QGraveId } from "./QGrave.js";
+import { CemeteryService } from "../cemetery/CemeteryService.js";
 import { GraveItemService, GraveItemCollectionService } from "../grave-item/GraveItemService.js";
 import {
   GraveRecipientService,
@@ -22,6 +23,8 @@ export class GraveService<V extends ODataVersionV4 = "4.0"> extends EntityTypeSe
   QGrave,
   V
 > {
+  private _Cemetery?: CemeteryService<V>;
+
   constructor(
     client: ODataHttpClient,
     basePath: string,
@@ -29,6 +32,15 @@ export class GraveService<V extends ODataVersionV4 = "4.0"> extends EntityTypeSe
     options?: ODataServiceOptionsInternal<V>,
   ) {
     super(client, basePath, name, qGrave, options);
+  }
+
+  public Cemetery(): CemeteryService<V> {
+    if (!this._Cemetery) {
+      const { client, path, options } = this.__base;
+      this._Cemetery = new CemeteryService(client, path, "Cemetery", options);
+    }
+
+    return this._Cemetery;
   }
 
   public Items(): GraveItemCollectionService<V>;

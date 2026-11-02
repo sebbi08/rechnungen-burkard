@@ -49,6 +49,12 @@ exactly those values.
 5. **Given** the user changes the VAT rates, ending text, or stamp word, **When**
    a new invoice is generated, **Then** only invoices generated after the change
    use the new values; previously generated invoices are unchanged.
+6. **Given** a cemetery "Südfriedhof" in the settings, **When** the user adds
+   "SÜDFRIEDHOF", **Then** it is refused as already existing; **When** they
+   rename "Südfriedhof", **Then** every grave in it shows the new name.
+7. **Given** a cemetery that a grave lies in, **When** the user deletes it,
+   **Then** the deletion is refused with a clear message; a cemetery without
+   graves is deleted.
 
 ---
 
@@ -136,7 +142,7 @@ and that a normal document and a stamped copy both result.
 ### User Story 5 - Manage Graves (Priority: P2)
 
 A user manages graves, each with a grave number, a field number, a site name, a
-position, a start month and an optional end month, a creation date, one or more
+cemetery, a position, a start month and an optional end month, a creation date, one or more
 invoicing items (each with a count and an optional price that
 overrides the item's default), and one to four recipients.
 
@@ -144,18 +150,19 @@ overrides the item's default), and one to four recipients.
 needed before half-year invoices can be generated.
 
 **Independent Test**: Can be fully tested by creating a grave with a number, field
-number, site name, position, months, one invoicing item, and two recipients, then
-listing and searching it.
+number, site name, cemetery, position, months, one invoicing item, and two
+recipients, then listing it and searching it by column.
 
 **Acceptance Scenarios**:
 
 1. **Given** the grave section is opened, **When** the user saves a grave with a
-   number, field number, site name, position, start month, one item with count,
+   number, field number, site name, cemetery, position, start month, one item with count,
    and one to four recipients, **Then** the grave is stored with a creation date
    and is searchable. Saving without an end month is allowed.
-2. **Given** the user searches for a grave, **When** they enter a grave number,
-   field number, site name or recipient name, **Then** matching graves are
-   returned.
+2. **Given** the user fills the search of a column of the grave overview,
+   **When** they enter a grave number, field number, site name, month, or a
+   recipient's name or address, or pick a cemetery, **Then** only matching graves
+   are listed.
 3. **Given** a new grave that has not been saved yet, **When** the user adds items
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
@@ -277,17 +284,17 @@ that copy results.
 
 ### User Story 9 - Browse Invoices and Bulk-Download Grave Invoices (Priority: P3)
 
-A user browses the invoices that are not tied to a grave in a searchable list,
-one row per invoice chain, finding them by invoice number, recipient, date, or
-total. Grave invoices are browsed through their grave instead; from the grave
+A user browses the invoices that are not tied to a grave in a list that can be
+searched by column, one row per invoice chain, finding them by invoice number,
+recipient, date, or total. Grave invoices are browsed through their grave instead; from the grave
 overview, a user bulk-downloads the normal documents of a selected half-year's
 grave invoices.
 
 **Why this priority**: These conveniences build on the core flows and improve
 day-to-day efficiency.
 
-**Independent Test**: Can be fully tested by searching the invoice overview by
-each of the four criteria, then selecting a half-year on the grave overview and
+**Independent Test**: Can be fully tested by searching the invoice overview in
+each of its four text columns, then selecting a half-year on the grave overview and
 bulk-downloading its normal invoices.
 
 **Acceptance Scenarios**:
@@ -295,9 +302,9 @@ bulk-downloading its normal invoices.
 1. **Given** non-grave invoices with several revisions exist, **When** the user
    opens the invoice overview, **Then** each invoice chain is listed once, showing
    its latest revision.
-2. **Given** the user searches the invoice overview, **When** they enter an
-   invoice number, a recipient's name or address, a date, or a total, **Then**
-   matching invoices are returned.
+2. **Given** the user fills the search of a column of the invoice overview,
+   **When** they enter an invoice number, a recipient's name or address, a date,
+   or a total, **Then** only matching invoices are listed.
 3. **Given** a half-year is selected on the grave overview, **When** the user
    triggers the bulk download, **Then** the normal documents of that half-year's
    grave invoices are downloaded, with no copies included.
@@ -460,6 +467,11 @@ non-interactive until completion, and the task runs exactly once.
 - What happens when the import is interrupted (e.g., connection loss)? No partial
   data remains; the import can be repeated from scratch.
 - What happens when a search returns no matches? A clear empty state is shown.
+- What happens when a cemetery that graves lie in is deleted? The deletion is
+  refused; the graves have to be moved to another cemetery first.
+- What happens when an archive names a cemetery the settings do not have? The
+  row is reported and nothing is imported; the cemetery has to be added in the
+  settings first.
 
 ## Requirements _(mandatory)_
 
@@ -469,6 +481,12 @@ non-interactive until completion, and the task runs exactly once.
 
 - **FR-001**: The system MUST allow configuring multiple VAT percentages globally.
 - **FR-002**: The system MUST allow configuring a multi-line ending text globally.
+- **FR-002a**: Users MUST be able to keep the cemeteries graves lie in, in the
+  settings: list, add, rename and delete them. A cemetery has a name, required
+  and trimmed, which MUST be unique ignoring case, umlauts included ("Südfriedhof"
+  and "SÜDFRIEDHOF" are one name). Graves refer to their cemetery, so a rename
+  MUST apply to every grave in it at once. Deleting a cemetery MUST be refused,
+  with a clear message, while any grave lies in it.
 - **FR-003**: Invoices MUST be generated from a template.
 - **FR-004**: Invoices MUST include mandatory fields, including the recipient
   address, and MUST block generation when a mandatory field is missing.
@@ -495,6 +513,13 @@ non-interactive until completion, and the task runs exactly once.
   price they bill.
 - **FR-010**: Users MUST be able to select invoice items by their number when
   composing invoices.
+- **FR-010a**: Where an item is picked, users MUST be able to search invoice
+  items by number and description.
+- **FR-010b**: The item list MUST offer a search per column (FR-068c): text
+  fields for the number, the description and the default price (as the list
+  shows it), and selects for the VAT rate (among the configured rates) and the
+  quarter (all, whole year, or one of the quarters by the name the list shows,
+  such as "Frühling" for spring).
 
 **Invoice lines and totals**
 
@@ -512,6 +537,15 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-015**: Users MUST be able to manage recipients in a separate section.
 - **FR-016**: Users MUST be able to add recipients while creating a grave or an
   invoice.
+- **FR-016a**: Where a recipient is picked, the list MUST offer the 20 newest
+  recipients and search all of them by name, number and address, never loading
+  every recipient. It MUST say so when a search leaves more than it shows. A
+  recipient the grave being edited already has MUST NOT be offered again.
+- **FR-016b**: The recipient picker's search MUST look in the name, the number
+  and the address.
+- **FR-016c**: The recipient list MUST offer a text search per column (FR-068c):
+  number, name, address (all its lines) and e-mail. It MUST be answered by the
+  server, which pages the list.
 - **FR-017**: Changes to a recipient's name or address MUST only apply to future
   invoices; previously generated invoices MUST keep the values they were issued
   with.
@@ -519,8 +553,9 @@ non-interactive until completion, and the task runs exactly once.
 **Graves**
 
 - **FR-018**: A grave MUST have a grave number, a field number, a site name, a
-  position (double, single or urn grave, inside or outside) and a start month; the
-  end month is optional.
+  cemetery, a position (double, single or urn grave, inside or outside) and a
+  start month; the end month is optional. The site name holds the site's own
+  name only; the cemetery is a field of its own.
 - **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
   a term runs from its start month through its end month, or indefinitely without
   one. Field numbers may repeat.
@@ -529,6 +564,11 @@ non-interactive until completion, and the task runs exactly once.
   and slab graves inside, outside or with the side unknown, and graves whose kind
   is unknown. The editor MUST NOT offer them for a grave; a grave that has one
   MUST keep it when it is saved unchanged.
+- **FR-018c**: A grave's cemetery MUST be one of those kept in the settings
+  (FR-002a). The grave editor MUST offer them all in a field that can be searched,
+  and MUST NOT save a grave without one; saving MUST be refused for a cemetery
+  that does not exist. The cemetery MUST NOT be printed on invoices, and
+  invoices MUST NOT keep a copy of it.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
@@ -580,8 +620,13 @@ non-interactive until completion, and the task runs exactly once.
   worked out per rate from that share. The percentage MUST be shown to at most
   two decimals, so three recipients each read 33,33 %.
 - **FR-023**: The system MUST record a creation date for each grave.
-- **FR-024**: Users MUST be able to search graves by grave number, field number,
-  site name and recipient name.
+- **FR-024**: The grave overview MUST offer a search per column (FR-068c): text
+  fields for the grave number, the site name, the field number, the start and
+  end month (as shown, `MM/yyyy`) and the recipients, a select for the
+  cemetery (among those in the settings), and selects for the invoicing status
+  (open or invoiced) and the payment status (FR-077). The recipients search
+  MUST look in the names and addresses of all of the grave's recipients. The
+  list is filtered in the browser, folding case including umlauts.
 
 **Half-year grave invoicing**
 
@@ -602,6 +647,12 @@ non-interactive until completion, and the task runs exactly once.
   half-year first.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
+- **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows
+  its site name, and the grave's detail page MUST name it.
+- **FR-029b**: The grave overview MUST show each grave's recipients in a column
+  of their own: the name of a grave's only recipient, and for two to four
+  recipients a button "{n} Empfänger" that opens a popover with all their names,
+  one per line.
 
 **Non-grave invoices**
 
@@ -686,8 +737,12 @@ non-interactive until completion, and the task runs exactly once.
   as `Spring`, `Summer`, `Autumn` or `Winter` or left empty; any other value is
   a problem. An archive whose items CSV lacks the `Quarter` column is refused.
 - **FR-052**: The graves CSV MUST capture the grave number, field number, site
-  name, position, start month and an optional end month, in six columns. Months
-  are written as YYYY-MM.
+  name, cemetery, position, start month and an optional end month, in seven
+  columns: `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate`.
+  Months are written as YYYY-MM. The cemetery is required and names one kept in
+  the settings (FR-002a), matched ignoring case; one that is not there is a
+  problem naming the row and the value. The import MUST NOT create cemeteries.
+  An archive whose graves CSV lacks the `Cemetery` column is refused.
 - **FR-053**: The mapping CSV MUST link each grave to its invoicing items (item
   identifier with count, VAT-included flag and an optional unit price for this
   grave) and to its recipients (recipient number, the other three columns
@@ -737,13 +792,46 @@ non-interactive until completion, and the task runs exactly once.
   earlier revisions MUST remain visible on the invoice's detail page.
 - **FR-067**: The system MUST provide detail pages for an invoice, a grave, and
   a grave invoice, each showing every revision of the invoices it covers.
-- **FR-068**: Users MUST be able to search invoices by invoice number, recipient
-  name, recipient address, invoice date, and invoice total.
+- **FR-068**: The invoice list MUST offer a text search per column (FR-068c): the
+  invoice number (a search for the base number finds every revision), the
+  recipient (name and address), the invoice date (as shown, `dd.MM.yyyy`) and
+  the invoice total (gross; matched as an amount, FR-068b).
+  These searches MUST be answered by the server, which pages the list.
 - **FR-068a**: The invoice list, the grave overview and the recipient list MUST
-  show 100 entries per page. The pages MUST be cut from the list as searched
-  and filtered, and a changed search or filter MUST start on the first page.
+  show 100 entries per page. The pages MUST be cut from the list as filtered,
+  and a changed column search MUST start on the first page.
   The paginator MUST stay visible at the lower edge of the window while the
   rows of a page scroll.
+- **FR-068b**: Every search (each column's search in the four lists, and the
+  item and recipient pickers) MUST take its term as words separated by
+  whitespace and leave the entries that hold every one of them, in any order and
+  ignoring case. The four lists' column searches MUST ignore the case of umlauts
+  too ("ö" finds "Ö"); the pickers fold the case of A–Z only. The words MAY be
+  found in different fields of those the search looks in: "Hanna Bauer" MUST
+  find a recipient named "Bauer Hanna", and a name typed together with a street
+  the recipient who lives there. A search for an amount (the invoice list's
+  total, the item list's price) MUST find it as shown ("1.234,56 €"), without
+  the "€", without the thousands separator ("1234,56") and with a point for the
+  decimal comma ("1234.56", "12.50"); "12,5" MUST find 12,50.
+- **FR-068c**: The invoice list, the grave overview, the item list and the
+  recipient list MUST each offer a search per column instead of a single search
+  field. Every column that holds data has its own: a text field, or a select
+  for a column of fixed values, "Alle" being its empty choice; columns that hold
+  only buttons have none. All searches that are filled MUST apply together.
+  On a screen wide enough to show every column of the list (the grave overview
+  from 1536 px, so Beginn and Ende stay hidden below it), the searches MUST sit
+  in a row directly under the column headers. On a narrower screen the list
+  MUST show a "Filter" button with the number of active searches instead, which
+  opens a sheet from the bottom with a labelled field for every searchable
+  column, hidden columns included, and a button to clear them all. The active
+  searches MUST also show as chips above the list, each removable on its own.
+  The row and the sheet MUST edit the same searches, applied as the user types.
+- **FR-068d**: The column searches MUST live in the URL query of the list, so
+  that leaving for a detail page and coming back, reloading, or sharing the
+  link shows the same filtered list; a breadcrumb back to the list MUST lead to
+  it as it was left. On the grave overview the selected
+  half-year MUST live in the URL query too, though it is no column search:
+  clearing the searches leaves it alone.
 
 **Payment status**
 
@@ -758,12 +846,14 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-074**: The system MUST refuse to edit a grave invoice while any recipient
   of that grave and half-year is marked paid, and MUST name those recipients.
 - **FR-075**: Only the latest revision of an invoice MUST be markable as paid.
-- **FR-076**: The invoice list MUST be filterable by payment status.
+- **FR-076**: The invoice list MUST offer a payment status search (FR-068c): all
+  invoices, only unpaid ones, or only paid ones.
 - **FR-077**: The grave overview MUST show, for the selected half-year, whether a
   grave's invoices are unpaid, partly paid or paid; for a half-year with no
   invoice at all, this MUST show nothing, since the invoicing-status column
-  beside it already reports that. The overview MUST be filterable to the
-  graves that still have an unpaid invoice in that half-year.
+  beside it already reports that. The overview's payment status search
+  (FR-068c) MUST be able to narrow the list to the graves that still have an
+  unpaid invoice in that half-year.
 
 ### Key Entities _(include if feature involves data)_
 
@@ -773,7 +863,7 @@ non-interactive until completion, and the task runs exactly once.
 - **Invoice Item**: A catalogue entry identified by a number, with a text, a VAT
   rate, an optional default price and an optional quarter.
 - **Grave**: Identified by a grave number (unique among graves whose terms
-  overlap); has a field number, a site name, a position, a start month, an
+  overlap); has a field number, a site name, a cemetery, a position, a start month, an
   optional end month, a creation date, one or more invoicing items (with counts), and one to four recipients,
   fixed once the grave is created.
 - **Invoice**: A generated document; tied either to a grave (for a half-year, one
@@ -798,6 +888,8 @@ non-interactive until completion, and the task runs exactly once.
   applied to their line totals.
 - **Global Settings**: Holds the VAT rates, the multi-line ending text, and the
   copy stamp word (default "Kopie").
+- **Cemetery**: Kept in the settings; has a name, unique ignoring case. Graves
+  refer to it; it is not part of any invoice.
 - **Import Template**: A ZIP archive with four CSV files (recipients, items,
   graves, mapping), each with a header row; downloadable even when no data exists.
 - **Validation Report**: A list of problems found before import, each locating the
@@ -869,6 +961,10 @@ non-interactive until completion, and the task runs exactly once.
 - Graves that existed before the field number, site name and position were
   introduced keep them empty until edited; the editor then requires them, and
   invoice generation does not.
+- Graves that existed before the cemetery was introduced are put in one
+  cemetery named "Unbekannt" when the database is upgraded, to be corrected in
+  the editor; their site names, which may still name the cemetery, are left as
+  they were. An empty database gets no cemetery.
 - Generated documents are PDFs.
 - Invoice numbers are sequential and unique; revisions are clearly marked as
   revisions.

@@ -4,6 +4,7 @@ import { ODataService, UrlRequestCmd } from "@odata2ts/odata-service";
 import type { VatRateId } from "./burkard-invoicing-domain-entities/vat-rate/VatRate.js";
 import type { InvoiceItemId } from "./burkard-invoicing-domain-entities/invoice-item/InvoiceItem.js";
 import type { RecipientId } from "./burkard-invoicing-domain-entities/recipient/Recipient.js";
+import type { CemeteryId } from "./burkard-invoicing-domain-entities/cemetery/Cemetery.js";
 import type { GraveId } from "./burkard-invoicing-domain-entities/grave/Grave.js";
 import type { GraveItemId } from "./burkard-invoicing-domain-entities/grave-item/GraveItem.js";
 import type { GraveRecipientId } from "./burkard-invoicing-domain-entities/grave-recipient/GraveRecipient.js";
@@ -23,6 +24,10 @@ import {
   RecipientService,
   RecipientCollectionService,
 } from "./burkard-invoicing-domain-entities/recipient/RecipientService.js";
+import {
+  CemeteryService,
+  CemeteryCollectionService,
+} from "./burkard-invoicing-domain-entities/cemetery/CemeteryService.js";
 import {
   GraveService,
   GraveCollectionService,
@@ -98,6 +103,18 @@ export class InvoicingService extends ODataService {
     const fieldName = "Recipients";
     const { client, path, options } = this.__base;
     const collection = new RecipientCollectionService(client, path, fieldName, {
+      ...options,
+      subtype: false,
+    });
+    return typeof id === "undefined" || id === null ? collection : collection.byId(id);
+  }
+
+  public Cemeteries(): CemeteryCollectionService;
+  public Cemeteries(id: CemeteryId): CemeteryService;
+  public Cemeteries(id?: CemeteryId | undefined) {
+    const fieldName = "Cemeteries";
+    const { client, path, options } = this.__base;
+    const collection = new CemeteryCollectionService(client, path, fieldName, {
       ...options,
       subtype: false,
     });

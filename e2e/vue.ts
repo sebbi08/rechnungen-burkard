@@ -144,11 +144,55 @@ export async function search(
   answer: (url: string) => boolean,
 ): Promise<void> {
   // a query option's value spells its spaces as "+"
-  const answered = page.waitForResponse((response) =>
-    answer(decodeURIComponent(response.url().replace(/\+/g, " "))),
-  );
+  const answered = page.waitForResponse((response) => {
+    const url = response.url().replace(/\+/g, " ");
+    try {
+      return answer(decodeURIComponent(url));
+    } catch {
+      // a malformed escape belongs to some other request
+      return false;
+    }
+  });
   await field.fill(term);
   await answered;
+}
+
+/**
+ * Searches one column of a list through its filter row cell (or, on a phone,
+ * the filter sheet's field), named "{header} durchsuchen". Given `answer`, it
+ * waits for the response to the search like `search` does; without it the
+ * caller waits for what the search leaves on screen.
+ */
+export async function searchColumn(
+  page: Page,
+  header: string,
+  term: string,
+  answer?: (url: string) => boolean,
+): Promise<void> {
+  const field = page.getByRole("textbox", { name: `${header} durchsuchen` });
+  if (answer === undefined) {
+    await field.fill(term);
+  } else {
+    await search(page, field, term, answer);
+  }
+}
+
+/** Picks an option of a column's filter select, named "{header} filtern". */
+export async function filterColumn(page: Page, header: string, option: string): Promise<void> {
+  await pickOption(page, page.getByRole("combobox", { name: `${header} filtern` }), option);
+}
+
+/**
+ * Opens a PrimeVue Popover with the button that toggles it (and says so in
+ * `aria-expanded`), and answers the popover once it has finished opening.
+ */
+export async function openPopover(page: Page, button: Locator): Promise<Locator> {
+  await button.click();
+  const popover = page.locator(".p-popover");
+  await expect(popover).toBeVisible();
+  await expect(popover).not.toHaveClass(/p-popover-enter-active/);
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+  return popover;
 }
 
 /**

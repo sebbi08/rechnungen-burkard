@@ -64,6 +64,7 @@ public class GraveMultiItemGenerationTests
         var grave = new Grave
         {
             GraveNumber = "M-1",
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2020, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

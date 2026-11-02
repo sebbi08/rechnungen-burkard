@@ -49,6 +49,7 @@ public sealed record GraveRow(
     string Number,
     string FieldNumber,
     string SiteName,
+    string Cemetery,
     GravePosition Position,
     DateOnly StartDate,
     DateOnly? EndDate
@@ -81,6 +82,10 @@ public sealed class ImportData
     public HashSet<string> DeclaredRecipients { get; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> DeclaredItems { get; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> DeclaredGraves { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The stored cemeteries' ids by name, ignoring case: a grave row
+    /// names its cemetery, which the import does not create.</summary>
+    public Dictionary<string, long> CemeteryIds { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Either the problems that block the import, or the data to write.</summary>

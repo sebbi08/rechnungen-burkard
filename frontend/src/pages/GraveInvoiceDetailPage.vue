@@ -14,6 +14,7 @@ import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
 import RevisionList from "@/components/RevisionList.vue";
+import { listLocation } from "@/composables/useColumnFilters";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import { usePaidToggle } from "@/composables/usePaidToggle";
 import { formatInvoiceNumber, formatShare } from "@/lib/format";
@@ -59,7 +60,7 @@ const halfYear = computed(() =>
   <PageHeader
     :title="latest ? number : t('graveInvoiceDetailTitle')"
     :crumbs="[
-      { label: t('menuGraves'), to: '/graves' },
+      { label: t('menuGraves'), to: listLocation('/graves') },
       { label: group.data.value?.GraveNumber ?? t('graveDetailTitle'), to: `/graves/${graveId}` },
       { label: number || t('graveInvoiceDetailTitle') },
     ]"

@@ -10,8 +10,9 @@ import Select from "primevue/select";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
+import type { Recipient } from "@/api/generated";
 import { ApiError, toApiError } from "@/api/http";
-import { useItemsQuery, useRecipientsQuery } from "@/api/queries";
+import { useCemeteriesQuery, useItemsQuery } from "@/api/queries";
 import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
 import { useErrorToast } from "@/composables/useErrorToast";
@@ -33,12 +34,12 @@ const { showError } = useErrorToast();
 const drawerFocus = useDrawerFocus();
 const formEl = ref<HTMLFormElement | null>(null);
 const queryClient = useQueryClient();
-const allRecipients = useRecipientsQuery(ref(""));
 
 const form = reactive({
   GraveNumber: "",
   FieldNumber: "",
   SiteName: "",
+  CemeteryId: null as number | null,
   Position: null as GravePositionName | null,
   StartDate: null as Date | null,
   EndDate: null as Date | null,
@@ -55,9 +56,12 @@ const positionOptions = computed(() => {
     label: t(`gravePosition${value}`),
   }));
 });
+const cemeteries = useCemeteriesQuery();
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
+// the recipient behind that id, as the picker knows it
+const linkRecipient = ref<Recipient | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 // What the user can change; the recipient picked for adding is not, until it
@@ -81,6 +85,9 @@ watch(visible, async (open) => {
   const current = ++opening;
   if (open) {
     drawerFocus.remember();
+    // loaded with the page, which may be older than a cemetery added since;
+    // the item and recipient pickers load anew as the drawer opens anyway
+    void cemeteries.refetch();
   }
   if (!open) {
     loading.value = false;
@@ -90,6 +97,7 @@ watch(visible, async (open) => {
     GraveNumber: "",
     FieldNumber: "",
     SiteName: "",
+    CemeteryId: null,
     Position: null,
     StartDate: null,
     EndDate: null,
@@ -112,6 +120,7 @@ watch(visible, async (open) => {
       GraveNumber: grave.GraveNumber,
       FieldNumber: grave.FieldNumber,
       SiteName: grave.SiteName,
+      CemeteryId: grave.CemeteryId,
       Position: grave.Position,
       StartDate: parseIsoDate(grave.StartDate),
       EndDate: parseIsoDate(grave.EndDate),
@@ -145,17 +154,13 @@ watch(visible, async (open) => {
 });
 
 function addRecipient(): void {
-  const id = linkRecipientId.value;
-  if (id == null) {
+  const recipient = linkRecipient.value;
+  if (recipient == null || recipient.Id !== linkRecipientId.value) {
     return;
   }
-  if (recipients.value.some((recipient) => recipient.id === id)) {
-    showError(new ApiError("GraveRecipientLinkExists"));
-    return;
-  }
-  const name =
-    allRecipients.data.value?.find((recipient) => recipient.Id === id)?.Name ?? String(id);
-  recipients.value = [...recipients.value, { id, name }];
+  recipients.value = [...recipients.value, { id: recipient.Id, name: recipient.Name }];
+  // the picker no longer offers a recipient the grave has
+  linkRecipientId.value = null;
 }
 
 function removeRecipient(id: number): void {
@@ -214,6 +219,10 @@ async function focusFailingInvoice(): Promise<void> {
 }
 
 async function save(): Promise<void> {
+  if (form.CemeteryId == null) {
+    showError(new ApiError("CemeteryRequired"));
+    return;
+  }
   try {
     toLineInputs(lines.value);
   } catch (error) {
@@ -224,6 +233,7 @@ async function save(): Promise<void> {
     showError(new ApiError("AllYearItemRequired"));
     return;
   }
+
   saving.value = true;
   try {
     const corrections: BillingCorrection[] = [];
@@ -294,6 +304,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       graveNumber: form.GraveNumber,
       fieldNumber: form.FieldNumber,
       siteName: form.SiteName,
+      cemeteryId: form.CemeteryId,
       position: form.Position,
       startDate: toIsoMonth(form.StartDate),
       endDate: toIsoMonth(form.EndDate),
@@ -352,6 +363,23 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
         <div class="flex flex-col gap-2">
           <label for="graveSiteName" class="font-medium">{{ t("graveSiteName") }}</label>
           <InputText id="graveSiteName" v-model="form.SiteName" />
+        </div>
+        <div class="flex flex-col gap-2">
+          <label for="graveCemetery" class="font-medium">{{ t("graveCemetery") }}</label>
+          <!-- the settings keep a handful, so all of them are offered and
+               searched here rather than by the server -->
+          <Select
+            v-model="form.CemeteryId"
+            input-id="graveCemetery"
+            :options="cemeteries.data.value ?? []"
+            option-label="Name"
+            option-value="Id"
+            filter
+            :placeholder="t('selectCemetery')"
+            :loading="cemeteries.isPending.value"
+            fluid
+            overlay-class="max-w-[calc(100vw-1rem)]"
+          />
         </div>
         <div class="flex flex-col gap-2">
           <label for="gravePosition" class="font-medium">{{ t("gravePosition") }}</label>
@@ -431,11 +459,15 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           v-if="graveId == null && recipients.length < MAX_RECIPIENTS"
           class="flex flex-wrap items-center gap-2"
         >
+          <!-- the newest recipient by default for the first one only: after an
+               add the field stays empty rather than move on to the next -->
           <RecipientPicker
             v-model="linkRecipientId"
             input-id="graveRecipient"
-            default-to-newest
+            :default-to-newest="recipients.length === 0"
+            :exclude="recipients.map((recipient) => recipient.id)"
             class="min-w-0 flex-1"
+            @selected="linkRecipient = $event"
           />
           <Button :label="t('add')" icon="pi pi-plus" outlined @click="addRecipient" />
         </div>

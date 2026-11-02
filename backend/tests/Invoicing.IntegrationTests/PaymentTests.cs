@@ -252,6 +252,7 @@ public class PaymentTests
             var grave = new Grave
             {
                 GraveNumber = "G-700",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

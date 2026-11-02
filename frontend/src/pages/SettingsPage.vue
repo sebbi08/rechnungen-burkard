@@ -4,6 +4,7 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
+import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Textarea from "primevue/textarea";
@@ -13,7 +14,7 @@ import { useI18n } from "vue-i18n";
 import { onBeforeRouteLeave } from "vue-router";
 import { ApiError } from "@/api/http";
 import { odata } from "@/api/odata";
-import { useSettingsQuery, useVatRatesQuery } from "@/api/queries";
+import { useCemeteriesQuery, useSettingsQuery, useVatRatesQuery } from "@/api/queries";
 import PageHeader from "@/components/PageHeader.vue";
 import { useConfirmAsync } from "@/composables/useConfirmAsync";
 import { useErrorToast } from "@/composables/useErrorToast";
@@ -111,6 +112,67 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
     vatBusy.value = false;
   }
 }
+
+const cemeteries = useCemeteriesQuery();
+const newCemetery = ref("");
+// one change at a time, like the VAT rates
+const cemeteryBusy = ref(false);
+
+async function addCemetery(): Promise<void> {
+  if (cemeteryBusy.value) {
+    return;
+  }
+  cemeteryBusy.value = true;
+  try {
+    // no client check: the backend answers CemeteryNameRequired and, ignoring
+    // case, CemeteryNameExists
+    await odata.Cemeteries().create({ Name: newCemetery.value }).execute();
+    newCemetery.value = "";
+    await queryClient.invalidateQueries();
+  } catch (error) {
+    showError(error);
+  } finally {
+    cemeteryBusy.value = false;
+  }
+}
+
+// Graves refer to a cemetery, so a new name is every grave's at once.
+const renaming = reactive({ visible: false, id: 0, name: "" });
+function startRename(id: number, name: string): void {
+  Object.assign(renaming, { visible: true, id, name });
+}
+
+async function rename(): Promise<void> {
+  if (cemeteryBusy.value) {
+    return;
+  }
+  cemeteryBusy.value = true;
+  try {
+    await odata.Cemeteries(renaming.id).patch({ Name: renaming.name }).execute();
+    renaming.visible = false;
+    await queryClient.invalidateQueries();
+  } catch (error) {
+    showError(error);
+  } finally {
+    cemeteryBusy.value = false;
+  }
+}
+
+async function deleteCemetery(id: number, name: string): Promise<void> {
+  if (cemeteryBusy.value || !(await ask(t("confirmDeleteCemetery", [name])))) {
+    return;
+  }
+  cemeteryBusy.value = true;
+  try {
+    // refused with CemeteryInUse while a grave lies there
+    await odata.Cemeteries(id).delete().execute();
+    await queryClient.invalidateQueries();
+  } catch (error) {
+    showError(error);
+  } finally {
+    cemeteryBusy.value = false;
+  }
+}
 </script>
 
 <template>
@@ -136,55 +198,134 @@ async function deleteVatRate(id: number, rate: number): Promise<void> {
       </template>
     </Card>
 
-    <Card>
-      <template #title>{{ t("settingsVatRates") }}</template>
-      <template #content>
-        <DataTable
-          :value="vatRates.data.value ?? []"
-          data-key="Id"
-          size="small"
-          :loading="vatRates.isFetching.value"
-        >
-          <template #empty>{{ t("noData") }}</template>
-          <Column :header="t('vatRate')">
-            <template #body="{ data }">{{ formatVatRate(data.Rate) }} %</template>
-          </Column>
-          <Column class="w-16 text-right">
-            <template #body="{ data }">
-              <Button
-                v-tooltip.left="t('delete')"
-                icon="pi pi-trash"
-                severity="danger"
-                text
-                rounded
-                :aria-label="t('delete')"
-                @click="deleteVatRate(data.Id, data.Rate)"
+    <div class="flex min-w-0 flex-col gap-6">
+      <Card>
+        <template #title>{{ t("settingsVatRates") }}</template>
+        <template #content>
+          <DataTable
+            :value="vatRates.data.value ?? []"
+            data-key="Id"
+            size="small"
+            :loading="vatRates.isFetching.value"
+          >
+            <template #empty>{{ t("noData") }}</template>
+            <Column :header="t('vatRate')">
+              <template #body="{ data }">{{ formatVatRate(data.Rate) }} %</template>
+            </Column>
+            <Column class="w-16 text-right">
+              <template #body="{ data }">
+                <Button
+                  v-tooltip.left="t('delete')"
+                  icon="pi pi-trash"
+                  severity="danger"
+                  text
+                  rounded
+                  :aria-label="t('delete')"
+                  @click="deleteVatRate(data.Id, data.Rate)"
+                />
+              </template>
+            </Column>
+          </DataTable>
+          <form class="mt-4 flex flex-wrap items-end gap-2" @submit.prevent="addVatRate">
+            <div class="flex flex-col gap-2">
+              <label for="newRate" class="text-sm">{{ t("vatRate") }}</label>
+              <InputNumber
+                v-model="newRate"
+                v-decimal-point
+                input-id="newRate"
+                locale="de-DE"
+                :max-fraction-digits="2"
+                suffix=" %"
+                :input-style="{ width: '8rem' }"
               />
-            </template>
-          </Column>
-        </DataTable>
-        <form class="mt-4 flex flex-wrap items-end gap-2" @submit.prevent="addVatRate">
-          <div class="flex flex-col gap-2">
-            <label for="newRate" class="text-sm">{{ t("vatRate") }}</label>
-            <InputNumber
-              v-model="newRate"
-              v-decimal-point
-              input-id="newRate"
-              locale="de-DE"
-              :max-fraction-digits="2"
-              suffix=" %"
-              :input-style="{ width: '8rem' }"
+            </div>
+            <Button
+              type="submit"
+              :label="t('addVatRate')"
+              icon="pi pi-plus"
+              outlined
+              :loading="vatBusy"
             />
-          </div>
-          <Button
-            type="submit"
-            :label="t('addVatRate')"
-            icon="pi pi-plus"
-            outlined
-            :loading="vatBusy"
-          />
-        </form>
-      </template>
-    </Card>
+          </form>
+        </template>
+      </Card>
+
+      <Card>
+        <template #title>{{ t("settingsCemeteries") }}</template>
+        <template #content>
+          <DataTable
+            :value="cemeteries.data.value ?? []"
+            data-key="Id"
+            size="small"
+            :loading="cemeteries.isFetching.value"
+          >
+            <template #empty>{{ t("noData") }}</template>
+            <Column :header="t('cemeteryName')">
+              <template #body="{ data }">
+                <span class="[overflow-wrap:anywhere]">{{ data.Name }}</span>
+              </template>
+            </Column>
+            <Column class="w-0 whitespace-nowrap text-right">
+              <template #body="{ data }">
+                <Button
+                  v-tooltip.left="t('renameCemetery')"
+                  icon="pi pi-pencil"
+                  text
+                  rounded
+                  :aria-label="`${t('renameCemetery')}: ${data.Name}`"
+                  @click="startRename(data.Id, data.Name)"
+                />
+                <Button
+                  v-tooltip.left="t('delete')"
+                  icon="pi pi-trash"
+                  severity="danger"
+                  text
+                  rounded
+                  :aria-label="`${t('delete')}: ${data.Name}`"
+                  @click="deleteCemetery(data.Id, data.Name)"
+                />
+              </template>
+            </Column>
+          </DataTable>
+          <form class="mt-4 flex flex-wrap items-end gap-2" @submit.prevent="addCemetery">
+            <div class="flex min-w-0 flex-1 flex-col gap-2">
+              <label for="newCemetery" class="text-sm">{{ t("cemeteryName") }}</label>
+              <InputText id="newCemetery" v-model="newCemetery" class="w-full" />
+            </div>
+            <Button
+              type="submit"
+              :label="t('addCemetery')"
+              icon="pi pi-plus"
+              outlined
+              :loading="cemeteryBusy"
+            />
+          </form>
+        </template>
+      </Card>
+    </div>
   </div>
+
+  <Dialog
+    v-model:visible="renaming.visible"
+    modal
+    :header="t('renameCemetery')"
+    :style="{ width: '26rem' }"
+    :breakpoints="{ '640px': '100vw' }"
+  >
+    <form id="renameCemeteryForm" class="flex flex-col gap-2" @submit.prevent="rename">
+      <label for="renameCemetery" class="font-medium">{{ t("cemeteryName") }}</label>
+      <InputText id="renameCemetery" v-model="renaming.name" autofocus />
+      <small class="text-muted-color">{{ t("renameCemeteryHint") }}</small>
+    </form>
+    <template #footer>
+      <Button :label="t('cancel')" severity="secondary" text @click="renaming.visible = false" />
+      <Button
+        type="submit"
+        form="renameCemeteryForm"
+        :label="t('save')"
+        icon="pi pi-check"
+        :loading="cemeteryBusy"
+      />
+    </template>
+  </Dialog>
 </template>

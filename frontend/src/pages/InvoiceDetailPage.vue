@@ -13,6 +13,7 @@ import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
 import RevisionList from "@/components/RevisionList.vue";
+import { listLocation } from "@/composables/useColumnFilters";
 import { usePaidToggle } from "@/composables/usePaidToggle";
 import { formatInvoiceNumber } from "@/lib/format";
 
@@ -50,7 +51,7 @@ const editorOpen = ref(false);
   <PageHeader
     :title="latest ? number : t('invoiceDetailTitle')"
     :crumbs="[
-      { label: t('menuInvoices'), to: '/invoices' },
+      { label: t('menuInvoices'), to: listLocation('/invoices') },
       { label: number || t('invoiceDetailTitle') },
     ]"
   >

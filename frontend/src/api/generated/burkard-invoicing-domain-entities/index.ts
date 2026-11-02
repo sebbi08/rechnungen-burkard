@@ -1,4 +1,7 @@
 export * from "./billing-quarter/BillingQuarter.js";
+export * from "./cemetery/Cemetery.js";
+export * from "./cemetery/CemeteryService.js";
+export * from "./cemetery/QCemetery.js";
 export * from "./document/Document.js";
 export * from "./document/DocumentService.js";
 export * from "./document/QDocument.js";

@@ -109,16 +109,27 @@ export function getItemGraves(itemId: number): Promise<ItemGraves> {
 
 // ---- graves ---------------------------------------------------------------
 
+/** One of a grave's recipients, as the overview lists and searches them. */
+export interface GraveStatusRecipient {
+  Id: number;
+  Name: string;
+  Address: string;
+}
+
 export interface GraveStatusRow {
   Id: number;
   GraveNumber: string;
   FieldNumber: string;
   SiteName: string;
+  CemeteryId: number;
+  CemeteryName: string;
   StartDate: string;
   EndDate: string | null;
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
+  /** In the order they were linked; empty for a grave without any. */
+  Recipients: GraveStatusRecipient[];
 }
 
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
@@ -126,22 +137,12 @@ export async function fetchGraveStatus(year: number, half: number): Promise<Grav
   return (await getJson<{ value: GraveStatusRow[] }>(url)).value;
 }
 
-export interface GraveSearchResult {
-  Id: number;
-  GraveNumber: string;
-  RecipientNames: string[];
-}
-
-export async function searchGraves(term: string): Promise<GraveSearchResult[]> {
-  const url = `/odata/SearchGraves?term=${encodeURIComponent(term)}`;
-  return (await getJson<{ value: GraveSearchResult[] }>(url)).value;
-}
-
 export interface SaveGraveInput {
   graveId: number | null;
   graveNumber: string;
   fieldNumber: string;
   siteName: string;
+  cemeteryId: number | null;
   position: GravePositionName | null;
   /** "yyyy-MM" */
   startDate: string | null;
@@ -187,6 +188,8 @@ export interface GraveDetails {
   GraveNumber: string;
   FieldNumber: string;
   SiteName: string;
+  CemeteryId: number;
+  Cemetery: { Id: number; Name: string };
   Position: GravePositionName | null;
   StartDate: string;
   EndDate: string | null;
@@ -200,7 +203,7 @@ export interface GraveDetails {
 /** Graves(id) answers hand-built JSON with the links already expanded. */
 export function fetchGraveDetails(graveId: number): Promise<GraveDetails> {
   return getJson<GraveDetails>(
-    `/odata/Graves(${graveId})?$expand=Items($expand=Item),Recipients($expand=Recipient)`,
+    `/odata/Graves(${graveId})?$expand=Cemetery,Items($expand=Item),Recipients($expand=Recipient)`,
   );
 }
 
