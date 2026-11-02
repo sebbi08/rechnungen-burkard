@@ -29,5 +29,7 @@
       "matchStrings": ["(?<depName>mcr\\.microsoft\\.com/dotnet/sdk):(?<currentValue>[^\\s\"']+)"],
       "datasourceTemplate": "docker"
     }
-  ]
+  ],
+  "npmrc": "allow-remote=all",
+  "npmrcMerge": true
 }
