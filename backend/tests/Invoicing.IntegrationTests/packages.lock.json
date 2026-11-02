@@ -490,8 +490,8 @@
       },
       "QuestPDF": {
         "type": "Transitive",
-        "resolved": "2025.12.4",
-        "contentHash": "dDeLlrj/7dxZFUDzmGYqmWW9VWrD30+6SztusBMvDGlz0w2MaA9WVW2ISLGL8ufUjinJr97yHDkdIl3ueMgmow=="
+        "resolved": "2026.9.1",
+        "contentHash": "i2BT/v+Ui6Hg9+BZbOci/VfsyvmtY8nlQqAOmFt8iOZ4Hm9aKZZRgZZ+LfrKWYXAHRb3l1EjDcMVfjRaZTt+Cw=="
       },
       "SQLitePCLRaw.bundle_e_sqlite3": {
         "type": "Transitive",
@@ -583,7 +583,7 @@
         "type": "Project",
         "dependencies": {
           "Invoicing.Domain": "[1.0.0, )",
-          "QuestPDF": "[2025.*, )"
+          "QuestPDF": "[2026.*, )"
         }
       },
       "invoicing.domain": {
