@@ -9,7 +9,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 # The PrimeUI license key PrimeVue 5 checks; the release workflow passes it in
-# from the repository variable PRIMEUI_LICENSE. Without it the app still works
+# from the repository secret PRIMEUI_LICENSE. Without it the app still works
 # and shows PrimeVue's license notice. This stage is not part of the image.
 ARG PRIMEUI_LICENSE
 ENV VITE_PRIMEUI_LICENSE=${PRIMEUI_LICENSE}

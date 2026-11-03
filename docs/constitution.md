@@ -1,18 +1,13 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 5.0.0 → 6.0.0 (PrimeUI's commercial license is accepted)
-Modified principles: Principle VI (Vue Frontend (Open Source) → Vue Frontend,
-  Open Source with a PrimeUI Exception) — the PrimeUI packages (primevue,
-  @primevue/*, @primeuix/*, primeicons) may ship under the PrimeUI License
-  from version 5 / 3 / 8 on; every other frontend library stays open source;
-  the license key is supplied at build time and never committed
-Modified sections: Technology Constraints — PrimeVue is no longer listed as
-  open-source
+Version change: 6.0.0 → 6.0.1 (wording: the PrimeUI key is a repository secret)
+Modified principles: Principle VI — the license key comes from the
+  PRIMEUI_LICENSE repository secret rather than a repository variable
+Modified sections: none
 Added sections: none
 Removed sections: none
-Follow-up TODOs: the repository variable PRIMEUI_LICENSE must exist before a
-  release built with PrimeVue 5
+Follow-up TODOs: none (the PRIMEUI_LICENSE secret exists)
 -->
 
 # rechnungen-burkard Constitution
@@ -76,7 +71,7 @@ the bundled dependencies, the PrimeUI License included, MUST ship with the
 frontend delivery.
 
 The PrimeUI license key MUST NOT be committed. It is supplied at build time
-(the `PRIMEUI_LICENSE` repository variable, passed to the image build), and
+(the `PRIMEUI_LICENSE` repository secret, passed to the image build), and
 the frontend MUST keep working without it.
 
 Rationale: Vue and PrimeVue provide the required UI framework. From PrimeVue 5,
@@ -139,4 +134,4 @@ PATCH for clarifications and wording fixes.
 Compliance with this constitution MUST be reviewed as part of code review and
 release. Deviations MUST be justified and recorded.
 
-**Version**: 6.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-11-02
+**Version**: 6.0.1 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-11-03
