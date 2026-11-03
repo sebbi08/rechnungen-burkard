@@ -71,9 +71,12 @@ jobs:
       # `latest` tags are added to this same image at the end, so what the tag
       # names and what the image holds cannot differ.
       - name: Build and push the image under the commit's tag
+        env:
+          PRIMEUI_LICENSE: ${{ secrets.PRIMEUI_LICENSE }}
         run: |
           IMAGE="ghcr.io/${{ github.repository }}"
           docker build --build-arg VERSION="${{ env.BUILD_VERSION }}" \
+            --build-arg PRIMEUI_LICENSE \
             -t "$IMAGE:sha-${GITHUB_SHA::7}" .
           docker push "$IMAGE:sha-${GITHUB_SHA::7}"
 

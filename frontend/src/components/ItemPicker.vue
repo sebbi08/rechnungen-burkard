@@ -28,8 +28,12 @@ const items = useItemsQuery(useDebounced(filter));
     :placeholder="t('selectItem')"
     fluid
     overlay-class="max-w-[calc(100vw-1rem)]"
+    :pt="{ option: ({ context }) => ({ 'aria-label': context?.option.Number }) }"
     @filter="filter = $event.value"
   >
+    <!-- PrimeVue 5 leaves an option without aria-label when the option slot is
+         used, so the description became part of its name; the pt above names
+         it by the item number alone again, as the field shows it. -->
     <!-- A long number has no space to break at. Without the width limit and
          the break, it widened the list past the screen of a phone, which
          then zoomed the whole page out and slid the editor under it. -->

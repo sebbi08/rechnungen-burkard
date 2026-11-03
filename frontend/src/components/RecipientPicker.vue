@@ -99,8 +99,12 @@ function onCreated(id: number): void {
       :loading="offered.isFetching.value && filter === ''"
       class="min-w-0 flex-1 basis-64"
       overlay-class="max-w-[calc(100vw-1rem)]"
+      :pt="{ option: ({ context }) => ({ 'aria-label': context?.option.Name }) }"
       @filter="filter = $event.value"
     >
+      <!-- PrimeVue 5 leaves an option without aria-label when the option slot
+           is used, so the address became part of its name; the pt above names
+           it by the recipient alone again, as the field shows it. -->
       <!-- An option does not wrap on its own. Without the width limit and the
            break, a long name widened the list past the screen of a phone, which
            then zoomed the whole page out and slid the editor under it. -->

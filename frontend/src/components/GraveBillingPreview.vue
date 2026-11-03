@@ -37,7 +37,7 @@ function problemText(problem: GraveBillingProblem): string {
       <ProgressSpinner
         v-if="pending"
         style="width: 1.25rem; height: 1.25rem"
-        stroke-width="6"
+        :stroke-width="12"
         :aria-label="t('billingPreviewChecking')"
       />
     </div>
