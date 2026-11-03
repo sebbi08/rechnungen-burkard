@@ -4,11 +4,21 @@
   "dependencyDashboard": true,
   "automerge": false,
   "lockFileMaintenance": { "enabled": false },
+  "nuget": {
+    "lockFileMaintenance": { "enabled": true }
+  },
   "packageRules": [
     {
       "description": "Nie automatisch mergen",
       "matchPackageNames": ["*"],
       "automerge": false
+    },
+    {
+      "description": "NuGet-Floating-Ranges (z. B. 17.*): keine In-Range-PRs. Renovate würde 17.* in 17.1* umschreiben, das scheitert im Locked Mode mit NU1004. Neue Versionen innerhalb des Bereichs kommen über die Lockfile-Wartung (nur NuGet).",
+      "matchManagers": ["nuget"],
+      "matchCurrentValue": "/\\*/",
+      "matchUpdateTypes": ["minor", "patch"],
+      "enabled": false
     }
   ],
   "customManagers": [
@@ -19,5 +29,7 @@
       "matchStrings": ["(?<depName>mcr\\.microsoft\\.com/dotnet/sdk):(?<currentValue>[^\\s\"']+)"],
       "datasourceTemplate": "docker"
     }
-  ]
+  ],
+  "npmrc": "allow-remote=all",
+  "npmrcMerge": true
 }

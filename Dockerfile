@@ -3,7 +3,7 @@
 # The release image: the frontend's build is served from the API's wwwroot, so
 # frontend and backend ship as one container on one port and need no proxy
 # between them.
-FROM node:22 AS frontend
+FROM node:26 AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
