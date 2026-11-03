@@ -7,6 +7,11 @@ public sealed class Grave
     public string FieldNumber { get; set; } = "";
     public string SiteName { get; set; } = "";
 
+    /// <summary>Required; restricted, so a cemetery cannot be deleted while a
+    /// grave lies in it.</summary>
+    public long CemeteryId { get; set; }
+    public Cemetery Cemetery { get; set; } = null!;
+
     /// <summary>Required when a grave is saved; null only on graves that were
     /// migrated from before the field existed and have not been edited since.</summary>
     public GravePosition? Position { get; set; }

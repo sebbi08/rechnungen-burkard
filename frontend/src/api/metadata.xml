@@ -33,6 +33,13 @@
                 <Property Name="Address" Type="Edm.String" Nullable="false" />
                 <Property Name="Email" Type="Edm.String" />
             </EntityType>
+            <EntityType Name="Cemetery">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="Name" Type="Edm.String" Nullable="false" />
+            </EntityType>
             <EntityType Name="Grave">
                 <Key>
                     <PropertyRef Name="Id" />
@@ -41,10 +48,18 @@
                 <Property Name="GraveNumber" Type="Edm.String" Nullable="false" />
                 <Property Name="FieldNumber" Type="Edm.String" Nullable="false" />
                 <Property Name="SiteName" Type="Edm.String" Nullable="false" />
+                <Property Name="CemeteryId" Type="Edm.Int64" Nullable="false" />
                 <Property Name="Position" Type="Burkard.Invoicing.Domain.Entities.GravePosition" />
                 <Property Name="StartDate" Type="Edm.Date" Nullable="false" />
                 <Property Name="EndDate" Type="Edm.Date" />
                 <Property Name="CreatedAt" Type="Edm.Date" Nullable="false" />
+                <NavigationProperty
+                    Name="Cemetery"
+                    Type="Burkard.Invoicing.Domain.Entities.Cemetery"
+                    Nullable="false"
+                >
+                    <ReferentialConstraint Property="CemeteryId" ReferencedProperty="Id" />
+                </NavigationProperty>
                 <NavigationProperty
                     Name="Items"
                     Type="Collection(Burkard.Invoicing.Domain.Entities.GraveItem)"
@@ -286,7 +301,12 @@
                     Name="Recipients"
                     EntityType="Burkard.Invoicing.Domain.Entities.Recipient"
                 />
+                <EntitySet
+                    Name="Cemeteries"
+                    EntityType="Burkard.Invoicing.Domain.Entities.Cemetery"
+                />
                 <EntitySet Name="Graves" EntityType="Burkard.Invoicing.Domain.Entities.Grave">
+                    <NavigationPropertyBinding Path="Cemetery" Target="Cemeteries" />
                     <NavigationPropertyBinding Path="Items" Target="GraveItems" />
                     <NavigationPropertyBinding Path="Recipients" Target="GraveRecipients" />
                 </EntitySet>

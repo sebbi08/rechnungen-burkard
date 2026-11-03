@@ -3,11 +3,16 @@
 # The release image: the frontend's build is served from the API's wwwroot, so
 # frontend and backend ship as one container on one port and need no proxy
 # between them.
-FROM node:22 AS frontend
+FROM node:26 AS frontend
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+# The PrimeUI license key PrimeVue 5 checks; the release workflow passes it in
+# from the repository secret PRIMEUI_LICENSE. Without it the app still works
+# and shows PrimeVue's license notice. This stage is not part of the image.
+ARG PRIMEUI_LICENSE
+ENV VITE_PRIMEUI_LICENSE=${PRIMEUI_LICENSE}
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend

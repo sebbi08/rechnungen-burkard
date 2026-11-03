@@ -58,6 +58,7 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
                     graveNumber,
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -87,6 +88,7 @@ public class InvoiceItemTests : IClassFixture<ApiTestHost>
         var grave = new Burkard.Invoicing.Domain.Entities.Grave
         {
             GraveNumber = graveNumber,
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2026, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

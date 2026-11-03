@@ -93,6 +93,7 @@ public sealed class ImportService
                 GraveNumber = row.Number,
                 FieldNumber = row.FieldNumber,
                 SiteName = row.SiteName,
+                CemeteryId = data.CemeteryIds[row.Cemetery],
                 Position = row.Position,
                 StartDate = row.StartDate,
                 EndDate = row.EndDate,

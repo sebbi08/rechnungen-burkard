@@ -1,7 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { createRow, ensureRow, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
-import { dialog, pickOption, search, toasts, waitForOverlayOpen } from "../vue";
+import {
+  confirmation,
+  dialog,
+  filterColumn,
+  pickOption,
+  searchColumn,
+  toasts,
+  waitForOverlayOpen,
+} from "../vue";
 
 test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) => {
   await page.goto("/settings");
@@ -43,6 +51,86 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
   await expect(page.getByLabel("Stempelwort")).toHaveValue("Kopie");
 });
 
+test("settings: a cemetery is added, renamed for its graves and kept while they lie there", async ({
+  page,
+}) => {
+  const ts = unique();
+  const name = `Südfriedhof ${ts}`;
+  const renamed = `Hauptfriedhof ${ts}`;
+  const unused = `Leerer Friedhof ${ts}`;
+  await page.goto("/settings");
+  const cemeteries = page.locator("table", {
+    has: page.getByRole("columnheader", { name: "Name", exact: true }),
+  });
+  const field = page.getByLabel("Name", { exact: true });
+
+  await field.fill(name);
+  await page.getByRole("button", { name: "Friedhof hinzufügen" }).click();
+  await expect(cemeteries.getByRole("row").filter({ hasText: name })).toBeVisible();
+  await expect(field).toHaveValue("");
+
+  // the same name in other letters is the same cemetery, umlauts included
+  await field.fill(name.toUpperCase());
+  await page.getByRole("button", { name: "Friedhof hinzufügen" }).click();
+  await expect(
+    toasts(page).filter({ hasText: "Ein Friedhof mit diesem Namen existiert bereits." }),
+  ).toBeVisible();
+
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `FH-${ts}`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 10,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Friedhof Beispiel ${ts}`,
+    Address: "Friedhofsweg 1",
+  });
+  const graveId = await seedGrave(page, {
+    graveNumber: `FH-${ts}`,
+    cemeteryId: await ensureCemetery(page, name),
+    items: [{ itemId: item.Id }],
+    recipientIds: [recipient.Id],
+  });
+
+  // a rename is the grave's new cemetery name too: it refers to the cemetery
+  await cemeteries
+    .getByRole("row")
+    .filter({ hasText: name })
+    .getByRole("button", { name: `Friedhof umbenennen: ${name}` })
+    .click();
+  await waitForOverlayOpen(page);
+  const renameDialog = dialog(page, "Friedhof umbenennen");
+  await expect(renameDialog.getByLabel("Name")).toHaveValue(name);
+  await renameDialog.getByLabel("Name").fill(renamed);
+  await renameDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(renameDialog).toHaveCount(0);
+  const row = cemeteries.getByRole("row").filter({ hasText: renamed });
+  await expect(row).toBeVisible();
+  await expect(cemeteries).not.toContainText(name);
+
+  // refused while the grave lies there, and asked about first
+  await row.getByRole("button", { name: `Löschen: ${renamed}` }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(
+    toasts(page).filter({ hasText: "Auf diesem Friedhof liegen noch Gräber." }),
+  ).toBeVisible();
+  await expect(row).toBeVisible();
+
+  // one without graves goes
+  await createRow(page, "/odata/Cemeteries", { Name: unused });
+  await page.reload();
+  const unusedRow = cemeteries.getByRole("row").filter({ hasText: unused });
+  await unusedRow.getByRole("button", { name: `Löschen: ${unused}` }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(unusedRow).toHaveCount(0);
+  await expect(row).toBeVisible();
+
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByText(renamed, { exact: true })).toBeVisible();
+});
+
 test("items: create an item without default price (Story 2)", async ({ page }) => {
   const number = `1001-${unique()}`;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -63,6 +151,92 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
   await expect(row).toContainText("Grabpflege");
   await expect(row).toContainText("7 %");
   await expect(row).not.toContainText("€");
+});
+
+test("items: each column filters on its own", async ({ page }) => {
+  const ts = unique();
+  const allYear = `SA-${ts}`;
+  const summer = `SB-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: allYear,
+    Description: "Grabpflege Ganzjahr",
+    VatRate: 7,
+    DefaultPrice: 12.5,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: summer,
+    Description: "Bepflanzung Sommer",
+    VatRate: 19,
+    DefaultPrice: 40,
+    Quarter: "Summer",
+  });
+
+  await page.goto("/items");
+  // the marker narrows the shared catalogue to this test's two items
+  await searchColumn(page, "Nummer", ts);
+  const table = page.getByRole("table");
+  await expect(table).toContainText(allYear);
+  await expect(table).toContainText(summer);
+
+  await filterColumn(page, "Quartal", "Sommer");
+  await expect(table).toContainText(summer);
+  await expect(table).not.toContainText(allYear);
+
+  await filterColumn(page, "Quartal", "Alle");
+  await filterColumn(page, "MwSt.-Satz", "7 %");
+  await expect(table).toContainText(allYear);
+  await expect(table).not.toContainText(summer);
+  await filterColumn(page, "MwSt.-Satz", "Alle");
+
+  // the words of a term match in any order
+  await searchColumn(page, "Bezeichnung", "Sommer Bepflanzung");
+  await expect(table).toContainText(summer);
+  await expect(table).not.toContainText(allYear);
+  await searchColumn(page, "Bezeichnung", "");
+
+  await searchColumn(page, "Standardpreis", "12,50");
+  await expect(table).toContainText(allYear);
+  await expect(table).not.toContainText(summer);
+});
+
+test("items: the price is found as shown and as typed", async ({ page }) => {
+  const ts = unique();
+  const large = `PG-${ts}`;
+  const small = `PK-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: large,
+    Description: "Grabanlage",
+    VatRate: 7,
+    DefaultPrice: 1234.56,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: small,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 12.5,
+  });
+
+  await page.goto("/items");
+  // the marker narrows the shared catalogue to this test's two items
+  await searchColumn(page, "Nummer", ts);
+  const table = page.getByRole("table");
+  await expect(table).toContainText(large);
+  await expect(table).toContainText(small);
+
+  // the same forms the invoice list's total takes
+  for (const term of ["1.234,56 €", "1.234,56", "1234,56", "1234.56"]) {
+    await searchColumn(page, "Standardpreis", term);
+    await expect(table, term).toContainText(large);
+    await expect(table, term).not.toContainText(small);
+  }
+  for (const term of ["12,50 €", "12.50", "12,5"]) {
+    await searchColumn(page, "Standardpreis", term);
+    await expect(table, term).toContainText(small);
+    await expect(table, term).not.toContainText(large);
+  }
 });
 
 test("items: edit an existing item via the row dialog (Story 2)", async ({ page }) => {
@@ -233,16 +407,134 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   await expect(page.getByRole("row").filter({ hasText: first })).toContainText(/E-\d+/);
 
   // search must actually narrow the list: this term matches only the first one
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
-    `Mahr ${ts}`,
-    // the term goes out lower-cased, so the search ignores case
-    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`mahr ${ts}`),
+    "Name",
+    `mahr ${ts}`,
+    // the search ignores case: the term is lower-cased, the names are not
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=mahr ${ts}`),
   );
   const table = page.getByRole("table");
   await expect(table).toContainText(first);
   await expect(table).not.toContainText(second);
+});
+
+test("recipients: the search finds the words of a term in any order", async ({ page }) => {
+  const ts = unique();
+  const wanted = `Bauer Hanna ${ts}`;
+  const other = `Bauer Fritz ${ts}`;
+  for (const name of [wanted, other]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/recipients");
+  await searchColumn(
+    page,
+    "Name",
+    `Hanna Bauer ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=Hanna Bauer ${ts}`),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
+});
+
+test("recipients: the search looks in the address as well as the name", async ({ page }) => {
+  const ts = unique();
+  const wanted = `Lina Lindenweg-Test ${ts}`;
+  const other = `Anton Amselweg-Test ${ts}`;
+  await createRow(page, "/odata/Recipients", {
+    Name: wanted,
+    Address: "Lindenallee 5\n97070 Würzburg",
+  });
+  await createRow(page, "/odata/Recipients", {
+    Name: other,
+    Address: "Amselgasse 1\n97070 Würzburg",
+  });
+
+  await page.goto("/recipients");
+  // one word from the address, one from the name
+  await searchColumn(
+    page,
+    "Adresse",
+    "lindenallee",
+    (url) => url.includes("/odata/Recipients") && url.includes("address=lindenallee"),
+  );
+  await searchColumn(
+    page,
+    "Name",
+    `Lindenweg-Test ${ts}`,
+    (url) => url.includes("address=lindenallee") && url.includes(`name=Lindenweg-Test ${ts}`),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(other);
+});
+
+test("recipients: each column searches its own field", async ({ page }) => {
+  const ts = unique();
+  const inAddress = `Erna ‹m› ${ts}`;
+  const inName = `Ahorn ‹m› ${ts}`;
+  await createRow(page, "/odata/Recipients", { Name: inAddress, Address: `Ahornweg ‹m› ${ts}` });
+  await createRow(page, "/odata/Recipients", { Name: inName, Address: `Birkenweg ‹m› ${ts}` });
+
+  await page.goto("/recipients");
+  const table = page.getByRole("table");
+
+  // "ahorn" is in the first one's address and the second one's name
+  await searchColumn(
+    page,
+    "Name",
+    `ahorn ‹m› ${ts}`,
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=ahorn ‹m› ${ts}`),
+  );
+  await expect(table).toContainText(inName);
+  await expect(table).not.toContainText(inAddress);
+  await expect(page).toHaveURL(/[?&]name=/);
+
+  // a reload shows the same filtered list
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Name durchsuchen" })).toHaveValue(
+    `ahorn ‹m› ${ts}`,
+  );
+  await expect(table).toContainText(inName);
+  await expect(table).not.toContainText(inAddress);
+
+  // the other column, the name filter cleared
+  await searchColumn(page, "Name", "");
+  await searchColumn(
+    page,
+    "Adresse",
+    `ahornweg ‹m› ${ts}`,
+    (url) => url.includes(`address=ahornweg ‹m› ${ts}`) && !url.includes("name="),
+  );
+  await expect(table).toContainText(inAddress);
+  await expect(table).not.toContainText(inName);
+});
+
+test("recipients: a filter with special characters", async ({ page }) => {
+  const ts = unique();
+  // ' & % and + each have a meaning in a URL; the decoy differs from the
+  // wanted name only in the +, which a wrongly encoded query would read as a space
+  const wanted = `O'Brien & Söhne 100% a+b ‹m› ${ts}`;
+  const decoy = `O'Brien & Söhne 100% a b ‹m› ${ts}`;
+  for (const name of [wanted, decoy]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+
+  await page.goto("/recipients");
+  const term = `o'brien & söhne 100% a+b ‹m› ${ts}`;
+  await searchColumn(
+    page,
+    "Name",
+    term,
+    // the helper reads a literal "+" on the wire as a space; a "+" that reaches
+    // the backend as itself was sent as %2B
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=${term}`),
+  );
+  const table = page.getByRole("table");
+  await expect(table).toContainText(wanted);
+  await expect(table).not.toContainText(decoy);
 });
 
 test("recipients: the list shows a hundred a page, of those the search leaves", async ({
@@ -262,11 +554,11 @@ test("recipients: the list shows a hundred a page, of those the search leaves", 
   }
 
   await page.goto("/recipients");
-  await search(
+  await searchColumn(
     page,
-    page.getByRole("textbox", { name: "Nach Name oder Nummer suchen" }),
+    "Name",
     `Seite ${ts}`,
-    (url) => url.includes("/odata/Recipients") && url.toLowerCase().includes(`seite ${ts}`),
+    (url) => url.includes("/odata/Recipients") && url.includes(`name=Seite ${ts}`),
   );
   const rows = page.getByRole("row").filter({ hasText: `Seite ${ts}` });
   await expect(rows).toHaveCount(100);
@@ -347,10 +639,9 @@ test("graves: search by number narrows the list and empty search shows nothing (
 }) => {
   const ts = unique();
   const graveNumber = `SUCHE-${ts}`;
-  // a grave cannot be saved without a recipient. The search matches recipient
-  // names as well as numbers, so this one shares nothing with the terms below.
-  // It needs an item billed all year; a generation running alongside may
-  // invoice the grave, which leaves it in the list all the same
+  // a grave cannot be saved without a recipient, and needs an item billed all
+  // year; a generation running alongside may invoice the grave, which leaves
+  // it in the list all the same
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: `SUCHE-${ts}`,
@@ -368,23 +659,20 @@ test("graves: search by number narrows the list and empty search shows nothing (
     recipientIds: [recipient.Id],
   });
 
+  // wide enough for the overview's filter row, which comes from Tailwind's 2xl on
+  await page.setViewportSize({ width: 1536, height: 720 });
   await page.goto("/graves");
   const table = page.getByRole("table");
   // graves still open for the selected half-year are listed first, so a
   // freshly created one is in the table right away
   await expect(table).toContainText(graveNumber);
 
-  const field = page.getByRole("textbox", { name: "Nach Grabnummer oder Empfänger suchen" });
-  await search(page, field, graveNumber, (url) =>
-    url.includes(`/odata/SearchGraves?term=${graveNumber}`),
-  );
+  await searchColumn(page, "Grabnummer", graveNumber);
   // the unique number matches exactly this run's grave, nothing else
   await expect(table.locator("tbody tr")).toHaveCount(1);
   await expect(table.locator("tbody tr")).toContainText(graveNumber);
 
-  await search(page, field, `gibtsnicht${ts}`, (url) =>
-    url.includes(`/odata/SearchGraves?term=gibtsnicht${ts}`),
-  );
+  await searchColumn(page, "Grabnummer", `gibtsnicht${ts}`);
   // no match: the table renders its German empty state and this run's grave is gone
   await expect(table).toContainText("Keine Daten");
   await expect(table).not.toContainText(graveNumber);

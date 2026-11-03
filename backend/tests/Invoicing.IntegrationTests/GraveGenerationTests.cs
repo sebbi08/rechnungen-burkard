@@ -59,6 +59,7 @@ public class GraveGenerationTests
         var g2 = new Grave
         {
             GraveNumber = "G-1",
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2020, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -66,6 +67,7 @@ public class GraveGenerationTests
         var g1 = new Grave
         {
             GraveNumber = "G-2",
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2020, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -73,6 +75,7 @@ public class GraveGenerationTests
         var g0 = new Grave
         {
             GraveNumber = "G-3",
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2020, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -233,6 +236,7 @@ public class GraveGenerationTests
             var grave = new Grave
             {
                 GraveNumber = "G-1",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -319,6 +323,7 @@ public class GraveGenerationTests
             var grave = new Grave
             {
                 GraveNumber = "G-4",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -429,6 +434,7 @@ public class GraveGenerationTests
                 new Grave
                 {
                     GraveNumber = "G-ENDED",
+                    CemeteryId = TestCemetery.Id,
                     StartDate = new DateOnly(2020, 1, 1),
                     EndDate = new DateOnly(2025, 12, 1),
                     CreatedAt = new DateOnly(2020, 1, 1),

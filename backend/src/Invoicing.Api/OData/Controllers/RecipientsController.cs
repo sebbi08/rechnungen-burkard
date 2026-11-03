@@ -20,8 +20,43 @@ public class RecipientsController : ODataController
         _numbers = numbers;
     }
 
+    /// <summary>The recipient set, optionally narrowed by the custom query
+    /// options 'number', 'name', 'address' and 'email', each searching its own
+    /// column word by word (combined with AND). The comparison runs in memory,
+    /// like the invoice search, since SQLite folds case for ASCII only; what is
+    /// returned is still a query over the matching ids, so [EnableQuery] pages
+    /// and counts the matches.</summary>
     [EnableQuery]
-    public IQueryable<Recipient> Get() => _db.Recipients.AsNoTracking();
+    public IQueryable<Recipient> Get()
+    {
+        var number = Request.Query["number"].ToString();
+        var name = Request.Query["name"].ToString();
+        var address = Request.Query["address"].ToString();
+        var email = Request.Query["email"].ToString();
+        if (new[] { number, name, address, email }.All(t => SearchWords.Of(t).Length == 0))
+            return _db.Recipients.AsNoTracking();
+
+        var ids = _db
+            .Recipients.AsNoTracking()
+            .Select(r => new
+            {
+                r.Id,
+                r.Number,
+                r.Name,
+                r.Address,
+                r.Email,
+            })
+            .ToList()
+            .Where(r =>
+                SearchWords.InAny(number, r.Number)
+                && SearchWords.InAny(name, r.Name)
+                && SearchWords.InAny(address, r.Address)
+                && SearchWords.InAny(email, r.Email)
+            )
+            .Select(r => r.Id)
+            .ToList();
+        return _db.Recipients.AsNoTracking().Where(r => ids.Contains(r.Id));
+    }
 
     public ActionResult<Recipient> Get([FromRoute] long key)
     {

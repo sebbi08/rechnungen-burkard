@@ -2,8 +2,9 @@ using System.Globalization;
 
 namespace Burkard.Invoicing.Api.Services;
 
-/// <summary>Matches a search term against an invoice's own fields — number,
-/// recipient, date and total. Line items are deliberately not searched.
+/// <summary>Matches a search term, word by word, against an invoice's own
+/// fields — number, recipient, date and total. Line items are deliberately not
+/// searched.
 ///
 /// The comparison runs in memory rather than as a SQL LIKE: SQLite folds case
 /// for ASCII only, so a term typed as 'ö' would miss a name spelled 'Ö'.</summary>
@@ -18,27 +19,28 @@ public static class InvoiceSearch
         decimal GrossTotal
     );
 
-    public static bool Matches(Row row, string term)
+    /// <summary>What the invoice list's column searches ask for; a part that
+    /// is null or without words asks for nothing.</summary>
+    public sealed record Filter(string? Number, string? Recipient, string? Date, string? Total)
     {
-        var needle = term.Trim();
-        if (needle.Length == 0)
-        {
-            return true;
-        }
+        public bool IsEmpty =>
+            SearchWords.Of(Number ?? "").Length == 0
+            && SearchWords.Of(Recipient ?? "").Length == 0
+            && SearchWords.Of(Date ?? "").Length == 0
+            && SearchWords.OfAmount(Total).Length == 0;
+    }
 
-        return Contains(row.InvoiceNumber, needle)
-            || Contains(row.RecipientName, needle)
-            || Contains(row.RecipientAddress, needle)
-            // the date as the list shows it, so what the user reads is what they can type
-            || Contains(
-                row.GeneratedAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
-                needle
-            )
-            // the total is rendered with a '.'; a German ',' in the term still matches
-            || Contains(
-                row.GrossTotal.ToString("0.00", CultureInfo.InvariantCulture),
-                needle.Replace(',', '.')
-            );
+    /// <summary>Whether the row passes every part of the filter, each part
+    /// against its own column only: number, recipient (name and address),
+    /// the date as shown, and the total the way
+    /// <see cref="SearchWords.InAmount"/> matches an amount.</summary>
+    public static bool Matches(Row row, Filter filter)
+    {
+        var date = row.GeneratedAt.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+        return SearchWords.InAny(filter.Number, row.InvoiceNumber)
+            && SearchWords.InAny(filter.Recipient, row.RecipientName, row.RecipientAddress)
+            && SearchWords.InAny(filter.Date, date)
+            && SearchWords.InAmount(filter.Total, row.GrossTotal);
     }
 
     /// <summary>The invoice's gross total, rounded exactly the way
@@ -67,7 +69,4 @@ public static class InvoiceSearch
 
         return (netCents + vatCents) / 100m;
     }
-
-    private static bool Contains(string haystack, string needle) =>
-        haystack.Contains(needle, StringComparison.OrdinalIgnoreCase);
 }

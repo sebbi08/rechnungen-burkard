@@ -7,11 +7,12 @@ import {
   drawer,
   fillNumber,
   pickItem,
-  pickOption,
   pickRecipient,
   rowAction,
   saveEditor,
   search,
+  searchColumn,
+  filterColumn,
   toasts,
   waitForOverlayOpen,
 } from "../vue";
@@ -122,6 +123,94 @@ test("a recipient suggestion shows the first line of the address (Story 3)", asy
   const option = overlay.getByRole("option", { name: recipientName });
   await expect(option).toContainText("Musterstraße 1");
   await expect(option).not.toContainText("12345 Musterstadt");
+});
+
+test("the recipient picker offers the newest twenty and searches the rest", async ({ page }) => {
+  const marker = unique();
+  const earlier = `Frühere Kundin ${marker}`;
+  await createRow(page, "/odata/Recipients", { Name: earlier, Address: "Altweg 1" });
+  // twenty newer ones push it off the list, whatever the other tests create meanwhile
+  for (let start = 0; start < 20; start += 10) {
+    await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        createRow(page, "/odata/Recipients", {
+          Name: `Neuer ${marker} ${start + i}`,
+          Address: "Neuweg 1",
+        }),
+      ),
+    );
+  }
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  await page.locator(`#${RECIPIENT}`).click();
+  const overlay = page.locator(".p-select-overlay");
+  await expect(overlay.getByRole("option")).toHaveCount(20);
+  await expect(overlay.getByRole("option", { name: earlier })).toHaveCount(0);
+  await expect(overlay).toContainText("Nur die ersten 20 Treffer");
+
+  // the search reaches the recipients the list does not hold
+  await overlay.locator("input.p-select-filter").fill(earlier);
+  await overlay.getByRole("option", { name: earlier, exact: true }).click();
+  await expect(page.locator(`#${RECIPIENT}`)).toContainText(earlier);
+});
+
+test("the recipient picker finds the words of a search in any order", async ({ page }) => {
+  const marker = unique();
+  const wanted = `Bauer Hanna ${marker}`;
+  const other = `Bauer Fritz ${marker}`;
+  for (const name of [wanted, other]) {
+    await createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" });
+  }
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  await page.locator(`#${RECIPIENT}`).click();
+  const overlay = page.locator(".p-select-overlay");
+  await overlay.locator("input.p-select-filter").fill(`Hanna Bauer ${marker}`);
+  await expect(overlay.getByRole("option", { name: wanted })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: other })).toHaveCount(0);
+  await overlay.getByRole("option", { name: wanted, exact: true }).click();
+  await expect(page.locator(`#${RECIPIENT}`)).toContainText(wanted);
+});
+
+test("the item picker searches on the server, the words of a search in any order", async ({
+  page,
+}) => {
+  const marker = unique();
+  const wanted = `SW-${marker}`;
+  const other = `SX-${marker}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: wanted,
+    Description: "Grabpflege Sommer",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  await createRow(page, "/odata/InvoiceItems", {
+    Number: other,
+    Description: "Grabpflege Winter",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  await page.goto("/invoices");
+  await openNewInvoice(page);
+
+  const picker = page.getByRole("combobox", { name: "Nummer 1" });
+  await picker.click();
+  const overlay = page.locator(".p-select-overlay");
+  await expect(overlay).not.toHaveClass(/p-connected-overlay-enter-active/);
+  // the description's word first, the number's after it
+  await search(
+    page,
+    overlay.locator("input.p-select-filter"),
+    `Sommer ${marker}`,
+    (url) => url.includes("/odata/InvoiceItems") && url.includes("sommer") && url.includes(marker),
+  );
+  await expect(overlay.getByRole("option", { name: wanted })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: other })).toHaveCount(0);
+  await overlay.getByRole("option", { name: wanted, exact: true }).click();
+  await expect(picker).toContainText(wanted);
 });
 
 test("invoice without price cannot be saved (Story 4.3/edge case)", async ({ page }) => {
@@ -458,25 +547,24 @@ test("the list shows non-grave invoices only and searches them (Story 9)", async
   await listRequest;
   await expect(invoiceRow(page, recipientName)).toBeVisible();
 
-  // the search reaches the backend as its own query option
-  const field = page.getByRole("textbox", { name: "Rechnung suchen" });
+  // each column's search reaches the backend as its own query option
   const searched = (term: string) => (url: string) =>
-    url.includes("/odata/Invoices") && url.includes(`search=${term}`);
-  await search(page, field, recipientName, searched(recipientName));
+    url.includes("/odata/Invoices") && url.includes(`recipient=${term}`);
+  await searchColumn(page, "Empfänger", recipientName, searched(recipientName));
   await expect(invoiceRow(page, recipientName)).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
   // clearing the field restores the list
   const all = page.waitForResponse((response) => {
     const url = decodeURIComponent(response.url());
-    return url.includes("/odata/Invoices") && !url.includes("search=");
+    return url.includes("/odata/Invoices") && !url.includes("recipient=");
   });
-  await field.fill("");
+  await page.getByRole("textbox", { name: "Empfänger durchsuchen" }).fill("");
   await all;
   await expect(invoiceRow(page, recipientName)).toBeVisible();
 
   // narrow it again for the row assertions below
-  await search(page, field, recipientName, searched(recipientName));
+  await searchColumn(page, "Empfänger", recipientName, searched(recipientName));
   await expect(page.locator("tbody tr")).toHaveCount(1);
 
   // the row actions are icon-only, named by their labels
@@ -545,12 +633,11 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   );
 
   // the unpaid filter drops it, the paid filter keeps it
-  const paymentFilter = page.getByRole("combobox", { name: "Zahlung" });
-  await pickOption(page, paymentFilter, "Nur unbezahlte");
+  await filterColumn(page, "Zahlung", "Nur unbezahlte");
   await expect(invoiceRow(page, recipientName)).toHaveCount(0);
-  await pickOption(page, paymentFilter, "Nur bezahlte");
+  await filterColumn(page, "Zahlung", "Nur bezahlte");
   await expect(invoiceRow(page, recipientName)).toHaveCount(1);
-  await pickOption(page, paymentFilter, "Alle");
+  await filterColumn(page, "Zahlung", "Alle");
 
   // taking the payment back asks first
   await row.getByRole("button", { name: rowAction("Zahlung zurücknehmen") }).click();
@@ -562,4 +649,152 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
   expect((await unmarked).ok()).toBe(true);
   await expect(row).toContainText("unbezahlt");
   await expect(row.getByRole("button", { name: rowAction("Bearbeiten") })).toBeEnabled();
+});
+
+/** Seeds one invoice of one line, billed to a recipient of the given name. */
+async function seedInvoice(
+  page: Page,
+  recipientName: string,
+  itemNumber: string,
+  unitPrice: number,
+): Promise<{ Id: number; RootId: number }> {
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: recipientName,
+    Address: "Suchweg 1\n12345 Suchstadt",
+  });
+  const item = await (
+    await page.request.get(`/odata/InvoiceItems?$filter=Number eq '${itemNumber}'`)
+  ).json();
+  return createRow(page, "/odata/CreateInvoice", {
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.value[0].Id, count: 1, unitPrice }],
+  });
+}
+
+async function seedSearchItem(page: Page, marker: string): Promise<string> {
+  const itemNumber = `${marker}-item`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureRow(page, "/odata/InvoiceItems", {
+    Number: itemNumber,
+    Description: "E2E",
+    VatRate: 7,
+    DefaultPrice: null,
+  });
+  return itemNumber;
+}
+
+test("the list searches each column on its own", async ({ page }) => {
+  const marker = `Spalte ${unique()}`;
+  const hanna = `Hanna Bauer ${marker}`;
+  const karl = `Karl Weber ${marker}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  // 50 net is 53,50 gross at 7 %; 11,68 net is 12,50
+  await seedInvoice(page, hanna, itemNumber, 50);
+  const karlInvoice = await seedInvoice(page, karl, itemNumber, 11.68);
+
+  await page.goto("/invoices");
+  const answered = (key: string) => (url: string) =>
+    url.includes("/odata/Invoices") && url.includes(`${key}=`);
+
+  // both recipients carry the marker; the words may come in any order
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await searchColumn(page, "Empfänger", `bauer hanna ${marker}`, answered("recipient"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toHaveCount(0);
+
+  // the total, in the form the list shows it
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await searchColumn(page, "Betrag", "12,50", answered("total"));
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await expect(invoiceRow(page, hanna)).toHaveCount(0);
+  await searchColumn(
+    page,
+    "Betrag",
+    "",
+    (url) => url.includes("/odata/Invoices") && !url.includes("total="),
+  );
+
+  // today's date, as the list shows it, keeps both
+  const today = new Date().toISOString().slice(0, 10).split("-").reverse().join(".");
+  await searchColumn(page, "Datum", today, answered("date"));
+  await expect(invoiceRow(page, hanna)).toBeVisible();
+  await expect(invoiceRow(page, karl)).toBeVisible();
+
+  // paid only: mark Karl's invoice paid, then ask for the paid ones
+  await page.request.post("/odata/SetInvoicePaid", {
+    data: { invoiceId: karlInvoice.Id, paid: true },
+  });
+  await filterColumn(page, "Zahlung", "Nur bezahlte");
+  await expect(invoiceRow(page, karl)).toBeVisible();
+  await expect(invoiceRow(page, hanna)).toHaveCount(0);
+});
+
+test("coming back from an invoice keeps the list's filters", async ({ page }) => {
+  const marker = `Zurück ${unique()}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  // 50 net is 53,50 gross at 7 %
+  await seedInvoice(page, marker, itemNumber, 50);
+
+  // the page's clock, held below while a total is typed and a row clicked
+  await page.clock.install();
+  await page.goto("/invoices");
+  const answered = (key: string) => (url: string) =>
+    url.includes("/odata/Invoices") && url.includes(`${key}=`);
+  await searchColumn(page, "Empfänger", marker, answered("recipient"));
+  const row = invoiceRow(page, marker);
+  await expect(row).toBeVisible();
+  const details = row.getByRole("button", { name: rowAction("Details") });
+
+  // The list takes a term once it has rested for 300 ms, and only then
+  // writes it into the URL. With the clock held, the click into the invoice
+  // comes before that: leaving the list has to write the total itself.
+  const typeAndLeave = async (total: string) => {
+    // the table's loading mask fades on timers, and would lie over the row
+    await expect(page.locator(".p-datatable-mask")).toHaveCount(0);
+    // a second ahead of the page's clock, not this one: a hold leaves the
+    // page's clock ahead, and holding at a time it has passed fails
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 1_000);
+    await page.getByRole("textbox", { name: "Betrag durchsuchen" }).fill(total);
+    await details.click();
+    await expect(page).toHaveURL(/\/invoices\/\d+$/);
+    await page.clock.resume();
+  };
+  const kept = async (total: string) => {
+    await expect(page.getByRole("textbox", { name: "Empfänger durchsuchen" })).toHaveValue(marker);
+    await expect(page.getByRole("textbox", { name: "Betrag durchsuchen" })).toHaveValue(total);
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(row).toBeVisible();
+  };
+
+  // through the browser's back button ...
+  await typeAndLeave("53,50 €");
+  await page.goBack();
+  await kept("53,50 €");
+
+  // ... and through the breadcrumb
+  await typeAndLeave("53.50");
+  await page
+    .getByRole("navigation", { name: "Seitenpfad" })
+    .getByRole("link", { name: "Rechnungen" })
+    .click();
+  await kept("53.50");
+});
+
+test("the Betrag column shows the gross total", async ({ page }) => {
+  const marker = `Betrag ${unique()}`;
+  const itemNumber = await seedSearchItem(page, marker);
+  const invoice = await seedInvoice(page, marker, itemNumber, 50);
+
+  await page.goto("/invoices");
+  await searchColumn(page, "Empfänger", marker);
+  const cell = invoiceRow(page, marker).getByRole("cell", { name: "53,50", exact: false });
+  await expect(cell).toBeVisible();
+  const shown = (await cell.innerText()).trim();
+
+  await page.goto(`/invoices/${invoice.RootId ?? invoice.Id}`);
+  await expect(page.getByText(shown).first()).toBeVisible();
 });

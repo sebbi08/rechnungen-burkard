@@ -214,6 +214,7 @@ public class LatestRevisionTests
                     graveNumber = "L-1",
                     fieldNumber = "1",
                     siteName = "Grabstätte",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01",
                     endDate = "2040-12",
@@ -313,6 +314,7 @@ public class LatestRevisionTests
             var grave = new Grave
             {
                 GraveNumber = "G-100",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(System.DateTime.UtcNow),

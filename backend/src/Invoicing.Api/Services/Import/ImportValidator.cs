@@ -446,15 +446,17 @@ public sealed class ImportValidator
             var number = row[0].Trim();
             var fieldNumber = row[1].Trim();
             var siteName = row[2].Trim();
-            var rawPosition = row[3].Trim();
-            var rawStart = row[4].Trim();
-            var rawEnd = row[5].Trim();
+            var cemetery = row[3].Trim();
+            var rawPosition = row[4].Trim();
+            var rawStart = row[5].Trim();
+            var rawEnd = row[6].Trim();
             if (number.Length > 0)
                 data.DeclaredGraves.Add(number);
             if (
                 Missing(number, file, line, "GraveNumber", problems)
                 | Missing(fieldNumber, file, line, "FieldNumber", problems)
                 | Missing(siteName, file, line, "SiteName", problems)
+                | Missing(cemetery, file, line, "Cemetery", problems)
                 | Missing(rawPosition, file, line, "Position", problems)
                 | Missing(rawStart, file, line, "StartDate", problems)
             )
@@ -527,7 +529,7 @@ public sealed class ImportValidator
 
             seen[number] = line;
             data.Graves.Add(
-                new GraveRow(line, number, fieldNumber, siteName, position, start, end)
+                new GraveRow(line, number, fieldNumber, siteName, cemetery, position, start, end)
             );
         }
     }
@@ -1050,7 +1052,8 @@ public sealed class ImportValidator
     /// <summary>Version 1 imports are create-only, so an identifier that is
     /// already stored is a validation error rather than an update. An item's VAT
     /// rate must also be one of the configured ones, exactly as it must be when
-    /// the item is created through the item section (FR-006).</summary>
+    /// the item is created through the item section (FR-006), and a grave's
+    /// cemetery one of those kept in the settings (FR-052).</summary>
     private async Task CheckAgainstStoredDataAsync(
         ImportData data,
         List<ImportProblem> problems,
@@ -1100,6 +1103,28 @@ public sealed class ImportValidator
                     $"An item with the number '{item.Number}' already exists.",
                     "ItemExists",
                     [item.Number]
+                )
+            );
+        }
+
+        // The cemeteries are kept in the settings, where a name is unique
+        // ignoring case; the import only links to them. Matched in memory:
+        // SQLite folds ASCII case alone.
+        foreach (var stored in await _db.Cemeteries.ToListAsync(ct))
+        {
+            data.CemeteryIds[stored.Name] = stored.Id;
+        }
+
+        foreach (var grave in data.Graves.Where(g => !data.CemeteryIds.ContainsKey(g.Cemetery)))
+        {
+            problems.Add(
+                new ImportProblem(
+                    ImportArchiveLayout.GravesFile,
+                    grave.Row,
+                    "CemeteryNotDefined",
+                    $"The cemetery '{grave.Cemetery}' is not defined in the settings.",
+                    "CemeteryNotDefined",
+                    [grave.Cemetery]
                 )
             );
         }

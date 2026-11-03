@@ -94,6 +94,7 @@ public class SaveGraveTests
                     graveNumber = "S-001",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -150,6 +151,7 @@ public class SaveGraveTests
                     graveNumber = "S-002",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -193,6 +195,7 @@ public class SaveGraveTests
                     graveNumber = "S-004",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -235,6 +238,7 @@ public class SaveGraveTests
             var grave = new Burkard.Invoicing.Domain.Entities.Grave
             {
                 GraveNumber = "S-003",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2026, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -253,6 +257,7 @@ public class SaveGraveTests
                     graveNumber = "S-003",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2041-12-31",
@@ -288,6 +293,7 @@ public class SaveGraveTests
                     graveNumber = "S-002",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -319,6 +325,7 @@ public class SaveGraveTests
                     graveNumber = "S-002b",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2027-01-01",
                     endDate = "2041-12-31",
@@ -374,6 +381,7 @@ public class SaveGraveTests
                     graveNumber = "S-003",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -417,6 +425,7 @@ public class SaveGraveTests
                     graveNumber = "S-004",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -471,6 +480,7 @@ public class SaveGraveTests
                     graveNumber,
                     fieldNumber,
                     siteName,
+                    cemeteryId = TestCemetery.Id,
                     position,
                     startDate,
                     endDate = (string?)null,
@@ -502,6 +512,7 @@ public class SaveGraveTests
                     graveNumber = "S-006",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -541,6 +552,7 @@ public class SaveGraveTests
                     graveNumber = "S-007",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -586,6 +598,7 @@ public class SaveGraveTests
                     graveNumber = "S-008",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01-01",
                     endDate = "2040-12-31",
@@ -630,6 +643,7 @@ public class SaveGraveTests
                     graveNumber = "S-DATE",
                     fieldNumber = "F-1",
                     siteName = "Grabstätte Test",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2030-12-31",
                     endDate = "2026-01-01",
@@ -679,6 +693,7 @@ public class SaveGraveTests
                     graveNumber,
                     fieldNumber,
                     siteName,
+                    cemeteryId = TestCemetery.Id,
                     position,
                     startDate,
                     endDate,
@@ -744,11 +759,78 @@ public class SaveGraveTests
         var row = status.RootElement.GetProperty("value")[0];
         Assert.Equal("Schineller Bäcke", row.GetProperty("SiteName").GetString());
         Assert.Equal("27", row.GetProperty("FieldNumber").GetString());
+    }
 
-        using var search = await ODataJson.ReadAsync(
-            await client.GetAsync("/odata/SearchGraves?term=bäcke")
+    [Fact]
+    public async Task The_status_rows_carry_the_graves_recipients()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, other) = await SeedAsync(client);
+
+        var saved = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = "R-100",
+                    fieldNumber = "1",
+                    siteName = "Test",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = "2026-01-01",
+                    endDate = (string?)null,
+                    items = new[]
+                    {
+                        new
+                        {
+                            itemId = item,
+                            count = 1,
+                            unitPrice = (decimal?)null,
+                        },
+                    },
+                    recipientIds = new[] { recipient, other },
+                }
+            )
         );
-        Assert.Equal(1, search.RootElement.GetProperty("value").GetArrayLength());
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        async Task<(long Id, string Name, string Address)[]> RecipientsOfRowAsync()
+        {
+            using var status = await ODataJson.ReadAsync(
+                await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
+            );
+            var row = status.RootElement.GetProperty("value")[0];
+            return row.GetProperty("Recipients")
+                .EnumerateArray()
+                .Select(r =>
+                    (
+                        r.GetProperty("Id").GetInt64(),
+                        r.GetProperty("Name").GetString()!,
+                        r.GetProperty("Address").GetString()!
+                    )
+                )
+                .ToArray();
+        }
+
+        Assert.Equal(
+            new[]
+            {
+                (recipient, "Anna Beispiel", "Hauptstraße 1\n99999 Musterdorf"),
+                (other, "Bert Beispiel", "Nebenweg 2\n99999 Musterdorf"),
+            },
+            await RecipientsOfRowAsync()
+        );
+
+        var rename = await client.SendAsync(
+            new HttpRequestMessage(HttpMethod.Patch, $"/odata/Recipients({recipient})")
+            {
+                Content = ODataJson.Body(new { Name = "Anna Neu" }),
+            }
+        );
+        Assert.True(rename.IsSuccessStatusCode);
+        Assert.Equal("Anna Neu", (await RecipientsOfRowAsync())[0].Name);
     }
 
     [Fact]
@@ -877,6 +959,7 @@ public class SaveGraveTests
             graveNumber = number,
             fieldNumber = "1",
             siteName = "Schineller Bäcke",
+            cemeteryId = TestCemetery.Id,
             position = "SingleInside",
             startDate = start,
             endDate = end,
@@ -1032,6 +1115,7 @@ public class SaveGraveTests
             graveNumber = "AY-1",
             fieldNumber = "F-1",
             siteName = "Grabstätte Test",
+            cemeteryId = TestCemetery.Id,
             position = "SingleInside",
             startDate = "2026-01-01",
             endDate = "2040-12-31",
@@ -1113,6 +1197,7 @@ public class SaveGraveTests
             graveNumber = "K-1",
             fieldNumber = "1",
             siteName = "Schineller Bäcke",
+            cemeteryId = TestCemetery.Id,
             position = "SingleInside",
             startDate = "2026-03",
             endDate = "2028-10",
@@ -1218,6 +1303,7 @@ public class SaveGraveTests
                     graveNumber = "K-2",
                     fieldNumber = "1",
                     siteName = "Schineller Bäcke",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-03",
                     endDate = "2028-10",

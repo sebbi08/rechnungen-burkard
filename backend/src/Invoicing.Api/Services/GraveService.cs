@@ -29,6 +29,7 @@ public sealed record GraveFields(
     string GraveNumber,
     string FieldNumber,
     string SiteName,
+    long? CemeteryId,
     GravePosition? Position,
     DateOnly StartDate,
     DateOnly? EndDate
@@ -117,6 +118,7 @@ public sealed class GraveService
         grave.GraveNumber = fields.GraveNumber.Trim();
         grave.FieldNumber = fields.FieldNumber.Trim();
         grave.SiteName = fields.SiteName.Trim();
+        grave.CemeteryId = fields.CemeteryId!.Value;
         grave.Position = fields.Position;
         grave.StartDate = fields.StartDate;
         grave.EndDate = fields.EndDate;
@@ -222,6 +224,16 @@ public sealed class GraveService
             throw new ValidationException("SiteNameRequired", "The grave site name is required.");
         }
 
+        if (fields.CemeteryId is not { } cemeteryId)
+        {
+            throw new ValidationException("CemeteryRequired", "The cemetery is required.");
+        }
+
+        if (!await _db.Cemeteries.AnyAsync(c => c.Id == cemeteryId, ct))
+        {
+            throw new ValidationException("CemeteryNotFound", "The cemetery does not exist.");
+        }
+
         if (fields.Position is null)
         {
             throw new ValidationException("PositionRequired", "The grave position is required.");
@@ -257,8 +269,8 @@ public sealed class GraveService
         }
 
         // A number may come back once its grave has ended, but two graves that
-        // run at the same time cannot share it. Compared in memory, like
-        // SearchGraves: SQLite's lower() folds ASCII only.
+        // run at the same time cannot share it. Compared in memory: SQLite's
+        // lower() folds ASCII only.
         var number = fields.GraveNumber.Trim();
         var others = await _db
             .Graves.Where(g => graveId == null || g.Id != graveId)

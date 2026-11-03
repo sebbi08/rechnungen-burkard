@@ -54,6 +54,7 @@ public class BulkDownloadTests
                     graveNumber = "B-1",
                     fieldNumber = "1",
                     siteName = "Grabstätte",
+                    cemeteryId = TestCemetery.Id,
                     position = "SingleInside",
                     startDate = "2026-01",
                     endDate = "2040-12",

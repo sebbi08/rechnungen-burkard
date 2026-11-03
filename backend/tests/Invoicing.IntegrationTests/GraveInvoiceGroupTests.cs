@@ -50,6 +50,7 @@ public class GraveInvoiceGroupTests
             var grave = new Grave
             {
                 GraveNumber = "G-200",
+                CemeteryId = TestCemetery.Id,
                 StartDate = new DateOnly(2020, 1, 1),
                 EndDate = new DateOnly(2040, 12, 31),
                 CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -128,6 +129,7 @@ public class GraveInvoiceGroupTests
         var grave = new Grave
         {
             GraveNumber = graveNumber,
+            CemeteryId = TestCemetery.Id,
             StartDate = new DateOnly(2020, 1, 1),
             EndDate = new DateOnly(2040, 12, 31),
             CreatedAt = DateOnly.FromDateTime(DateTime.UtcNow),

@@ -17,6 +17,7 @@ import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
 import InvoiceRowActions from "@/components/InvoiceRowActions.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
+import { listLocation } from "@/composables/useColumnFilters";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import {
@@ -86,7 +87,7 @@ const {
   <PageHeader
     :title="grave?.GraveNumber ?? t('graveDetailTitle')"
     :crumbs="[
-      { label: t('menuGraves'), to: '/graves' },
+      { label: t('menuGraves'), to: listLocation('/graves') },
       { label: grave?.GraveNumber ?? t('graveDetailTitle') },
     ]"
   >
@@ -113,6 +114,10 @@ const {
           <div>
             <dt class="text-sm text-muted-color">{{ t("graveSiteName") }}</dt>
             <dd class="m-0">{{ grave.SiteName || "–" }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-muted-color">{{ t("graveCemetery") }}</dt>
+            <dd class="m-0">{{ grave.Cemetery.Name }}</dd>
           </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("gravePosition") }}</dt>

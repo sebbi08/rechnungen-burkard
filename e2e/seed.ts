@@ -65,6 +65,26 @@ export async function ensureRow(
   throw new Error(`POST ${path} failed: ${failure}`);
 }
 
+/** The cemetery the specs' graves lie in, unless a test is about cemeteries. */
+export const SEED_CEMETERY = "Bergfriedhof";
+
+/**
+ * Makes sure a cemetery of this name exists and answers its id. Every grave
+ * needs one, and most specs share the one cemetery rather than each creating
+ * their own: a cemetery is created once and found by every later call, the
+ * way ensureRow finds a VAT rate.
+ */
+export async function ensureCemetery(page: Page, name = SEED_CEMETERY): Promise<number> {
+  await ensureRow(page, "/odata/Cemeteries", { Name: name });
+  const filter = encodeURIComponent(`Name eq '${name.replaceAll("'", "''")}'`);
+  const response = await page.request.get(`/odata/Cemeteries?$filter=${filter}&$select=Id`);
+  const found = (await response.json()).value;
+  if (!response.ok() || found.length !== 1) {
+    throw new Error(`cemetery "${name}" not found after ensuring it: HTTP ${response.status()}`);
+  }
+  return found[0].Id;
+}
+
 /** One item line of a grave `seedGrave` saves. A `unitPrice` left out (or null)
  *  bills the item's default price, as the dialog does when the pre-filled price
  *  is left alone; `priceIncludesVat` says the price is a gross one. */
@@ -79,6 +99,8 @@ export interface SeedGraveInput {
   graveNumber: string;
   fieldNumber?: string;
   siteName?: string;
+  /** Defaults to SEED_CEMETERY. */
+  cemeteryId?: number;
   position?: string;
   /** "yyyy-MM" */
   startDate?: string;
@@ -93,10 +115,10 @@ export interface SeedGraveInput {
  * grave, its items and its recipients — and returns the new grave's id.
  *
  * The Graves, GraveItems and GraveRecipients sets take no writes any more, so
- * a spec's grave passes the same checks as the dialog's: at least one
- * recipient, a price on every line (the link's own or the item's default, with
- * at most two decimals), and per VAT rate a net subtotal that divides evenly
- * across the recipients. A fixture that breaks one of these is refused as a
+ * a spec's grave passes the same checks as the dialog's: a cemetery, at
+ * least one recipient, a price on every line (the link's own or the item's
+ * default, with at most two decimals), and per VAT rate a net subtotal that
+ * divides evenly across the recipients. A fixture that breaks one of these is refused as a
  * whole rather than written half-way, and createRow's retry-and-throw names
  * the code.
  */
@@ -106,6 +128,7 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
     graveNumber: grave.graveNumber,
     fieldNumber: grave.fieldNumber ?? "1",
     siteName: grave.siteName ?? "Schineller Bäcke",
+    cemeteryId: grave.cemeteryId ?? (await ensureCemetery(page)),
     position: grave.position ?? "SingleInside",
     startDate: grave.startDate ?? "2026-01",
     endDate: grave.endDate === undefined ? "2040-12" : grave.endDate,

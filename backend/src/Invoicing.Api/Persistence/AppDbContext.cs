@@ -12,6 +12,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<GlobalSettings> GlobalSettings => Set<GlobalSettings>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<Recipient> Recipients => Set<Recipient>();
+    public DbSet<Cemetery> Cemeteries => Set<Cemetery>();
     public DbSet<Grave> Graves => Set<Grave>();
     public DbSet<GraveItem> GraveItems => Set<GraveItem>();
     public DbSet<GraveRecipient> GraveRecipients => Set<GraveRecipient>();
@@ -27,6 +28,9 @@ public sealed class AppDbContext : DbContext
         mb.Entity<VatRate>().HasIndex(v => v.Rate).IsUnique();
         mb.Entity<InvoiceItem>().HasIndex(i => i.Number).IsUnique();
         mb.Entity<Recipient>().HasIndex(r => r.Number).IsUnique();
+        // exact duplicates only: SQLite folds ASCII case alone, so the
+        // case-insensitive check is CemeteriesController's, in memory
+        mb.Entity<Cemetery>().HasIndex(c => c.Name).IsUnique();
         mb.Entity<Invoice>()
             .HasIndex(i => new
             {
@@ -100,6 +104,11 @@ public sealed class AppDbContext : DbContext
             .HasOne(r => r.Recipient)
             .WithMany()
             .HasForeignKey(r => r.RecipientId)
+            .OnDelete(DeleteBehavior.Restrict);
+        mb.Entity<Grave>()
+            .HasOne(g => g.Cemetery)
+            .WithMany()
+            .HasForeignKey(g => g.CemeteryId)
             .OnDelete(DeleteBehavior.Restrict);
         // one link per (grave, item) / (grave, recipient)
         mb.Entity<GraveItem>().HasIndex(i => new { i.GraveId, i.ItemId }).IsUnique();

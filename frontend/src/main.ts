@@ -1,6 +1,9 @@
 import "primeicons/primeicons.css";
 import "./main.css";
-import Aura from "@primeuix/themes/aura";
+// The compat variant of Aura: @primeuix/themes 3 made Aura's default sizes
+// smaller (14px text, tighter padding); the compat variant keeps the sizes the
+// layout was built with.
+import Aura from "@primeuix/themes/aura-compat";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
 import PrimeVue from "primevue/config";
 import ConfirmationService from "primevue/confirmationservice";
@@ -37,6 +40,10 @@ createApp(App)
         cssLayer: { name: "primevue", order: "theme, base, primevue" },
       },
     },
+    // PrimeUI license key, set at build time (Docker build arg PRIMEUI_LICENSE).
+    // Without one PrimeVue still works but shows an "Invalid PrimeUI License"
+    // notice and logs a console warning. Never commit a key.
+    license: import.meta.env.VITE_PRIMEUI_LICENSE || undefined,
   })
   .use(ToastService)
   .use(ConfirmationService)

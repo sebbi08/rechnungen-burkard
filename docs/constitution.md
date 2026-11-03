@@ -1,16 +1,13 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 4.0.0 → 5.0.0 (the application is German only)
-Modified principles: Principle VII (English Codebase, Multilingual UI →
-  English Codebase, German UI) — the user interface and the generated
-  documents are German only; user-visible strings still live in the i18n
-  catalogue rather than in the code
-Modified sections: Technology Constraints — the i18n catalogue holds the
-  German texts instead of serving a multilingual user interface
+Version change: 6.0.0 → 6.0.1 (wording: the PrimeUI key is a repository secret)
+Modified principles: Principle VI — the license key comes from the
+  PRIMEUI_LICENSE repository secret rather than a repository variable
+Modified sections: none
 Added sections: none
 Removed sections: none
-Follow-up TODOs: none
+Follow-up TODOs: none (the PRIMEUI_LICENSE secret exists)
 -->
 
 # rechnungen-burkard Constitution
@@ -64,14 +61,24 @@ published as Docker container images on GitHub.
 Rationale: Containers provide a consistent environment from local development
 through production release.
 
-### VI. Vue Frontend (Open Source)
+### VI. Vue Frontend, Open Source with a PrimeUI Exception
 
 The frontend MUST be built with Vue 3 and the PrimeVue component library. Every
-library the frontend ships MUST be under an open-source license, and the
-licenses of the bundled dependencies MUST ship with the frontend delivery.
+library the frontend ships MUST be under an open-source license, with one
+exception: the PrimeUI packages (`primevue`, `@primevue/*`, `@primeuix/*` and
+`primeicons`) MAY ship under the commercial PrimeUI License. The licenses of
+the bundled dependencies, the PrimeUI License included, MUST ship with the
+frontend delivery.
 
-Rationale: Vue and PrimeVue provide the required UI framework under the MIT
-license, without proprietary licensing obligations.
+The PrimeUI license key MUST NOT be committed. It is supplied at build time
+(the `PRIMEUI_LICENSE` repository secret, passed to the image build), and
+the frontend MUST keep working without it.
+
+Rationale: Vue and PrimeVue provide the required UI framework. From PrimeVue 5,
+PrimeUI publishes its packages under its own commercial license; the project
+holds a PrimeUI license and stays on PrimeVue rather than migrating to another
+component library. The exception is limited to PrimeUI so that no other
+proprietary licensing obligations enter the frontend.
 
 ### VII. English Codebase, German UI
 
@@ -100,7 +107,7 @@ data inconsistency while giving users a clear signal that work is in progress.
 - .NET as the backend implementation stack.
 - OData v4 as the backend API protocol, consumed by the frontend through a
   client generated from `$metadata`.
-- Vue 3 and PrimeVue (open-source) for the frontend.
+- Vue 3 and PrimeVue for the frontend (PrimeUI License, see Principle VI).
 - SQLite for data persistence.
 - Docker for local development and release packaging.
 - GitHub for source control, releases, and container image distribution.
@@ -127,4 +134,4 @@ PATCH for clarifications and wording fixes.
 Compliance with this constitution MUST be reviewed as part of code review and
 release. Deviations MUST be justified and recorded.
 
-**Version**: 5.0.0 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-10-02
+**Version**: 6.0.1 | **Ratified**: 2026-08-15 | **Last Amended**: 2026-11-03

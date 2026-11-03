@@ -50,6 +50,7 @@ public class InvoiceSnapshotTests
                     graveNumber = "1234",
                     fieldNumber = "27",
                     siteName = "Schineller Bäcke",
+                    cemeteryId = TestCemetery.Id,
                     position = "DoubleOutside",
                     startDate = "2020-01",
                     endDate = (string?)null,

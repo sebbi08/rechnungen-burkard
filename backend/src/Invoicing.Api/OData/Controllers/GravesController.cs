@@ -28,11 +28,13 @@ public class GravesController : ODataController
     // The OData single-result $expand validator rejects collection navigations
     // ("The property 'Items' cannot be used in the $expand query option"), so
     // build the expected payload explicitly: same shape the EDM serializer
-    // would produce for $expand=Items($expand=Item),Recipients($expand=Recipient).
+    // would produce for
+    // $expand=Cemetery,Items($expand=Item),Recipients($expand=Recipient).
     public IActionResult Get([FromRoute] long key)
     {
         var grave = _db
-            .Graves.Include(g => g.Items)
+            .Graves.Include(g => g.Cemetery)
+            .Include(g => g.Items)
                 .ThenInclude(i => i.Item)
             .Include(g => g.Recipients)
                 .ThenInclude(r => r.Recipient)
@@ -47,6 +49,8 @@ public class GravesController : ODataController
             grave.GraveNumber,
             grave.FieldNumber,
             grave.SiteName,
+            grave.CemeteryId,
+            Cemetery = new { grave.Cemetery.Id, grave.Cemetery.Name },
             // by name; System.Text.Json would write the enum as a number
             Position = grave.Position?.ToString(),
             grave.StartDate,
@@ -95,43 +99,6 @@ public class GravesController : ODataController
     // leave its invoices and runs pointing at nothing — those hold the id
     // without a foreign key.
 
-    [ODataAttributeRouting]
-    [HttpGet("odata/SearchGraves")]
-    public async Task<IActionResult> Search([FromQuery] string term)
-    {
-        if (string.IsNullOrWhiteSpace(term))
-        {
-            return new JsonResult(
-                new { value = Array.Empty<object>() },
-                ODataJsonDefaults.PascalCase
-            );
-        }
-
-        var graves = await _db
-            .Graves.Select(g => new
-            {
-                g.Id,
-                g.GraveNumber,
-                g.FieldNumber,
-                g.SiteName,
-                RecipientNames = g.Recipients.Select(r => r.Recipient.Name).ToList(),
-            })
-            .ToListAsync();
-
-        // Match in memory: SQL-side lower() folds ASCII only and would miss
-        // non-ASCII case differences (e.g. 'ö' vs 'Ö'), which matters for German names.
-        var matches = graves
-            .Where(g =>
-                g.GraveNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.SiteName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.FieldNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || g.RecipientNames.Any(n => n.Contains(term, StringComparison.OrdinalIgnoreCase))
-            )
-            .ToList();
-
-        return new JsonResult(new { value = matches }, ODataJsonDefaults.PascalCase);
-    }
-
     // The grave dialog collects the grave, its items and its recipients before
     // anything is saved, so the whole set arrives as one request.
     [ODataAttributeRouting]
@@ -172,6 +139,7 @@ public class GravesController : ODataController
             request.GraveNumber ?? "",
             request.FieldNumber ?? "",
             request.SiteName ?? "",
+            request.CemeteryId,
             // an unknown name is reported as missing; a known one the editor
             // does not offer is the save's to judge
             GraveTerm.TryParsePosition(request.Position, out var position)
@@ -273,6 +241,7 @@ public class GravesController : ODataController
         public string? GraveNumber { get; set; }
         public string? FieldNumber { get; set; }
         public string? SiteName { get; set; }
+        public long? CemeteryId { get; set; }
         public string? Position { get; set; }
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
