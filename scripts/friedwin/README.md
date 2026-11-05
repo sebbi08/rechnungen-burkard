@@ -12,9 +12,12 @@ repository's history (`export/` is ignored) and never paste its content anywhere
 python3 scripts/friedwin/convert.py export/ZWI/<stamp> --out export/friedwin-import.zip
 ```
 
-It writes three files next to `--out`:
+It writes four files next to `--out`:
 
 - the import archive (`recipients.csv`, `items.csv`, `graves.csv`, `mapping.csv`);
+- `<name>-report.pdf`, in German: how many graves FriedWin holds, how many are
+  prepared for the import and how many are left out, each reason explained with
+  every grave it leaves out, and the prepared graves that carry a guess;
 - `<name>-report.txt`, what was guessed or left out, by grave and item number;
 - `<name>-nie-abgerechnet.csv`, the graves left out because FriedWin never billed
   them for care (semicolon-separated for Excel; this one names people).
