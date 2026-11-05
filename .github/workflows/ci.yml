@@ -30,31 +30,104 @@ jobs:
       - name: Test
         run: dotnet test backend/Invoicing.sln -c Release --no-build
 
-  # Keeps the frontend compiling and lint-clean; its behaviour is covered by
-  # the E2E job.
-  frontend:
+  # The quick checks share one runner. Each of them takes seconds, and every job
+  # is billed rounded up to the next minute, so four jobs cost four minutes or
+  # more where one costs two. Once the tools are installed every check runs
+  # even if one before it failed, so a red run reports all of them, the way
+  # separate jobs did.
+  #
+  # The frontend check keeps it compiling and lint-clean; its behaviour is
+  # covered by the E2E job.
+  #
+  # Format and commit messages are checked again here because the hooks that
+  # check them on commit only exist where `npm install` has been run at the
+  # repository root, and `--no-verify` skips them. The release version is
+  # derived from the commit messages, so they are worth checking twice.
+  # CSharpier runs through the SDK directly rather than through
+  # scripts/csharpier.sh, which exists because the dev machine has no .NET SDK;
+  # the runner has one.
+  checks:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v7
+        with:
+          # commit-lint reads the commits between the base and the head
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version: 26
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run build
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install the root dependencies
+        id: root-deps
+        run: npm ci
+      - name: Install the frontend dependencies
+        id: frontend-deps
+        working-directory: frontend
+        run: npm ci
+      - name: Install the .NET tools
+        id: dotnet-tools
+        working-directory: backend
+        run: dotnet tool restore
+
+      - name: "Frontend: typecheck"
+        if: ${{ !cancelled() && steps.frontend-deps.outcome == 'success' }}
+        working-directory: frontend
+        run: npm run typecheck
+      - name: "Frontend: lint"
+        if: ${{ !cancelled() && steps.frontend-deps.outcome == 'success' }}
+        working-directory: frontend
+        run: npm run lint
+      - name: "Frontend: build"
+        if: ${{ !cancelled() && steps.frontend-deps.outcome == 'success' }}
+        working-directory: frontend
+        run: npm run build
+
+      - name: "Format: Prettier"
+        if: ${{ !cancelled() && steps.root-deps.outcome == 'success' }}
+        run: npx prettier --check .
+      - name: "Format: CSharpier"
+        if: ${{ !cancelled() && steps.dotnet-tools.outcome == 'success' }}
+        working-directory: backend
+        run: dotnet csharpier check .
+
+      - name: Lint the new commit messages
+        if: ${{ !cancelled() && steps.root-deps.outcome == 'success' }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FROM="${{ github.event.pull_request.base.sha }}"
+            TO="${{ github.event.pull_request.head.sha }}"
+          else
+            FROM="${{ github.event.before }}"
+            TO="${{ github.sha }}"
+          fi
+          # A branch's first push reports an all-zero "before", and a forced
+          # push one this checkout may not have; there is no range to check
+          # then, so look at the tip commit only.
+          if [ -z "$FROM" ] || [ "$FROM" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "$FROM^{commit}" 2> /dev/null; then
+            npx commitlint --last --verbose
+          else
+            npx commitlint --from "$FROM" --to "$TO" --verbose
+          fi
+
+      - name: Test the release scripts
+        if: ${{ !cancelled() && steps.root-deps.outcome == 'success' }}
+        run: scripts/test-release-scripts.sh
 
   # The constitution puts integration and E2E tests ahead of unit tests, so the
   # Playwright suite runs on every change, against the image that gets released
   # — which also makes this the job that proves the image still builds.
   #
-  # A runner for a private repository has two cores, so one runner works
-  # through the suite two tests at a time. Three runners each take a third of
-  # it; fail-fast is off so a red shard does not cancel the others and hide
-  # what they would have found.
+  # The repository is public, so its runners have four cores and are not
+  # billed by the minute: one runner works through the suite four tests at a
+  # time, and three runners each take a third of it. fail-fast is off so a red
+  # shard does not cancel the others and hide what they would have found.
   e2e:
     name: e2e (shard ${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
@@ -131,70 +204,3 @@ jobs:
         with:
           name: playwright-report-${{ matrix.shard }}
           path: e2e/playwright-report
-
-  # Same reasoning as commit-lint below: the pre-commit hook formats staged
-  # files, but it only exists where `npm install` has been run at the repository
-  # root, and `--no-verify` skips it. CSharpier runs through the SDK directly
-  # here rather than through scripts/csharpier.sh, which exists because the dev
-  # machine has no .NET SDK — the runner does.
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: "10.0.x"
-      - run: npm ci
-      - name: Prettier
-        run: npx prettier --check .
-      - name: CSharpier
-        working-directory: backend
-        run: |
-          dotnet tool restore
-          dotnet csharpier check .
-
-  # The commit-msg hook is what normally catches these, but it only runs on a
-  # machine where `npm install` has been run at the repository root, and
-  # `--no-verify` skips it. The release version is derived from these messages,
-  # so it is worth checking them again here.
-  commit-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-      - run: npm ci
-      - name: Lint the new commit messages
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            FROM="${{ github.event.pull_request.base.sha }}"
-            TO="${{ github.event.pull_request.head.sha }}"
-          else
-            FROM="${{ github.event.before }}"
-            TO="${{ github.sha }}"
-          fi
-          # A branch's first push reports an all-zero "before", and a forced
-          # push one this checkout may not have; there is no range to check
-          # then, so look at the tip commit only.
-          if [ -z "$FROM" ] || [ "$FROM" = "0000000000000000000000000000000000000000" ] \
-            || ! git cat-file -e "$FROM^{commit}" 2> /dev/null; then
-            npx commitlint --last --verbose
-          else
-            npx commitlint --from "$FROM" --to "$TO" --verbose
-          fi
-
-  release-scripts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26
-      - run: npm ci
-      - run: scripts/test-release-scripts.sh
