@@ -12,4 +12,4 @@ exec docker run --rm \
   -v "${REPO_ROOT}/backend:/src" \
   -v invoicing-nuget:/nuget \
   -w /src \
-  mcr.microsoft.com/dotnet/sdk:10.0 dotnet "$@"
+  mcr.microsoft.com/dotnet/sdk:11.0 dotnet "$@"
