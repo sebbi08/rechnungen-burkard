@@ -203,7 +203,7 @@ public class CreateInvoiceTests
         using var client = host.CreateClient();
 
         var tasks = Enumerable
-            .Range(0, 5)
+            .Range(0, 8)
             .Select(_ =>
                 Task.Run(async () =>
                 {
@@ -239,7 +239,7 @@ public class CreateInvoiceTests
             numbers.Add(number);
         }
 
-        Assert.Equal(5, numbers.Distinct().Count());
+        Assert.Equal(8, numbers.Distinct().Count());
     }
 
     [Fact]

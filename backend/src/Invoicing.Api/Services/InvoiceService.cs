@@ -46,20 +46,7 @@ public sealed class InvoiceService
         var lines = await BuildLinesAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
 
-        for (var attempt = 0; ; attempt++)
-        {
-            try
-            {
-                return await PersistAsync(recipient, settings, lines, ct);
-            }
-            catch (DbUpdateException) when (attempt < 2)
-            {
-                // unique (Year, Sequence) race — drop the failed attempt's tracked
-                // inserts (they stay Added otherwise and poison every retry),
-                // then retry with a fresh number
-                _db.ChangeTracker.Clear();
-            }
-        }
+        return await PersistAsync(recipient, settings, lines, ct);
     }
 
     public async Task<Invoice> CreateRevisionAsync(
@@ -296,6 +283,12 @@ public sealed class InvoiceService
             );
         }
 
+        // SQLite opens the transaction with BEGIN IMMEDIATE, so it holds the
+        // write lock from before the highest number is read until the invoice is
+        // in: creates at once take turns rather than read the same number. (They
+        // used to read it first and retry on the unique index, and a request that
+        // lost the race three times in a row came back as a 500.)
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var (number, year, sequence) = await _numbers.AllocateAsync(ct);
         // the wall-clock here, like the number's year: the day it names is the
         // issue date the document prints, and until one or two in the morning
@@ -318,7 +311,6 @@ public sealed class InvoiceService
             Lines = lines,
         };
 
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         _db.Invoices.Add(invoice);
         await _db.SaveChangesAsync(ct);
         invoice.RootId = invoice.Id;

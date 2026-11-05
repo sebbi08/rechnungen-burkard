@@ -16,9 +16,11 @@ public sealed class InvoiceNumberService
     }
 
     /// <summary>
-    /// Computes the next number for the current local year. The caller inserts the
-    /// Invoice row inside its own transaction; the unique (Year, Sequence)
-    /// index makes concurrent allocations fail loudly (retry in caller).
+    /// Computes the next number for the current local year. Call it inside the
+    /// transaction that inserts the Invoice row: SQLite opens that transaction
+    /// with BEGIN IMMEDIATE, so no other connection can insert between this read
+    /// and the insert. Outside one, concurrent callers read the same number and
+    /// all but one fail on the unique (Year, Sequence) index.
     /// </summary>
     public async Task<(string Number, int Year, int Sequence)> AllocateAsync(
         CancellationToken ct = default
