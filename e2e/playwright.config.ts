@@ -14,10 +14,10 @@ export default defineConfig({
   // together. That holds because each test seeds its own data and depends on no
   // other test; the one group that must not overlap says so itself.
   fullyParallel: true,
-  // GitHub's runners for a private repository have two cores, where
-  // Playwright's default of half the cores leaves a single worker. Two keep
-  // both busy while a test waits on the app.
-  workers: process.env.CI ? 2 : undefined,
+  // GitHub's runners for a public repository have four cores, where
+  // Playwright's default of half the cores leaves two workers. Four keep them
+  // all busy while a test waits on the app, which runs on the same runner.
+  workers: process.env.CI ? 4 : undefined,
   // A `test.only` left in a spec would shrink a CI shard to that one test and
   // report it green; CI refuses to run with one.
   forbidOnly: !!process.env.CI,
