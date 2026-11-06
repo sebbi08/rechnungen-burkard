@@ -19,5 +19,5 @@ exec docker run --rm \
   -v "${REPO_ROOT}/backend:/src" \
   -v invoicing-nuget:/nuget \
   -w /src \
-  mcr.microsoft.com/dotnet/sdk:10.0 \
+  mcr.microsoft.com/dotnet/sdk:11.0 \
   sh -c 'dotnet tool restore >/dev/null && exec dotnet csharpier "$@"' -- "$@"
