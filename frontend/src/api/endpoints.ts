@@ -93,7 +93,7 @@ export interface ItemGraveGroup {
   UnitPrice: number | null;
   PriceIncludesVat: boolean;
   IsDefault: boolean;
-  Graves: { Id: number; GraveNumber: string }[];
+  Graves: { Id: number; GraveNumber: string; IsCooperative: boolean }[];
 }
 
 export interface ItemGraves {
@@ -128,6 +128,8 @@ export interface GraveStatusRow {
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
+  /** A cooperative grave is never invoiced by the business. */
+  Cooperative: boolean;
   /** In the order they were linked; empty for a grave without any. */
   Recipients: GraveStatusRecipient[];
 }
@@ -135,6 +137,52 @@ export interface GraveStatusRow {
 export async function fetchGraveStatus(year: number, half: number): Promise<GraveStatusRow[]> {
   const url = `/odata/GraveInvoicingStatus?year=${year}&half=${half}`;
   return (await getJson<{ value: GraveStatusRow[] }>(url)).value;
+}
+
+/** One cooperative grave in the cooperative list. */
+export interface CooperativeGraveRow {
+  Id: number;
+  GraveNumber: string;
+  FieldNumber: string;
+  SiteName: string;
+  CemeteryId: number;
+  CemeteryName: string;
+  StartDate: string;
+  EndDate: string | null;
+  Recipients: GraveStatusRecipient[];
+}
+
+interface CooperativeGraveAnswer {
+  Id: number;
+  GraveNumber: string;
+  FieldNumber: string;
+  SiteName: string;
+  CemeteryId: number;
+  Cemetery: { Id: number; Name: string };
+  StartDate: string;
+  EndDate: string | null;
+  Recipients: { Recipient: GraveStatusRecipient }[];
+}
+
+export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
+  const url =
+    "/odata/Graves?$filter=IsCooperative eq true&$expand=Cemetery,Recipients($expand=Recipient)&$orderby=GraveNumber";
+  const { value } = await getJson<{ value: CooperativeGraveAnswer[] }>(url);
+  return value.map((grave) => ({
+    Id: grave.Id,
+    GraveNumber: grave.GraveNumber,
+    FieldNumber: grave.FieldNumber,
+    SiteName: grave.SiteName,
+    CemeteryId: grave.CemeteryId,
+    CemeteryName: grave.Cemetery.Name,
+    StartDate: grave.StartDate,
+    EndDate: grave.EndDate,
+    Recipients: grave.Recipients.map(({ Recipient }) => ({
+      Id: Recipient.Id,
+      Name: Recipient.Name,
+      Address: Recipient.Address,
+    })),
+  }));
 }
 
 export interface SaveGraveInput {
@@ -150,6 +198,10 @@ export interface SaveGraveInput {
   endDate: string | null;
   items: InvoiceLineInput[];
   recipientIds: number[];
+  /** A cooperative grave is invoiced by the cooperative, not by the business. */
+  isCooperative: boolean;
+  /** The grave this one takes over from; only when graveId is null. */
+  succeedsGraveId?: number | null;
   /** The rounding corrections the user confirmed; the save refuses when they
    *  differ from the ones it computes itself. */
   corrections: {
@@ -194,6 +246,9 @@ export interface GraveDetails {
   StartDate: string;
   EndDate: string | null;
   CreatedAt: string;
+  IsCooperative: boolean;
+  /** Whether any invoice has been made for the grave. */
+  HasInvoices: boolean;
   Items: GraveItemLink[];
   Recipients: {
     Recipient: { Id: number; Name: string; Address: string; Email: string | null };

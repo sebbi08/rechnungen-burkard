@@ -4,6 +4,7 @@ import {
   QStringPath,
   QEnumPath,
   QDatePath,
+  QBooleanPath,
   QEntityPath,
   QBinding,
   QEntityCollectionPath,
@@ -26,6 +27,7 @@ export class QGrave extends QueryObject {
   public readonly StartDate = new QDatePath(this.withPrefix("StartDate"));
   public readonly EndDate = new QDatePath(this.withPrefix("EndDate"));
   public readonly CreatedAt = new QDatePath(this.withPrefix("CreatedAt"));
+  public readonly IsCooperative = new QBooleanPath(this.withPrefix("IsCooperative"));
   public readonly Cemetery = new QEntityPath(
     this.withPrefix("Cemetery"),
     () => QCemetery,

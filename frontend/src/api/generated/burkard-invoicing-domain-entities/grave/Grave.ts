@@ -102,6 +102,16 @@ export interface Grave {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `IsCooperative` |
+   * | Type | `Edm.Boolean` |
+   * | Nullable | `false` |
+   */
+  IsCooperative: boolean;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `Cemetery` |
    * | Type | `Burkard.Invoicing.Domain.Entities.Cemetery` |
    * | Nullable | `false` |
@@ -133,7 +143,13 @@ export interface EditableGrave
   extends
     Pick<
       Grave,
-      "GraveNumber" | "FieldNumber" | "SiteName" | "CemeteryId" | "StartDate" | "CreatedAt"
+      | "GraveNumber"
+      | "FieldNumber"
+      | "SiteName"
+      | "CemeteryId"
+      | "StartDate"
+      | "CreatedAt"
+      | "IsCooperative"
     >,
     Partial<Pick<Grave, "Id" | "Position" | "EndDate">> {
   /**

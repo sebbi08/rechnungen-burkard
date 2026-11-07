@@ -310,6 +310,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       endDate: toIsoMonth(form.EndDate),
       items: toLineInputs(lines.value),
       recipientIds: recipients.value.map((recipient) => recipient.id),
+      isCooperative: false,
       corrections: corrections.map((c) => ({
         kind: c.Kind,
         year: c.Year,

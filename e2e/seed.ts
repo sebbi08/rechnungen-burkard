@@ -108,6 +108,8 @@ export interface SeedGraveInput {
   endDate?: string | null;
   items: SeedGraveLine[];
   recipientIds: number[];
+  /** A cooperative grave skips the recipient, price and divide rules below. */
+  isCooperative?: boolean;
 }
 
 /**
@@ -139,6 +141,7 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
       priceIncludesVat: line.priceIncludesVat ?? false,
     })),
     recipientIds: grave.recipientIds,
+    isCooperative: grave.isCooperative ?? false,
   });
   return created.Id;
 }
