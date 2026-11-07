@@ -7,13 +7,14 @@ import DataTable from "primevue/datatable";
 import DatePicker from "primevue/datepicker";
 import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 import {
   bulkDownload,
   fetchGraveStatus,
   generateGraveInvoices,
+  type GraveDetails,
   type GraveStatusRow,
   pollJob,
 } from "@/api/endpoints";
@@ -293,8 +294,19 @@ onMounted(async () => {
 
 const editorOpen = ref(false);
 const editorGraveId = ref<number | null>(null);
+const successorOf = ref<GraveDetails | null>(null);
+const successorStart = ref<Date | null>(null);
 function openEditor(graveId: number | null): void {
   editorGraveId.value = graveId;
+  successorOf.value = null;
+  editorOpen.value = true;
+}
+// The editor has closed; the grave handed over takes its place as a new one.
+async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
+  editorGraveId.value = null;
+  successorOf.value = grave;
+  successorStart.value = month;
+  await nextTick();
   editorOpen.value = true;
 }
 </script>
@@ -541,5 +553,11 @@ function openEditor(graveId: number | null): void {
     :initial-half="period[1]"
     @generate="generate"
   />
-  <GraveEditor v-model:visible="editorOpen" :grave-id="editorGraveId" />
+  <GraveEditor
+    v-model:visible="editorOpen"
+    :grave-id="editorGraveId"
+    :successor-of="successorOf"
+    :successor-start="successorStart"
+    @hand-over="openSuccessor"
+  />
 </template>

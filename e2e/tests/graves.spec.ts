@@ -220,6 +220,38 @@ async function addRecipient(page: Page, editor: Locator, name: string): Promise<
   await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
 }
 
+/** A cooperative grave with one all-year item and no recipient, the way a save
+ *  without any stores it; `startDate` and `endDate` as in `term`. */
+async function seedCooperativeGrave(
+  page: Page,
+  marker: string,
+  { startDate, endDate }: { startDate: string; endDate: string | null },
+): Promise<number> {
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${marker}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  return saveGrave(page, {
+    graveNumber: marker,
+    startDate,
+    endDate,
+    items: [{ itemId: item.Id, count: 1 }],
+    recipientIds: [],
+    isCooperative: true,
+  });
+}
+
+/** Opens the editor of a grave from its detail page. */
+async function editGraveOnItsPage(page: Page, graveId: number): Promise<Locator> {
+  await page.goto(`/graves/${graveId}`);
+  await page.getByRole("button", { name: "Grab bearbeiten" }).click();
+  await waitForOverlayOpen(page);
+  return drawer(page);
+}
+
 test("a recipient added to a grave is no longer offered for it", async ({ page }) => {
   const marker = `GX-${unique()}`;
   const [first, second] = [`Erna ${marker}`, `Fritz ${marker}`];
@@ -241,6 +273,54 @@ test("a recipient added to a grave is no longer offered for it", async ({ page }
   await overlay.locator("input.p-select-filter").fill(street);
   await expect(overlay.getByRole("option", { name: second })).toHaveCount(1);
   await expect(overlay.getByRole("option", { name: first })).toHaveCount(0);
+});
+
+test("a cooperative grave is saved without recipients and items", async ({ page }) => {
+  const marker = `CG-${unique()}`;
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  await editor.getByLabel("Genossenschaftsgrab").check();
+  await saveEditor(editor);
+
+  const graves = await (
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${marker}'&$select=Id`)
+  ).json();
+  expect(graves.value).toHaveLength(1);
+
+  // saved as a cooperative grave: reopened, the box is ticked and there is nothing to bill
+  const reopened = await editGraveOnItsPage(page, graves.value[0].Id);
+  await expect(reopened.getByLabel("Genossenschaftsgrab")).toBeChecked();
+  await expect(reopened.getByRole("listitem")).toHaveCount(0);
+  await reopened.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(reopened).toHaveCount(0);
+});
+
+test("unticking a cooperative grave asks for a recipient", async ({ page }) => {
+  const marker = `CU-${unique()}`;
+  const graveId = await seedCooperativeGrave(page, marker, { startDate: "2026-01", endDate: null });
+
+  const editor = await editGraveOnItsPage(page, graveId);
+  const box = editor.getByLabel("Genossenschaftsgrab");
+  await expect(box).toBeChecked();
+  await box.uncheck();
+  await editor.getByRole("button", { name: "Speichern" }).click();
+
+  await expect(
+    toasts(page).filter({ hasText: "Das Grab braucht mindestens einen Empfänger." }),
+  ).toBeVisible();
+  await expect(editor).toBeVisible();
+
+  // a recipient makes it an ordinary grave, billed from now on
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Gen ${marker}`,
+    Address: "Musterweg 1",
+  });
+  await addRecipient(page, editor, recipient.Name);
+  await saveEditor(editor);
+  const stored = await (
+    await page.request.get(`/odata/Graves(${graveId})?$select=IsCooperative`)
+  ).json();
+  expect(stored.IsCooperative).toBe(false);
 });
 
 test("create a grave with item, price and recipient in one save (Story 5)", async ({ page }) => {
@@ -1675,6 +1755,68 @@ test.describe("the half-year today falls in", () => {
     // fully paid, so the unpaid filter drops it
     await filterColumn(page, "Zahlung", "Nur unbezahlte");
     await expect(page.getByRole("row").filter({ hasText: graveNumber })).toHaveCount(0);
+  });
+
+  test("the box is locked once the grave has invoices", async ({ page }) => {
+    const marker = `CL-${unique()}`;
+    const { graveId } = await seedGrave(page, marker, [`Sperre ${marker}`]);
+    await generateFor(page, CURRENT_YEAR, CURRENT_HALF);
+
+    const editor = await editGraveOnItsPage(page, graveId);
+    await expect(editor.getByLabel("Genossenschaftsgrab")).toBeDisabled();
+    await expect(editor).toContainText(
+      "Das Grab hat Rechnungen; ein Wechsel geht nur ab einem Monat.",
+    );
+    // the change is offered from a month on instead
+    await expect(
+      editor.getByRole("button", { name: "Ab Monat … über die Genossenschaft" }),
+    ).toBeVisible();
+    await expect(editor.getByRole("button", { name: "Ab Monat … selbst abrechnen" })).toHaveCount(
+      0,
+    );
+  });
+
+  test("a cooperative grave hands over from a month on", async ({ page }) => {
+    const marker = `CH-${unique()}`;
+    const graveId = await seedCooperativeGrave(page, marker, {
+      startDate: `${CURRENT_YEAR - 1}-01`,
+      endDate: null,
+    });
+    const recipient = await createRow(page, "/odata/Recipients", {
+      Name: `Neu ${marker}`,
+      Address: "Musterweg 1",
+    });
+    // the month before the hand-over month is the predecessor's last
+    const month = CURRENT_HALF === 1 ? "01" : "07";
+    const lastMonth = CURRENT_HALF === 1 ? `12/${CURRENT_YEAR - 1}` : `06/${CURRENT_YEAR}`;
+
+    const editor = await editGraveOnItsPage(page, graveId);
+    await editor.getByRole("button", { name: "Ab Monat … selbst abrechnen" }).click();
+    await waitForOverlayOpen(page);
+    const chooser = dialog(page, "Grab ab einem Monat übergeben");
+    await fillDate(page, chooser.getByLabel("Ab Monat"), `${month}/${CURRENT_YEAR}`);
+    await chooser.getByRole("button", { name: "Weiter" }).click();
+
+    // the successor's editor: prefilled from the grave, of the other kind
+    await expect(editor.getByLabel("Grabnummer")).toHaveValue(marker);
+    await waitForOverlayOpen(page);
+    await expect(editor.getByLabel("Genossenschaftsgrab")).not.toBeChecked();
+    await expect(editor.getByLabel("Beginn")).toHaveValue(`${month}/${CURRENT_YEAR}`);
+    await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("");
+    await expect(editor.getByLabel("Feld-Nr.")).toHaveValue("1");
+    await addRecipient(page, editor, recipient.Name);
+    await saveEditor(editor);
+
+    // the overview of this half-year lists the successor as still to be invoiced ...
+    await page.goto("/graves");
+    await searchColumn(page, "Grabnummer", marker);
+    const rows = page.getByRole("row").filter({ hasText: marker });
+    await expect(rows).toHaveCount(1);
+    await expect(rows.locator(".p-tag-danger", { hasText: "offen" })).toBeVisible();
+
+    // ... and the predecessor ends the month before it
+    await page.goto(`/graves/${graveId}`);
+    await expect(page.getByText(lastMonth)).toBeVisible();
   });
 });
 

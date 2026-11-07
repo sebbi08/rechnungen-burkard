@@ -7,8 +7,9 @@ import DataTable from "primevue/datatable";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
-import { computed, ref, toRef } from "vue";
+import { computed, nextTick, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
+import type { GraveDetails } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadGraveDetail } from "@/api/queries";
 import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
@@ -76,6 +77,19 @@ const previewInput = computed<PreviewInput | null>(() => {
 const billing = useGraveBillingPreview(previewInput);
 
 const editorOpen = ref(false);
+// After a hand-over the editor opens again, as the new grave that takes over.
+const successorOf = ref<GraveDetails | null>(null);
+const successorStart = ref<Date | null>(null);
+async function openSuccessor(predecessor: GraveDetails, month: Date): Promise<void> {
+  successorOf.value = predecessor;
+  successorStart.value = month;
+  await nextTick();
+  editorOpen.value = true;
+}
+function openEditor(): void {
+  successorOf.value = null;
+  editorOpen.value = true;
+}
 const {
   visible: graveInvoiceOpen,
   draft: graveInvoiceDraft,
@@ -92,7 +106,7 @@ const {
     ]"
   >
     <template v-if="grave" #actions>
-      <Button :label="t('editGrave')" icon="pi pi-pencil" @click="editorOpen = true" />
+      <Button :label="t('editGrave')" icon="pi pi-pencil" @click="openEditor" />
     </template>
   </PageHeader>
 
@@ -306,6 +320,12 @@ const {
     </Card>
   </div>
 
-  <GraveEditor v-model:visible="editorOpen" :grave-id="graveId" />
+  <GraveEditor
+    v-model:visible="editorOpen"
+    :grave-id="successorOf ? null : graveId"
+    :successor-of="successorOf"
+    :successor-start="successorStart"
+    @hand-over="openSuccessor"
+  />
   <GraveInvoiceEditor v-model:visible="graveInvoiceOpen" :draft="graveInvoiceDraft" />
 </template>

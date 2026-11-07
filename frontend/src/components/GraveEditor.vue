@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
+import Checkbox from "primevue/checkbox";
 import DatePicker from "primevue/datepicker";
 import Drawer from "primevue/drawer";
 import InputText from "primevue/inputtext";
@@ -9,7 +10,12 @@ import ProgressSpinner from "primevue/progressspinner";
 import Select from "primevue/select";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { type BillingCorrection, fetchGraveDetails, saveGrave } from "@/api/endpoints";
+import {
+  type BillingCorrection,
+  fetchGraveDetails,
+  type GraveDetails,
+  saveGrave,
+} from "@/api/endpoints";
 import type { Recipient } from "@/api/generated";
 import { ApiError, toApiError } from "@/api/http";
 import { useCemeteriesQuery, useItemsQuery } from "@/api/queries";
@@ -23,11 +29,23 @@ import { type GravePositionName, OFFERED_GRAVE_POSITIONS } from "@/lib/gravePosi
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
 import CorrectionsDialog, { type CorrectionRow } from "./CorrectionsDialog.vue";
 import GraveBillingPreview from "./GraveBillingPreview.vue";
+import GraveHandOverDialog from "./GraveHandOverDialog.vue";
 import LineEditor from "./LineEditor.vue";
 import RecipientPicker from "./RecipientPicker.vue";
 
-const props = defineProps<{ graveId: number | null }>();
+const props = defineProps<{
+  graveId: number | null;
+  /** A new grave starts out as a cooperative one. */
+  initialCooperative?: boolean;
+  /** A new grave that takes over from this one, prefilled from it and of the
+   *  other kind, starting in `successorStart`. */
+  successorOf?: GraveDetails | null;
+  successorStart?: Date | null;
+}>();
 const visible = defineModel<boolean>("visible", { required: true });
+// The editor has closed (the user may have been asked to discard first) and
+// the host opens the successor in its place.
+const emit = defineEmits<{ handOver: [grave: GraveDetails, month: Date] }>();
 
 const { t } = useI18n();
 const { showError } = useErrorToast();
@@ -43,6 +61,7 @@ const form = reactive({
   Position: null as GravePositionName | null,
   StartDate: null as Date | null,
   EndDate: null as Date | null,
+  IsCooperative: false,
 });
 // The position the grave was stored with. One the editor does not offer
 // (imported from the old program) is listed as well, so that the grave can be
@@ -56,12 +75,22 @@ const positionOptions = computed(() => {
     label: t(`gravePosition${value}`),
   }));
 });
+const title = computed(() =>
+  props.graveId != null
+    ? t("editGrave")
+    : props.successorOf
+      ? t("createSuccessorGrave")
+      : t("createGrave"),
+);
 const cemeteries = useCemeteriesQuery();
 const lines = ref<DraftLine[]>([]);
 const recipients = ref<{ id: number; name: string }[]>([]);
 const linkRecipientId = ref<number | null>(null);
 // the recipient behind that id, as the picker knows it
 const linkRecipient = ref<Recipient | null>(null);
+// The grave as stored; null for a new one.
+const stored = ref<GraveDetails | null>(null);
+const handOverVisible = ref(false);
 const loading = ref(false);
 const saving = ref(false);
 // What the user can change; the recipient picked for adding is not, until it
@@ -80,6 +109,33 @@ const discard = useDiscardGuard(visible, () => ({
 // closed -- or reopened for another grave, or for a new one -- is dropped:
 // filled in, it turned a new grave into a copy of the old one.
 let opening = 0;
+
+function fill(grave: GraveDetails): void {
+  Object.assign(form, {
+    GraveNumber: grave.GraveNumber,
+    FieldNumber: grave.FieldNumber,
+    SiteName: grave.SiteName,
+    CemeteryId: grave.CemeteryId,
+    Position: grave.Position,
+    StartDate: parseIsoDate(grave.StartDate),
+    EndDate: parseIsoDate(grave.EndDate),
+    IsCooperative: grave.IsCooperative,
+  });
+  storedPosition.value = grave.Position;
+  // a link price is shown as stored -- already the gross on a VAT-included line
+  lines.value = grave.Items.map((link) =>
+    newLine({
+      itemId: link.Item.Id,
+      count: link.Count,
+      unitPrice: link.UnitPrice,
+      priceIncludesVat: link.PriceIncludesVat,
+    }),
+  );
+  recipients.value = grave.Recipients.map((link) => ({
+    id: link.Recipient.Id,
+    name: link.Recipient.Name,
+  }));
+}
 
 watch(visible, async (open) => {
   const current = ++opening;
@@ -101,12 +157,23 @@ watch(visible, async (open) => {
     Position: null,
     StartDate: null,
     EndDate: null,
+    IsCooperative: props.initialCooperative ?? false,
   });
+  stored.value = null;
   storedPosition.value = null;
   lines.value = [];
   recipients.value = [];
   linkRecipientId.value = null;
   if (props.graveId == null) {
+    const predecessor = props.successorOf;
+    if (predecessor) {
+      fill(predecessor);
+      Object.assign(form, {
+        StartDate: props.successorStart ?? null,
+        EndDate: null,
+        IsCooperative: !predecessor.IsCooperative,
+      });
+    }
     discard.markClean();
     return;
   }
@@ -116,29 +183,8 @@ watch(visible, async (open) => {
     if (current !== opening) {
       return;
     }
-    Object.assign(form, {
-      GraveNumber: grave.GraveNumber,
-      FieldNumber: grave.FieldNumber,
-      SiteName: grave.SiteName,
-      CemeteryId: grave.CemeteryId,
-      Position: grave.Position,
-      StartDate: parseIsoDate(grave.StartDate),
-      EndDate: parseIsoDate(grave.EndDate),
-    });
-    storedPosition.value = grave.Position;
-    // a link price is shown as stored -- already the gross on a VAT-included line
-    lines.value = grave.Items.map((link) =>
-      newLine({
-        itemId: link.Item.Id,
-        count: link.Count,
-        unitPrice: link.UnitPrice,
-        priceIncludesVat: link.PriceIncludesVat,
-      }),
-    );
-    recipients.value = grave.Recipients.map((link) => ({
-      id: link.Recipient.Id,
-      name: link.Recipient.Name,
-    }));
+    fill(grave);
+    stored.value = grave;
     discard.markClean();
   } catch (error) {
     if (current === opening) {
@@ -175,6 +221,10 @@ const defaultPrices = computed(
 // term bills something. Reported only once an item is picked: a blank editor
 // has not got anything wrong yet.
 const lacksAllYearItem = computed(() => {
+  // a cooperative grave is not billed here, so nothing has to be billable
+  if (form.IsCooperative) {
+    return false;
+  }
   const picked = lines.value.filter((line) => line.itemId != null);
   if (picked.length === 0) {
     return false;
@@ -183,7 +233,7 @@ const lacksAllYearItem = computed(() => {
   return !picked.some((line) => quarters.get(line.itemId as number) == null);
 });
 const previewInput = computed<PreviewInput | null>(() => {
-  if (!visible.value || loading.value) {
+  if (!visible.value || loading.value || form.IsCooperative) {
     return null;
   }
   // an end before the start is the save's to refuse; a preview of it would
@@ -218,6 +268,14 @@ async function focusFailingInvoice(): Promise<void> {
   formEl.value?.querySelector<HTMLElement>("[data-billing-invalid]")?.focus();
 }
 
+// The box is fixed once invoices exist: they were split by who bills them.
+const flagLocked = computed(() => stored.value?.HasInvoices === true || props.successorOf != null);
+// The recipients of a grave are fixed at creation -- unless it is a cooperative
+// one nobody has invoiced, which has no split to disagree with.
+const recipientsEditable = computed(
+  () => props.graveId == null || (stored.value?.IsCooperative && !stored.value.HasInvoices),
+);
+
 async function save(): Promise<void> {
   if (form.CemeteryId == null) {
     showError(new ApiError("CemeteryRequired"));
@@ -229,7 +287,10 @@ async function save(): Promise<void> {
     showError(error);
     return;
   }
-  if (lacksAllYearItem.value || !lines.value.some((line) => line.itemId != null)) {
+  if (
+    !form.IsCooperative &&
+    (lacksAllYearItem.value || !lines.value.some((line) => line.itemId != null))
+  ) {
     showError(new ApiError("AllYearItemRequired"));
     return;
   }
@@ -297,6 +358,20 @@ watch(correctionsVisible, (open) => {
   }
 });
 
+// Asks to discard what was typed first; the host opens the successor once the
+// editor has closed.
+async function handOver(month: Date): Promise<void> {
+  const grave = stored.value;
+  handOverVisible.value = false;
+  if (grave == null) {
+    return;
+  }
+  await discard.requestClose();
+  if (!visible.value) {
+    emit("handOver", grave, month);
+  }
+}
+
 async function persist(corrections: BillingCorrection[]): Promise<void> {
   try {
     await saveGrave({
@@ -310,7 +385,8 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       endDate: toIsoMonth(form.EndDate),
       items: toLineInputs(lines.value),
       recipientIds: recipients.value.map((recipient) => recipient.id),
-      isCooperative: false,
+      isCooperative: form.IsCooperative,
+      succeedsGraveId: props.graveId == null ? (props.successorOf?.Id ?? null) : null,
       corrections: corrections.map((c) => ({
         kind: c.Kind,
         year: c.Year,
@@ -340,8 +416,8 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
     :visible="visible"
     :close-on-escape="false"
     position="right"
-    :header="graveId == null ? t('createGrave') : t('editGrave')"
-    :aria-label="graveId == null ? t('createGrave') : t('editGrave')"
+    :header="title"
+    :aria-label="title"
     :style="{ width: 'min(100vw, 60rem)' }"
     @after-show="drawerFocus.focusFirst(formEl)"
     @after-hide="drawerFocus.restore()"
@@ -351,11 +427,14 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
     <div v-if="loading" class="flex justify-center p-10"><ProgressSpinner /></div>
     <form ref="formEl" v-else id="graveForm" class="flex flex-col gap-6" @submit.prevent="save">
       <Message v-if="graveId != null" severity="warn">{{ t("graveEditWarning") }}</Message>
+      <Message v-if="successorOf" severity="info">
+        {{ t("graveSuccessorInfo", [successorOf.GraveNumber]) }}
+      </Message>
 
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="flex flex-col gap-2">
           <label for="graveNumber" class="font-medium">{{ t("graveNumber") }}</label>
-          <InputText id="graveNumber" v-model="form.GraveNumber" />
+          <InputText id="graveNumber" v-model="form.GraveNumber" :disabled="successorOf != null" />
         </div>
         <div class="flex flex-col gap-2">
           <label for="graveFieldNumber" class="font-medium">{{ t("graveFieldNumber") }}</label>
@@ -416,6 +495,20 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
             fluid
           />
         </div>
+        <div class="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
+          <div class="flex items-center gap-2">
+            <Checkbox
+              v-model="form.IsCooperative"
+              input-id="graveCooperative"
+              binary
+              :disabled="flagLocked"
+            />
+            <label for="graveCooperative" class="font-medium">{{ t("cooperativeGrave") }}</label>
+          </div>
+          <Message v-if="stored?.HasInvoices" severity="info" size="small">
+            {{ t("cooperativeFlagLocked") }}
+          </Message>
+        </div>
       </div>
 
       <section class="flex flex-col gap-2">
@@ -427,6 +520,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       </section>
 
       <GraveBillingPreview
+        v-if="!form.IsCooperative"
         :preview="billing.preview.value"
         :pending="billing.pending.value"
         :failed="billing.failed.value"
@@ -435,7 +529,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
 
       <section class="flex flex-col gap-3">
         <h3 class="m-0 text-base font-semibold">{{ t("graveRecipients") }}</h3>
-        <Message v-if="graveId != null" severity="info" size="small">
+        <Message v-if="!recipientsEditable" severity="info" size="small">
           {{ t("graveRecipientsFixed") }}
         </Message>
         <ul class="m-0 flex list-none flex-col gap-1 p-0">
@@ -446,7 +540,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           >
             <span>{{ recipient.name }}</span>
             <Button
-              v-if="graveId == null"
+              v-if="recipientsEditable"
               icon="pi pi-times"
               text
               rounded
@@ -457,7 +551,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           </li>
         </ul>
         <div
-          v-if="graveId == null && recipients.length < MAX_RECIPIENTS"
+          v-if="recipientsEditable && recipients.length < MAX_RECIPIENTS"
           class="flex flex-wrap items-center gap-2"
         >
           <!-- the newest recipient by default for the first one only: after an
@@ -473,7 +567,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           <Button :label="t('add')" icon="pi pi-plus" outlined @click="addRecipient" />
         </div>
         <Message
-          v-if="graveId == null && recipients.length >= MAX_RECIPIENTS"
+          v-if="recipientsEditable && recipients.length >= MAX_RECIPIENTS"
           severity="info"
           size="small"
         >
@@ -482,7 +576,17 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       </section>
     </form>
     <template #footer>
-      <div class="flex justify-end gap-2">
+      <div class="flex flex-wrap justify-end gap-2">
+        <Button
+          v-if="stored"
+          :label="stored.IsCooperative ? t('handOverToBusiness') : t('handOverToCooperative')"
+          icon="pi pi-arrow-right-arrow-left"
+          severity="secondary"
+          outlined
+          class="mr-auto"
+          :disabled="saving"
+          @click="handOverVisible = true"
+        />
         <Button
           :label="t('cancel')"
           severity="secondary"
@@ -501,6 +605,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       </div>
     </template>
   </Drawer>
+  <GraveHandOverDialog v-model:visible="handOverVisible" @confirm="handOver" />
   <CorrectionsDialog
     v-model:visible="correctionsVisible"
     :rows="correctionRows"
