@@ -677,3 +677,43 @@ test("graves: search by number narrows the list and empty search shows nothing (
   await expect(table).toContainText("Keine Daten");
   await expect(table).not.toContainText(graveNumber);
 });
+
+test("items: the edit dialog marks cooperative graves", async ({ page }) => {
+  const ts = unique();
+  const number = `E2E-COOP-${ts}`;
+  const ordinary = `E2E-COOP-O-${ts}`;
+  const cooperative = `E2E-COOP-G-${ts}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: number,
+    Description: `Genossenschaft ${ts}`,
+    VatRate: 7,
+    DefaultPrice: 100,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Coop ${ts}`,
+    Address: "Musterweg 1",
+  });
+  const line = [{ itemId: item.Id, count: 1, unitPrice: null }];
+  await seedGrave(page, { graveNumber: ordinary, items: line, recipientIds: [recipient.Id] });
+  await seedGrave(page, {
+    graveNumber: cooperative,
+    items: line,
+    recipientIds: [],
+    isCooperative: true,
+  });
+
+  await page.goto("/items");
+  await page
+    .getByRole("row")
+    .filter({ hasText: number })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForOverlayOpen(page);
+
+  const itemDialog = dialog(page, "Leistung bearbeiten");
+  const marked = itemDialog.locator("span", { has: page.getByRole("link", { name: cooperative }) });
+  await expect(marked.locator(".p-tag", { hasText: "Genossenschaft" })).toBeVisible();
+  await expect(itemDialog.getByRole("link", { name: ordinary })).toBeVisible();
+  await expect(itemDialog.locator(".p-tag", { hasText: "Genossenschaft" })).toHaveCount(1);
+});

@@ -6,6 +6,7 @@ import InputNumber from "primevue/inputnumber";
 import InputText from "primevue/inputtext";
 import Message from "primevue/message";
 import Select from "primevue/select";
+import Tag from "primevue/tag";
 import { useToast } from "primevue/usetoast";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -190,15 +191,24 @@ async function save(): Promise<void> {
         >
           <span class="text-sm font-medium">{{ groupLabel(group) }}</span>
           <div class="flex flex-wrap gap-x-3 gap-y-1">
-            <RouterLink
+            <span
               v-for="grave in group.Graves"
               :key="grave.Id"
-              :to="`/graves/${grave.Id}`"
-              class="text-primary hover:underline"
-              @click="visible = false"
+              class="inline-flex items-center gap-1"
             >
-              {{ grave.GraveNumber }}
-            </RouterLink>
+              <RouterLink
+                :to="`/graves/${grave.Id}`"
+                class="text-primary hover:underline"
+                @click="visible = false"
+              >
+                {{ grave.GraveNumber }}
+              </RouterLink>
+              <Tag
+                v-if="grave.IsCooperative"
+                :value="t('statusCooperative')"
+                severity="secondary"
+              />
+            </span>
           </div>
         </div>
       </section>

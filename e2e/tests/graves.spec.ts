@@ -287,6 +287,10 @@ test("a cooperative grave is saved without recipients and items", async ({ page 
   ).json();
   expect(graves.value).toHaveLength(1);
 
+  // the detail page names it
+  await page.goto(`/graves/${graves.value[0].Id}`);
+  await expect(page.locator(".p-tag", { hasText: "Genossenschaftsgrab" })).toBeVisible();
+
   // saved as a cooperative grave: reopened, the box is ticked and there is nothing to bill
   const reopened = await editGraveOnItsPage(page, graves.value[0].Id);
   await expect(reopened.getByLabel("Genossenschaftsgrab")).toBeChecked();
@@ -1681,6 +1685,45 @@ test.describe("the half-year today falls in", () => {
     // The red state could make a screen reader call an open half-year an invalid
     // entry; the tag carries its own announcement instead.
     await expect(status).toHaveAttribute("aria-label", "Rechnungen offen");
+  });
+
+  test("the overview shows a cooperative grave with its tag and filters by it", async ({
+    page,
+  }) => {
+    const marker = `CO-${unique()}`;
+    await seedCooperativeGrave(page, marker, {
+      startDate: `${CURRENT_YEAR - 1}-01`,
+      endDate: null,
+    });
+
+    await page.goto("/graves");
+    await searchColumn(page, "Grabnummer", marker);
+    const row = page.getByRole("row").filter({ hasText: marker });
+    const tag = row.locator(".p-tag-secondary", { hasText: "Genossenschaft" });
+    await expect(tag).toBeVisible();
+    await expect(tag).toHaveAttribute("aria-label", "Genossenschaftsgrab, wird nicht abgerechnet");
+
+    await filterColumn(page, "Status", "offen");
+    await expect(page.getByRole("table")).toContainText("Keine Daten");
+    await filterColumn(page, "Status", "Genossenschaft");
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator("tbody tr")).toContainText(marker);
+  });
+
+  test("the detail page names a cooperative grave", async ({ page }) => {
+    const marker = `CD-${unique()}`;
+    const graveId = await seedCooperativeGrave(page, marker, {
+      startDate: `${CURRENT_YEAR - 1}-01`,
+      endDate: null,
+    });
+
+    await page.goto(`/graves/${graveId}`);
+    await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+    await expect(page.locator(".p-tag", { hasText: "Genossenschaftsgrab" })).toBeVisible();
+    // the current half-year is not open, it is the cooperative's
+    await expect(page.getByText(`Halbjahr H${CURRENT_HALF} ${CURRENT_YEAR}`)).toBeVisible();
+    await expect(page.locator(".p-tag-secondary", { hasText: /^Genossenschaft$/ })).toBeVisible();
+    await expect(page.locator(".p-tag-danger", { hasText: "offen" })).toHaveCount(0);
   });
 
   test("the grave detail page shows this half-year's billed price once it is today's", async ({

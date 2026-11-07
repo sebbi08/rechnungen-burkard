@@ -56,6 +56,34 @@ const inTerm = computed(() =>
       )
     : true,
 );
+// invoiced beats the rest; a cooperative grave is never open, whatever its term
+const currentTag = computed(() => {
+  if (detail.data.value?.currentInvoiced) {
+    return {
+      value: t("statusInvoiced"),
+      severity: "success" as const,
+      announcement: t("statusInvoicedAnnouncement"),
+    };
+  }
+  if (grave.value?.IsCooperative) {
+    return {
+      value: t("statusCooperative"),
+      severity: "secondary" as const,
+      announcement: t("statusCooperativeAnnouncement"),
+    };
+  }
+  return inTerm.value
+    ? {
+        value: t("statusOpen"),
+        severity: "danger" as const,
+        announcement: t("statusOpenAnnouncement"),
+      }
+    : {
+        value: t("statusOutsideTerm"),
+        severity: "secondary" as const,
+        announcement: t("statusOutsideTermAnnouncement"),
+      };
+});
 const previewInput = computed<PreviewInput | null>(() => {
   const current = grave.value;
   if (!current || current.Items.length === 0) {
@@ -105,6 +133,9 @@ const {
       { label: grave?.GraveNumber ?? t('graveDetailTitle') },
     ]"
   >
+    <template v-if="grave?.IsCooperative" #title-tag>
+      <Tag :value="t('cooperativeGrave')" severity="secondary" icon="pi pi-users" />
+    </template>
     <template v-if="grave" #actions>
       <Button :label="t('editGrave')" icon="pi pi-pencil" @click="openEditor" />
     </template>
@@ -153,24 +184,10 @@ const {
             <dt class="text-sm text-muted-color">{{ currentLabel }}</dt>
             <dd class="m-0">
               <Tag
-                :value="
-                  detail.data.value.currentInvoiced
-                    ? t('statusInvoiced')
-                    : inTerm
-                      ? t('statusOpen')
-                      : t('statusOutsideTerm')
-                "
-                :severity="
-                  detail.data.value.currentInvoiced ? 'success' : inTerm ? 'danger' : 'secondary'
-                "
+                :value="currentTag.value"
+                :severity="currentTag.severity"
                 role="img"
-                :aria-label="
-                  detail.data.value.currentInvoiced
-                    ? t('statusInvoicedAnnouncement')
-                    : inTerm
-                      ? t('statusOpenAnnouncement')
-                      : t('statusOutsideTermAnnouncement')
-                "
+                :aria-label="currentTag.announcement"
               />
             </dd>
           </div>

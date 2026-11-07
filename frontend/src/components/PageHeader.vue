@@ -30,7 +30,10 @@ const { t } = useI18n();
           />
         </template>
       </nav>
-      <h1 class="m-0 truncate text-2xl font-semibold">{{ title }}</h1>
+      <div class="flex items-center gap-3">
+        <h1 class="m-0 truncate text-2xl font-semibold">{{ title }}</h1>
+        <slot name="title-tag" />
+      </div>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <slot name="actions" />

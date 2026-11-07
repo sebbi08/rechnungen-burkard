@@ -159,6 +159,8 @@
   "invoicingStatus": "Status",
   "statusInvoiced": "erstellt",
   "statusOpen": "offen",
+  "statusCooperative": "Genossenschaft",
+  "statusCooperativeAnnouncement": "Genossenschaftsgrab, wird nicht abgerechnet",
   "statusInvoicedAnnouncement": "Rechnungen erstellt",
   "statusOpenAnnouncement": "Rechnungen offen",
   "statusOutsideTerm": "außerhalb der Laufzeit",

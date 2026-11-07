@@ -127,6 +127,7 @@ const cemeteryOptions = computed(() =>
 const statusOptions = computed(() => [
   { value: "open", label: t("statusOpen") },
   { value: "invoiced", label: t("statusInvoiced") },
+  { value: "cooperative", label: t("statusCooperative") },
 ]);
 const paidOptions = computed(() => [{ value: "unpaid", label: t("paymentFilterUnpaid") }]);
 
@@ -153,6 +154,31 @@ const status = useQuery({
   queryFn: () => fetchGraveStatus(period.value[0], period.value[1]),
 });
 
+// the value the status column shows and the status filter selects
+function statusOf(row: GraveStatusRow): "cooperative" | "invoiced" | "open" {
+  return row.Cooperative ? "cooperative" : row.Invoiced ? "invoiced" : "open";
+}
+const statusTags = computed(() => ({
+  cooperative: {
+    value: t("statusCooperative"),
+    severity: "secondary" as const,
+    icon: "pi pi-users",
+    label: t("statusCooperativeAnnouncement"),
+  },
+  invoiced: {
+    value: t("statusInvoiced"),
+    severity: "success" as const,
+    icon: "pi pi-check",
+    label: t("statusInvoicedAnnouncement"),
+  },
+  open: {
+    value: t("statusOpen"),
+    severity: "danger" as const,
+    icon: "pi pi-exclamation-circle",
+    label: t("statusOpenAnnouncement"),
+  },
+}));
+
 const rows = computed(() => {
   const applied = filters.applied.value;
   // a select value that is no option counts as "Alle"
@@ -173,7 +199,7 @@ const rows = computed(() => {
         ...row.Recipients.flatMap((recipient) => [recipient.Name, recipient.Address]),
       ) &&
       (cemetery === undefined || String(row.CemeteryId) === cemetery) &&
-      (invoicing === undefined || row.Invoiced === (invoicing === "invoiced")) &&
+      (invoicing === undefined || statusOf(row) === invoicing) &&
       (paid === undefined || (row.InvoiceCount > 0 && row.PaidCount < row.InvoiceCount)),
   );
 });
@@ -477,13 +503,11 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
         <Column :header="t('invoicingStatus')" :show-filter-menu="false" :show-clear-button="false">
           <template #body="{ data }">
             <Tag
-              :value="data.Invoiced ? t('statusInvoiced') : t('statusOpen')"
-              :severity="data.Invoiced ? 'success' : 'danger'"
-              :icon="data.Invoiced ? 'pi pi-check' : 'pi pi-exclamation-circle'"
+              :value="statusTags[statusOf(data)].value"
+              :severity="statusTags[statusOf(data)].severity"
+              :icon="statusTags[statusOf(data)].icon"
               role="img"
-              :aria-label="
-                data.Invoiced ? t('statusInvoicedAnnouncement') : t('statusOpenAnnouncement')
-              "
+              :aria-label="statusTags[statusOf(data)].label"
             />
             <!-- on a phone the payment state sits under the status instead of in its own column -->
             <div v-if="paymentTag(data)" class="mt-1 sm:hidden">
