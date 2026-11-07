@@ -79,10 +79,11 @@ LEFT_OUT = {
     "never-billed": (
         "never billed for care, see the separate report (left out)",
         "Nie für Grabpflege abgerechnet",
-        "FriedWin hat für diese Gräber nie eine Rechnung mit einer Grabpflege-Zeile gedruckt. Was ein "
-        "Grab bekommt, steht in FriedWin nur auf seinen Rechnungen; ohne eine solche Rechnung gibt es "
-        "nichts, woraus sich die Leistungen des Grabes ablesen ließen. Mit Grabstätte und Kunde stehen "
-        "die Gräber in der Datei {csv}.",
+        "FriedWin hat für diese beendeten Gräber nie eine Rechnung mit einer Grabpflege-Zeile gedruckt. "
+        "Was ein Grab bekommt, steht in FriedWin nur auf seinen Rechnungen; ohne eine solche Rechnung "
+        "gibt es nichts, woraus sich die Leistungen des Grabes ablesen ließen. Mit Grabstätte und Kunde "
+        "stehen die Gräber, zusammen mit den aktiven, die als Genossenschaftsgräber übernommen sind, in "
+        "der Datei {csv}.",
     ),
     "no-site": (
         "no site name (left out)",
@@ -123,10 +124,25 @@ LEFT_OUT = {
 
 # What was guessed or filled in for a grave that is imported, likewise.
 NOTES = {
+    "cooperative": (
+        "active grave never billed for care (or last care invoice before the euro), imported as a "
+        "cooperative grave",
+        "Als Genossenschaftsgrab übernommen",
+        "Der Grabsatz ist aktiv, aber FriedWin hat für das Grab nie eine Pflege-Rechnung gedruckt (oder "
+        "die letzte stammt aus der Zeit vor dem Euro). Das Grab ist als Genossenschaftsgrab im "
+        "Importarchiv: mit den Angaben des Grabsatzes, dem Kundensatz als Empfänger, wenn es einen "
+        "brauchbaren gibt, und der Grabpflege zum Pflegepreis des Grabsatzes.",
+    ),
+    "empty-record": (
+        "grave record without a name, site name and field number written as '-'",
+        "Leerer Grabsatz",
+        "Der Grabsatz nennt keinen Namen der Grabstätte; übernommen ist „-“ als Name und als Feldnummer.",
+    ),
     "no-start": (
-        "no care start, first care invoice's month taken",
+        "no care start, first care invoice's month taken (cooperative graves: January of the export's year)",
         "Pflegebeginn aus der ersten Rechnung",
-        "Der Grabsatz nennt keinen Pflegebeginn; übernommen ist der Monat der ersten Pflege-Rechnung.",
+        "Der Grabsatz nennt keinen Pflegebeginn; übernommen ist der Monat der ersten Pflege-Rechnung, bei "
+        "einem Genossenschaftsgrab der Januar des Exportjahres.",
     ),
     "price-differs": (
         "care price of grave record and last invoice differ by more than 10 % (grave record taken)",
@@ -229,7 +245,10 @@ def shown_month(value):
 
 
 def read(root, name):
-    path = os.path.join(root, "frieddat", name)
+    return read_file(os.path.join(root, "frieddat", name))
+
+
+def read_file(path):
     with open(path, "rb") as fh:
         data = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
         try:
@@ -297,6 +316,7 @@ class Grave:
     start: str
     end: str
     care_price: Decimal
+    contract: str
 
 
 def read_cemeteries(root):
@@ -319,9 +339,24 @@ def read_graves(root):
                 start=month(r[236:240]),
                 end=month(r[240:244]),
                 care_price=Decimal(care) / 100 if care else None,
+                contract=text(r[250:261]),
             )
         )
     return graves
+
+
+def read_contracts(root):
+    """The contract numbers of the cooperative's contract file (GENODDAT/u60vert1.DAT)."""
+    return {text(r[5:11]) for r in read_file(os.path.join(root, "GENODDAT", "u60vert1.DAT"))}
+
+
+def contract_kind(number, contracts):
+    """How a grave record's contract number stands to the cooperative's contracts."""
+    if not number:
+        return "keiner"
+    if number in contracts or number.zfill(6) in contracts:
+        return "Genossenschaftsvertrag"
+    return "andere Vertragsnummer"
 
 
 # Grave kinds as FriedWin's hand-typed location texts spell them: "27 dGr.a",
@@ -595,11 +630,13 @@ def graves_count(n):
     return "1 Grab" if n == 1 else f"{n} Gräber"
 
 
-def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, left_out, notes, contents,
-                     before_import):
+def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, left_out, notes, cooperative,
+                     contents, before_import):
     """The PDF report: how many graves were found, prepared and left out, and why.
 
-    `found` is (active, ended) over every grave record; `contents` the rest of the
+    `found` is (active, ended) over every grave record; `cooperative` maps the
+    numbers of the graves imported as cooperative graves to (contract, customer
+    record, care price); `contents` the rest of the
     archive as (label, count) rows, and `before_import` what the app must hold
     first. Like the text report, it names graves by number only.
     """
@@ -666,6 +703,24 @@ def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, le
     doc.table(["Inhalt", "Anzahl"], contents, widths=[0.84, 0.16], align="lr")
     doc.paragraph(before_import)
 
+    if cooperative:
+        doc.page_break()
+        doc.heading("Als Genossenschaftsgrab übernommen", 2)
+        doc.paragraph(NOTES["cooperative"][2])
+        kinds = collections.Counter(entry[0] for entry in cooperative.values())
+        doc.paragraph(
+            f"{graves_count(len(cooperative))}; Vertrag: "
+            + ", ".join(f"{kinds[k]} {k}" for k in sorted(kinds))
+            + ". „Kundensatz“ sagt, ob FriedWin zum Grab einen brauchbaren Kundensatz hat (Name und "
+            "Anschrift); ohne ihn hat das Grab keinen Empfänger."
+        )
+        doc.table(
+            ["Grabnummer", "Vertrag", "Kundensatz", "Pflegepreis"],
+            [[n, kind, "ja" if usable else "nein", euro(price) if price else "–"]
+             for n, (kind, usable, price) in sorted(cooperative.items())],
+            widths=[0.18, 0.42, 0.18, 0.22], align="llll",
+        )
+
     doc.page_break()
     doc.heading("Weggelassene Gräber im Einzelnen", 2)
     doc.paragraph(
@@ -684,7 +739,7 @@ def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, le
         )
 
     noted = {key: sorted(n for n in numbers if n in converted) for key, numbers in notes.items()}
-    noted = {key: numbers for key, numbers in noted.items() if numbers}
+    noted = {key: numbers for key, numbers in noted.items() if numbers and key != "cooperative"}
     if noted:
         doc.heading("Vorbereitete Gräber mit Hinweisen", 2)
         doc.paragraph(
@@ -718,6 +773,9 @@ def main():
 
     stem = os.path.splitext(args.out)[0]
     today = datetime.date.today().strftime("%Y-%m")
+    # the year the export was taken, from its folder name (20260930-1807)
+    stamp = os.path.basename(os.path.normpath(args.root))
+    export_year = stamp[:4] if re.match(r"\d{4}", stamp) else today[:4]
     overrides = {}
     if args.positions:
         with open(args.positions, newline="", encoding="utf-8") as fh:
@@ -727,6 +785,7 @@ def main():
     report = collections.Counter()
     attention = collections.defaultdict(list)
     never_invoiced = []
+    cooperative = {}  # grave number -> (contract kind, customer record usable, care price)
     left_out = []  # (reason, grave number, active, care start, care end, detail)
     notes = collections.defaultdict(list)
 
@@ -741,6 +800,7 @@ def main():
     customers = read_customers(args.root)
     cemeteries = read_cemeteries(args.root)
     graves = read_graves(args.root)
+    contracts = read_contracts(args.root)
     invoices = read_invoices(args.root, {g.customer for g in graves})
 
     # ---- recipients
@@ -756,6 +816,7 @@ def main():
         if c.email:
             report["recipients with e-mail"] += 1
     known_recipients = {row[0] for row in recipient_rows}
+    usable_records = set(known_recipients)
 
     # ---- graves and their plans
     seen_numbers = collections.Counter()
@@ -778,15 +839,48 @@ def main():
             field_number = "-"
             note("no-field", number)
 
-        if not items or not any(i.quarter is None for i in items):
+        never_billed = not items or not any(i.quarter is None for i in items)
+        # An active grave FriedWin never billed for care (or last billed in DM) is a
+        # cooperative grave: what it gets is not readable off any invoice.
+        is_cooperative = active and (never_billed or newest.date.year < 2002)
+        if never_billed:
             customer = customers.get(g.customer)
             never_invoiced.append(
                 [number, "aktiv" if active else "beendet", g.start or "", g.end or "",
                  money(g.care_price) if g.care_price else "", field_number, position, g.site,
-                 customer.name if customer else ""]
+                 customer.name if customer else "", "ja" if is_cooperative else "nein"]
             )
-            price = f"Pflegepreis laut Grabsatz {euro(g.care_price)}" if g.care_price else "kein Pflegepreis im Grabsatz"
-            leave_out("never-billed", number, active, g.start, g.end, price)
+            if not is_cooperative:
+                price = (f"Pflegepreis laut Grabsatz {euro(g.care_price)}" if g.care_price
+                         else "kein Pflegepreis im Grabsatz")
+                leave_out("never-billed", number, active, g.start, g.end, price)
+                continue
+        if is_cooperative:
+            site = g.site
+            if not site:
+                site, field_number = "-", "-"
+                note("empty-record", number)
+            cemetery = cemeteries.get(g.cemetery)
+            if not cemetery:
+                leave_out("no-cemetery", number, active, g.start, g.end, f"Friedhofscode {g.cemetery}")
+                continue
+            start = g.start
+            if not start:
+                start = f"{export_year}-01"
+                note("no-start", number)
+            if g.end and g.end < start:
+                leave_out("ends-before-start", number, active, start, g.end,
+                          "" if g.start else "Pflegebeginn: Januar des Exportjahres")
+                continue
+            usable = g.customer in usable_records
+            kind = contract_kind(g.contract, contracts)
+            note("cooperative", number)
+            cooperative[number] = (kind, usable, g.care_price)
+            report["graves converted"] += 1
+            report["graves cooperative"] += 1
+            report[f"cemetery {cemetery}"] += 1
+            grave_rows.append([number, field_number, site, cemetery, position, start, g.end or "", "true"])
+            plans[number] = (g.customer if usable else None, [], active)
             continue
         # the printed name, which the grave record may hold cut short, without the cemetery
         site = split_site(newest.site)[0] or g.site
@@ -837,7 +931,7 @@ def main():
             note("shares", number)
         report["graves converted"] += 1
         report[f"cemetery {cemetery}"] += 1
-        grave_rows.append([number, field_number, site, cemetery, position, start, g.end or ""])
+        grave_rows.append([number, field_number, site, cemetery, position, start, g.end or "", "false"])
         plans[number] = (g.customer, items, active)
 
     # ---- items: one per FriedWin article and quarter
@@ -874,7 +968,14 @@ def main():
 
     mapping_rows = []
     for number, (customer, items, _) in plans.items():
-        mapping_rows.append(["Recipient", number, customer, "", "", ""])
+        if customer:
+            mapping_rows.append(["Recipient", number, customer, "", "", ""])
+        if number in cooperative and cooperative[number][2]:
+            price = cooperative[number][2]
+            if CARE_ITEM not in default_price:
+                raise SystemExit(f"item {CARE_ITEM} is in no ordinary grave's items, a cooperative grave needs it")
+            own = "" if default_price[CARE_ITEM] == price else money(price)
+            mapping_rows.append(["Item", number, CARE_ITEM, "1", "false", own])
         for i in items:
             n = item_number(i)
             own = "" if default_price[n] == i.price else money(i.price)
@@ -884,7 +985,7 @@ def main():
         "recipients.csv": csv_text(["RecipientNumber", "Name", "Address", "Email"], recipient_rows),
         "items.csv": csv_text(["ItemNumber", "Description", "VatRate", "Price", "Quarter"], item_rows),
         "graves.csv": csv_text(
-            ["GraveNumber", "FieldNumber", "SiteName", "Cemetery", "Position", "StartDate", "EndDate"],
+            ["GraveNumber", "FieldNumber", "SiteName", "Cemetery", "Position", "StartDate", "EndDate", "Cooperative"],
             grave_rows,
         ),
         "mapping.csv": csv_text(
@@ -900,7 +1001,7 @@ def main():
     with open(f"{stem}-nie-abgerechnet.csv", "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.writer(fh, delimiter=";")
         writer.writerow(["Grabnummer", "Status", "Pflegebeginn", "Pflegeende", "Pflegepreis laut Grabsatz",
-                         "Feld", "Lage", "Grabstätte", "Kunde"])
+                         "Feld", "Lage", "Grabstätte", "Kunde", "Als Genossenschaftsgrab übernommen"])
         writer.writerows(sorted(never_invoiced, key=lambda r: (r[1], r[0])))
 
     vat_rates = sorted({r[2] for r in item_rows}, key=Decimal)
@@ -908,6 +1009,7 @@ def main():
     write_pdf_report(
         f"{stem}-report.pdf", args.root, args.out, os.path.basename(f"{stem}-nie-abgerechnet.csv"),
         (report["graves active"], report["graves ended"]), grave_rows, plans, left_out, notes,
+        cooperative,
         [
             ["Empfänger", str(len(recipient_rows))],
             ["davon mit E-Mail-Adresse", str(report["recipients with e-mail"])],
@@ -930,6 +1032,10 @@ def main():
         f"  cemeteries used: {sorted({r[3] for r in grave_rows})} (must exist in the settings before importing)",
     ]
     lines += [f"  {key}: {value}" for key, value in sorted(report.items())]
+    if cooperative:
+        lines.append("cooperative graves (number, contract, customer record, care price):")
+        lines += [f"  {n}  {kind}  {'ja' if usable else 'nein'}  {money(price) if price else '-'}"
+                  for n, (kind, usable, price) in sorted(cooperative.items())]
     if attention:
         lines.append("needs attention (grave or item numbers):")
         for key, numbers in sorted(attention.items(), key=lambda kv: -len(kv[1])):
