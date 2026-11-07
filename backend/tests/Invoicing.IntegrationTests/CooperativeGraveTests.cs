@@ -494,16 +494,22 @@ public class CooperativeGraveTests
         var id = await SavedIdAsync(
             await SaveAsync(client, null, true, [Link(seed.PricedItem)], [seed.Anna])
         );
+        // invoiced for H1 2026, with a number that sorts before the unticked grave's
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "A-001", seed.PricedItem, seed.Bert));
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
         await SavedIdAsync(
             await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna])
         );
-        await SavedIdAsync(await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Bert));
-        await GraveGenerationHelper.RunAsync(client, 2026, 2);
 
         using var status = await StatusAsync(client, 2026, 1);
-        var row = Row(status, "K-001");
-        Assert.False(row.GetProperty("Cooperative").GetBoolean());
-        Assert.False(row.GetProperty("Invoiced").GetBoolean());
+        var rows = status.RootElement.GetProperty("value").EnumerateArray().ToList();
+        Assert.Equal(
+            ["K-001", "A-001"],
+            rows.Select(r => r.GetProperty("GraveNumber").GetString()).ToList()
+        );
+        Assert.False(rows[0].GetProperty("Cooperative").GetBoolean());
+        Assert.False(rows[0].GetProperty("Invoiced").GetBoolean());
+        Assert.True(rows[1].GetProperty("Invoiced").GetBoolean());
     }
 
     [Fact]
