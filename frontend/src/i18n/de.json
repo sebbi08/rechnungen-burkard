@@ -167,6 +167,7 @@
   "generationProgress": "Rechnungen werden erstellt … {0} %",
   "generationDone": "Erstellt",
   "skippedGraves": "Übersprungen",
+  "skipReasonCooperative": "Genossenschaftsgrab, wird nicht abgerechnet",
   "skipReasonNoRecipients": "keine Empfänger",
   "skipReasonNoItems": "keine Leistungen",
   "skipReasonItemWithoutPrice": "Leistung ohne Standardpreis",

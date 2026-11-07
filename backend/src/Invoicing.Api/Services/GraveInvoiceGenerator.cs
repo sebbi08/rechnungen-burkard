@@ -27,7 +27,7 @@ public sealed class GraveInvoiceGenerator
 
     /// <summary>Generates all invoices for one grave and half-year in a single
     /// transaction. Returns a result with a skip reason when the grave must be
-    /// skipped (no recipients, no items, an item with no price at all, a
+    /// skipped (a cooperative grave, no recipients, no items, an item with no price at all, a
     /// half-year outside the grave's term, or nothing to bill in it),
     /// otherwise the created invoices.</summary>
     public async Task<GraveGenerationResult> GenerateForGraveAsync(
@@ -37,6 +37,11 @@ public sealed class GraveInvoiceGenerator
         CancellationToken ct
     )
     {
+        if (grave.IsCooperative)
+        {
+            return new GraveGenerationResult(null, "Cooperative");
+        }
+
         // ordered explicitly by link id, so which recipient gets which sequence
         // number is deterministic and reproducible across runs. Revision no
         // longer depends on this order: every recipient is billed the same

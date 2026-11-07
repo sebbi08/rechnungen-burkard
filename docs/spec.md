@@ -644,6 +644,8 @@ non-interactive until completion, and the task runs exactly once.
   correction differs from the current one; such a grave has to be opened and
   saved again first. This is a safeguard against the rule or the stored data
   changing underneath a stored correction (for instance after an update).
+  A cooperative grave is never invoiced: it is not due in any run, is left out of
+  that check, and the generator skips it with the reason `Cooperative`.
   A run MUST NOT reach further back than two half-years before the current one
   and MUST refuse an older half-year, naming the earliest one allowed.
 - **FR-026**: The system MUST record that a grave's invoices have been generated

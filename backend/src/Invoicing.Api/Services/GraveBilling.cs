@@ -121,8 +121,9 @@ public static class GraveBilling
     /// due in it that have no invoices for it yet, in the order a run invoices
     /// them, and how many graves already have theirs. A grave outside its term,
     /// or with nothing to bill in the half-year, is not due and counts for
-    /// neither. The generate action and the run read the same answer, so the
-    /// refusal of a run with nothing left to do and the run itself agree.</summary>
+    /// neither. A cooperative grave is never due and counts as settled. The
+    /// generate action and the run read the same answer, so the refusal of a
+    /// run with nothing left to do and the run itself agree.</summary>
     public static async Task<(List<Grave> Open, int Invoiced)> OpenForHalfYearAsync(
         AppDbContext db,
         int year,
@@ -140,7 +141,8 @@ public static class GraveBilling
         var links = await LinksByGraveAsync(db, ct);
         var open = graves
             .Where(g =>
-                !invoicedIds.Contains(g.Id)
+                !g.IsCooperative
+                && !invoicedIds.Contains(g.Id)
                 && IsDue(
                     g.StartDate,
                     g.EndDate,
@@ -150,6 +152,8 @@ public static class GraveBilling
                 )
             )
             .ToList();
-        return (open, invoicedIds.Count);
+        // a cooperative grave counts as settled: it never has invoices, and a
+        // run with only cooperative graves left has nothing to do either
+        return (open, invoicedIds.Count + graves.Count(g => g.IsCooperative));
     }
 }

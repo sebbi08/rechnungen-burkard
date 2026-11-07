@@ -46,7 +46,8 @@ public sealed class GraveCorrectionCheck
         {
             var graveLinks = links.GetValueOrDefault(grave.Id) ?? [];
             if (
-                invoiced.Contains(grave.Id)
+                grave.IsCooperative
+                || invoiced.Contains(grave.Id)
                 || !recipients.TryGetValue(grave.Id, out var count)
                 || !GraveBilling.IsDue(grave.StartDate, grave.EndDate, graveLinks, year, half)
             )

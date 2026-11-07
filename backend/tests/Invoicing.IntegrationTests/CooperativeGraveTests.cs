@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -289,4 +290,135 @@ public class CooperativeGraveTests
             "NoRecipients"
         );
     }
+
+    [Fact]
+    public async Task A_run_never_invoices_a_cooperative_grave()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var cooperative = await SavedIdAsync(
+            await SaveAsync(client, null, true, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        var ordinary = await SavedIdAsync(
+            await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Bert)
+        );
+
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(await db.Invoices.Where(i => i.GraveId == cooperative).ToListAsync());
+        Assert.NotEmpty(await db.Invoices.Where(i => i.GraveId == ordinary).ToListAsync());
+        Assert.Empty(await db.GraveInvoiceRuns.Where(r => r.GraveId == cooperative).ToListAsync());
+    }
+
+    [Fact]
+    public async Task A_run_with_only_cooperative_graves_due_is_refused_as_nothing_open()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        await SavedIdAsync(
+            await SaveAsync(client, null, true, [Link(seed.PricedItem)], [seed.Anna])
+        );
+
+        var response = await client.PostAsync(
+            "/odata/GenerateGraveInvoices",
+            ODataJson.Body(new { year = 2026, half = 1 })
+        );
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(
+            "GravesAlreadyInvoiced",
+            json.RootElement.GetProperty("error").GetProperty("code").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task The_correction_precheck_ignores_cooperative_graves()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        // 100,00 EUR over three recipients would need a correction, and a
+        // cooperative grave stores none
+        var item = await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "4003",
+                        Description = "Teilbar nicht",
+                        VatRate = 7.0m,
+                        DefaultPrice = 100.00m,
+                    }
+                )
+            )
+        );
+        await SavedIdAsync(
+            await SaveAsync(client, null, true, [Link(item)], [seed.Anna, seed.Bert, seed.Carl])
+        );
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Anna));
+
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.GraveInvoiceRuns.CountAsync());
+    }
+
+    [Fact]
+    public async Task The_generator_refuses_a_cooperative_grave_directly()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, true, [Link(seed.PricedItem)], [seed.Anna])
+        );
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var grave = await db.Graves.SingleAsync(g => g.Id == id);
+        var generator = scope.ServiceProvider.GetRequiredService<GraveInvoiceGenerator>();
+
+        var result = await generator.GenerateForGraveAsync(grave, 2026, 1, CancellationToken.None);
+
+        Assert.Null(result.Invoices);
+        Assert.Equal("Cooperative", result.SkipReason);
+        Assert.Empty(await db.Invoices.ToListAsync());
+    }
+
+    private static Task<HttpResponseMessage> SaveOrdinaryAsync(
+        HttpClient client,
+        string number,
+        long itemId,
+        long recipientId
+    ) =>
+        client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = number,
+                    fieldNumber = "F-1",
+                    siteName = "Ordentlich",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = "2026-01-01",
+                    endDate = (string?)null,
+                    isCooperative = false,
+                    items = new[] { Link(itemId) },
+                    recipientIds = new[] { recipientId },
+                    corrections = Array.Empty<object>(),
+                }
+            )
+        );
 }
