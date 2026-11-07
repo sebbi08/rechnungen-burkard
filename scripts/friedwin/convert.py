@@ -56,23 +56,20 @@ SEASONS = {
 }
 # The reduced rates of the second half of 2020, billed at today's rates.
 VAT_NOW = {Decimal(16): Decimal(19), Decimal(5): Decimal(7)}
-# FriedWin prints the cemetery after the grave's name ("GRABSTÄTTE: Name  Speyer")
-# but stores it nowhere the export holds, so it is read off the invoices. Its
-# spelling changed over the years; the app's name for each spelling:
+# A grave record names its cemetery by a code into FriedWin's cemetery table
+# (f24pfle1.DAT), and the invoices print it after the grave's name ("GRABSTÄTTE:
+# Name  Speyer"), spelled differently over the years. The app's name for each
+# spelling, in the table and on the invoices:
 CEMETERIES = {
     "FRIEDHOF SPEYER": "Speyer",
     "Speyer": "Speyer",
     "FRIEDHOF DUDENH": "Dudenhofen",
     "Harthausen": "Harthausen",
+    "Otterstadt": "Otterstadt",
 }
 CEMETERY_SUFFIX = re.compile(
     r"\s+(" + "|".join(re.escape(c) for c in sorted(CEMETERIES, key=len, reverse=True)) + r")$"
 )
-# From 2018 to 2025 the invoices of a grave in Speyer named no cemetery at all,
-# while those in Dudenhofen and Harthausen kept naming theirs.
-SILENT_YEARS = range(2018, 2026)
-SILENT_CEMETERY = "Speyer"
-
 # Suffix of an item number when one FriedWin article is billed in several quarters.
 QUARTER_SUFFIX = {"Spring": "F", "Summer": "S", "Autumn": "H", "Winter": "W"}
 
@@ -94,12 +91,10 @@ LEFT_OUT = {
         "App verlangt ihn.",
     ),
     "no-cemetery": (
-        "no cemetery on any invoice (left out)",
+        "cemetery code of the grave record not in the cemetery table (left out)",
         "Kein Friedhof erkennbar",
-        "Keine Pflege-Rechnung des Grabes nennt hinter dem Namen einen der bekannten Friedhöfe. Aus den "
-        "Jahren lässt er sich nicht ableiten: als Speyer gilt nur ein Grab, das ausschließlich "
-        "{silent} abgerechnet wurde, als FriedWin bei Speyer keinen Friedhof druckte. Die App "
-        "verlangt einen Friedhof.",
+        "Der Grabsatz nennt keinen Friedhof aus FriedWins Friedhofstabelle, oder der Friedhof ist dem "
+        "Umwandlungsskript unbekannt. Die App verlangt einen Friedhof.",
     ),
     "ends-before-start": (
         "care ends before it starts (left out)",
@@ -139,12 +134,11 @@ NOTES = {
         "Grabsatz und letzte Pflege-Rechnung nennen Pflegepreise, die mehr als 10 % auseinanderliegen. "
         "Übernommen ist der Preis des Grabsatzes, den FriedWin als Nächstes berechnet hätte.",
     ),
-    "speyer-taken": (
-        f"no cemetery printed, {SILENT_CEMETERY} taken (only invoiced {SILENT_YEARS.start}-"
-        f"{SILENT_YEARS.stop - 1}, when {SILENT_CEMETERY} went unprinted)",
-        f"Friedhof {SILENT_CEMETERY} angenommen",
-        f"Keine Rechnung nennt den Friedhof, aber das Grab wurde nur {SILENT_YEARS.start}–"
-        f"{SILENT_YEARS.stop - 1} abgerechnet, als FriedWin bei {SILENT_CEMETERY} keinen Friedhof druckte.",
+    "cemetery-differs": (
+        "the last invoice naming a cemetery names another than the grave record (grave record taken)",
+        "Friedhof der Rechnungen weicht ab",
+        "Die letzte Rechnung, die einen Friedhof nennt, nennt einen anderen als der Grabsatz. "
+        "Übernommen ist der Friedhof des Grabsatzes.",
     ),
     "position-unknown": (
         "grave kind not recognised in the location text (position Unknown...)",
@@ -183,7 +177,7 @@ NOTES = {
 
 
 def text(raw):
-    return raw.decode(ENCODING).strip()
+    return raw.decode(ENCODING).replace("\0", " ").strip()
 
 
 def unpack(raw):
@@ -279,11 +273,13 @@ def read_customers(root):
     customers = {}
     for r in read(root, "F01KUNR1.DAT"):
         number = r[3:9].decode()
-        plz, place = text(r[221:226]), text(r[226:242])
-        lines = [text(r[54:81]), text(r[94:109]), text(r[178:206]), f"{plz} {place}".strip()]
+        # the country code ("CH", "NL") in front of the postcode, as FriedWin prints it
+        country, plz, place = text(r[218:221]), text(r[221:226]), text(r[226:266])
+        town = " ".join(x for x in (country, plz, place) if x)
+        lines = [text(r[54:94]), text(r[94:134]), text(r[178:218]), town]
         customers[number] = Customer(
             number=number,
-            name=text(r[14:44]),
+            name=text(r[14:54]),
             salutation=salutations.get(r[134:136].decode(), ""),
             address=[line for line in lines if line],
             email=email_of(r),
@@ -295,11 +291,18 @@ def read_customers(root):
 class Grave:
     number: str
     customer: str
+    cemetery: str
     site: str
     location: str
     start: str
     end: str
     care_price: Decimal
+
+
+def read_cemeteries(root):
+    """The app's cemetery for each code of FriedWin's cemetery table; unknown names are left out."""
+    table = {r[3:5].decode(): text(r[16:56]) for r in read(root, "f24pfle1.DAT")}
+    return {code: CEMETERIES[name] for code, name in table.items() if name in CEMETERIES}
 
 
 def read_graves(root):
@@ -310,6 +313,7 @@ def read_graves(root):
             Grave(
                 number=r[5:11].decode(),
                 customer=r[5:11].decode(),
+                cemetery=r[3:5].decode(),
                 site=text(r[72:96]) or text(r[32:56]),
                 location=re.sub(r"\s+", " ", text(r[104:160])),
                 start=month(r[236:240]),
@@ -423,7 +427,7 @@ def read_invoices(root, customers):
         current, quarter = None, None
         for r in range(len(data) // ARCHIVE_RECORD):
             raw = data[r * ARCHIVE_RECORD : (r + 1) * ARCHIVE_RECORD]
-            f = [v.strip() for v in raw.decode(ENCODING).split(";")]
+            f = [v.replace("\0", " ").strip() for v in raw.decode(ENCODING).split(";")]
             if len(f) < ARCHIVE_FIELDS:
                 continue
             if f[1].startswith("****"):
@@ -566,15 +570,13 @@ def split_site(site):
     return (site[: m.start()], m.group(1)) if m else (site, None)
 
 
-def cemetery_of(invoices):
-    """(the app's cemetery, how it was found) for a grave, or (None, None)."""
+def printed_cemetery(invoices):
+    """The app's cemetery as the newest invoice naming one prints it, or None."""
     for inv in sorted(invoices, key=lambda i: (i.date, i.number), reverse=True):
         _, printed = split_site(inv.site)
         if printed:
-            return CEMETERIES[printed], "printed"
-    if invoices and all(i.date.year in SILENT_YEARS for i in invoices):
-        return SILENT_CEMETERY, "inferred"
-    return None, None
+            return CEMETERIES[printed]
+    return None
 
 
 def csv_text(header, rows):
@@ -670,11 +672,10 @@ def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, le
         "Je Grund die Erklärung und jedes Grab, das er betrifft: aktive Gräber zuerst, dann nach "
         "Grabnummer. Ein Grab steht unter dem ersten Grund, an dem es scheitert."
     )
-    silent = f"{SILENT_YEARS.start}–{SILENT_YEARS.stop - 1}"
     for r in reasons:
         entries = sorted(by_reason[r], key=lambda e: (not e[2], e[1]))
         doc.heading(f"{LEFT_OUT[r][1]}: {graves_count(len(entries))}", 3)
-        doc.paragraph(LEFT_OUT[r][2].format(csv=csv_name, silent=silent))
+        doc.paragraph(LEFT_OUT[r][2].format(csv=csv_name))
         doc.table(
             ["Grabnummer", "Status", "Pflegebeginn", "Pflegeende", "Einzelheiten"],
             [[e[1], "aktiv" if e[2] else "beendet", shown_month(e[3]), shown_month(e[4]), e[5]]
@@ -738,6 +739,7 @@ def main():
         notes[key].append(number)
 
     customers = read_customers(args.root)
+    cemeteries = read_cemeteries(args.root)
     graves = read_graves(args.root)
     invoices = read_invoices(args.root, {g.customer for g in graves})
 
@@ -791,14 +793,12 @@ def main():
         if not site:
             leave_out("no-site", number, active, g.start, g.end)
             continue
-        cemetery, found = cemetery_of(invoices[g.customer])
+        cemetery = cemeteries.get(g.cemetery)
         if not cemetery:
-            years = sorted({i.date.year for i in invoices[g.customer]})
-            span = f"{years[0]}" if len(years) == 1 else f"{years[0]}–{years[-1]}"
-            leave_out("no-cemetery", number, active, g.start, g.end, f"Pflege-Rechnungen {span}")
+            leave_out("no-cemetery", number, active, g.start, g.end, f"Friedhofscode {g.cemetery}")
             continue
-        if found == "inferred":
-            note("speyer-taken", number)
+        if printed_cemetery(invoices[g.customer]) not in (None, cemetery):
+            note("cemetery-differs", number)
         start = g.start
         if not start:
             start = min(i.date for i in invoices[g.customer]).strftime("%Y-%m")
