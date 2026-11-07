@@ -166,7 +166,7 @@ interface CooperativeGraveAnswer {
 
 export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
   const url =
-    "/odata/Graves?$filter=IsCooperative eq true&$expand=Cemetery,Recipients($expand=Recipient)&$orderby=GraveNumber";
+    "/odata/Graves?$filter=IsCooperative eq true&$expand=Cemetery,Recipients($expand=Recipient;$orderby=Id)&$orderby=GraveNumber";
   const { value } = await getJson<{ value: CooperativeGraveAnswer[] }>(url);
   return value.map((grave) => ({
     Id: grave.Id,

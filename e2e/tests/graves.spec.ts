@@ -1724,6 +1724,23 @@ test.describe("the half-year today falls in", () => {
     await expect(page.getByText(`Halbjahr H${CURRENT_HALF} ${CURRENT_YEAR}`)).toBeVisible();
     await expect(page.locator(".p-tag-secondary", { hasText: /^Genossenschaft$/ })).toBeVisible();
     await expect(page.locator(".p-tag-danger", { hasText: "offen" })).toHaveCount(0);
+    // the cooperative bills it, so there is no billing preview
+    await expect(page.getByText("Beispielrechnungen")).toHaveCount(0);
+  });
+
+  test("the detail page shows an ended cooperative grave as outside its term", async ({ page }) => {
+    const marker = `CE-${unique()}`;
+    const graveId = await seedCooperativeGrave(page, marker, {
+      startDate: `${CURRENT_YEAR - 2}-01`,
+      endDate: `${CURRENT_YEAR - 1}-12`,
+    });
+
+    await page.goto(`/graves/${graveId}`);
+    await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
+    await expect(
+      page.locator(".p-tag-secondary", { hasText: "außerhalb der Laufzeit" }),
+    ).toBeVisible();
+    await expect(page.locator(".p-tag", { hasText: /^Genossenschaft$/ })).toHaveCount(0);
   });
 
   test("the grave detail page shows this half-year's billed price once it is today's", async ({

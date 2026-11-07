@@ -56,13 +56,20 @@ const inTerm = computed(() =>
       )
     : true,
 );
-// invoiced beats the rest; a cooperative grave is never open, whatever its term
+// invoiced beats the rest, then the term; a cooperative grave in its term is never open
 const currentTag = computed(() => {
   if (detail.data.value?.currentInvoiced) {
     return {
       value: t("statusInvoiced"),
       severity: "success" as const,
       announcement: t("statusInvoicedAnnouncement"),
+    };
+  }
+  if (!inTerm.value) {
+    return {
+      value: t("statusOutsideTerm"),
+      severity: "secondary" as const,
+      announcement: t("statusOutsideTermAnnouncement"),
     };
   }
   if (grave.value?.IsCooperative) {
@@ -72,21 +79,15 @@ const currentTag = computed(() => {
       announcement: t("statusCooperativeAnnouncement"),
     };
   }
-  return inTerm.value
-    ? {
-        value: t("statusOpen"),
-        severity: "danger" as const,
-        announcement: t("statusOpenAnnouncement"),
-      }
-    : {
-        value: t("statusOutsideTerm"),
-        severity: "secondary" as const,
-        announcement: t("statusOutsideTermAnnouncement"),
-      };
+  return {
+    value: t("statusOpen"),
+    severity: "danger" as const,
+    announcement: t("statusOpenAnnouncement"),
+  };
 });
 const previewInput = computed<PreviewInput | null>(() => {
   const current = grave.value;
-  if (!current || current.Items.length === 0) {
+  if (!current || current.IsCooperative || current.Items.length === 0) {
     return null;
   }
   return {
@@ -238,7 +239,7 @@ const {
       </template>
     </Card>
 
-    <Card v-if="(grave?.Items.length ?? 0) > 0">
+    <Card v-if="(grave?.Items.length ?? 0) > 0 && !grave?.IsCooperative">
       <template #content>
         <GraveBillingPreview
           :assumes-one-recipient="(grave?.Recipients.length ?? 0) === 0"

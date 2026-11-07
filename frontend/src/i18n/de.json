@@ -282,7 +282,7 @@
   "errorSuccessorStartInvoiced": "Für das bisherige Grab wurde ein Halbjahr abgerechnet, das bis zum neuen Beginn reicht. Wählen Sie einen späteren Monat.",
   "errorSuccessorNumberDiffers": "Das neue Grab muss dieselbe Nummer haben wie das bisherige.",
   "errorSuccessorOnlyOnCreate": "Ein bestehendes Grab kann nicht nachträglich zum Nachfolger eines anderen werden.",
-  "errorSuccessorChangesCorrections": "Durch das frühere Ende ändern sich die bestätigten Rundungsanpassungen des bisherigen Grabs. Bitte speichern Sie es zuerst erneut.",
+  "errorSuccessorChangesCorrections": "Der Wechsel ändert die Rundungskorrekturen des bisherigen Grabs. Setzen Sie zuerst dessen Ende auf den Monat vor dem Wechsel und speichern Sie es; danach ist der Wechsel möglich.",
   "errorGraveRecipientsImmutable": "Die Empfänger eines Grabs können nicht geändert werden.",
   "errorQuarterImmutable": "Das Quartal ist festgelegt, solange Gräber die Leistung verwenden.",
   "errorTooManyRecipients": "Ein Grab kann höchstens 4 Empfänger haben.",
