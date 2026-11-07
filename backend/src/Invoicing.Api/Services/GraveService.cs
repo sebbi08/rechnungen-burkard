@@ -32,7 +32,8 @@ public sealed record GraveFields(
     long? CemeteryId,
     GravePosition? Position,
     DateOnly StartDate,
-    DateOnly? EndDate
+    DateOnly? EndDate,
+    bool IsCooperative
 );
 
 public sealed class GraveService
@@ -59,6 +60,28 @@ public sealed class GraveService
     )
     {
         await ValidateFieldsAsync(graveId, fields, ct);
+
+        var stored = graveId is { } storedId
+            ? await _db
+                .Graves.Where(g => g.Id == storedId)
+                .Select(g => new
+                {
+                    g.IsCooperative,
+                    HasInvoices = _db.Invoices.Any(i => i.GraveId == g.Id),
+                })
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        // Whether a grave is billed decides what its invoices were split by, so
+        // the flag cannot flip under invoices that already exist.
+        if (stored is { HasInvoices: true } && stored.IsCooperative != fields.IsCooperative)
+        {
+            throw new ValidationException(
+                "CooperativeFlagFixed",
+                "A grave that has invoices cannot become or stop being a cooperative grave."
+            );
+        }
+
         var evaluation = await ValidateAsync(items, recipientIds, fields, ct);
 
         // These come first: without recipients nothing is evaluated, so the
@@ -66,7 +89,13 @@ public sealed class GraveService
         // A grave created without recipients could never be billed: generation
         // would skip it, and once created its recipient set cannot change. A
         // grave that predates this rule keeps its empty set and stays editable.
-        if (graveId is null && recipientIds.Count == 0)
+        // A cooperative grave is never billed and needs none -- until it is
+        // unticked, which makes it an ordinary grave from then on.
+        if (
+            !fields.IsCooperative
+            && recipientIds.Count == 0
+            && (graveId is null || stored is { IsCooperative: true })
+        )
         {
             throw new ValidationException(
                 "NoRecipients",
@@ -76,14 +105,16 @@ public sealed class GraveService
 
         // A grave's recipients are fixed at creation: the even split across them is
         // baked into every invoice already generated, and changing the set would
-        // make a later revision disagree with what was sent out.
-        if (graveId is { } existingId)
+        // make a later revision disagree with what was sent out. A cooperative
+        // grave that was never invoiced has no split to disagree with, so its
+        // recipients may change.
+        if (graveId is { } existingId && stored is not { IsCooperative: true, HasInvoices: false })
         {
-            var stored = await _db
+            var storedRecipients = await _db
                 .GraveRecipients.Where(r => r.GraveId == existingId)
                 .Select(r => r.RecipientId)
                 .ToListAsync(ct);
-            if (!stored.OrderBy(id => id).SequenceEqual(recipientIds.OrderBy(id => id)))
+            if (!storedRecipients.OrderBy(id => id).SequenceEqual(recipientIds.OrderBy(id => id)))
             {
                 throw new ValidationException(
                     "GraveRecipientsImmutable",
@@ -122,6 +153,7 @@ public sealed class GraveService
         grave.Position = fields.Position;
         grave.StartDate = fields.StartDate;
         grave.EndDate = fields.EndDate;
+        grave.IsCooperative = fields.IsCooperative;
 
         // the deletes must reach the database before the new links and corrections
         // are inserted, or the unique indexes reject a re-added row
@@ -345,7 +377,9 @@ public sealed class GraveService
             // an item with neither a link price nor a default price would make the
             // whole grave get skipped during generation, so reject it while the
             // dialog is still open
-            if ((input.UnitPrice ?? item.DefaultPrice) is null)
+            //
+            // A cooperative grave is never generated, so it may stay unpriced.
+            if (!fields.IsCooperative && (input.UnitPrice ?? item.DefaultPrice) is null)
             {
                 throw new ValidationException(
                     "PriceRequired",
@@ -366,7 +400,7 @@ public sealed class GraveService
 
         // with one all-year item every half-year of the term bills something, so a
         // grave is always due while its term runs
-        if (!items.Any(i => invoiceItems[i.ItemId].Quarter is null))
+        if (!fields.IsCooperative && !items.Any(i => invoiceItems[i.ItemId].Quarter is null))
         {
             throw new ValidationException(
                 "AllYearItemRequired",
@@ -389,7 +423,9 @@ public sealed class GraveService
         // Only checked once there are recipients -- until then there is nothing
         // to divide by, and a grave is often saved with its items before its
         // recipients are known.
-        if (recipientIds.Count > 0 && items.Count > 0)
+        //
+        // A cooperative grave is never split: it stores no corrections.
+        if (!fields.IsCooperative && recipientIds.Count > 0 && items.Count > 0)
         {
             var links = items
                 .Select(input =>

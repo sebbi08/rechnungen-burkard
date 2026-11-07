@@ -56,6 +56,9 @@ public class GravesController : ODataController
             grave.StartDate,
             grave.EndDate,
             grave.CreatedAt,
+            grave.IsCooperative,
+            // the editor locks the flag once an invoice exists
+            HasInvoices = _db.Invoices.Any(i => i.GraveId == key),
             Items = grave
                 .Items.Select(i => new
                 {
@@ -146,7 +149,8 @@ public class GravesController : ODataController
                 ? position
                 : null,
             startDate,
-            endDate
+            endDate,
+            request.IsCooperative ?? false
         );
 
         try
@@ -245,6 +249,7 @@ public class GravesController : ODataController
         public string? Position { get; set; }
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
+        public bool? IsCooperative { get; set; }
         public List<GraveItemInput>? Items { get; set; }
         public List<long>? RecipientIds { get; set; }
         public List<GraveCorrectionInput>? Corrections { get; set; }

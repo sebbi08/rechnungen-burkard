@@ -21,6 +21,11 @@ public sealed class Grave
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
     public DateOnly CreatedAt { get; set; }
+
+    /// <summary>A grave the cooperative looks after: it is listed and kept up to
+    /// date here, but never invoiced, so it needs no recipient, no price and no
+    /// all-year item.</summary>
+    public bool IsCooperative { get; set; }
     public List<GraveItem> Items { get; set; } = new();
     public List<GraveRecipient> Recipients { get; set; } = new();
     public List<GraveBillingCorrection> Corrections { get; set; } = new();

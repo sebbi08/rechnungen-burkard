@@ -555,7 +555,10 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-018**: A grave MUST have a grave number, a field number, a site name, a
   cemetery, a position (double, single or urn grave, inside or outside) and a
   start month; the end month is optional. The site name holds the site's own
-  name only; the cemetery is a field of its own.
+  name only; the cemetery is a field of its own. A grave MAY be marked as a
+  cooperative grave (Genossenschaftsgrab): the cooperative looks after it, so it
+  is kept and listed here but never invoiced. A grave that has invoices MUST NOT
+  have the mark ticked or unticked.
 - **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
   a term runs from its start month through its end month, or indefinitely without
   one. Field numbers may repeat.
@@ -581,12 +584,16 @@ non-interactive until completion, and the task runs exactly once.
   as a whole month and the count is unchanged. A quarter item MUST be billed in
   full, once, in the half-year that holds its quarter, when the invoice's months
   touch that quarter at all, and not otherwise. A grave MUST have at least one
-  item billed all year (without a quarter).
-- **FR-020**: A grave MUST support one to four recipients.
+  item billed all year (without a quarter). A cooperative grave is exempt: it
+  MAY have no item at all, an item without a price, and no all-year item.
+- **FR-020**: A grave MUST support one to four recipients. A cooperative grave
+  MAY have none, and at most four.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
 - **FR-020b**: A grave's set of recipients MUST be fixed when the grave is
-  created and MUST NOT change afterwards.
+  created and MUST NOT change afterwards. A cooperative grave that has no invoice
+  is exempt, so that it can become an ordinary grave later; unticking it applies
+  every rule of an ordinary grave, including FR-020 and FR-021a.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each carrying the grave's own items and counts in full,
   billed at the same amount as every other recipient's invoice.

@@ -110,6 +110,9 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsCooperative")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Position")
                         .HasColumnType("TEXT");
 

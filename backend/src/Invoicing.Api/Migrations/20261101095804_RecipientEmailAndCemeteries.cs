@@ -76,11 +76,21 @@ namespace Burkard.Invoicing.Api.Migrations
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict
             );
+
+            migrationBuilder.AddColumn<bool>(
+                name: "IsCooperative",
+                table: "Graves",
+                type: "INTEGER",
+                nullable: false,
+                defaultValue: false
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(name: "IsCooperative", table: "Graves");
+
             migrationBuilder.DropForeignKey(
                 name: "FK_Graves_Cemeteries_CemeteryId",
                 table: "Graves"
