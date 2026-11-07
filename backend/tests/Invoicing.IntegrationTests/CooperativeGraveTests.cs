@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Text.Json;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -563,6 +564,330 @@ public class CooperativeGraveTests
                 .GetProperty("Name")
                 .GetString()
         );
+    }
+
+    private static Task<HttpResponseMessage> SaveSuccessorAsync(
+        HttpClient client,
+        long? succeedsGraveId,
+        string start,
+        bool isCooperative,
+        object[] items,
+        long[] recipientIds,
+        string number = "K-001"
+    ) =>
+        client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    succeedsGraveId,
+                    graveNumber = number,
+                    fieldNumber = "F-1",
+                    siteName = "Nachfolger",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = start,
+                    endDate = (string?)null,
+                    isCooperative,
+                    items,
+                    recipientIds,
+                    corrections = Array.Empty<object>(),
+                }
+            )
+        );
+
+    private static async Task<string?> EndDateAsync(HttpClient client, long id)
+    {
+        using var grave = await GetGraveAsync(client, id);
+        return grave.RootElement.GetProperty("EndDate").GetString();
+    }
+
+    [Fact]
+    public async Task A_successor_ends_its_predecessor_the_month_before()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+
+        var successor = await SavedIdAsync(
+            await SaveSuccessorAsync(
+                client,
+                cooperative,
+                "2026-07-01",
+                false,
+                [Link(seed.PricedItem)],
+                [seed.Anna]
+            )
+        );
+
+        Assert.StartsWith("2026-06-01", await EndDateAsync(client, cooperative));
+        Assert.Null(await EndDateAsync(client, successor));
+
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Empty(await db.Invoices.Where(i => i.GraveId == cooperative).ToListAsync());
+            Assert.NotEmpty(await db.Invoices.Where(i => i.GraveId == successor).ToListAsync());
+        }
+
+        using var status = await StatusAsync(client, 2026, 1);
+        var row = Row(status, "K-001");
+        Assert.True(row.GetProperty("Cooperative").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_successor_of_the_same_kind_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(client, cooperative, "2026-07-01", true, [], []),
+            "SuccessorSameKind"
+        );
+        Assert.Null(await EndDateAsync(client, cooperative));
+    }
+
+    [Fact]
+    public async Task A_successor_starting_at_or_before_the_predecessor_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+
+        foreach (var start in new[] { "2024-01-01", "2023-06-01" })
+        {
+            await AssertRefusedAsync(
+                await SaveSuccessorAsync(
+                    client,
+                    cooperative,
+                    start,
+                    false,
+                    [Link(seed.PricedItem)],
+                    [seed.Anna]
+                ),
+                "SuccessorStartTooEarly"
+            );
+        }
+
+        Assert.Null(await EndDateAsync(client, cooperative));
+    }
+
+    [Fact]
+    public async Task A_successor_inside_an_invoiced_half_year_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var ordinary = await SavedIdAsync(
+            await SaveOrdinaryAsync(client, "K-001", seed.PricedItem, seed.Anna)
+        );
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(client, ordinary, "2026-10-01", true, [], []),
+            "SuccessorStartInvoiced"
+        );
+        Assert.Null(await EndDateAsync(client, ordinary));
+
+        await SavedIdAsync(await SaveSuccessorAsync(client, ordinary, "2027-01-01", true, [], []));
+        Assert.StartsWith("2026-12-01", await EndDateAsync(client, ordinary));
+    }
+
+    [Fact]
+    public async Task Invoices_of_the_predecessor_stay_usable()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var ordinary = await SavedIdAsync(
+            await SaveOrdinaryAsync(client, "K-001", seed.PricedItem, seed.Anna)
+        );
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+        await SavedIdAsync(await SaveSuccessorAsync(client, ordinary, "2027-01-01", true, [], []));
+
+        long invoiceId;
+        long documentId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            invoiceId = (await db.Invoices.SingleAsync(i => i.GraveId == ordinary)).Id;
+            documentId = (
+                await db.Documents.SingleAsync(d =>
+                    d.InvoiceId == invoiceId && d.Kind == DocumentKind.Normal
+                )
+            ).Id;
+        }
+
+        var download = await client.GetAsync($"/odata/Documents({documentId})/$value");
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal("application/pdf", download.Content.Headers.ContentType?.MediaType);
+
+        var revision = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId = seed.PricedItem,
+                            count = 1,
+                            unitPrice = (decimal?)120.00m,
+                        },
+                    },
+                }
+            )
+        );
+        Assert.True(revision.IsSuccessStatusCode, await revision.Content.ReadAsStringAsync());
+
+        // a paid grave invoice is not revised any more, so payment comes after
+        long revisedId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            revisedId = (
+                await db
+                    .Invoices.Where(i => i.GraveId == ordinary)
+                    .OrderByDescending(i => i.Id)
+                    .FirstAsync()
+            ).Id;
+        }
+
+        var paid = await client.PostAsync(
+            "/odata/SetInvoicePaid",
+            ODataJson.Body(new { invoiceId = revisedId, paid = true })
+        );
+        Assert.True(paid.IsSuccessStatusCode, await paid.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task A_half_year_with_invoices_shows_invoiced()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var ordinary = await SavedIdAsync(
+            await SaveOrdinaryAsync(client, "K-001", seed.PricedItem, seed.Anna)
+        );
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+        await SavedIdAsync(await SaveSuccessorAsync(client, ordinary, "2027-01-01", true, [], []));
+
+        using var status = await StatusAsync(client, 2026, 2);
+        var row = Row(status, "K-001");
+        Assert.True(row.GetProperty("Invoiced").GetBoolean());
+        Assert.False(row.GetProperty("Cooperative").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_failed_successor_leaves_the_predecessor_alone()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(
+                client,
+                cooperative,
+                "2026-07-01",
+                false,
+                [Link(seed.PricedItem)],
+                []
+            ),
+            "NoRecipients"
+        );
+        Assert.Null(await EndDateAsync(client, cooperative));
+    }
+
+    [Fact]
+    public async Task A_successor_needs_an_existing_predecessor_with_the_same_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+        object[] items = [Link(seed.PricedItem)];
+
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(client, 9999, "2026-07-01", false, items, [seed.Anna]),
+            "GraveNotFound"
+        );
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(
+                client,
+                cooperative,
+                "2026-07-01",
+                false,
+                items,
+                [seed.Anna],
+                " k-002 "
+            ),
+            "SuccessorNumberDiffers"
+        );
+        // trimmed and case-insensitive like the overlap check
+        await SavedIdAsync(
+            await SaveSuccessorAsync(
+                client,
+                cooperative,
+                "2026-07-01",
+                false,
+                items,
+                [seed.Anna],
+                " k-001 "
+            )
+        );
+    }
+
+    [Fact]
+    public async Task Taking_over_is_only_for_a_new_grave()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var cooperative = await SavedIdAsync(
+            await SaveTermAsync(client, "K-001", "2024-01-01", null, true, [], [])
+        );
+
+        var response = await client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = cooperative,
+                    succeedsGraveId = cooperative,
+                    graveNumber = "K-001",
+                    fieldNumber = "F-1",
+                    siteName = "X",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = "2024-01-01",
+                    endDate = (string?)null,
+                    isCooperative = true,
+                    items = Array.Empty<object>(),
+                    recipientIds = Array.Empty<long>(),
+                    corrections = Array.Empty<object>(),
+                }
+            )
+        );
+        await AssertRefusedAsync(response, "SuccessorOnlyOnCreate");
     }
 
     private static Task<HttpResponseMessage> SaveOrdinaryAsync(

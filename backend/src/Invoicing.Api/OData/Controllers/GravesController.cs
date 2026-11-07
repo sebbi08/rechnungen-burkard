@@ -161,6 +161,7 @@ public class GravesController : ODataController
                 request.Items ?? new List<GraveItemInput>(),
                 request.RecipientIds ?? new List<long>(),
                 request.Corrections ?? new List<GraveCorrectionInput>(),
+                request.SucceedsGraveId,
                 HttpContext.RequestAborted
             );
             // PascalCase like every other entity payload; MVC's default camelCase
@@ -250,6 +251,10 @@ public class GravesController : ODataController
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
         public bool? IsCooperative { get; set; }
+
+        /// <summary>Only with <c>GraveId = null</c>: the grave this one takes
+        /// over from, which ends the month before this one starts.</summary>
+        public long? SucceedsGraveId { get; set; }
         public List<GraveItemInput>? Items { get; set; }
         public List<long>? RecipientIds { get; set; }
         public List<GraveCorrectionInput>? Corrections { get; set; }

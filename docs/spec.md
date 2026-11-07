@@ -572,6 +572,14 @@ non-interactive until completion, and the task runs exactly once.
   and MUST NOT save a grave without one; saving MUST be refused for a cemetery
   that does not exist. The cemetery MUST NOT be printed on invoices, and
   invoices MUST NOT keep a copy of it.
+- **FR-018d**: A grave MAY be handed over between the cooperative and the
+  business from a month on: a new grave with the same grave number, the opposite
+  cooperative mark and a start month after the old grave's start takes over, and
+  the old grave then ends the month before, in the same save. Saving MUST be
+  refused, leaving the old grave unchanged, when the two have the same mark, when
+  the numbers differ, when the old grave has invoices for a half-year that
+  reaches the new start month, or when ending it earlier would change the rounding
+  corrections stored for it. Its earlier invoices MUST stay as they are.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item

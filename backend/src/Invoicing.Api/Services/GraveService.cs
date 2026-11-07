@@ -56,10 +56,17 @@ public sealed class GraveService
         IReadOnlyList<GraveItemInput> items,
         IReadOnlyList<long> recipientIds,
         IReadOnlyList<GraveCorrectionInput> corrections,
+        long? succeedsGraveId,
         CancellationToken ct
     )
     {
-        await ValidateFieldsAsync(graveId, fields, ct);
+        // The predecessor is resolved before anything else is judged, so a
+        // refusal names the handover rather than a field of the successor.
+        var handover = succeedsGraveId is { } predecessorId
+            ? await ResolveHandoverAsync(graveId, predecessorId, fields, ct)
+            : null;
+
+        await ValidateFieldsAsync(graveId, fields, handover, ct);
 
         var stored = graveId is { } storedId
             ? await _db
@@ -145,6 +152,17 @@ public sealed class GraveService
         }
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        if (handover is not null)
+        {
+            // its stored corrections were checked to stay valid for the shorter term
+            var predecessor = await _db.Graves.SingleAsync(
+                g => g.Id == handover.Predecessor.Id,
+                ct
+            );
+            predecessor.EndDate = handover.EndDate;
+            await _db.SaveChangesAsync(ct);
+        }
+
         var grave = graveId is { } id ? await LoadForReplaceAsync(id, ct) : NewGrave();
         grave.GraveNumber = fields.GraveNumber.Trim();
         grave.FieldNumber = fields.FieldNumber.Trim();
@@ -209,6 +227,138 @@ public sealed class GraveService
         return grave;
     }
 
+    /// <summary>A grave that takes over from another from a month on: the other
+    /// ends the month before, and the two share the grave number.</summary>
+    private sealed record Handover(Grave Predecessor, DateOnly EndDate);
+
+    private async Task<Handover> ResolveHandoverAsync(
+        long? graveId,
+        long predecessorId,
+        GraveFields fields,
+        CancellationToken ct
+    )
+    {
+        if (graveId is not null)
+        {
+            throw new ValidationException(
+                "SuccessorOnlyOnCreate",
+                "A grave can only take over from another when it is created."
+            );
+        }
+
+        var predecessor =
+            await _db
+                .Graves.AsNoTracking()
+                .Include(g => g.Items)
+                .Include(g => g.Recipients)
+                .SingleOrDefaultAsync(g => g.Id == predecessorId, ct)
+            ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
+
+        if (
+            !string.Equals(
+                predecessor.GraveNumber.Trim(),
+                fields.GraveNumber.Trim(),
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            throw new ValidationException(
+                "SuccessorNumberDiffers",
+                "A grave can only take over from a grave with the same number."
+            );
+        }
+
+        if (predecessor.IsCooperative == fields.IsCooperative)
+        {
+            throw new ValidationException(
+                "SuccessorSameKind",
+                "The grave must change between cooperative and ordinary."
+            );
+        }
+
+        if (fields.StartDate <= predecessor.StartDate)
+        {
+            throw new ValidationException(
+                "SuccessorStartTooEarly",
+                "The new grave must start after the one it takes over from."
+            );
+        }
+
+        // an invoice covers a whole half-year, so a start inside one that was
+        // invoiced would leave invoices for months the predecessor no longer has
+        var startMonth = fields.StartDate.Year * 12 + fields.StartDate.Month;
+        var halves = await _db
+            .GraveInvoiceRuns.Where(r => r.GraveId == predecessorId)
+            .Select(r => new { r.Year, r.Half })
+            .ToListAsync(ct);
+        if (halves.Any(r => r.Year * 12 + r.Half * 6 >= startMonth))
+        {
+            throw new ValidationException(
+                "SuccessorStartInvoiced",
+                "The grave has been invoiced for a half-year that reaches the new start."
+            );
+        }
+
+        // a predecessor that already ended earlier keeps its end
+        var end = fields.StartDate.AddMonths(-1);
+        if (predecessor.EndDate is { } ended && ended < end)
+        {
+            end = ended;
+        }
+
+        // The split of an ordinary grave's invoices depends on its term, and a
+        // correction the user never confirmed cannot be stored for it.
+        if (!predecessor.IsCooperative)
+        {
+            var shortened = new GraveFields(
+                predecessor.GraveNumber,
+                predecessor.FieldNumber,
+                predecessor.SiteName,
+                predecessor.CemeteryId,
+                predecessor.Position,
+                predecessor.StartDate,
+                end,
+                false
+            );
+            var evaluation = await ValidateAsync(
+                predecessor
+                    .Items.Select(i => new GraveItemInput
+                    {
+                        ItemId = i.ItemId,
+                        Count = i.Count,
+                        UnitPrice = i.UnitPrice,
+                        PriceIncludesVat = i.PriceIncludesVat,
+                    })
+                    .ToList(),
+                predecessor.Recipients.Select(r => r.RecipientId).ToList(),
+                shortened,
+                ct
+            );
+            var stored = (
+                await _db
+                    .GraveBillingCorrections.AsNoTracking()
+                    .Where(c => c.GraveId == predecessorId)
+                    .ToListAsync(ct)
+            ).Select(c => new CorrectionKey(
+                c.Kind,
+                c.Year,
+                c.Half,
+                c.VatRate,
+                c.ItemId,
+                c.CorrectedPrice
+            ));
+            if (!GraveBillingCheck.SameCorrections(evaluation?.CorrectionKeys ?? [], stored))
+            {
+                throw new ValidationException(
+                    "SuccessorChangesCorrections",
+                    "Ending the grave earlier changes its rounding corrections."
+                );
+            }
+        }
+
+        return new Handover(predecessor, end);
+    }
+
     private Grave NewGrave()
     {
         var grave = new Grave { CreatedAt = DateOnly.FromDateTime(_clock.GetLocalNow()) };
@@ -236,7 +386,12 @@ public sealed class GraveService
         return grave;
     }
 
-    private async Task ValidateFieldsAsync(long? graveId, GraveFields fields, CancellationToken ct)
+    private async Task ValidateFieldsAsync(
+        long? graveId,
+        GraveFields fields,
+        Handover? handover,
+        CancellationToken ct
+    )
     {
         if (string.IsNullOrWhiteSpace(fields.GraveNumber))
         {
@@ -304,15 +459,19 @@ public sealed class GraveService
         // run at the same time cannot share it. Compared in memory: SQLite's
         // lower() folds ASCII only.
         var number = fields.GraveNumber.Trim();
-        var others = await _db
-            .Graves.Where(g => graveId == null || g.Id != graveId)
-            .Select(g => new
-            {
-                g.GraveNumber,
-                g.StartDate,
-                g.EndDate,
-            })
-            .ToListAsync(ct);
+        // The predecessor of a handover is checked at the end it is about to get.
+        var others = (
+            await _db
+                .Graves.Where(g => graveId == null || g.Id != graveId)
+                .Select(g => new
+                {
+                    g.Id,
+                    g.GraveNumber,
+                    g.StartDate,
+                    g.EndDate,
+                })
+                .ToListAsync(ct)
+        ).Select(g => handover is not null && g.Id == handover.Predecessor.Id ? g with { EndDate = handover.EndDate } : g).ToList();
         var clash = others.FirstOrDefault(g =>
             string.Equals(g.GraveNumber.Trim(), number, StringComparison.OrdinalIgnoreCase)
             && GraveTerm.Overlap(g.StartDate, g.EndDate, fields.StartDate, fields.EndDate)
