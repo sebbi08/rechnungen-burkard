@@ -34,6 +34,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/pages/GravesPage.vue"),
   },
   {
+    path: "/cooperative-graves",
+    meta: { titleKey: "menuCooperativeGraves" },
+    component: () => import("@/pages/CooperativeGravesPage.vue"),
+  },
+  {
     path: "/graves/:graveId",
     meta: { titleKey: "graveDetailTitle" },
     component: () => import("@/pages/GraveDetailPage.vue"),

@@ -34,6 +34,7 @@ const RUN = unique();
 const ITEM_NUMBER = `L${RUN}-GRABPFLEGE-SOMMERBEPFLANZUNG-HERBST`;
 const RECIPIENT_NAME = `Layout ${RUN} Hohenberg-Schwarzenstein`;
 const GRAVE_NUMBER = `L-${RUN}-GRABSTELLE-SCHINELLER-BAECKE-NORD`;
+const COOPERATIVE_NUMBER = `L-${RUN}-GENOSSENSCHAFTSGRAB-SCHINELLER-BAECKE-SUED`;
 
 /** Tailwind's breakpoints, from which a column a narrow screen drops comes back. */
 const BREAKPOINTS = { sm: 640, md: 768, lg: 1024, xl: 1280, "2xl": 1536 };
@@ -81,6 +82,19 @@ const LIST_SCREENS: ListScreen[] = [
       Zahlung: "sm",
     },
   },
+  {
+    route: "cooperative-graves",
+    seeded: COOPERATIVE_NUMBER,
+    action: "Neues Genossenschaftsgrab",
+    secondary: {
+      Grabstätte: "lg",
+      Friedhof: "lg",
+      "Feld-Nr.": "lg",
+      Beginn: "xl",
+      Ende: "xl",
+      Empfänger: "sm",
+    },
+  },
 ];
 
 // The rows only have to exist — these assertions are about layout, not about
@@ -112,6 +126,13 @@ async function seedRows(page: Page): Promise<number> {
     graveNumber: GRAVE_NUMBER,
     items: [{ itemId: item.Id, count: 1 }],
     recipientIds: [recipient.Id],
+  });
+  await seedGrave(page, {
+    graveNumber: COOPERATIVE_NUMBER,
+    items: [],
+    recipientIds: [recipient.Id],
+    isCooperative: true,
+    endDate: null,
   });
   const invoice = await createRow(page, "/odata/CreateInvoice", {
     recipientId: recipient.Id,
@@ -289,6 +310,27 @@ test("graves: the filter sheet holds the selects as well", async ({ page }) => {
   await pickOption(page, sheet.getByRole("combobox", { name: "Status filtern" }), "offen");
   await expect(page.getByText("Status: offen")).toBeVisible();
   await expect(button).toContainText("1");
+  await expectNoSidewaysScrolling(page);
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expectNoSidewaysScrolling(page);
+});
+
+test("cooperative-graves: the filter sheet opens", async ({ page }) => {
+  await seed(page);
+  await page.goto("/cooperative-graves");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+
+  const button = page.getByRole("button", { name: /^Filter( \d+)?$/ });
+  await button.click();
+  await waitForOverlayOpen(page);
+
+  const sheet = page.locator(".p-drawer");
+  await expect(sheet.getByRole("textbox", { name: "Empfänger durchsuchen" })).toBeVisible();
+  await expect(sheet.getByRole("combobox", { name: "Friedhof filtern" })).toBeVisible();
+  await sheet.getByRole("textbox", { name: "Grabnummer durchsuchen" }).fill(COOPERATIVE_NUMBER);
+  await expect(page.getByText(`Grabnummer: ${COOPERATIVE_NUMBER}`)).toBeVisible();
   await expectNoSidewaysScrolling(page);
 
   await page.keyboard.press("Escape");

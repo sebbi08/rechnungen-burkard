@@ -669,7 +669,9 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-024a**: The system MUST offer a list of the cooperative graves of its own,
   with each grave's number, field, site name, cemetery, recipients and term,
   ordered by grave number, from which a grave opens in the editor and a new
-  cooperative grave can be created.
+  cooperative grave can be created. The list offers the search per column of
+  FR-024 and a "Laufzeit" select: active graves (no end, or an end in the
+  current month or later) by default, ended ones, or all.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
 - **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows

@@ -9,6 +9,7 @@ const route = useRoute();
 const links = computed(() => [
   { to: "/invoices", label: t("menuInvoices"), icon: "pi pi-file" },
   { to: "/graves", label: t("menuGraves"), icon: "pi pi-home" },
+  { to: "/cooperative-graves", label: t("menuCooperativeGraves"), icon: "pi pi-home" },
   { to: "/items", label: t("menuItems"), icon: "pi pi-box" },
   { to: "/recipients", label: t("menuRecipients"), icon: "pi pi-users" },
   { to: "/import-export", label: t("menuImportExport"), icon: "pi pi-upload" },
