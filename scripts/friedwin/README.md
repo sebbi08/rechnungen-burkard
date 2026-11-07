@@ -41,10 +41,10 @@ cooperative bills it. An ended one of these is still left out.
 
 A cooperative grave is written from its grave record alone:
 
-- site name and field number `-` when the record has no name (note "Leerer
+- site name `-` when the record has no name (note "Leerer
   Grabsatz");
 - care start from the record, else January of the export's year (the folder stamp,
-  `20260930-1807` gives `2026-01`; note "Pflegebeginn aus der ersten Rechnung");
+  `20260930-1807` gives `2026-01`; note "Pflegebeginn ergänzt");
 - recipient: the customer record when it has a name and an address, else none;
 - items: one link to `99990` (Grabpflege) at the record's care price, count 1,
   when the record has one, else none.

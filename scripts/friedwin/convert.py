@@ -134,13 +134,13 @@ NOTES = {
         "brauchbaren gibt, und der Grabpflege zum Pflegepreis des Grabsatzes.",
     ),
     "empty-record": (
-        "grave record without a name, site name and field number written as '-'",
+        "grave record without a name, site name written as '-'",
         "Leerer Grabsatz",
-        "Der Grabsatz nennt keinen Namen der Grabstätte; übernommen ist „-“ als Name und als Feldnummer.",
+        "Der Grabsatz nennt keinen Namen der Grabstätte; übernommen ist „-“ als Name.",
     ),
     "no-start": (
         "no care start, first care invoice's month taken (cooperative graves: January of the export's year)",
-        "Pflegebeginn aus der ersten Rechnung",
+        "Pflegebeginn ergänzt",
         "Der Grabsatz nennt keinen Pflegebeginn; übernommen ist der Monat der ersten Pflege-Rechnung, bei "
         "einem Genossenschaftsgrab der Januar des Exportjahres.",
     ),
@@ -858,7 +858,7 @@ def main():
         if is_cooperative:
             site = g.site
             if not site:
-                site, field_number = "-", "-"
+                site = "-"
                 note("empty-record", number)
             cemetery = cemeteries.get(g.cemetery)
             if not cemetery:
