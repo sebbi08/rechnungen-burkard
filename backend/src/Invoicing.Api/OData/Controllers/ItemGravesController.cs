@@ -39,6 +39,7 @@ public class ItemGravesController : ODataController
                 link.PriceIncludesVat,
                 grave.Id,
                 grave.GraveNumber,
+                grave.IsCooperative,
             }
         ).ToListAsync(HttpContext.RequestAborted);
 
@@ -50,7 +51,12 @@ public class ItemGravesController : ODataController
                 g.Key.PriceIncludesVat,
                 IsDefault = g.Key.Price == item.DefaultPrice,
                 Graves = g.OrderBy(l => l.GraveNumber, StringComparer.OrdinalIgnoreCase)
-                    .Select(l => new { l.Id, l.GraveNumber })
+                    .Select(l => new
+                    {
+                        l.Id,
+                        l.GraveNumber,
+                        l.IsCooperative,
+                    })
                     .ToList(),
             })
             .OrderByDescending(g => g.IsDefault)

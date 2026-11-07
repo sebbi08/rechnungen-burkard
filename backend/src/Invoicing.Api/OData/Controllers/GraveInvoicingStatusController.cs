@@ -49,8 +49,9 @@ public class GraveInvoicingStatusController : ODataController
         var graves = await _db
             .Graves
             // false sorts before true, so ordering by "is invoiced" puts the
-            // graves that are still open at the top
-            .OrderBy(g => invoicedIds.Contains(g.Id))
+            // graves that are still open at the top; a cooperative grave is
+            // never open, so it ranks with the invoiced ones
+            .OrderBy(g => invoicedIds.Contains(g.Id) || g.IsCooperative)
             .ThenBy(g => g.GraveNumber)
             .Select(g => new
             {
@@ -62,6 +63,7 @@ public class GraveInvoicingStatusController : ODataController
                 CemeteryName = g.Cemetery.Name,
                 g.StartDate,
                 g.EndDate,
+                g.IsCooperative,
             })
             .ToListAsync();
 
@@ -86,16 +88,22 @@ public class GraveInvoicingStatusController : ODataController
         var links = await GraveBilling.LinksByGraveAsync(_db);
 
         // a grave is due when its term reaches this half-year and its links bill
-        // something in it; one that was invoiced for it anyway stays listed
+        // something in it; one that was invoiced for it anyway stays listed. A
+        // cooperative grave is listed whenever its term touches the half-year,
+        // billing or not, because it is never invoiced.
         var value = graves
             .Where(g =>
                 invoicedIds.Contains(g.Id)
-                || GraveBilling.IsDue(
-                    g.StartDate,
-                    g.EndDate,
-                    links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
-                    year,
-                    half
+                || (
+                    g.IsCooperative
+                        ? HalfYearBilling.PeriodIn(g.StartDate, g.EndDate, year, half) is not null
+                        : GraveBilling.IsDue(
+                            g.StartDate,
+                            g.EndDate,
+                            links.GetValueOrDefault(g.Id) ?? Array.Empty<BillableLink>(),
+                            year,
+                            half
+                        )
                 )
             )
             .Select(g => new
@@ -109,6 +117,7 @@ public class GraveInvoicingStatusController : ODataController
                 g.StartDate,
                 g.EndDate,
                 Invoiced = invoicedIds.Contains(g.Id),
+                Cooperative = g.IsCooperative && !invoicedIds.Contains(g.Id),
                 InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
                 PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
                 Recipients = recipients.GetValueOrDefault(g.Id) ?? [],

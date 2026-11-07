@@ -395,6 +395,170 @@ public class CooperativeGraveTests
         Assert.Empty(await db.Invoices.ToListAsync());
     }
 
+    private static Task<HttpResponseMessage> SaveTermAsync(
+        HttpClient client,
+        string number,
+        string start,
+        string? end,
+        bool isCooperative,
+        object[] items,
+        long[] recipientIds
+    ) =>
+        client.PostAsync(
+            "/odata/SaveGrave",
+            ODataJson.Body(
+                new
+                {
+                    graveId = (long?)null,
+                    graveNumber = number,
+                    fieldNumber = "F-1",
+                    siteName = "Term Test",
+                    cemeteryId = TestCemetery.Id,
+                    position = "SingleInside",
+                    startDate = start,
+                    endDate = end,
+                    isCooperative,
+                    items,
+                    recipientIds,
+                    corrections = Array.Empty<object>(),
+                }
+            )
+        );
+
+    private static async Task<JsonDocument> StatusAsync(HttpClient client, int year, int half) =>
+        await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/GraveInvoicingStatus?year={year}&half={half}")
+        );
+
+    private static JsonElement Row(JsonDocument status, string number) =>
+        status
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Single(r => r.GetProperty("GraveNumber").GetString() == number);
+
+    [Fact]
+    public async Task The_overview_lists_a_cooperative_grave_in_every_half_year_its_term_touches()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await SavedIdAsync(
+            await SaveTermAsync(client, "K-010", "2026-03-01", "2026-08-31", true, [], [])
+        );
+
+        foreach (var half in new[] { 1, 2 })
+        {
+            using var status = await StatusAsync(client, 2026, half);
+            var row = Row(status, "K-010");
+            Assert.True(row.GetProperty("Cooperative").GetBoolean());
+            Assert.False(row.GetProperty("Invoiced").GetBoolean());
+        }
+
+        using var later = await StatusAsync(client, 2027, 1);
+        Assert.Equal(0, later.RootElement.GetProperty("value").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task The_overview_ranks_cooperative_graves_after_open_ones()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        await SavedIdAsync(await SaveTermAsync(client, "A-001", "2026-01-01", null, true, [], []));
+        await SavedIdAsync(
+            await SaveTermAsync(
+                client,
+                "Z-999",
+                "2026-01-01",
+                null,
+                false,
+                [Link(seed.PricedItem)],
+                [seed.Anna]
+            )
+        );
+
+        using var status = await StatusAsync(client, 2026, 1);
+        var numbers = status
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("GraveNumber").GetString())
+            .ToList();
+        Assert.Equal(["Z-999", "A-001"], numbers);
+    }
+
+    [Fact]
+    public async Task An_unticked_grave_shows_open()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, true, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        await SavedIdAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Bert));
+        await GraveGenerationHelper.RunAsync(client, 2026, 2);
+
+        using var status = await StatusAsync(client, 2026, 1);
+        var row = Row(status, "K-001");
+        Assert.False(row.GetProperty("Cooperative").GetBoolean());
+        Assert.False(row.GetProperty("Invoiced").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Item_graves_mark_cooperative_graves()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        await SavedIdAsync(await SaveAsync(client, null, true, [Link(seed.PricedItem)], []));
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Anna));
+
+        using var json = await ODataJson.ReadAsync(
+            await client.GetAsync($"/odata/ItemGraves?itemId={seed.PricedItem}")
+        );
+        var graves = json
+            .RootElement.GetProperty("Groups")
+            .EnumerateArray()
+            .SelectMany(g => g.GetProperty("Graves").EnumerateArray())
+            .ToDictionary(
+                g => g.GetProperty("GraveNumber").GetString()!,
+                g => g.GetProperty("IsCooperative").GetBoolean()
+            );
+        Assert.True(graves["K-001"]);
+        Assert.False(graves["K-002"]);
+    }
+
+    [Fact]
+    public async Task The_graves_set_filters_cooperative_graves()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+        await SavedIdAsync(await SaveAsync(client, null, true, [], [seed.Anna]));
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "K-002", seed.PricedItem, seed.Bert));
+
+        var response = await client.GetAsync(
+            "/odata/Graves?$filter=IsCooperative eq true"
+                + "&$expand=Cemetery,Recipients($expand=Recipient)&$orderby=GraveNumber"
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var rows = json.RootElement.GetProperty("value");
+        Assert.Equal(1, rows.GetArrayLength());
+        Assert.Equal("K-001", rows[0].GetProperty("GraveNumber").GetString());
+        Assert.Equal(TestCemetery.Id, rows[0].GetProperty("Cemetery").GetProperty("Id").GetInt64());
+        Assert.Equal(
+            "Anna Beispiel",
+            rows[0]
+                .GetProperty("Recipients")[0]
+                .GetProperty("Recipient")
+                .GetProperty("Name")
+                .GetString()
+        );
+    }
+
     private static Task<HttpResponseMessage> SaveOrdinaryAsync(
         HttpClient client,
         string number,
