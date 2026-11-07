@@ -334,19 +334,13 @@ public sealed class GraveService
                 shortened,
                 ct
             );
-            var stored = (
+            var stored = GraveBillingCheck.StoredKeys(
                 await _db
                     .GraveBillingCorrections.AsNoTracking()
                     .Where(c => c.GraveId == predecessorId)
-                    .ToListAsync(ct)
-            ).Select(c => new CorrectionKey(
-                c.Kind,
-                c.Year,
-                c.Half,
-                c.VatRate,
-                c.ItemId,
-                c.CorrectedPrice
-            ));
+                    .ToListAsync(ct),
+                HalfYearBilling.HalfYearOf(_clock.GetLocalNow())
+            );
             if (!GraveBillingCheck.SameCorrections(evaluation?.CorrectionKeys ?? [], stored))
             {
                 throw new ValidationException(

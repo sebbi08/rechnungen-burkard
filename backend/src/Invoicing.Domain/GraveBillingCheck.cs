@@ -1,3 +1,5 @@
+using Burkard.Invoicing.Domain.Entities;
+
 namespace Burkard.Invoicing.Domain;
 
 /// <summary>A raised price on one line of a block, so that the line's VAT rate
@@ -209,4 +211,22 @@ public static class GraveBillingCheck
         var right = b.ToList();
         return left.Count == right.Count && new HashSet<CorrectionKey>(left).SetEquals(right);
     }
+
+    /// <summary>The stored corrections of a grave as keys to compare with a fresh
+    /// evaluation. A start block before the generation window is no longer
+    /// checked, so a row stored while it was must not count as a difference.</summary>
+    public static IEnumerable<CorrectionKey> StoredKeys(
+        IEnumerable<GraveBillingCorrection> stored,
+        (int Year, int Half) current
+    ) =>
+        stored
+            .Where(c => !HalfYearBilling.IsBeyondGeneration(c.Kind, c.Year, c.Half, current))
+            .Select(c => new CorrectionKey(
+                c.Kind,
+                c.Year,
+                c.Half,
+                c.VatRate,
+                c.ItemId,
+                c.CorrectedPrice
+            ));
 }

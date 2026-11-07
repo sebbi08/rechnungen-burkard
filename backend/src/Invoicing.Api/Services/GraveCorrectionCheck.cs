@@ -58,18 +58,10 @@ public sealed class GraveCorrectionCheck
             var computed = GraveBillingCheck
                 .Evaluate(graveLinks, grave.StartDate, grave.EndDate, count, current)
                 .CorrectionKeys;
-            // a start block before the generation window is no longer checked, so a
-            // row stored while it was must not count as a difference
-            var saved = (stored.GetValueOrDefault(grave.Id) ?? [])
-                .Where(c => !HalfYearBilling.IsBeyondGeneration(c.Kind, c.Year, c.Half, current))
-                .Select(c => new CorrectionKey(
-                    c.Kind,
-                    c.Year,
-                    c.Half,
-                    c.VatRate,
-                    c.ItemId,
-                    c.CorrectedPrice
-                ));
+            var saved = GraveBillingCheck.StoredKeys(
+                stored.GetValueOrDefault(grave.Id) ?? [],
+                current
+            );
             if (!GraveBillingCheck.SameCorrections(computed, saved))
             {
                 outdated.Add(grave.GraveNumber);

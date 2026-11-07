@@ -890,6 +890,145 @@ public class CooperativeGraveTests
         await AssertRefusedAsync(response, "SuccessorOnlyOnCreate");
     }
 
+    private static async Task<long> SeedItemAt19Async(HttpClient client)
+    {
+        await client.PostAsync("/odata/VatRates", ODataJson.Body(new { Rate = 19.0m }));
+        return await ReadIdAsync(
+            client.PostAsync(
+                "/odata/InvoiceItems",
+                ODataJson.Body(
+                    new
+                    {
+                        Number = "5001",
+                        Description = "Pflege",
+                        VatRate = 19.0m,
+                        DefaultPrice = (decimal?)null,
+                    }
+                )
+            )
+        );
+    }
+
+    // 3 recipients, care 60,00 all year: the part-year start and end blocks of
+    // a term bill 40,00 and need a correction to 40,02
+    private static async Task<long> SaveCorrectedAsync(
+        HttpClient client,
+        long item,
+        long[] recipients,
+        string? end,
+        object[] corrections
+    ) =>
+        await SavedIdAsync(
+            await client.PostAsync(
+                "/odata/SaveGrave",
+                ODataJson.Body(
+                    new
+                    {
+                        graveId = (long?)null,
+                        graveNumber = "K-1",
+                        fieldNumber = "1",
+                        siteName = "Korrigiert",
+                        cemeteryId = TestCemetery.Id,
+                        position = "SingleInside",
+                        startDate = "2026-03",
+                        endDate = end,
+                        isCooperative = false,
+                        items = new[]
+                        {
+                            new
+                            {
+                                itemId = item,
+                                count = 1,
+                                unitPrice = (decimal?)60.00m,
+                                priceIncludesVat = false,
+                            },
+                        },
+                        recipientIds = recipients,
+                        corrections,
+                    }
+                )
+            )
+        );
+
+    private static object Correction(string kind, int year, int half, long item) =>
+        new
+        {
+            kind,
+            year,
+            half,
+            vatRate = 19.0m,
+            itemId = item,
+            correctedPrice = 40.02m,
+        };
+
+    private static async Task<long[]> ThreeRecipientsAsync(HttpClient client)
+    {
+        var ids = new List<long>();
+        foreach (var name in new[] { "Anna", "Bert", "Carl" })
+        {
+            ids.Add(await RecipientAsync(client, name));
+        }
+
+        return [.. ids];
+    }
+
+    [Fact]
+    public async Task A_successor_that_changes_the_predecessors_corrections_is_refused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await ThreeRecipientsAsync(client);
+        // term 03/2026-10/2028: start H1 2026 and end H2 2028 both need a correction
+        var id = await SaveCorrectedAsync(
+            client,
+            item,
+            recipients,
+            "2028-10",
+            [Correction("Start", 2026, 1, item), Correction("End", 2028, 2, item)]
+        );
+
+        // ending in 12/2026 leaves no end block, so its correction would go
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(client, id, "2027-01-01", true, [], [], "K-1"),
+            "SuccessorChangesCorrections"
+        );
+        Assert.StartsWith("2028-10-01", await EndDateAsync(client, id));
+    }
+
+    [Fact]
+    public async Task A_start_block_beyond_the_generation_window_does_not_stop_a_hand_over()
+    {
+        // H2 2027: a start block in H1 2026 can no longer be invoiced, so it is
+        // not evaluated -- but the row stored while it could be is still there
+        using var host = new ApiTestHost { Now = new DateTime(2027, 10, 6, 12, 0, 0) };
+        using var client = host.CreateClient();
+        var item = await SeedItemAt19Async(client);
+        var recipients = await ThreeRecipientsAsync(client);
+        var id = await SaveCorrectedAsync(client, item, recipients, null, []);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.GraveBillingCorrections.Add(
+                new Burkard.Invoicing.Domain.Entities.GraveBillingCorrection
+                {
+                    GraveId = id,
+                    Kind = Burkard.Invoicing.Domain.BillingExampleKind.Start,
+                    Year = 2026,
+                    Half = 1,
+                    VatRate = 19.0m,
+                    ItemId = item,
+                    EnteredPrice = 40.00m,
+                    CorrectedPrice = 40.02m,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        await SavedIdAsync(await SaveSuccessorAsync(client, id, "2028-01-01", true, [], [], "K-1"));
+        Assert.StartsWith("2027-12-01", await EndDateAsync(client, id));
+    }
+
     private static Task<HttpResponseMessage> SaveOrdinaryAsync(
         HttpClient client,
         string number,
