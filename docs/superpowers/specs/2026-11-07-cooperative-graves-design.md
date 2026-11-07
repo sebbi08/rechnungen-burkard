@@ -2,7 +2,7 @@
 
 **Created**: 2026-11-07
 
-**Status**: Draft, waiting for the owner's approval
+**Status**: Approved design (pre-implementation), approved by the owner on 2026-11-07
 
 **Source**: the owner's answers of 2026-11-07, given while comparing FriedWin's
 care list ("Pflegeliste mit Preise.pdf") and address list ("Kundendaten.pdf")
