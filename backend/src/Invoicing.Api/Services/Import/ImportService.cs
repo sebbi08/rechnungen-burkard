@@ -97,6 +97,7 @@ public sealed class ImportService
                 Position = row.Position,
                 StartDate = row.StartDate,
                 EndDate = row.EndDate,
+                IsCooperative = row.Cooperative,
                 CreatedAt = createdAt,
             },
             StringComparer.OrdinalIgnoreCase
@@ -139,6 +140,12 @@ public sealed class ImportService
         var correctedGraves = 0;
         foreach (var (number, grave) in graves)
         {
+            // a cooperative grave has no recipients to split across
+            if (grave.IsCooperative)
+            {
+                continue;
+            }
+
             var count = data.RecipientLinks.Count(l =>
                 string.Equals(l.GraveNumber, number, StringComparison.OrdinalIgnoreCase)
             );

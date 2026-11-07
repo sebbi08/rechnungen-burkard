@@ -52,7 +52,8 @@ public sealed record GraveRow(
     string Cemetery,
     GravePosition Position,
     DateOnly StartDate,
-    DateOnly? EndDate
+    DateOnly? EndDate,
+    bool Cooperative
 );
 
 public sealed record ItemLinkRow(

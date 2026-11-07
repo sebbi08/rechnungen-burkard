@@ -38,6 +38,7 @@ public static class ImportArchiveLayout
         "Position",
         "StartDate",
         "EndDate",
+        "Cooperative",
     };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
@@ -76,7 +77,7 @@ public static class ImportArchiveLayout
         {
             [RecipientsFile] = 1,
             [ItemsFile] = 0,
-            [GravesFile] = 0,
+            [GravesFile] = 1,
             [MappingFile] = 1,
         };
 

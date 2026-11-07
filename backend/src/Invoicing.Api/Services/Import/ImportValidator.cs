@@ -450,6 +450,7 @@ public sealed class ImportValidator
             var rawPosition = row[4].Trim();
             var rawStart = row[5].Trim();
             var rawEnd = row[6].Trim();
+            var rawCooperative = Cell(row, 7);
             if (number.Length > 0)
                 data.DeclaredGraves.Add(number);
             if (
@@ -498,6 +499,21 @@ public sealed class ImportValidator
                 end = parsedEnd;
             }
 
+            if (!TryParseBool(rawCooperative, out var cooperative))
+            {
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "CooperativeInvalid",
+                        $"'{rawCooperative}' is not a valid yes/no value for Cooperative.",
+                        "CooperativeInvalid",
+                        [rawCooperative]
+                    )
+                );
+                continue;
+            }
+
             if (end < start)
             {
                 problems.Add(
@@ -529,7 +545,17 @@ public sealed class ImportValidator
 
             seen[number] = line;
             data.Graves.Add(
-                new GraveRow(line, number, fieldNumber, siteName, cemetery, position, start, end)
+                new GraveRow(
+                    line,
+                    number,
+                    fieldNumber,
+                    siteName,
+                    cemetery,
+                    position,
+                    start,
+                    end,
+                    cooperative
+                )
             );
         }
     }
@@ -758,7 +784,7 @@ public sealed class ImportValidator
                 StringComparer.OrdinalIgnoreCase
             );
 
-        foreach (var grave in data.Graves)
+        foreach (var grave in data.Graves.Where(g => !g.Cooperative))
         {
             // every grave has at least one: CheckGraveRecipients reported any
             // without, and this runs only on a report with nothing in it
@@ -867,7 +893,8 @@ public sealed class ImportValidator
         );
         foreach (var grave in data.Graves)
         {
-            if (!linked.Contains(grave.Number))
+            // a cooperative grave is billed to the cooperative, not to a recipient
+            if (!grave.Cooperative && !linked.Contains(grave.Number))
             {
                 problems.Add(
                     new ImportProblem(
@@ -921,7 +948,7 @@ public sealed class ImportValidator
             link => link.GraveNumber,
             StringComparer.OrdinalIgnoreCase
         );
-        foreach (var grave in data.Graves)
+        foreach (var grave in data.Graves.Where(g => !g.Cooperative))
         {
             var links = linksByGrave[grave.Number].ToList();
             if (
@@ -954,10 +981,17 @@ public sealed class ImportValidator
     private static void CheckLinkedItemPrices(ImportData data, List<ImportProblem> problems)
     {
         var items = data.Items.ToDictionary(item => item.Number, StringComparer.OrdinalIgnoreCase);
+        // a cooperative grave carries no prices; a link to an undeclared grave
+        // is reported by the reference check
+        var cooperative = data
+            .Graves.Where(g => g.Cooperative)
+            .Select(g => g.Number)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var link in data.ItemLinks)
         {
             if (
-                link.UnitPrice is null
+                !cooperative.Contains(link.GraveNumber)
+                && link.UnitPrice is null
                 && items.TryGetValue(link.ItemNumber, out var item)
                 && item.Price is null
             )

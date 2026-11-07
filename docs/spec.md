@@ -763,7 +763,12 @@ non-interactive until completion, and the task runs exactly once.
   a problem. An archive whose items CSV lacks the `Quarter` column is refused.
 - **FR-052**: The graves CSV MUST capture the grave number, field number, site
   name, cemetery, position, start month and an optional end month, in seven
-  columns: `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate`.
+  columns, plus an eighth optional one marking a cooperative grave (FR-020):
+  `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative`.
+  `Cooperative` is read like the mapping's VAT-included flag (`true`/`false`,
+  `ja`/`nein`, `1`/`0`; empty is false) and may be left out of the file with its
+  header, as `Email` and `UnitPrice` may; a value that is none of these is a
+  problem naming the row and the value.
   Months are written as YYYY-MM. The cemetery is required and names one kept in
   the settings (FR-002a), matched ignoring case; one that is not there is a
   problem naming the row and the value. The import MUST NOT create cemeteries.
@@ -788,6 +793,9 @@ non-interactive until completion, and the task runs exactly once.
   rounding correction (FR-021a; the first failing invoice of a grave is reported
   with its label), a grave without an item billed all year, or more than four
   recipients (FR-020).
+  A grave marked cooperative in its `Cooperative` column is exempt from all of these but the cap of four
+  recipients: it needs no recipient, no all-year item and no prices, and stores
+  no rounding corrections.
   A price that merely needs a correction is accepted; the correction is stored
   with the grave without a confirmation. The archive is refused as a
   whole, so nothing imports that the dialog would have refused to save.

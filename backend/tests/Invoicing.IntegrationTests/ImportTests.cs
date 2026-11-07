@@ -30,6 +30,8 @@ public class ImportTests
     private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 
     // the full headers, as the template has them
+    private const string FullGravesHeader =
+        "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative\r\n";
     private const string FullRecipientsHeader = "RecipientNumber,Name,Address,Email\r\n";
     private const string FullMappingHeader =
         "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
@@ -207,7 +209,7 @@ public class ImportTests
             {
                 ("recipients.csv", FullRecipientsHeader),
                 ("items.csv", ItemsHeader),
-                ("graves.csv", GravesHeader),
+                ("graves.csv", FullGravesHeader),
                 ("mapping.csv", FullMappingHeader),
             }
         )
@@ -1436,6 +1438,130 @@ public class ImportTests
                     )
             )
         );
+
+    /// <summary>One grave under the given graves header, an unpriced all-year
+    /// item linked to it and <paramref name="recipients"/> recipient links.</summary>
+    private static byte[] CooperativeArchive(string header, string graveRow, int recipients = 0) =>
+        Zip(
+            (
+                "recipients.csv",
+                RecipientsHeader
+                    + string.Concat(
+                        Enumerable
+                            .Range(0, recipients)
+                            .Select(i => $"E-100{i},Empfänger {i},Weg {i}\r\n")
+                    )
+            ),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,19,,\r\n"),
+            ("graves.csv", header + graveRow),
+            (
+                "mapping.csv",
+                MappingHeader
+                    + "Item,IMP-1,9001,1,\r\n"
+                    + string.Concat(
+                        Enumerable
+                            .Range(0, recipients)
+                            .Select(i => $"Recipient,IMP-1,E-100{i},,\r\n")
+                    )
+            )
+        );
+
+    private const string CooperativeRow =
+        "IMP-1,27,Grabstätte Import,Bergfriedhof,DoubleOutside,2026-01,2040-12,";
+
+    [Fact]
+    public async Task A_cooperative_grave_imports_without_recipient_or_price()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true\r\n"))
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True((await db.Graves.SingleAsync(g => g.GraveNumber == "IMP-1")).IsCooperative);
+        Assert.Empty(await db.GraveRecipients.ToListAsync());
+        Assert.Empty(await db.GraveBillingCorrections.ToListAsync());
+    }
+
+    [Fact]
+    public async Task An_archive_without_the_Cooperative_column_imports_ordinary_graves()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m, 19m);
+        using var client = host.CreateClient();
+
+        var ordinary = await client.PostAsync("/odata/ImportArchive", Upload(ValidArchive()));
+        Assert.True(ordinary.IsSuccessStatusCode, await ordinary.Content.ReadAsStringAsync());
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.False((await db.Graves.SingleAsync()).IsCooperative);
+        }
+
+        // and without the column nothing exempts a grave from its recipient
+        using var other = new ApiTestHost();
+        await ConfigureVatAsync(other, 19m);
+        using var otherClient = other.CreateClient();
+        var response = await otherClient.PostAsync(
+            "/odata/ImportArchive",
+            Upload(CooperativeArchive(GravesHeader, CooperativeRow.TrimEnd(',') + "\r\n"))
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "NoRecipients"
+        );
+    }
+
+    [Fact]
+    public async Task A_Cooperative_value_that_is_no_boolean_is_a_problem()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "x\r\n"))
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var problem = json
+            .RootElement.GetProperty("problems")
+            .EnumerateArray()
+            .Single(p => p.GetProperty("code").GetString() == "CooperativeInvalid");
+        Assert.Equal("graves.csv", problem.GetProperty("file").GetString());
+        Assert.Equal(2, problem.GetProperty("row").GetInt32());
+        Assert.Equal("CooperativeInvalid", problem.GetProperty("messageKey").GetString());
+        Assert.Equal("x", problem.GetProperty("messageArgs")[0].GetString());
+        await AssertNothingImportedAsync(host);
+    }
+
+    [Fact]
+    public async Task A_cooperative_grave_keeps_the_recipient_cap()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true\r\n", 5))
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
+        );
+    }
 
     [Fact]
     public async Task A_recipients_email_address_is_imported_and_a_blank_one_is_none()

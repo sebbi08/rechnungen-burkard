@@ -213,6 +213,7 @@
   "importProblemPositionInvalid": "„{0}“ ist keine Grabposition; erlaubt sind: {1}.",
   "importProblemDateRangeInvalid": "Das Ende darf nicht vor dem Beginn liegen.",
   "importProblemCountInvalid": "„{0}“ ist keine gültige Anzahl; eine Leistung braucht eine positive Anzahl.",
+  "importProblemCooperativeInvalid": "„{0}“ ist kein gültiger Wert für Genossenschaftsgrab (erwartet true oder false).",
   "importProblemPriceIncludesVatInvalid": "„{0}“ ist kein gültiger Ja/Nein-Wert.",
   "importProblemDuplicateItemLink": "Das Grab „{0}“ ist bereits in Zeile {2} mit der Leistung „{1}“ verknüpft.",
   "importProblemDuplicateRecipientLink": "Das Grab „{0}“ ist bereits in Zeile {2} mit dem Empfänger „{1}“ verknüpft.",
