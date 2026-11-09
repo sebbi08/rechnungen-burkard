@@ -190,7 +190,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
             <!-- may break anywhere: a grave number has no space to break at, and
                  a long one would otherwise push the row actions off the card -->
             <RouterLink
-              :to="`/graves/${data.Id}`"
+              :to="`/cooperative-graves/${data.Id}`"
               class="font-medium [overflow-wrap:anywhere] text-primary hover:underline"
             >
               {{ data.GraveNumber }}
@@ -289,7 +289,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 text
                 rounded
                 :aria-label="`${t('actionDetails')}: ${data.GraveNumber}`"
-                @click="router.push(`/graves/${data.Id}`)"
+                @click="router.push(`/cooperative-graves/${data.Id}`)"
               />
               <Button
                 v-tooltip.top="t('edit')"

@@ -42,7 +42,15 @@ const routes: RouteRecordRaw[] = [
     path: "/graves/:graveId",
     meta: { titleKey: "graveDetailTitle" },
     component: () => import("@/pages/GraveDetailPage.vue"),
-    props: (route) => ({ graveId: Number(route.params.graveId) }),
+    props: (route) => ({ graveId: Number(route.params.graveId), list: "/graves" }),
+  },
+  // The same page, opened from the list of cooperative graves: the menu keeps
+  // that list marked and the breadcrumb leads back to it.
+  {
+    path: "/cooperative-graves/:graveId",
+    meta: { titleKey: "graveDetailTitle" },
+    component: () => import("@/pages/GraveDetailPage.vue"),
+    props: (route) => ({ graveId: Number(route.params.graveId), list: "/cooperative-graves" }),
   },
   {
     path: "/graves/:graveId/invoices/:rootId",

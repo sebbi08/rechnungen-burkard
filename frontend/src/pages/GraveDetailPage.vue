@@ -31,8 +31,16 @@ import {
 } from "@/lib/format";
 import { currentHalfYear, halfYearHasBilling, halfYearText } from "@/lib/halfYear";
 
-const props = defineProps<{ graveId: number }>();
+const props = defineProps<{
+  graveId: number;
+  /** The list the page was opened from, which its breadcrumb leads back to. */
+  list: "/graves" | "/cooperative-graves";
+}>();
 const { t } = useI18n();
+const listCrumb = computed(() => ({
+  label: t(props.list === "/cooperative-graves" ? "menuCooperativeGraves" : "menuGraves"),
+  to: listLocation(props.list),
+}));
 
 const detail = useQuery({
   queryKey: ["graves", "detail", toRef(props, "graveId")],
@@ -129,10 +137,7 @@ const {
 <template>
   <PageHeader
     :title="grave?.GraveNumber ?? t('graveDetailTitle')"
-    :crumbs="[
-      { label: t('menuGraves'), to: listLocation('/graves') },
-      { label: grave?.GraveNumber ?? t('graveDetailTitle') },
-    ]"
+    :crumbs="[listCrumb, { label: grave?.GraveNumber ?? t('graveDetailTitle') }]"
   >
     <template v-if="grave?.IsCooperative" #title-tag>
       <Tag :value="t('cooperativeGrave')" severity="secondary" icon="pi pi-users" />

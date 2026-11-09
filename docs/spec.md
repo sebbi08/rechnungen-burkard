@@ -671,7 +671,9 @@ non-interactive until completion, and the task runs exactly once.
   ordered by grave number, from which a grave opens in the editor and a new
   cooperative grave can be created. The list offers the search per column of
   FR-024 and a "Laufzeit" select: active graves (no end, or an end in the
-  current month or later) by default, ended ones, or all.
+  current month or later) by default, ended ones, or all. A grave's detail page
+  opened from this list MUST keep the list marked in the menu and lead back to it
+  through its breadcrumb, as one opened from the grave overview does for that.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
 - **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows

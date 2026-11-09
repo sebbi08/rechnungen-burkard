@@ -158,5 +158,25 @@ test("a row opens the grave's detail page", async ({ page }) => {
   await searchColumn(page, "Grabnummer", marker);
   await page.locator("tbody tr").getByRole("link", { name: marker }).click();
   await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
-  await expect(page).toHaveURL(/\/graves\/\d+$/);
+  await expect(page).toHaveURL(/\/cooperative-graves\/\d+$/);
+
+  // the page stays in the section it was opened from, as a grave opened from
+  // the grave overview stays under "Gräber"
+  const nav = page.getByRole("navigation", { name: "Navigation" });
+  await expect(
+    nav.getByRole("link", { name: "Genossenschaftsgräber", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(nav.getByRole("link", { name: "Gräber", exact: true })).not.toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await page
+    .getByRole("navigation", { name: "Seitenpfad" })
+    .getByRole("link", { name: "Genossenschaftsgräber" })
+    .click();
+  await expect(page).toHaveURL(/\/cooperative-graves(\?.*)?$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Genossenschaftsgräber" }),
+  ).toBeVisible();
 });
