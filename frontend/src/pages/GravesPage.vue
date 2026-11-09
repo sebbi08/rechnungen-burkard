@@ -160,7 +160,9 @@ function statusOf(row: GraveStatusRow): "cooperative" | "invoiced" | "open" {
 }
 const statusTags = computed(() => ({
   cooperative: {
-    value: t("statusCooperative"),
+    // with a soft hyphen: on a phone the word would otherwise widen the column
+    // enough to push the row actions off the screen
+    value: t("statusCooperativeTag"),
     severity: "secondary" as const,
     icon: "pi pi-users",
     label: t("statusCooperativeAnnouncement"),

@@ -1699,9 +1699,10 @@ test.describe("the half-year today falls in", () => {
     await page.goto("/graves");
     await searchColumn(page, "Grabnummer", marker);
     const row = page.getByRole("row").filter({ hasText: marker });
-    const tag = row.locator(".p-tag-secondary", { hasText: "Genossenschaft" });
+    // found by what a screen reader hears: the text carries a soft hyphen
+    const tag = row.getByRole("img", { name: "Genossenschaftsgrab, wird nicht abgerechnet" });
     await expect(tag).toBeVisible();
-    await expect(tag).toHaveAttribute("aria-label", "Genossenschaftsgrab, wird nicht abgerechnet");
+    await expect(tag).toHaveClass(/p-tag-secondary/);
 
     await filterColumn(page, "Status", "offen");
     await expect(page.getByRole("table")).toContainText("Keine Daten");
