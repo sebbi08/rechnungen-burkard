@@ -5,6 +5,55 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.2.0 — 2026-11-09
+
+### Features
+- **scripts**: import every active FriedWin grave, the unbilled ones as cooperative graves (0cb4c7a)
+- list the cooperative graves on a page of their own (fd46487)
+- mark cooperative graves in the overview, on the detail page and in the item dialog (dcfe7cd)
+- tick, untick and hand over a cooperative grave in the editor (6510aff)
+- import cooperative graves from an optional Cooperative column (89ff23f)
+- type the cooperative flag in the frontend API (39d4f78)
+- hand a grave over between the cooperative and the business from a month on (a3f23aa)
+- list cooperative graves in the overview, the item dialog and the graves set (b3fbb63)
+- never invoice a cooperative grave (17ddd8d)
+- let a grave be a cooperative grave that needs no recipient or price (7b5f937)
+- **frontend**: search the grave overview by column, with its recipients (42c6e43)
+- **api**: carry the cemetery id on the grave status rows (ef0cf5d)
+- **frontend**: search the item list by column (98c1751)
+- **frontend**: search the invoice list by column and show its totals (c60eb3b)
+- **frontend**: search the recipient list by column (344f707)
+- **frontend**: column filter state, filter row cell and filter sheet (71968ff)
+- **api**: carry a grave's recipients on its status row (7fd6a79)
+- **api**: search invoices and recipients column by column (d018c6d)
+- give each grave a cemetery of its own, kept in the settings (7a8efc0)
+- search every word of a term, in any order and any field (095357a)
+- **frontend**: offer the newest twenty recipients in the picker and search the rest (a929809)
+- **frontend**: show lists a hundred rows a page with the paginator always in view (adbb972)
+- **import**: take e-mail addresses, prices per grave and more grave positions (6835d6e)
+
+### Fixes
+- let the cooperative status tag break on a phone (4b9278f)
+- keep the cooperative graves marked when one of them is opened (f3de9cf)
+- **scripts**: keep the field number of an unnamed cooperative grave (160bf61)
+- hide the billing preview and outdated tag of cooperative graves on the detail page (0cd3972)
+- ignore a start block beyond the generation window when handing a grave over (ff9832d)
+- **scripts**: read FriedWin's customer fields at full width and the cemetery from the grave record (f0e21b1)
+- **invoices**: allocate the invoice number inside the write transaction (e1f6c58)
+- **deps**: update dependency primeicons to v8 (#35) (6dbf958)
+- **deps**: update dependency primevue to v5 (#36) (d542753)
+- **deps**: update dependency @primeuix/themes to v3 (#34) (66ccc79)
+- **deps**: update dependency vue-router to v5 (#37) (f1fee94)
+- **frontend**: keep the invoice list's row actions on screen on tablets (d809d7f)
+- match amounts alike in the invoice total and the item price searches (a874e83)
+- **frontend**: keep a list's filters on the breadcrumb, and write them once settled (fde6fe8)
+- **frontend**: keep the grave overview inside its card on laptop screens (cb297cd)
+
+### Other changes
+- **api**: drop the SearchGraves endpoint (8307a1b)
+- **api**: drop the single-term invoice search option (6a1cdca)
+- drop the rounding-corrections filter and tag from the grave overview (a2ed05e)
+
 ## v3.1.0 — 2026-10-08
 
 ### Features
