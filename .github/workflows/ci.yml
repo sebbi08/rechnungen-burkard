@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Renovate only opens a PR once its branch has checks (prCreation:
+    # not-pending), so its update branches are checked on push too.
+    branches: [main, "renovate/**"]
   pull_request:
 
 # Nothing here writes to the repository, and the third-party actions below run
@@ -14,7 +16,7 @@ permissions:
 # cancelled so the runners go to the commit that counts. Each push to main
 # keeps its own run: a release reads the checks of the commit it releases.
 concurrency:
-  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
