@@ -717,8 +717,14 @@ test("the list searches each column on its own", async ({ page }) => {
     (url) => url.includes("/odata/Invoices") && !url.includes("total="),
   );
 
-  // today's date, as the list shows it, keeps both
-  const today = new Date().toISOString().slice(0, 10).split("-").reverse().join(".");
+  // today's date, as the list shows it, keeps both. The app dates an invoice by
+  // the day in Berlin, not the UTC day, which runs an hour or two behind it.
+  const today = new Intl.DateTimeFormat("de-DE", {
+    timeZone: "Europe/Berlin",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date());
   await searchColumn(page, "Datum", today, answered("date"));
   await expect(invoiceRow(page, hanna)).toBeVisible();
   await expect(invoiceRow(page, karl)).toBeVisible();
