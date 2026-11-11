@@ -954,7 +954,7 @@ def main():
         report[f"cemetery {cemetery}"] += 1
         if is_cooperative:
             note("cooperative", number)
-            cooperative[number] = (g.contract, True, g.care_price)
+            cooperative[number] = (g.contract, g.customer in usable_records, g.care_price)
             report["graves cooperative"] += 1
         grave_rows.append([number, field_number, site, cemetery, position, start, g.end or "",
                            "true" if is_cooperative else "false", g.contract if is_cooperative else ""])
