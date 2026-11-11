@@ -438,52 +438,37 @@ public class CooperativeGraveTests
             .Single(r => r.GetProperty("GraveNumber").GetString() == number);
 
     [Fact]
-    public async Task The_overview_lists_a_cooperative_grave_in_every_half_year_its_term_touches()
+    public async Task The_overview_leaves_cooperative_graves_out()
     {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        await SavedIdAsync(
-            await SaveTermAsync(client, "K-010", "2026-03-01", "2026-08-31", true, [], [])
-        );
-
-        foreach (var half in new[] { 1, 2 })
-        {
-            using var status = await StatusAsync(client, 2026, half);
-            var row = Row(status, "K-010");
-            Assert.True(row.GetProperty("Cooperative").GetBoolean());
-            Assert.False(row.GetProperty("Invoiced").GetBoolean());
-        }
-
-        using var later = await StatusAsync(client, 2027, 1);
-        Assert.Equal(0, later.RootElement.GetProperty("value").GetArrayLength());
-    }
-
-    [Fact]
-    public async Task The_overview_ranks_cooperative_graves_after_open_ones()
-    {
+        // The overview is the list of graves the business bills: a cooperative
+        // grave has a list of its own and is not shown here, billable links or not.
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
         var seed = await SeedAsync(client);
-        await SavedIdAsync(await SaveTermAsync(client, "A-001", "2026-01-01", null, true, [], []));
+        await SavedIdAsync(await SaveTermAsync(client, "K-010", "2026-01-01", null, true, [], []));
         await SavedIdAsync(
             await SaveTermAsync(
                 client,
-                "Z-999",
+                "K-011",
                 "2026-01-01",
                 null,
-                false,
+                true,
                 [Link(seed.PricedItem)],
                 [seed.Anna]
             )
         );
+        await SavedIdAsync(await SaveOrdinaryAsync(client, "A-001", seed.PricedItem, seed.Bert));
 
-        using var status = await StatusAsync(client, 2026, 1);
-        var numbers = status
-            .RootElement.GetProperty("value")
-            .EnumerateArray()
-            .Select(r => r.GetProperty("GraveNumber").GetString())
-            .ToList();
-        Assert.Equal(["Z-999", "A-001"], numbers);
+        foreach (var half in new[] { 1, 2 })
+        {
+            using var status = await StatusAsync(client, 2026, half);
+            var numbers = status
+                .RootElement.GetProperty("value")
+                .EnumerateArray()
+                .Select(r => r.GetProperty("GraveNumber").GetString())
+                .ToList();
+            Assert.Equal(["A-001"], numbers);
+        }
     }
 
     [Fact]
@@ -508,7 +493,6 @@ public class CooperativeGraveTests
             ["K-001", "A-001"],
             rows.Select(r => r.GetProperty("GraveNumber").GetString()).ToList()
         );
-        Assert.False(rows[0].GetProperty("Cooperative").GetBoolean());
         Assert.False(rows[0].GetProperty("Invoiced").GetBoolean());
         Assert.True(rows[1].GetProperty("Invoiced").GetBoolean());
     }
@@ -635,9 +619,13 @@ public class CooperativeGraveTests
             Assert.NotEmpty(await db.Invoices.Where(i => i.GraveId == successor).ToListAsync());
         }
 
-        using var status = await StatusAsync(client, 2026, 1);
-        var row = Row(status, "K-001");
-        Assert.True(row.GetProperty("Cooperative").GetBoolean());
+        // the cooperative predecessor is not in the overview; the successor is,
+        // from the half-year it starts in
+        using var before = await StatusAsync(client, 2026, 1);
+        Assert.Equal(0, before.RootElement.GetProperty("value").GetArrayLength());
+        using var after = await StatusAsync(client, 2026, 2);
+        var row = Row(after, "K-001");
+        Assert.Equal(successor, row.GetProperty("Id").GetInt64());
     }
 
     [Fact]
@@ -789,7 +777,10 @@ public class CooperativeGraveTests
         using var status = await StatusAsync(client, 2026, 2);
         var row = Row(status, "K-001");
         Assert.True(row.GetProperty("Invoiced").GetBoolean());
-        Assert.False(row.GetProperty("Cooperative").GetBoolean());
+        Assert.Equal(ordinary, row.GetProperty("Id").GetInt64());
+        // the cooperative successor is not listed in its own half-years
+        using var later = await StatusAsync(client, 2027, 1);
+        Assert.Equal(0, later.RootElement.GetProperty("value").GetArrayLength());
     }
 
     [Fact]

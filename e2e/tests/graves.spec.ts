@@ -1687,28 +1687,26 @@ test.describe("the half-year today falls in", () => {
     await expect(status).toHaveAttribute("aria-label", "Rechnungen offen");
   });
 
-  test("the overview shows a cooperative grave with its tag and filters by it", async ({
-    page,
-  }) => {
+  // The overview lists the graves the business bills. A cooperative grave is
+  // billed by the cooperative: it has a list of its own and is not shown here.
+  test("the overview leaves cooperative graves to their own list", async ({ page }) => {
     const marker = `CO-${unique()}`;
-    await seedCooperativeGrave(page, marker, {
+    await seedCooperativeGrave(page, `${marker}-G`, {
       startDate: `${CURRENT_YEAR - 1}-01`,
       endDate: null,
     });
+    await seedGrave(page, `${marker}-E`, [`Empfänger ${marker}`]);
 
     await page.goto("/graves");
     await searchColumn(page, "Grabnummer", marker);
-    const row = page.getByRole("row").filter({ hasText: marker });
-    // found by what a screen reader hears: the text carries a soft hyphen
-    const tag = row.getByRole("img", { name: "Genossenschaftsgrab, wird nicht abgerechnet" });
-    await expect(tag).toBeVisible();
-    await expect(tag).toHaveClass(/p-tag-secondary/);
-
-    await filterColumn(page, "Status", "offen");
-    await expect(page.getByRole("table")).toContainText("Keine Daten");
-    await filterColumn(page, "Status", "Genossenschaft");
     await expect(page.locator("tbody tr")).toHaveCount(1);
-    await expect(page.locator("tbody tr")).toContainText(marker);
+    await expect(page.locator("tbody tr")).toContainText(`${marker}-E`);
+    await expect(page.locator("tbody")).not.toContainText(`${marker}-G`);
+
+    await page.goto("/cooperative-graves");
+    await searchColumn(page, "Grabnummer", marker);
+    await expect(page.locator("tbody tr")).toHaveCount(1);
+    await expect(page.locator("tbody tr")).toContainText(`${marker}-G`);
   });
 
   test("the detail page names a cooperative grave", async ({ page }) => {

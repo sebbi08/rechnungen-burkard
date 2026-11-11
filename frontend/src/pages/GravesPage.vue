@@ -127,7 +127,6 @@ const cemeteryOptions = computed(() =>
 const statusOptions = computed(() => [
   { value: "open", label: t("statusOpen") },
   { value: "invoiced", label: t("statusInvoiced") },
-  { value: "cooperative", label: t("statusCooperative") },
 ]);
 const paidOptions = computed(() => [{ value: "unpaid", label: t("paymentFilterUnpaid") }]);
 
@@ -155,18 +154,10 @@ const status = useQuery({
 });
 
 // the value the status column shows and the status filter selects
-function statusOf(row: GraveStatusRow): "cooperative" | "invoiced" | "open" {
-  return row.Cooperative ? "cooperative" : row.Invoiced ? "invoiced" : "open";
+function statusOf(row: GraveStatusRow): "invoiced" | "open" {
+  return row.Invoiced ? "invoiced" : "open";
 }
 const statusTags = computed(() => ({
-  cooperative: {
-    // with a soft hyphen: on a phone the word would otherwise widen the column
-    // enough to push the row actions off the screen
-    value: t("statusCooperativeTag"),
-    severity: "secondary" as const,
-    icon: "pi pi-users",
-    label: t("statusCooperativeAnnouncement"),
-  },
   invoiced: {
     value: t("statusInvoiced"),
     severity: "success" as const,

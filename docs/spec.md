@@ -641,9 +641,9 @@ non-interactive until completion, and the task runs exactly once.
   cemetery (among those in the settings), and selects for the invoicing status
   (open or invoiced) and the payment status (FR-077). The recipients search
   MUST look in the names and addresses of all of the grave's recipients. The
-  list is filtered in the browser, folding case including umlauts. A cooperative
-  grave is tagged "Genossenschaft" in the status column instead of open or
-  invoiced; that select offers it as a third value.
+  list is filtered in the browser, folding case including umlauts. The overview
+  lists the graves the business bills: a cooperative grave MUST NOT appear in
+  it, only in the list of its own (FR-024a).
 
 **Half-year grave invoicing**
 
@@ -663,9 +663,8 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-027**: The system MUST prevent generating duplicate invoices for the same
   grave and the same half-year.
 - **FR-028**: The grave overview MUST list graves not yet invoiced for the current
-  half-year first. A cooperative grave is listed in every half-year its term
-  touches, whether or not it has items, and ranks after the open graves, among
-  the invoiced ones; a grave whose cooperative flag was unticked ranks as open.
+  half-year first. A grave whose cooperative flag was unticked is listed like any
+  other, as open until it is invoiced.
 - **FR-024a**: The system MUST offer a list of the cooperative graves of its own,
   with each grave's number, field, site name, cemetery, recipients and term,
   ordered by grave number, from which a grave opens in the editor and a new

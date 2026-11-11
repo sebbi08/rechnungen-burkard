@@ -128,8 +128,6 @@ export interface GraveStatusRow {
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
-  /** A cooperative grave is never invoiced by the business. */
-  Cooperative: boolean;
   /** In the order they were linked; empty for a grave without any. */
   Recipients: GraveStatusRecipient[];
 }

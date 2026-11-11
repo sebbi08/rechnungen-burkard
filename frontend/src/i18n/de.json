@@ -165,7 +165,6 @@
   "statusInvoiced": "erstellt",
   "statusOpen": "offen",
   "statusCooperative": "Genossenschaft",
-  "statusCooperativeTag": "Genossen\u00adschaft",
   "statusCooperativeAnnouncement": "Genossenschaftsgrab, wird nicht abgerechnet",
   "statusInvoicedAnnouncement": "Rechnungen erstellt",
   "statusOpenAnnouncement": "Rechnungen offen",
