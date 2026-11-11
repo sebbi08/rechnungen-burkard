@@ -161,12 +161,17 @@ interface CooperativeGraveAnswer {
   Cemetery: { Id: number; Name: string };
   StartDate: string;
   EndDate: string | null;
-  Recipients: { Recipient: GraveStatusRecipient }[];
+  /** The links, each with its own id: the order they were made in. */
+  Recipients: { Id: number; Recipient: GraveStatusRecipient }[];
 }
 
 export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
+  // No nested "$orderby=Id" for the recipients: it needs a ";" inside
+  // $expand, and the proxy in front of the server splits the query at a ";"
+  // as at "&", which cut the request in two and left the list empty. The
+  // links come with their ids, so they are put in link order here instead.
   const url =
-    "/odata/Graves?$filter=IsCooperative eq true&$expand=Cemetery,Recipients($expand=Recipient;$orderby=Id)&$orderby=GraveNumber";
+    "/odata/Graves?$filter=IsCooperative eq true&$expand=Cemetery,Recipients($expand=Recipient)&$orderby=GraveNumber";
   const { value } = await getJson<{ value: CooperativeGraveAnswer[] }>(url);
   return value.map((grave) => ({
     Id: grave.Id,
@@ -177,11 +182,13 @@ export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
     CemeteryName: grave.Cemetery.Name,
     StartDate: grave.StartDate,
     EndDate: grave.EndDate,
-    Recipients: grave.Recipients.map(({ Recipient }) => ({
-      Id: Recipient.Id,
-      Name: Recipient.Name,
-      Address: Recipient.Address,
-    })),
+    Recipients: [...grave.Recipients]
+      .sort((a, b) => a.Id - b.Id)
+      .map(({ Recipient }) => ({
+        Id: Recipient.Id,
+        Name: Recipient.Name,
+        Address: Recipient.Address,
+      })),
   }));
 }
 

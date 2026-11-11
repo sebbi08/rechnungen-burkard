@@ -5,6 +5,7 @@ import {
   drawer,
   fillDate,
   filterColumn,
+  openPopover,
   pickOption,
   saveEditor,
   searchColumn,
@@ -179,4 +180,41 @@ test("a row opens the grave's detail page", async ({ page }) => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Genossenschaftsgräber" }),
   ).toBeVisible();
+});
+
+// The test server sits behind a proxy that splits a query at a semicolon as
+// well as at "&": a nested "$expand=...;$orderby=..." reached the API cut in
+// two, the API refused it, and the list stayed empty although the graves were
+// there. So the list asks without one, and keeps a grave's recipients in the
+// order they were linked by itself.
+test("the list asks without a semicolon and keeps the recipients in link order", async ({
+  page,
+}) => {
+  const marker = `GS-${unique()}`;
+  const ts = unique();
+  // linked in reverse alphabetical order, so a sort by name would show
+  const zeta = await createRow(page, "/odata/Recipients", {
+    Name: `Zeta ${ts}`,
+    Address: "Weg 1\n12345 Ort",
+  });
+  const alpha = await createRow(page, "/odata/Recipients", {
+    Name: `Alpha ${ts}`,
+    Address: "Weg 2\n12345 Ort",
+  });
+  await seedCooperative(page, marker, { endDate: null, recipientIds: [zeta.Id, alpha.Id] });
+
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/odata/Graves")) requests.push(decodeURIComponent(request.url()));
+  });
+  await page.goto("/cooperative-graves");
+  await searchColumn(page, "Grabnummer", marker);
+  const row = page.locator("tbody tr").filter({ hasText: marker });
+  await expect(row).toHaveCount(1);
+
+  expect(requests.length).toBeGreaterThan(0);
+  for (const url of requests) expect(url, url).not.toContain(";");
+
+  const popover = await openPopover(page, row.getByRole("button", { name: "2 Empfänger" }));
+  await expect(popover.getByRole("listitem")).toHaveText([`Zeta ${ts}`, `Alpha ${ts}`]);
 });
