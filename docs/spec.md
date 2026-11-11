@@ -557,8 +557,10 @@ non-interactive until completion, and the task runs exactly once.
   start month; the end month is optional. The site name holds the site's own
   name only; the cemetery is a field of its own. A grave MAY be marked as a
   cooperative grave (Genossenschaftsgrab): the cooperative looks after it, so it
-  is kept and listed here but never invoiced. A grave that has invoices MUST NOT
-  have the mark ticked or unticked.
+  is kept and listed here but never invoiced. A cooperative grave MUST carry a
+  contract number (Vertragsnummer), stored trimmed; saving without one MUST be
+  refused, and a grave that is not cooperative MUST store none. A grave that has
+  invoices MUST NOT have the mark ticked or unticked.
 - **FR-018a**: Two graves MUST NOT share a grave number while their terms overlap;
   a term runs from its start month through its end month, or indefinitely without
   one. Field numbers may repeat.
@@ -579,7 +581,9 @@ non-interactive until completion, and the task runs exactly once.
   refused, leaving the old grave unchanged, when the two have the same mark, when
   the numbers differ, when the old grave has invoices for a half-year that
   reaches the new start month, or when ending it earlier would change the rounding
-  corrections stored for it. Its earlier invoices MUST stay as they are.
+  corrections stored for it. A successor that is cooperative MUST carry a
+  contract number, and saving without one MUST be refused before the old grave
+  is changed. Its earlier invoices MUST stay as they are.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
@@ -598,10 +602,9 @@ non-interactive until completion, and the task runs exactly once.
   MAY have none, and at most four.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
-- **FR-020b**: A grave's set of recipients MUST be fixed when the grave is
-  created and MUST NOT change afterwards. A cooperative grave that has no invoice
-  is exempt, so that it can become an ordinary grave later; unticking it applies
-  every rule of an ordinary grave, including FR-020 and FR-021a.
+- **FR-020b**: A grave's set of recipients MAY change until the grave has its
+  first invoice and MUST be fixed from then on. Unticking a cooperative grave
+  applies every rule of an ordinary grave, including FR-020 and FR-021a.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each carrying the grave's own items and counts in full,
   billed at the same amount as every other recipient's invoice.

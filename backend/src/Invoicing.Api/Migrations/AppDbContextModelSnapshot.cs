@@ -15,7 +15,7 @@ namespace Burkard.Invoicing.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
 
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Cemetery", b =>
                 {
@@ -92,6 +92,9 @@ namespace Burkard.Invoicing.Api.Migrations
 
                     b.Property<long>("CemeteryId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContractNumber")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateOnly>("CreatedAt")
                         .HasColumnType("TEXT");

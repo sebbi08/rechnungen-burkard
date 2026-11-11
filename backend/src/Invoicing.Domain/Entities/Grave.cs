@@ -26,6 +26,10 @@ public sealed class Grave
     /// date here, but never invoiced, so it needs no recipient, no price and no
     /// all-year item.</summary>
     public bool IsCooperative { get; set; }
+
+    /// <summary>The cooperative's number for the contract the grave is kept
+    /// under; required, trimmed, on a cooperative grave and null on any other.</summary>
+    public string? ContractNumber { get; set; }
     public List<GraveItem> Items { get; set; } = new();
     public List<GraveRecipient> Recipients { get; set; } = new();
     public List<GraveBillingCorrection> Corrections { get; set; } = new();

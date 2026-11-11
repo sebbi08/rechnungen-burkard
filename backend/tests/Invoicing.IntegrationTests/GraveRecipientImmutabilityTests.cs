@@ -64,7 +64,7 @@ public class GraveRecipientImmutabilityTests
     }
 
     [Fact]
-    public async Task Saving_a_grave_with_a_different_recipient_set_is_rejected()
+    public async Task Saving_an_uninvoiced_grave_with_a_different_recipient_set_replaces_it()
     {
         using var host = new ApiTestHost();
         var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
@@ -97,16 +97,11 @@ public class GraveRecipientImmutabilityTests
             )
         );
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal(
-            "GraveRecipientsImmutable",
-            json.RootElement.GetProperty("error").GetProperty("code").GetString()
-        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(1, await db.GraveRecipients.CountAsync(r => r.GraveId == graveId));
+        Assert.Equal(2, await db.GraveRecipients.CountAsync(r => r.GraveId == graveId));
     }
 
     [Fact]

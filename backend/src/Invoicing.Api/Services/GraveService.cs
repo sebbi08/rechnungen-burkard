@@ -33,7 +33,8 @@ public sealed record GraveFields(
     GravePosition? Position,
     DateOnly StartDate,
     DateOnly? EndDate,
-    bool IsCooperative
+    bool IsCooperative,
+    string? ContractNumber
 );
 
 public sealed class GraveService
@@ -60,6 +61,16 @@ public sealed class GraveService
         CancellationToken ct
     )
     {
+        // Judged first, before a hand-over writes anything or judges its
+        // predecessor.
+        if (fields.IsCooperative && string.IsNullOrWhiteSpace(fields.ContractNumber))
+        {
+            throw new ValidationException(
+                "ContractNumberRequired",
+                "A cooperative grave needs a contract number."
+            );
+        }
+
         // The predecessor is resolved before anything else is judged, so a
         // refusal names the handover rather than a field of the successor.
         var handover = succeedsGraveId is { } predecessorId
@@ -110,12 +121,12 @@ public sealed class GraveService
             );
         }
 
-        // A grave's recipients are fixed at creation: the even split across them is
-        // baked into every invoice already generated, and changing the set would
-        // make a later revision disagree with what was sent out. A cooperative
+        // A grave's recipients are fixed by its first invoice: the even split
+        // across them is baked into every invoice already generated, and changing
+        // the set would make a later revision disagree with what was sent out. A
         // grave that was never invoiced has no split to disagree with, so its
         // recipients may change.
-        if (graveId is { } existingId && stored is not { IsCooperative: true, HasInvoices: false })
+        if (graveId is { } existingId && stored is { HasInvoices: true })
         {
             var storedRecipients = await _db
                 .GraveRecipients.Where(r => r.GraveId == existingId)
@@ -172,6 +183,7 @@ public sealed class GraveService
         grave.StartDate = fields.StartDate;
         grave.EndDate = fields.EndDate;
         grave.IsCooperative = fields.IsCooperative;
+        grave.ContractNumber = fields.IsCooperative ? fields.ContractNumber!.Trim() : null;
 
         // the deletes must reach the database before the new links and corrections
         // are inserted, or the unique indexes reject a re-added row
@@ -318,7 +330,8 @@ public sealed class GraveService
                 predecessor.Position,
                 predecessor.StartDate,
                 end,
-                false
+                false,
+                null
             );
             var evaluation = await ValidateAsync(
                 predecessor

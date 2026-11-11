@@ -76,7 +76,8 @@ public class CooperativeGraveTests
         bool? isCooperative,
         object[] items,
         long[] recipientIds,
-        object[]? corrections = null
+        object[]? corrections = null,
+        string? contractNumber = "V-1"
     ) =>
         client.PostAsync(
             "/odata/SaveGrave",
@@ -92,6 +93,7 @@ public class CooperativeGraveTests
                     startDate = "2026-01-01",
                     endDate = (string?)null,
                     isCooperative,
+                    contractNumber,
                     items,
                     recipientIds,
                     corrections = corrections ?? [],
@@ -396,6 +398,125 @@ public class CooperativeGraveTests
         Assert.Empty(await db.Invoices.ToListAsync());
     }
 
+    [Fact]
+    public async Task A_cooperative_grave_needs_a_contract_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await SeedAsync(client);
+
+        await AssertRefusedAsync(
+            await SaveAsync(client, null, true, [], [], contractNumber: null),
+            "ContractNumberRequired"
+        );
+        await AssertRefusedAsync(
+            await SaveAsync(client, null, true, [], [], contractNumber: "   "),
+            "ContractNumberRequired"
+        );
+
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, true, [], [], contractNumber: " 2023029 ")
+        );
+        using var grave = await GetGraveAsync(client, id);
+        Assert.Equal("2023029", grave.RootElement.GetProperty("ContractNumber").GetString());
+    }
+
+    [Fact]
+    public async Task An_ordinary_grave_stores_no_contract_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var id = await SavedIdAsync(
+            await SaveAsync(
+                client,
+                null,
+                false,
+                [Link(seed.PricedItem)],
+                [seed.Anna],
+                contractNumber: "X"
+            )
+        );
+        using var grave = await GetGraveAsync(client, id);
+        Assert.Equal(JsonValueKind.Null, grave.RootElement.GetProperty("ContractNumber").ValueKind);
+    }
+
+    [Fact]
+    public async Task Unticking_drops_the_contract_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, true, [], [], contractNumber: "V-9")
+        );
+        await SavedIdAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        using var grave = await GetGraveAsync(client, id);
+        Assert.Equal(JsonValueKind.Null, grave.RootElement.GetProperty("ContractNumber").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_successor_to_the_cooperative_needs_a_contract_number()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var predecessor = await SavedIdAsync(
+            await SaveAsync(client, null, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        await AssertRefusedAsync(
+            await SaveSuccessorAsync(
+                client,
+                predecessor,
+                "2026-07-01",
+                true,
+                [],
+                [],
+                contractNumber: null
+            ),
+            "ContractNumberRequired"
+        );
+        Assert.Null(await EndDateAsync(client, predecessor));
+
+        await SavedIdAsync(
+            await SaveSuccessorAsync(
+                client,
+                predecessor,
+                "2026-07-01",
+                true,
+                [],
+                [],
+                contractNumber: "V-2"
+            )
+        );
+    }
+
+    [Fact]
+    public async Task An_ordinary_grave_without_invoices_may_change_its_recipients()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        await SavedIdAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Bert])
+        );
+
+        await GraveGenerationHelper.RunAsync(client, 2026, 1);
+        await AssertRefusedAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna]),
+            "GraveRecipientsImmutable"
+        );
+    }
+
     private static Task<HttpResponseMessage> SaveTermAsync(
         HttpClient client,
         string number,
@@ -403,7 +524,8 @@ public class CooperativeGraveTests
         string? end,
         bool isCooperative,
         object[] items,
-        long[] recipientIds
+        long[] recipientIds,
+        string? contractNumber = "V-1"
     ) =>
         client.PostAsync(
             "/odata/SaveGrave",
@@ -419,6 +541,7 @@ public class CooperativeGraveTests
                     startDate = start,
                     endDate = end,
                     isCooperative,
+                    contractNumber,
                     items,
                     recipientIds,
                     corrections = Array.Empty<object>(),
@@ -557,7 +680,8 @@ public class CooperativeGraveTests
         bool isCooperative,
         object[] items,
         long[] recipientIds,
-        string number = "K-001"
+        string number = "K-001",
+        string? contractNumber = "V-1"
     ) =>
         client.PostAsync(
             "/odata/SaveGrave",
@@ -574,6 +698,7 @@ public class CooperativeGraveTests
                     startDate = start,
                     endDate = (string?)null,
                     isCooperative,
+                    contractNumber,
                     items,
                     recipientIds,
                     corrections = Array.Empty<object>(),
@@ -872,6 +997,7 @@ public class CooperativeGraveTests
                     startDate = "2024-01-01",
                     endDate = (string?)null,
                     isCooperative = true,
+                    contractNumber = "V-1",
                     items = Array.Empty<object>(),
                     recipientIds = Array.Empty<long>(),
                     corrections = Array.Empty<object>(),
