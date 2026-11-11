@@ -148,6 +148,8 @@ export interface CooperativeGraveRow {
   ContractNumber: string | null;
   StartDate: string;
   EndDate: string | null;
+  /** When the grave was deleted; null for one still in use. */
+  DeletedAt: string | null;
   Recipients: GraveStatusRecipient[];
 }
 
@@ -161,6 +163,7 @@ interface CooperativeGraveAnswer {
   ContractNumber: string | null;
   StartDate: string;
   EndDate: string | null;
+  DeletedAt: string | null;
   /** The links, each with its own id: the order they were made in. */
   Recipients: { Id: number; Recipient: GraveStatusRecipient }[];
 }
@@ -183,6 +186,7 @@ export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
     ContractNumber: grave.ContractNumber,
     StartDate: grave.StartDate,
     EndDate: grave.EndDate,
+    DeletedAt: grave.DeletedAt,
     Recipients: [...grave.Recipients]
       .sort((a, b) => a.Id - b.Id)
       .map(({ Recipient }) => ({
@@ -230,6 +234,15 @@ export async function saveGrave(input: SaveGraveInput): Promise<number> {
   return Number(body?.Id ?? body?.id);
 }
 
+/** Deletes a grave; it can be restored until the next invoice run. */
+export async function deleteGrave(graveId: number): Promise<void> {
+  await postJson("/odata/DeleteGrave", { graveId });
+}
+
+export async function restoreGrave(graveId: number): Promise<void> {
+  await postJson("/odata/RestoreGrave", { graveId });
+}
+
 export interface GraveItemLink {
   Count: number;
   /** The link's own price, stored as typed; null bills the item's default. */
@@ -261,6 +274,11 @@ export interface GraveDetails {
   ContractNumber: string | null;
   /** Whether any invoice has been made for the grave. */
   HasInvoices: boolean;
+  /** When the grave was deleted, as UTC without a trailing "Z": show the day
+   *  only. Null for a grave still in use. */
+  DeletedAt: string | null;
+  /** Whether a deleted grave can still be restored: no invoice run since. */
+  CanRestore: boolean;
   Items: GraveItemLink[];
   Recipients: {
     Recipient: { Id: number; Name: string; Address: string; Email: string | null };

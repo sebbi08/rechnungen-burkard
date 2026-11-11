@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
@@ -9,7 +9,7 @@ import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
 import { computed, nextTick, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
-import type { GraveDetails } from "@/api/endpoints";
+import { deleteGrave, type GraveDetails, restoreGrave } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadGraveDetail } from "@/api/queries";
 import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
@@ -20,6 +20,8 @@ import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
 import { listLocation } from "@/composables/useColumnFilters";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
+import { useConfirmAsync } from "@/composables/useConfirmAsync";
+import { useErrorToast } from "@/composables/useErrorToast";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import {
   formatAmount,
@@ -53,6 +55,36 @@ const currentLabel = computed(() =>
   t("currentHalfYearStatus", [halfYearText(currentYear, currentHalf)]),
 );
 
+const deleted = computed(() => grave.value?.DeletedAt != null);
+// "2026-11-11T09:30:00" is UTC without a "Z": only its day is shown, never a time
+const deletedOn = computed(() => formatDate(grave.value?.DeletedAt?.slice(0, 10)));
+
+const ask = useConfirmAsync();
+const { showError } = useErrorToast();
+const queryClient = useQueryClient();
+const changing = ref(false);
+async function change(action: () => Promise<void>): Promise<void> {
+  changing.value = true;
+  try {
+    await action();
+    await queryClient.invalidateQueries();
+  } catch (error) {
+    showError(error);
+    // the page may have been out of date: show what is true now
+    await queryClient.invalidateQueries();
+  } finally {
+    changing.value = false;
+  }
+}
+async function removeGrave(): Promise<void> {
+  if (await ask(t("confirmDeleteGrave"))) {
+    await change(() => deleteGrave(props.graveId));
+  }
+}
+async function restore(): Promise<void> {
+  await change(() => restoreGrave(props.graveId));
+}
+
 const inTerm = computed(() =>
   grave.value
     ? halfYearHasBilling(
@@ -66,6 +98,13 @@ const inTerm = computed(() =>
 );
 // invoiced beats the rest, then the term; a cooperative grave in its term is never open
 const currentTag = computed(() => {
+  if (deleted.value) {
+    return {
+      value: t("statusDeleted"),
+      severity: "secondary" as const,
+      announcement: t("statusDeletedAnnouncement"),
+    };
+  }
   if (detail.data.value?.currentInvoiced) {
     return {
       value: t("statusInvoiced"),
@@ -139,11 +178,36 @@ const {
     :title="grave?.GraveNumber ?? t('graveDetailTitle')"
     :crumbs="[listCrumb, { label: grave?.GraveNumber ?? t('graveDetailTitle') }]"
   >
-    <template v-if="grave?.IsCooperative" #title-tag>
-      <Tag :value="t('cooperativeGrave')" severity="secondary" icon="pi pi-users" />
+    <template v-if="grave?.IsCooperative || deleted" #title-tag>
+      <Tag
+        v-if="grave?.IsCooperative"
+        :value="t('cooperativeGrave')"
+        severity="secondary"
+        icon="pi pi-users"
+      />
+      <Tag v-if="deleted" :value="t('statusDeleted')" severity="warn" icon="pi pi-trash" />
     </template>
     <template v-if="grave" #actions>
-      <Button :label="t('editGrave')" icon="pi pi-pencil" @click="openEditor" />
+      <template v-if="deleted">
+        <Button
+          v-if="grave.CanRestore"
+          :label="t('restoreGrave')"
+          icon="pi pi-replay"
+          :loading="changing"
+          @click="restore"
+        />
+      </template>
+      <template v-else>
+        <Button
+          :label="t('deleteGrave')"
+          icon="pi pi-trash"
+          severity="danger"
+          outlined
+          :loading="changing"
+          @click="removeGrave"
+        />
+        <Button :label="t('editGrave')" icon="pi pi-pencil" @click="openEditor" />
+      </template>
     </template>
   </PageHeader>
 
@@ -155,6 +219,10 @@ const {
     {{ t("notFound") }}
   </Message>
   <div v-else class="flex flex-col gap-6">
+    <Message v-if="deleted" severity="warn">
+      {{ t("graveDeletedNotice", [deletedOn]) }}
+      {{ grave.CanRestore ? t("graveRestorableNotice") : t("graveNotRestorableNotice") }}
+    </Message>
     <Card>
       <template #content>
         <dl class="m-0 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -338,6 +406,7 @@ const {
                 :paid-on="data.PaidOn"
                 :details-to="`/graves/${graveId}/invoices/${data.RootId}`"
                 :row-label="`${halfYearText(data.PeriodYear, data.PeriodHalf)} ${data.RecipientName}`"
+                :readonly="deleted"
                 @edit="openGraveInvoice(data.Id)"
               />
             </template>

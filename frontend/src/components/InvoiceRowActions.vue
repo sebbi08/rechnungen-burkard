@@ -16,6 +16,8 @@ const props = defineProps<{
   detailsTo: RouteLocationRaw;
   /** Which row, for screen readers: every row has the same buttons. */
   rowLabel?: string;
+  /** Neither edit nor payment: the invoice's grave has been deleted. */
+  readonly?: boolean;
 }>();
 const emit = defineEmits<{ edit: [] }>();
 
@@ -34,26 +36,34 @@ function open(kind: DocumentKindName): void {
   openDocument(props.invoiceId, kind).catch(showError);
 }
 
-const menuItems = computed<MenuItem[]>(() => [
-  {
-    label: t("actionDetails"),
-    icon: "pi pi-eye",
-    command: () => void router.push(props.detailsTo),
-  },
-  { label: t("actionDownloadNormal"), icon: "pi pi-file-pdf", command: () => open("Normal") },
-  { label: t("actionDownloadCopy"), icon: "pi pi-copy", command: () => open("Copy") },
-  {
-    label: props.paidOn ? t("editBlockedPaid") : t("actionEdit"),
-    icon: "pi pi-pencil",
-    disabled: !!props.paidOn,
-    command: () => emit("edit"),
-  },
-  {
-    label: props.paidOn ? t("actionMarkUnpaid") : t("actionMarkPaid"),
-    icon: props.paidOn ? "pi pi-undo" : "pi pi-wallet",
-    command: () => void togglePaid(props.invoiceId, props.paidOn),
-  },
-]);
+const menuItems = computed<MenuItem[]>(() => {
+  const items: MenuItem[] = [
+    {
+      label: t("actionDetails"),
+      icon: "pi pi-eye",
+      command: () => void router.push(props.detailsTo),
+    },
+    { label: t("actionDownloadNormal"), icon: "pi pi-file-pdf", command: () => open("Normal") },
+    { label: t("actionDownloadCopy"), icon: "pi pi-copy", command: () => open("Copy") },
+  ];
+  if (props.readonly) {
+    return items;
+  }
+  return [
+    ...items,
+    {
+      label: props.paidOn ? t("editBlockedPaid") : t("actionEdit"),
+      icon: "pi pi-pencil",
+      disabled: !!props.paidOn,
+      command: () => emit("edit"),
+    },
+    {
+      label: props.paidOn ? t("actionMarkUnpaid") : t("actionMarkPaid"),
+      icon: props.paidOn ? "pi pi-undo" : "pi pi-wallet",
+      command: () => void togglePaid(props.invoiceId, props.paidOn),
+    },
+  ];
+});
 </script>
 
 <template>
@@ -86,7 +96,7 @@ const menuItems = computed<MenuItem[]>(() => [
         @click="open('Copy')"
       />
       <!-- a disabled button fires no hover, so the tooltip sits on a wrapper -->
-      <span v-tooltip.top="paidOn ? t('editBlockedPaid') : t('actionEdit')">
+      <span v-if="!readonly" v-tooltip.top="paidOn ? t('editBlockedPaid') : t('actionEdit')">
         <Button
           icon="pi pi-pencil"
           text
@@ -97,6 +107,7 @@ const menuItems = computed<MenuItem[]>(() => [
         />
       </span>
       <Button
+        v-if="!readonly"
         v-tooltip.top="paidOn ? t('actionMarkUnpaid') : t('actionMarkPaid')"
         :icon="paidOn ? 'pi pi-undo' : 'pi pi-wallet'"
         text

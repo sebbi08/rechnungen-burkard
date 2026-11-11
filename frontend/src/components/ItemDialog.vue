@@ -177,6 +177,14 @@ async function save(): Promise<void> {
 
       <section v-if="item" class="flex flex-col gap-2">
         <h3 class="m-0 text-base font-semibold">{{ t("itemGravesTitle") }}</h3>
+        <!-- linked, yet nothing listed: only deleted graves still link the item -->
+        <Message
+          v-if="graves.data.value?.Linked && graves.data.value.Groups.length === 0"
+          severity="secondary"
+          size="small"
+        >
+          {{ t("itemGravesOnlyDeleted") }}
+        </Message>
         <Message
           v-if="graves.data.value && !graves.data.value.Linked"
           severity="secondary"

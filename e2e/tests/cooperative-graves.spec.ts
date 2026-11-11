@@ -31,10 +31,21 @@ async function seedCooperative(
   });
 }
 
-test("the list shows active cooperative graves by default", async ({ page }) => {
+test("the list shows only current and future cooperative graves", async ({ page }) => {
   const marker = `GG-${unique()}`;
-  await seedCooperative(page, `${marker}-active`, { startDate: "2025-01", endDate: null });
-  await seedCooperative(page, `${marker}-ended`, { startDate: "2024-01", endDate: "2025-12" });
+  const year = new Date().getFullYear();
+  await seedCooperative(page, `${marker}-ended`, {
+    startDate: `${year - 2}-01`,
+    endDate: `${year - 1}-12`,
+  });
+  await seedCooperative(page, `${marker}-running`, { startDate: "2025-01", endDate: null });
+  await seedCooperative(page, `${marker}-future`, { startDate: "2044-01", endDate: null });
+  const deletedId = await seedCooperative(page, `${marker}-deleted`, {
+    startDate: "2025-01",
+    endDate: null,
+  });
+  const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId: deletedId } });
+  expect(deletion.ok()).toBe(true);
   // a grave of the business is no cooperative one
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
@@ -59,19 +70,10 @@ test("the list shows active cooperative graves by default", async ({ page }) => 
   ).toBeVisible();
   await searchColumn(page, "Grabnummer", marker);
   const rows = page.locator("tbody tr");
-  await expect(rows).toHaveCount(1);
-  await expect(rows).toContainText(`${marker}-active`);
-
-  const term = page.getByRole("combobox", { name: "Laufzeit" });
-  await pickOption(page, term, "Alle");
   await expect(rows).toHaveCount(2);
-
-  await pickOption(page, term, "Beendet");
-  await expect(rows).toHaveCount(1);
-  await expect(rows).toContainText(`${marker}-ended`);
-
-  // the term is kept in the URL, like the column filters
-  await expect(page).toHaveURL(/term=ended/);
+  await expect(rows.filter({ hasText: `${marker}-running` })).toHaveCount(1);
+  await expect(rows.filter({ hasText: `${marker}-future` })).toHaveCount(1);
+  await expect(page.getByRole("combobox", { name: "Laufzeit" })).toHaveCount(0);
 });
 
 test("the list filters by column", async ({ page }) => {

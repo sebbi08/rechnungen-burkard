@@ -4,7 +4,6 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
-import Select from "primevue/select";
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
@@ -24,10 +23,7 @@ import { matchesWords } from "@/lib/searchWords";
 const { t } = useI18n();
 const router = useRouter();
 
-// The term shown goes into the URL with the column filters. It is no column of
-// its own: it has no chip, and clearing the filters leaves it alone.
 const filters = useColumnFilters({
-  term: "active",
   number: "",
   site: "",
   cemetery: "",
@@ -37,23 +33,6 @@ const filters = useColumnFilters({
   end: "",
   recipients: "",
 });
-function clearColumns(): void {
-  for (const key of Object.keys(filters.values) as (keyof typeof filters.values)[]) {
-    if (key !== "term") {
-      filters.clear(key);
-    }
-  }
-}
-
-const termOptions = computed(() => [
-  { value: "active", label: t("cooperativeTermActive") },
-  { value: "ended", label: t("cooperativeTermEnded") },
-  { value: "all", label: t("filterAll") },
-]);
-// a URL whose term is none of these shows the active graves
-const term = computed(
-  () => termOptions.value.find((each) => each.value === filters.values.term)?.value ?? "active",
-);
 
 const cemeteries = useCemeteriesQuery();
 const cemeteryOptions = computed(() =>
@@ -90,12 +69,14 @@ const rows = computed(() => {
   const applied = filters.applied.value;
   const cemetery = cemeteryOptions.value.find((each) => each.value === applied.cemetery)?.value;
   const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  // the list is of current and future graves: no end, or an end in the current
+  // half-year or later (the ended ones are on the page of inactive graves)
+  const halfStart = `${now.getFullYear()}-${now.getMonth() < 6 ? "01" : "07"}`;
   return (graves.data.value ?? []).filter((row) => {
-    // active: no end, or an end in this month or later
-    const active = row.EndDate == null || row.EndDate.slice(0, 7) >= thisMonth;
+    const current = row.EndDate == null || row.EndDate.slice(0, 7) >= halfStart;
     return (
-      (term.value === "all" || (term.value === "active") === active) &&
+      row.DeletedAt == null &&
+      current &&
       matchesWords(applied.number, row.GraveNumber) &&
       matchesWords(applied.site, row.SiteName) &&
       matchesWords(applied.field, row.FieldNumber) &&
@@ -114,7 +95,7 @@ const rows = computed(() => {
 // the list arrives whole and is filtered here, so the pages are cut from what
 // is left of it
 const first = ref(0);
-watch([filters.applied, term], () => {
+watch(filters.applied, () => {
   first.value = 0;
 });
 watch(
@@ -155,22 +136,11 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
 
   <Card>
     <template #content>
-      <div class="mb-4 flex flex-wrap items-center gap-3">
-        <Select
-          v-model="filters.values.term"
-          :options="termOptions"
-          option-label="label"
-          option-value="value"
-          :aria-label="t('cooperativeTerm')"
-          class="w-full sm:w-48"
-        />
-      </div>
-
       <ColumnFilterSheet
         v-model:values="filters.values"
         :fields="fields"
         breakpoint="xl"
-        @clear="clearColumns"
+        @clear="filters.clear()"
       />
 
       <DataTable

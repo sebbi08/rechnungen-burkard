@@ -4,10 +4,11 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
+import Tag from "primevue/tag";
 import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
-import { fetchGraveInvoiceGroup } from "@/api/endpoints";
+import { fetchGraveDetails, fetchGraveInvoiceGroup } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadChain } from "@/api/queries";
 import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
@@ -43,6 +44,12 @@ const group = useQuery({
   queryFn: () => fetchGraveInvoiceGroup(latestId.value!),
   enabled: computed(() => latestId.value != null),
 });
+// a deleted grave's invoices can be read and downloaded, but neither paid nor revised
+const grave = useQuery({
+  queryKey: ["graves", "state", toRef(props, "graveId")],
+  queryFn: () => fetchGraveDetails(props.graveId),
+});
+const deleted = computed(() => grave.data.value?.DeletedAt != null);
 // the siblings of this half-year, minus the invoice shown
 const others = computed(() =>
   (group.data.value?.Recipients ?? []).filter(
@@ -67,14 +74,16 @@ const halfYear = computed(() =>
   >
     <template v-if="latest" #actions>
       <PaidStatusTag :paid-on="latest.PaidOn" />
+      <Tag v-if="deleted" :value="t('statusDeleted')" severity="warn" icon="pi pi-trash" />
       <Button
+        v-if="!deleted"
         :icon="latest.PaidOn ? 'pi pi-undo' : 'pi pi-wallet'"
         :label="latest.PaidOn ? t('actionMarkUnpaid') : t('actionMarkPaid')"
         severity="secondary"
         outlined
         @click="togglePaid(latest.Id, latest.PaidOn)"
       />
-      <span v-tooltip.bottom="latest.PaidOn ? t('editBlockedPaid') : undefined">
+      <span v-if="!deleted" v-tooltip.bottom="latest.PaidOn ? t('editBlockedPaid') : undefined">
         <Button
           :label="t('actionEdit')"
           icon="pi pi-pencil"

@@ -55,6 +55,7 @@
                 <Property Name="CreatedAt" Type="Edm.Date" Nullable="false" />
                 <Property Name="IsCooperative" Type="Edm.Boolean" Nullable="false" />
                 <Property Name="ContractNumber" Type="Edm.String" />
+                <Property Name="DeletedAt" Type="Edm.DateTimeOffset" />
                 <NavigationProperty
                     Name="Cemetery"
                     Type="Burkard.Invoicing.Domain.Entities.Cemetery"

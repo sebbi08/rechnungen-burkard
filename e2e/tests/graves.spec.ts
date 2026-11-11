@@ -676,6 +676,80 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
 });
 
+/** The grave detail page's request to delete, asked and confirmed. */
+async function deleteOnItsPage(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Grab löschen" }).click();
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+  await expect(page.getByText(/wurde am .* gelöscht/)).toBeVisible();
+}
+
+test("deleting a grave asks first and explains what follows", async ({ page }) => {
+  const marker = `GL-${unique()}`;
+  // from 2044: no generation reaches it, so it stays open and restorable
+  const graveId = await seedCooperativeGrave(page, marker, term(2044, 1));
+  await page.goto(`/graves/${graveId}`);
+
+  await page.getByRole("button", { name: "Grab löschen" }).click();
+  const question = confirmation(page);
+  await expect(question).toContainText("keiner Liste");
+  await expect(question).toContainText("keiner Statistik");
+  await expect(question).toContainText("keine Rechnungen mehr");
+  await expect(question).toContainText("zählen nicht mehr mit");
+  await expect(question).toContainText("bis zum nächsten Rechnungslauf");
+
+  // "Abbrechen" changes nothing
+  await question.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(question).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Wiederherstellen" })).toHaveCount(0);
+
+  await deleteOnItsPage(page);
+  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Grab löschen" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Wiederherstellen" })).toBeVisible();
+});
+
+test("a deleted grave can be restored before the next run", async ({ page }) => {
+  const marker = `GW-${unique()}`;
+  const graveId = await seedCooperativeGrave(page, marker, term(2044, 1));
+  await page.goto(`/graves/${graveId}`);
+  await deleteOnItsPage(page);
+
+  // Restoring straight away: another test's run in between would close the
+  // window and show the explanation instead (RestoreWindowClosed). The race
+  // is negligible within one test, so it is not guarded against.
+  await page.getByRole("button", { name: "Wiederherstellen" }).click();
+  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Wiederherstellen" })).toHaveCount(0);
+  await expect(page.getByText(/wurde am .* gelöscht/)).toHaveCount(0);
+});
+
+test("the grave invoice page of a deleted grave offers no payment or revision", async ({
+  page,
+}) => {
+  const marker = `GV-${unique()}`;
+  const names = [`Anna ${marker}`];
+  // its own half-year, so the generation reaches this grave alone
+  const { graveId } = await seedGrave(page, marker, names, [{}], term(2038, 1));
+  await generateFor(page, 2038, 1);
+
+  await page.goto(`/graves/${graveId}`);
+  await graveInvoiceRows(page)
+    .first()
+    .getByRole("button", { name: rowAction("Details") })
+    .click();
+  await expect(page.getByRole("button", { name: "Als bezahlt markieren" })).toBeVisible();
+
+  // deleting through the API: the restore window is closed by that run anyway
+  const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId } });
+  expect(deletion.ok()).toBe(true);
+
+  await page.reload();
+  await expect(page.getByText("gelöscht", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Als bezahlt markieren" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
+});
+
 /** The H1/H2 toggle of a form: the button of this half, pressed or not. */
 function halfButton(scope: Page | Locator, half: number): Locator {
   return scope.getByRole("group", { name: "Halbjahr" }).getByRole("button", { name: `H${half}` });
