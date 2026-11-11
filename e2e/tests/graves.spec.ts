@@ -717,6 +717,17 @@ test("deleting a grave asks first and explains what follows", async ({ page }) =
   await expect(page.getByText(/^Halbjahr H\d \d{4}$/)).toHaveCount(0);
 });
 
+test("a deleted grave shows no billing preview", async ({ page }) => {
+  const marker = `GP-${unique()}`;
+  // an ordinary grave, which has a preview; from 2044, so no run invoices it
+  const { graveId } = await seedGrave(page, marker, [`Anna ${marker}`], [{}], term(2044, 1));
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByText("Beispielrechnungen")).toBeVisible();
+
+  await deleteOnItsPage(page);
+  await expect(page.getByText("Beispielrechnungen")).toHaveCount(0);
+});
+
 test("a deleted grave can be restored before the next run", async ({ page }) => {
   const marker = `GW-${unique()}`;
   const graveId = await seedCooperativeGrave(page, marker, term(2044, 1));
