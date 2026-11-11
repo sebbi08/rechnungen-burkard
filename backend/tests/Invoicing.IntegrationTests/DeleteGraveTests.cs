@@ -104,6 +104,49 @@ public class DeleteGraveTests
     }
 
     [Fact]
+    public async Task Deleting_and_restoring_wait_while_an_invoice_run_is_active()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient(); // start the host so startup recovery has already run
+        var id = await SavedIdAsync(await SaveAsync(client));
+        var deleted = await SavedIdAsync(await SaveAsync(client, number: "D-2"));
+        await DeleteAsync(client, deleted);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Jobs.Add(
+                new Job
+                {
+                    Type = "GraveInvoices",
+                    Status = JobStatus.Running,
+                    TotalCount = 1,
+                    CreatedAt = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        foreach (
+            var response in new[]
+            {
+                await DeleteAsync(client, id),
+                await RestoreAsync(client, deleted),
+            }
+        )
+        {
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            using var json = await ODataJson.ReadAsync(response);
+            Assert.Equal(
+                "JobAlreadyRunning",
+                json.RootElement.GetProperty("error").GetProperty("code").GetString()
+            );
+        }
+
+        using var grave = await GetGraveAsync(client, id);
+        Assert.Equal(JsonValueKind.Null, grave.RootElement.GetProperty("DeletedAt").ValueKind);
+    }
+
+    [Fact]
     public async Task An_unknown_grave_is_not_found()
     {
         using var host = new ApiTestHost();
@@ -406,7 +449,7 @@ public class DeleteGraveTests
         var invoiced = await SeedBillableAsync(host, "D-1", recipients: 1, price: 100m);
         await GraveGenerationHelper.RunAsync(client, 2026, 1);
         var open = await SeedBillableAsync(host, "D-2", recipients: 1, price: 100m);
-        var kept = await SeedBillableAsync(host, "D-3", recipients: 1, price: 100m);
+        await SeedBillableAsync(host, "D-3", recipients: 1, price: 100m);
         await DeleteAsync(client, invoiced);
         await DeleteAsync(client, open);
 
@@ -420,7 +463,6 @@ public class DeleteGraveTests
             .Select(r => r.GetProperty("GraveNumber").GetString())
             .ToList();
         Assert.Equal(["D-3"], numbers);
-        Assert.NotEqual(0, kept);
     }
 
     [Fact]

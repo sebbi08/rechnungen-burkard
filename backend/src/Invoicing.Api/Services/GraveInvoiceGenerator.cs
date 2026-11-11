@@ -27,9 +27,9 @@ public sealed class GraveInvoiceGenerator
 
     /// <summary>Generates all invoices for one grave and half-year in a single
     /// transaction. Returns a result with a skip reason when the grave must be
-    /// skipped (a cooperative or deleted grave, no recipients, no items, an item with no price at all, a
-    /// half-year outside the grave's term, or nothing to bill in it),
-    /// otherwise the created invoices.</summary>
+    /// skipped (a cooperative or deleted grave, no recipients, no items, an item
+    /// with no price at all, a half-year outside the grave's term, or nothing to
+    /// bill in it), otherwise the created invoices.</summary>
     public async Task<GraveGenerationResult> GenerateForGraveAsync(
         Grave grave,
         int year,

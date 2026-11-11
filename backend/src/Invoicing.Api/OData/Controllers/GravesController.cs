@@ -13,12 +13,19 @@ public class GravesController : ODataController
 {
     private readonly AppDbContext _db;
     private readonly GraveService _graves;
+    private readonly JobService _jobs;
     private readonly ILogger<GravesController> _logger;
 
-    public GravesController(AppDbContext db, GraveService graves, ILogger<GravesController> logger)
+    public GravesController(
+        AppDbContext db,
+        GraveService graves,
+        JobService jobs,
+        ILogger<GravesController> logger
+    )
     {
         _db = db;
         _graves = graves;
+        _jobs = jobs;
         _logger = logger;
     }
 
@@ -259,6 +266,22 @@ public class GravesController : ODataController
                     {
                         code = "InvalidRequest",
                         message = "The request body is required.",
+                    },
+                }
+            );
+        }
+
+        // an invoice run reads its todo list once; a grave deleted or restored
+        // meanwhile would be billed (or skipped) from stale data
+        if (_jobs.HasActive("GraveInvoices"))
+        {
+            return Conflict(
+                new
+                {
+                    error = new
+                    {
+                        code = "JobAlreadyRunning",
+                        message = "A generation is already running.",
                     },
                 }
             );
