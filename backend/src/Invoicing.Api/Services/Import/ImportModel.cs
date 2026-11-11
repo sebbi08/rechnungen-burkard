@@ -53,7 +53,8 @@ public sealed record GraveRow(
     GravePosition Position,
     DateOnly StartDate,
     DateOnly? EndDate,
-    bool Cooperative
+    bool Cooperative,
+    string? ContractNumber
 );
 
 public sealed record ItemLinkRow(

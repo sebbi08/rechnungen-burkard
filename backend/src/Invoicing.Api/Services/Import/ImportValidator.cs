@@ -451,6 +451,7 @@ public sealed class ImportValidator
             var rawStart = row[5].Trim();
             var rawEnd = row[6].Trim();
             var rawCooperative = Cell(row, 7);
+            var contractNumber = Cell(row, 8);
             if (number.Length > 0)
                 data.DeclaredGraves.Add(number);
             if (
@@ -514,6 +515,21 @@ public sealed class ImportValidator
                 continue;
             }
 
+            if (cooperative && contractNumber.Length == 0)
+            {
+                problems.Add(
+                    new ImportProblem(
+                        file,
+                        line,
+                        "ContractNumberRequired",
+                        $"The cooperative grave '{number}' needs a contract number.",
+                        "ContractNumberRequired",
+                        [number]
+                    )
+                );
+                continue;
+            }
+
             if (end < start)
             {
                 problems.Add(
@@ -554,7 +570,8 @@ public sealed class ImportValidator
                     position,
                     start,
                     end,
-                    cooperative
+                    cooperative,
+                    cooperative ? contractNumber : null
                 )
             );
         }
@@ -786,9 +803,13 @@ public sealed class ImportValidator
 
         foreach (var grave in data.Graves.Where(g => !g.Cooperative))
         {
-            // every grave has at least one: CheckGraveRecipients reported any
-            // without, and this runs only on a report with nothing in it
-            var count = recipients[grave.Number];
+            // the split needs recipients: a grave without any is completed in
+            // the editor, which checks it then
+            if (!recipients.TryGetValue(grave.Number, out var count))
+            {
+                continue;
+            }
+
             if (count > GraveBilling.MaxRecipients)
             {
                 continue;
@@ -879,35 +900,11 @@ public sealed class ImportValidator
     private static string Euros(long cents) =>
         (cents / 100m).ToString("0.00", CultureInfo.InvariantCulture);
 
-    /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
-    /// imported without one could never be billed: generation would skip it and
-    /// nothing could add a recipient afterwards. SaveGrave refuses the same. This
-    /// runs with the other cross-file checks, so the report names it in the same
-    /// pass as everything else. A grave is also capped at
-    /// <see cref="GraveBilling.MaxRecipients"/> recipients, as SaveGrave does.</summary>
+    /// <summary>A grave is capped at <see cref="GraveBilling.MaxRecipients"/>
+    /// recipients, as SaveGrave caps it. One without any imports: its recipients
+    /// are added in the editor before its first invoice.</summary>
     private static void CheckGraveRecipients(ImportData data, List<ImportProblem> problems)
     {
-        var linked = new HashSet<string>(
-            data.RecipientLinks.Select(link => link.GraveNumber),
-            StringComparer.OrdinalIgnoreCase
-        );
-        foreach (var grave in data.Graves)
-        {
-            // a cooperative grave is billed to the cooperative, not to a recipient
-            if (!grave.Cooperative && !linked.Contains(grave.Number))
-            {
-                problems.Add(
-                    new ImportProblem(
-                        ImportArchiveLayout.GravesFile,
-                        grave.Row,
-                        "NoRecipients",
-                        "The grave needs at least one recipient.",
-                        "NoRecipients"
-                    )
-                );
-            }
-        }
-
         var counts = data
             .RecipientLinks.GroupBy(link => link.GraveNumber, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -951,8 +948,10 @@ public sealed class ImportValidator
         foreach (var grave in data.Graves.Where(g => !g.Cooperative))
         {
             var links = linksByGrave[grave.Number].ToList();
+            // a grave without item links is completed in the editor
             if (
-                links.Any(link => !items.ContainsKey(link.ItemNumber))
+                links.Count == 0
+                || links.Any(link => !items.ContainsKey(link.ItemNumber))
                 || links.Any(link => items[link.ItemNumber].Quarter is null)
             )
             {

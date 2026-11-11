@@ -769,12 +769,16 @@ non-interactive until completion, and the task runs exactly once.
   a problem. An archive whose items CSV lacks the `Quarter` column is refused.
 - **FR-052**: The graves CSV MUST capture the grave number, field number, site
   name, cemetery, position, start month and an optional end month, in seven
-  columns, plus an eighth optional one marking a cooperative grave (FR-020):
-  `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative`.
+  columns, plus an eighth marking a cooperative grave (FR-020) and a ninth with
+  its contract number:
+  `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative,ContractNumber`.
   `Cooperative` is read like the mapping's VAT-included flag (`true`/`false`,
-  `ja`/`nein`, `1`/`0`; empty is false) and may be left out of the file with its
-  header, as `Email` and `UnitPrice` may; a value that is none of these is a
-  problem naming the row and the value.
+  `ja`/`nein`, `1`/`0`; empty is false); a value that is none of these is a
+  problem naming the row and the value. `ContractNumber` is required for a
+  cooperative grave (a row without one is a problem naming the grave) and
+  ignored for any other. Either or both of the last two columns may be left out
+  of the file with their headers, as `Email` and `UnitPrice` may: a file without
+  them reads as ordinary graves.
   Months are written as YYYY-MM. The cemetery is required and names one kept in
   the settings (FR-002a), matched ignoring case; one that is not there is a
   problem naming the row and the value. The import MUST NOT create cemeteries.
@@ -793,12 +797,14 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-058**: Validation MUST check cross-file consistency: every invoice item
   and recipient referenced in the mapping CSV MUST be defined in the items or
   recipients CSV file.
-- **FR-058a**: Validation MUST refuse a grave that could not be billed: a grave
-  without a recipient, a link to an item without a price of its own or on the
+- **FR-058a**: Validation MUST refuse a grave that could not be billed: a link to an item without a price of its own or on the
   link, or prices that do not divide across the grave's recipients even after a
   rounding correction (FR-021a; the first failing invoice of a grave is reported
-  with its label), a grave without an item billed all year, or more than four
-  recipients (FR-020).
+  with its label), a grave with item links but none billed all year, or more
+  than four recipients (FR-020). A grave without recipient links, or without
+  item links, imports: it is completed in the editor before its first invoice,
+  and the checks that need what is missing (the split across recipients, the
+  all-year item) wait until it is there.
   A grave marked cooperative in its `Cooperative` column is exempt from all of these but the cap of four
   recipients: it needs no recipient, no all-year item and no prices, and stores
   no rounding corrections.

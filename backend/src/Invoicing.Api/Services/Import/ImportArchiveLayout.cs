@@ -39,6 +39,7 @@ public static class ImportArchiveLayout
         "StartDate",
         "EndDate",
         "Cooperative",
+        "ContractNumber",
     };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
@@ -71,25 +72,26 @@ public static class ImportArchiveLayout
     /// <summary>How many of a file's last columns may be left out, header and
     /// all: columns added after archives were already being prepared, so a file
     /// written before them still imports. A file whose header leaves them out
-    /// reads as if every row had them empty. Only all of them or none.</summary>
+    /// reads as if every row had them empty. Any number of them, from the
+    /// last backwards.</summary>
     public static readonly IReadOnlyDictionary<string, int> OptionalTrailingColumns =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             [RecipientsFile] = 1,
             [ItemsFile] = 0,
-            [GravesFile] = 1,
+            [GravesFile] = 2,
             [MappingFile] = 1,
         };
 
-    /// <summary>The header rows a file may carry: the full one, and the one
-    /// without its optional trailing columns.</summary>
+    /// <summary>The header rows a file may carry: the full one, and the ones
+    /// without its last one, two, ... optional trailing columns.</summary>
     public static IEnumerable<string[]> AcceptedHeaders(string file)
     {
         var header = Headers[file];
         yield return header;
-        if (OptionalTrailingColumns[file] > 0)
+        for (var left = 1; left <= OptionalTrailingColumns[file]; left++)
         {
-            yield return header[..^OptionalTrailingColumns[file]];
+            yield return header[..^left];
         }
     }
 

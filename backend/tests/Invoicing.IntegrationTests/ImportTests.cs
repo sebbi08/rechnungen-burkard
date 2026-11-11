@@ -31,6 +31,10 @@ public class ImportTests
 
     // the full headers, as the template has them
     private const string FullGravesHeader =
+        "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative,ContractNumber\r\n";
+
+    // the graves header v3.2.0 shipped, one column short of the template's
+    private const string EightColumnGravesHeader =
         "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative\r\n";
     private const string FullRecipientsHeader = "RecipientNumber,Name,Address,Email\r\n";
     private const string FullMappingHeader =
@@ -871,64 +875,6 @@ public class ImportTests
         );
     }
 
-    /// <summary>A grave's recipients are fixed at creation (FR-020b), so a grave
-    /// imported without one could never be billed: generation would skip it and
-    /// nothing could add a recipient afterwards. The dialog refuses the same.</summary>
-    [Fact]
-    public async Task A_grave_without_recipients_is_refused()
-    {
-        using var host = new ApiTestHost();
-        await ConfigureVatAsync(host, 19m);
-        using var client = host.CreateClient();
-
-        var archive = Zip(
-            ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
-            (
-                "graves.csv",
-                GravesHeader
-                    + "IMP-1,27,Grabstätte Import,Bergfriedhof,DoubleOutside,2026-01-01,2040-12-31\r\n"
-            ),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n")
-        );
-        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "NoRecipients"
-        );
-        await AssertNothingImportedAsync(host);
-    }
-
-    [Fact]
-    public async Task A_missing_recipient_is_reported_alongside_the_other_problems()
-    {
-        // one pass: the grave's missing recipient must not wait until every
-        // other problem in the archive has been fixed and it is uploaded again
-        using var host = new ApiTestHost();
-        await ConfigureVatAsync(host, 19m);
-        using var client = host.CreateClient();
-
-        var archive = Zip(
-            ("recipients.csv", RecipientsHeader),
-            ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
-            (
-                "graves.csv",
-                GravesHeader
-                    + "IMP-1,27,Grabstätte Import,Bergfriedhof,DoubleOutside,2026-01-01,2040-12-31\r\n"
-            ),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,9999,1,\r\n")
-        );
-        var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problems = await ProblemsAsync(response);
-        Assert.Contains(problems, p => p.File == "mapping.csv" && p.Code == "ItemNotDefined");
-        Assert.Contains(problems, p => p.File == "graves.csv" && p.Code == "NoRecipients");
-    }
-
     /// <summary>An item may come without a price (FR-051), but a grave that links
     /// it cannot be billed: the dialog refuses to save one, and generation would
     /// skip it. The import refuses the link, on the mapping row, so the item
@@ -1478,7 +1424,7 @@ public class ImportTests
 
         var response = await client.PostAsync(
             "/odata/ImportArchive",
-            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true\r\n"))
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true,2023029\r\n"))
         );
 
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -1503,20 +1449,166 @@ public class ImportTests
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             Assert.False((await db.Graves.SingleAsync()).IsCooperative);
         }
+    }
 
-        // and without the column nothing exempts a grave from its recipient
-        using var other = new ApiTestHost();
-        await ConfigureVatAsync(other, 19m);
-        using var otherClient = other.CreateClient();
-        var response = await otherClient.PostAsync(
+    private async Task<(ApiTestHost Host, HttpResponseMessage Response)> ImportCooperativeAsync(
+        string header,
+        string graveRow
+    )
+    {
+        var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+        var response = await client.PostAsync(
             "/odata/ImportArchive",
-            Upload(CooperativeArchive(GravesHeader, CooperativeRow.TrimEnd(',') + "\r\n"))
+            Upload(CooperativeArchive(header, graveRow))
         );
+        return (host, response);
+    }
+
+    [Fact]
+    public async Task A_cooperative_row_imports_its_contract_number()
+    {
+        var (host, response) = await ImportCooperativeAsync(
+            FullGravesHeader,
+            CooperativeRow + "true,2023029\r\n"
+        );
+        using var _ = host;
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal("2023029", (await db.Graves.SingleAsync()).ContractNumber);
+    }
+
+    [Fact]
+    public async Task A_cooperative_row_without_contract_number_is_a_problem()
+    {
+        var (host, response) = await ImportCooperativeAsync(
+            FullGravesHeader,
+            CooperativeRow + "true,\r\n"
+        );
+        using var _ = host;
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var problem = json
+            .RootElement.GetProperty("problems")
+            .EnumerateArray()
+            .Single(p => p.GetProperty("code").GetString() == "ContractNumberRequired");
+        Assert.Equal("graves.csv", problem.GetProperty("file").GetString());
+        Assert.Equal(2, problem.GetProperty("row").GetInt32());
+        Assert.Equal("ContractNumberRequired", problem.GetProperty("messageKey").GetString());
+        Assert.Equal("IMP-1", problem.GetProperty("messageArgs")[0].GetString());
+        await AssertNothingImportedAsync(host);
+    }
+
+    [Fact]
+    public async Task An_eight_column_archive_still_reads()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using (var client = host.CreateClient())
+        {
+            var archive = Zip(
+                ("recipients.csv", RecipientsHeader),
+                ("items.csv", ItemsHeader + "9001,Grabpflege,19,120.00,\r\n"),
+                ("graves.csv", EightColumnGravesHeader + CooperativeRow + "false\r\n"),
+                ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,\r\n")
+            );
+            var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
+            Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+            using var scope = host.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = await db.Graves.SingleAsync();
+            Assert.False(grave.IsCooperative);
+            Assert.Null(grave.ContractNumber);
+        }
+
+        var (other, refused) = await ImportCooperativeAsync(
+            EightColumnGravesHeader,
+            CooperativeRow + "true\r\n"
+        );
+        using (other)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Contains(
+                await ProblemsAsync(refused),
+                p => p.File == "graves.csv" && p.Row == 2 && p.Code == "ContractNumberRequired"
+            );
+        }
+    }
+
+    private static byte[] OrdinaryArchive(string items, string mapping) =>
+        Zip(
+            ("recipients.csv", RecipientsHeader),
+            ("items.csv", ItemsHeader + items),
+            (
+                "graves.csv",
+                GravesHeader
+                    + "IMP-1,27,Grabstätte Import,Bergfriedhof,DoubleOutside,2026-01,2040-12\r\n"
+            ),
+            ("mapping.csv", MappingHeader + mapping)
+        );
+
+    [Fact]
+    public async Task An_ordinary_grave_without_recipient_imports()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(OrdinaryArchive("9001,Grabpflege,19,120.00,\r\n", "Item,IMP-1,9001,1,\r\n"))
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(await db.Graves.ToListAsync());
+        Assert.Single(await db.GraveItems.ToListAsync());
+        Assert.Empty(await db.GraveRecipients.ToListAsync());
+    }
+
+    [Fact]
+    public async Task An_ordinary_grave_without_items_imports()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(OrdinaryArchive("", ""))
+        );
+
+        Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(await db.Graves.ToListAsync());
+        Assert.Empty(await db.GraveItems.ToListAsync());
+        Assert.Empty(await db.GraveRecipients.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Item_links_without_a_recipient_are_still_checked()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(OrdinaryArchive("9001,Grabpflege,19,,\r\n", "Item,IMP-1,9001,1,\r\n"))
+        );
+
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains(
             await ProblemsAsync(response),
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "NoRecipients"
+            p => p.File == "mapping.csv" && p.Code == "PriceRequired"
         );
+        await AssertNothingImportedAsync(host);
     }
 
     [Fact]
@@ -1528,7 +1620,7 @@ public class ImportTests
 
         var response = await client.PostAsync(
             "/odata/ImportArchive",
-            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "x\r\n"))
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "x,2023029\r\n"))
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -1553,7 +1645,7 @@ public class ImportTests
 
         var response = await client.PostAsync(
             "/odata/ImportArchive",
-            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true\r\n", 5))
+            Upload(CooperativeArchive(FullGravesHeader, CooperativeRow + "true,2023029\r\n", 5))
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

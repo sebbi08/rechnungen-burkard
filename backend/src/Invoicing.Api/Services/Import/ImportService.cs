@@ -98,6 +98,7 @@ public sealed class ImportService
                 StartDate = row.StartDate,
                 EndDate = row.EndDate,
                 IsCooperative = row.Cooperative,
+                ContractNumber = row.ContractNumber,
                 CreatedAt = createdAt,
             },
             StringComparer.OrdinalIgnoreCase
