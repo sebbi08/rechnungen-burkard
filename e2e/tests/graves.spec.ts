@@ -194,7 +194,11 @@ async function periodInvoices(page: Page): Promise<PeriodInvoice[]> {
 async function startNewGrave(
   page: Page,
   graveNumber: string,
-  { end = "12/2040", cemetery = SEED_CEMETERY }: { end?: string | null; cemetery?: string } = {},
+  {
+    start = "01/2026",
+    end = "12/2040",
+    cemetery = SEED_CEMETERY,
+  }: { start?: string; end?: string | null; cemetery?: string } = {},
 ): Promise<Locator> {
   await ensureCemetery(page, cemetery);
   await page.getByRole("button", { name: "Grab anlegen" }).click();
@@ -206,7 +210,7 @@ async function startNewGrave(
   // searched for: other specs add cemeteries of their own
   await pickOption(page, page.locator("#graveCemetery"), cemetery, { filter: cemetery });
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
-  await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
+  await fillDate(page, editor.getByLabel("Beginn"), start);
   if (end) {
     await fillDate(page, editor.getByLabel("Ende", { exact: true }), end);
   }
@@ -384,7 +388,9 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Nebenweg 2" });
 
   await page.goto("/graves");
-  const editor = await startNewGrave(page, graveNumber);
+  // a term no test generates invoices for: the recipients must still be editable
+  // when the grave is reopened below, which they are only while it has no invoice
+  const editor = await startNewGrave(page, graveNumber, { start: "01/2044", end: "12/2045" });
 
   // the grave does not exist yet: item and recipient are collected in the editor
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
@@ -399,7 +405,6 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
 
   // nothing has been persisted so far — one save writes the grave and both links
   await saveEditor(editor);
-  await expect(page.getByRole("table")).toContainText(graveNumber);
 
   const graves = await (
     await page.request.get(
@@ -408,8 +413,8 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   ).json();
   const grave = graves.value[0];
   // the picked months, stored as their first day -- not the month before
-  expect(grave.StartDate).toBe("2026-01-01");
-  expect(grave.EndDate).toBe("2040-12-01");
+  expect(grave.StartDate).toBe("2044-01-01");
+  expect(grave.EndDate).toBe("2045-12-01");
   expect(grave.FieldNumber).toBe("27");
   expect(grave.SiteName).toBe(`Schineller Bäcke ${graveNumber}`);
   expect(grave.Position).toBe("DoubleOutside");
@@ -424,19 +429,13 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   ).json();
   expect(recipientLinks.value).toHaveLength(1);
 
-  // Reopening the grave shows the saved count and price again. The editor was
-  // just open in create mode — no warnings, recipients editable — and this is
-  // the same page reopening it in edit mode, so it proves the editor follows
-  // the grave it is given rather than keeping the state of the first open.
-  await page
-    .getByRole("row")
-    .filter({ hasText: graveNumber })
-    .getByRole("button", { name: "Bearbeiten" })
-    .click();
-  await waitForOverlayOpen(page);
+  // Reopening the grave shows the saved count and price again. The overview
+  // lists only graves of the half-year shown and this term lies far ahead, so
+  // the editor is opened from the grave's detail page.
+  await editGraveOnItsPage(page, grave.Id);
   await expect(editor.getByLabel("Grabnummer")).toHaveValue(graveNumber);
-  await expect(editor.getByLabel("Beginn")).toHaveValue("01/2026");
-  await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("12/2040");
+  await expect(editor.getByLabel("Beginn")).toHaveValue("01/2044");
+  await expect(editor.getByLabel("Ende", { exact: true })).toHaveValue("12/2045");
   await expect(editor.getByLabel("Feld-Nr.")).toHaveValue("27");
   await expect(editor.getByRole("spinbutton", { name: "Anzahl 1" })).toHaveValue("2");
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("55,00");

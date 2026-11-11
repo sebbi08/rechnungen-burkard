@@ -155,7 +155,8 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
  * an import that had none to link, and returns its id. SaveGrave refuses to
  * create one, so this goes the way such a grave arises: a one-grave archive
  * through ImportArchive, with one priced all-year item and no recipient link.
- * The marker names the grave and its item, so it has to be new.
+ * The marker names the grave and its item, so it has to be new. Its term lies
+ * far ahead, where no test generates invoices, so it stays without any.
  */
 export async function seedIncompleteGrave(page: Page, marker: string): Promise<number> {
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -168,7 +169,7 @@ export async function seedIncompleteGrave(page: Page, marker: string): Promise<n
       `${marker}-item,Grabpflege,7,100.00,\r\n`,
     "graves.csv":
       "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative,ContractNumber\r\n" +
-      `${marker},1,Schineller Bäcke,${SEED_CEMETERY},SingleInside,2026-01,2040-12,,\r\n`,
+      `${marker},1,Schineller Bäcke,${SEED_CEMETERY},SingleInside,2044-01,2045-12,,\r\n`,
     "mapping.csv":
       "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n" +
       `Item,${marker},${marker}-item,1,,\r\n`,
