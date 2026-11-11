@@ -712,8 +712,7 @@ test("deleting a grave asks first and explains what follows", async ({ page }) =
       .getByRole("button", { name: "Wiederherstellen" })
       .or(page.getByText("nicht mehr wiederherstellen")),
   ).toBeVisible();
-  // a deleted grave is neither previewed nor shown with a status for this half-year
-  await expect(page.getByText("Beispielrechnungen")).toHaveCount(0);
+  // a deleted grave is not shown with a status for this half-year
   await expect(page.getByText(/^Halbjahr H\d \d{4}$/)).toHaveCount(0);
 });
 

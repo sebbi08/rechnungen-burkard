@@ -55,6 +55,17 @@ export function formatShare(value: number | null | undefined): string {
   return value == null ? "" : `${value.toLocaleString("de-DE", { maximumFractionDigits: 2 })} %`;
 }
 
+/** A UTC timestamp the API serialises without a zone ("2026-11-11T23:30:00") as
+ *  the local calendar date, formatted: the first ten characters alone would show
+ *  the UTC day, which near midnight is the previous or next local one. */
+export function formatDeletedDate(value: string | null | undefined): string {
+  if (value == null) {
+    return "";
+  }
+  const hasZone = /(Z|[+-]\d\d:?\d\d)$/i.test(value);
+  return formatDate(new Date(hasZone ? value : `${value}Z`));
+}
+
 /** An Edm.Date ("2026-01-31") as local midnight, for a DatePicker. */
 export function parseIsoDate(value: string | null | undefined): Date | null {
   if (!value) {

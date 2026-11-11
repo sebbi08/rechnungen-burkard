@@ -17,6 +17,7 @@ import PageHeader from "@/components/PageHeader.vue";
 import { type ColumnFilterField, useColumnFilters } from "@/composables/useColumnFilters";
 import { usePageReport } from "@/composables/usePageReport";
 import { formatMonth } from "@/lib/format";
+import { currentHalfYearStartMonth } from "@/lib/halfYear";
 import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 import { matchesWords } from "@/lib/searchWords";
 
@@ -68,10 +69,9 @@ const graves = useQuery({
 const rows = computed(() => {
   const applied = filters.applied.value;
   const cemetery = cemeteryOptions.value.find((each) => each.value === applied.cemetery)?.value;
-  const now = new Date();
   // the list is of current and future graves: no end, or an end in the current
   // half-year or later (the ended ones are on the page of inactive graves)
-  const halfStart = `${now.getFullYear()}-${now.getMonth() < 6 ? "01" : "07"}`;
+  const halfStart = currentHalfYearStartMonth();
   return (graves.data.value ?? []).filter((row) => {
     const current = row.EndDate == null || row.EndDate.slice(0, 7) >= halfStart;
     return (

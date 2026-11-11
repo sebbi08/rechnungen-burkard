@@ -26,6 +26,7 @@ import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import {
   formatAmount,
   formatDate,
+  formatDeletedDate,
   formatInvoiceNumber,
   formatMonth,
   formatRevisionBadge,
@@ -62,7 +63,7 @@ const currentLabel = computed(() =>
 
 const deleted = computed(() => grave.value?.DeletedAt != null);
 // "2026-11-11T09:30:00" is UTC without a "Z": only its day is shown, never a time
-const deletedOn = computed(() => formatDate(grave.value?.DeletedAt?.slice(0, 10)));
+const deletedOn = computed(() => formatDeletedDate(grave.value?.DeletedAt));
 
 const ask = useConfirmAsync();
 const { showError } = useErrorToast();

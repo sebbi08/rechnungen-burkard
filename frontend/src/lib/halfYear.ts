@@ -8,6 +8,14 @@ export function currentHalfYear(): [number, number] {
   return [now.getFullYear(), now.getMonth() < 6 ? 1 : 2];
 }
 
+/** The first month of the current half-year, "yyyy-01" or "yyyy-07": the
+ *  boundary between the current graves and the ended ones, so the lists on
+ *  either side of it stay exact complements. */
+export function currentHalfYearStartMonth(): string {
+  const [year, half] = currentHalfYear();
+  return `${year}-${half === 1 ? "01" : "07"}`;
+}
+
 /** How many half-years back a generation run may reach; the backend refuses older ones. */
 export const GENERATION_LOOK_BACK = 2;
 

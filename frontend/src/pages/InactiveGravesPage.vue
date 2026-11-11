@@ -9,7 +9,8 @@ import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { fetchInactiveGraves, type InactiveGraveRow } from "@/api/endpoints";
 import PageHeader from "@/components/PageHeader.vue";
-import { formatDate, formatMonth } from "@/lib/format";
+import { formatDeletedDate, formatMonth } from "@/lib/format";
+import { currentHalfYearStartMonth } from "@/lib/halfYear";
 import { PAGE_SIZE } from "@/lib/paging";
 import { matchesWords } from "@/lib/searchWords";
 
@@ -56,10 +57,7 @@ const terms = reactive<Record<string, string>>({
 // A grave is in exactly one panel or none: deleted wins over ended, and one
 // that has not ended (by the first month of the current half-year, as the
 // other lists count it) and is not deleted is in none.
-const halfStart = computed(() => {
-  const now = new Date();
-  return `${now.getFullYear()}-${now.getMonth() < 6 ? "01" : "07"}`;
-});
+const halfStart = computed(currentHalfYearStartMonth);
 
 function panelOf(row: InactiveGraveRow): string | null {
   const ended = row.EndDate != null && row.EndDate.slice(0, 7) < halfStart.value;
@@ -91,7 +89,7 @@ function rowsOf(panel: Panel): InactiveGraveRow[] {
       row.ContractNumber,
       formatMonth(row.StartDate),
       row.EndDate == null ? null : formatMonth(row.EndDate),
-      row.DeletedAt == null ? null : formatDate(row.DeletedAt.slice(0, 10)),
+      row.DeletedAt == null ? null : formatDeletedDate(row.DeletedAt),
     ),
   );
 }
@@ -171,7 +169,7 @@ function rowsOf(panel: Panel): InactiveGraveRow[] {
             header-class="hidden sm:table-cell"
             body-class="hidden sm:table-cell tabular-nums"
           >
-            <template #body="{ data }">{{ formatDate(data.DeletedAt.slice(0, 10)) }}</template>
+            <template #body="{ data }">{{ formatDeletedDate(data.DeletedAt) }}</template>
           </Column>
         </DataTable>
       </template>

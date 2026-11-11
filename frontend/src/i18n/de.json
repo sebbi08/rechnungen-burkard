@@ -272,7 +272,7 @@
   "editGrave": "Grab bearbeiten",
   "deleteGrave": "Grab löschen",
   "restoreGrave": "Wiederherstellen",
-  "confirmDeleteGrave": "Soll dieses Grab wirklich gelöscht werden? Es erscheint dann in keiner Liste und keiner Statistik mehr, und es werden keine Rechnungen mehr dafür erzeugt. Seine bisherigen Rechnungen zählen nicht mehr mit und können nicht mehr bezahlt oder geändert werden. Wiederherstellen lässt sich das Grab nur bis zum nächsten Rechnungslauf.",
+  "confirmDeleteGrave": "Soll dieses Grab wirklich gelöscht werden? Es erscheint dann in keiner Liste und keiner Statistik mehr und ist nur noch unter \"Inaktive Gräber\" zu finden, und es werden keine Rechnungen mehr dafür erzeugt. Seine bisherigen Rechnungen zählen nicht mehr mit und können nicht mehr bezahlt oder geändert werden. Wiederherstellen lässt sich das Grab nur bis zum nächsten Rechnungslauf.",
   "statusDeleted": "gelöscht",
   "statusDeletedAnnouncement": "Das Grab ist gelöscht",
   "graveDeletedNotice": "Dieses Grab wurde am {0} gelöscht.",

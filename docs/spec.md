@@ -591,7 +591,16 @@ non-interactive until completion, and the task runs exactly once.
   for graves has finished successfully since it was deleted, whatever half-year
   that run was for; restoring MUST be refused after that, and when its number has
   meanwhile been taken by a grave whose term overlaps. Deleting a deleted grave
-  and restoring one that is not deleted MUST be refused.
+  and restoring one that is not deleted MUST be refused, as both MUST be while an
+  invoice run for graves is active. Deleting MUST always ask for confirmation,
+  spelling out the consequences: the grave leaves every list and statistic except
+  "Inaktive Gräber", no invoices are generated for it any more, its invoices no
+  longer count and can be neither paid nor changed, and it can be restored only
+  until the next run. The detail page of a deleted grave MUST show that it is
+  deleted, with the day of deletion (in the local calendar), and "Wiederherstellen"
+  while the window is open or else the sentence saying why it can no longer be
+  restored; it MUST offer neither editing nor handing over, show no billing
+  preview, and show the grave's invoices read-only, as does the grave invoice page.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
