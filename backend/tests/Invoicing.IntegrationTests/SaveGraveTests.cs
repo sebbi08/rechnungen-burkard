@@ -136,8 +136,8 @@ public class SaveGraveTests
     [Fact]
     public async Task Save_rejects_a_new_grave_without_recipients()
     {
-        // recipients are fixed at creation, so a grave created without any could
-        // never be billed: generation would skip it and none could be added later
+        // an ordinary grave needs recipients to be billed: generation would skip
+        // one without any, so a new grave is refused without them
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
         var (pricedItem, _, _, _) = await SeedAsync(client);

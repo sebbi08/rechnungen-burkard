@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.OData.Controllers;
 
-/// <summary>Read-only: a grave's recipients are fixed when it is created through
-/// SaveGrave, since the even split across them is baked into every invoice
+/// <summary>Read-only: a grave's recipients are fixed once the grave has an
+/// invoice and change only through SaveGrave, since the even split across them is baked into every invoice
 /// generated for it. A link written on its own would change that set.</summary>
 public class GraveRecipientsController : ODataController
 {

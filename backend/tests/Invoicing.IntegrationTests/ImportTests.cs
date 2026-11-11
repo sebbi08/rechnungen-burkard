@@ -1612,6 +1612,28 @@ public class ImportTests
     }
 
     [Fact]
+    public async Task Quarterly_item_links_without_a_recipient_still_need_an_all_year_item()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 19m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(
+                OrdinaryArchive("9001,Sommerbepflanzung,19,40,Summer\r\n", "Item,IMP-1,9001,1,\r\n")
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(
+            await ProblemsAsync(response),
+            p => p.File == "graves.csv" && p.Code == "AllYearItemRequired"
+        );
+        await AssertNothingImportedAsync(host);
+    }
+
+    [Fact]
     public async Task A_Cooperative_value_that_is_no_boolean_is_a_problem()
     {
         using var host = new ApiTestHost();
