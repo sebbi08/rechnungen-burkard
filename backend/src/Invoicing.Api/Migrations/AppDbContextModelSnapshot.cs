@@ -99,6 +99,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<DateOnly>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("TEXT");
 

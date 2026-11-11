@@ -30,6 +30,12 @@ public sealed class Grave
     /// <summary>The cooperative's number for the contract the grave is kept
     /// under; required, trimmed, on a cooperative grave and null on any other.</summary>
     public string? ContractNumber { get; set; }
+
+    /// <summary>When the grave was deleted, in UTC, or null. A deleted grave is
+    /// kept, with its invoices, but is not saved, invoiced or counted against the
+    /// grave number any more; it can be restored until an invoice run has
+    /// finished since.</summary>
+    public DateTime? DeletedAt { get; set; }
     public List<GraveItem> Items { get; set; } = new();
     public List<GraveRecipient> Recipients { get; set; } = new();
     public List<GraveBillingCorrection> Corrections { get; set; } = new();

@@ -30,16 +30,16 @@ public class GravesController : ODataController
     // build the expected payload explicitly: same shape the EDM serializer
     // would produce for
     // $expand=Cemetery,Items($expand=Item),Recipients($expand=Recipient).
-    public IActionResult Get([FromRoute] long key)
+    public async Task<IActionResult> Get([FromRoute] long key)
     {
-        var grave = _db
+        var grave = await _db
             .Graves.Include(g => g.Cemetery)
             .Include(g => g.Items)
                 .ThenInclude(i => i.Item)
             .Include(g => g.Recipients)
                 .ThenInclude(r => r.Recipient)
             .AsNoTracking()
-            .FirstOrDefault(g => g.Id == key);
+            .FirstOrDefaultAsync(g => g.Id == key);
         if (grave is null)
             return NotFound();
 
@@ -58,6 +58,10 @@ public class GravesController : ODataController
             grave.CreatedAt,
             grave.IsCooperative,
             grave.ContractNumber,
+            grave.DeletedAt,
+            // deleted, and no run has finished since
+            CanRestore = grave.DeletedAt is { } deletedAt
+                && !await _graves.RunSinceAsync(deletedAt, HttpContext.RequestAborted),
             // the editor locks the flag once an invoice exists
             HasInvoices = _db.Invoices.Any(i => i.GraveId == key),
             Items = grave
@@ -228,6 +232,77 @@ public class GravesController : ODataController
                 }
             );
         }
+    }
+
+    [ODataAttributeRouting]
+    [HttpPost("odata/DeleteGrave")]
+    public Task<IActionResult> Delete([FromBody] GraveIdRequest? request) =>
+        ChangeAsync(request, _graves.DeleteAsync, "DeleteGrave");
+
+    [ODataAttributeRouting]
+    [HttpPost("odata/RestoreGrave")]
+    public Task<IActionResult> Restore([FromBody] GraveIdRequest? request) =>
+        ChangeAsync(request, _graves.RestoreAsync, "RestoreGrave");
+
+    private async Task<IActionResult> ChangeAsync(
+        GraveIdRequest? request,
+        Func<long, CancellationToken, Task> change,
+        string action
+    )
+    {
+        if (request?.GraveId is not { } graveId)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "The request body is required.",
+                    },
+                }
+            );
+        }
+
+        try
+        {
+            await change(graveId, HttpContext.RequestAborted);
+            return new JsonResult(new { Id = graveId }, ODataJsonDefaults.PascalCase);
+        }
+        catch (GraveNumberInUseException ex)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = ex.Code,
+                        message = ex.Message,
+                        args = ex.Args,
+                    },
+                }
+            );
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "{Action} failed", action);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
+        }
+    }
+
+    public sealed class GraveIdRequest
+    {
+        public long? GraveId { get; set; }
     }
 
     private BadRequestObjectResult InvalidDate() =>

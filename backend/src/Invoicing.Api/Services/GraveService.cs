@@ -71,6 +71,11 @@ public sealed class GraveService
             );
         }
 
+        if (graveId is { } editedId)
+        {
+            await RefuseIfDeletedAsync(editedId, ct);
+        }
+
         // The predecessor is resolved before anything else is judged, so a
         // refusal names the handover rather than a field of the successor.
         var handover = succeedsGraveId is { } predecessorId
@@ -269,6 +274,11 @@ public sealed class GraveService
                 .SingleOrDefaultAsync(g => g.Id == predecessorId, ct)
             ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
 
+        if (predecessor.DeletedAt is not null)
+        {
+            throw GraveDeleted();
+        }
+
         if (
             !string.Equals(
                 predecessor.GraveNumber.Trim(),
@@ -368,6 +378,90 @@ public sealed class GraveService
 
         return new Handover(predecessor, end);
     }
+
+    /// <summary>Marks the grave deleted. Its invoices and runs stay; nothing is
+    /// removed. Stamped with the real UTC time, not the app clock, because the
+    /// restore window compares it with the finish time of jobs, which the job
+    /// runner stamps the same way.</summary>
+    public async Task DeleteAsync(long graveId, CancellationToken ct)
+    {
+        var grave = await FindAsync(graveId, ct);
+        if (grave.DeletedAt is not null)
+        {
+            throw GraveDeleted();
+        }
+
+        grave.DeletedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Brings a deleted grave back, unless an invoice run has finished
+    /// since it was deleted (that run skipped it) or its number has been taken by
+    /// a grave whose term overlaps.</summary>
+    public async Task RestoreAsync(long graveId, CancellationToken ct)
+    {
+        var grave = await FindAsync(graveId, ct);
+        if (grave.DeletedAt is not { } deletedAt)
+        {
+            throw new ValidationException("GraveNotDeleted", "The grave is not deleted.");
+        }
+
+        if (await RunSinceAsync(deletedAt, ct))
+        {
+            throw new ValidationException(
+                "RestoreWindowClosed",
+                "An invoice run has finished since the grave was deleted."
+            );
+        }
+
+        var number = grave.GraveNumber.Trim();
+        var others = await _db
+            .Graves.Where(g => g.Id != graveId && g.DeletedAt == null)
+            .Select(g => new
+            {
+                g.GraveNumber,
+                g.StartDate,
+                g.EndDate,
+            })
+            .ToListAsync(ct);
+        var clash = others.FirstOrDefault(g =>
+            string.Equals(g.GraveNumber.Trim(), number, StringComparison.OrdinalIgnoreCase)
+            && GraveTerm.Overlap(g.StartDate, g.EndDate, grave.StartDate, grave.EndDate)
+        );
+        if (clash is not null)
+        {
+            throw new GraveNumberInUseException(clash.GraveNumber, clash.StartDate, clash.EndDate);
+        }
+
+        grave.DeletedAt = null;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>True when a grave invoice run finished successfully after the
+    /// moment; it decides whether a deleted grave can still be restored.</summary>
+    public Task<bool> RunSinceAsync(DateTime moment, CancellationToken ct) =>
+        _db.Jobs.AnyAsync(
+            j =>
+                j.Type == "GraveInvoices"
+                && j.Status == JobStatus.Succeeded
+                && j.FinishedAt > moment,
+            ct
+        );
+
+    private async Task<Grave> FindAsync(long graveId, CancellationToken ct) =>
+        await _db.Graves.SingleOrDefaultAsync(g => g.Id == graveId, ct)
+        ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
+
+    private async Task RefuseIfDeletedAsync(long graveId, CancellationToken ct)
+    {
+        if (await _db.Graves.AnyAsync(g => g.Id == graveId && g.DeletedAt != null, ct))
+        {
+            throw GraveDeleted();
+        }
+    }
+
+    private static ValidationException GraveDeleted() =>
+        new("GraveDeleted", "The grave has been deleted.");
 
     private Grave NewGrave()
     {
@@ -472,7 +566,7 @@ public sealed class GraveService
         // The predecessor of a handover is checked at the end it is about to get.
         var others = (
             await _db
-                .Graves.Where(g => graveId == null || g.Id != graveId)
+                .Graves.Where(g => g.DeletedAt == null && (graveId == null || g.Id != graveId))
                 .Select(g => new
                 {
                     g.Id,

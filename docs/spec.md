@@ -584,6 +584,14 @@ non-interactive until completion, and the task runs exactly once.
   corrections stored for it. A successor that is cooperative MUST carry a
   contract number, and saving without one MUST be refused before the old grave
   is changed. Its earlier invoices MUST stay as they are.
+- **FR-018e**: A grave MAY be deleted. Deleting marks it with the time and keeps
+  it and its invoices; a deleted grave MUST NOT be saved or handed over, and MUST
+  NOT count against its grave number, so the number may be given to a new grave
+  with an overlapping term. A deleted grave MAY be restored until an invoice run
+  for graves has finished successfully since it was deleted, whatever half-year
+  that run was for; restoring MUST be refused after that, and when its number has
+  meanwhile been taken by a grave whose term overlaps. Deleting a deleted grave
+  and restoring one that is not deleted MUST be refused.
 - **FR-019**: A grave MUST support one or more invoicing items, each with a count
   and an optional price that overrides the item's default price for that grave.
   An item is billable for a grave when it has either of the two prices. An item
