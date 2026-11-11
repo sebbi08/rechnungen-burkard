@@ -134,7 +134,12 @@ const currentTag = computed(() => {
 });
 const previewInput = computed<PreviewInput | null>(() => {
   const current = grave.value;
-  if (!current || current.IsCooperative || current.Items.length === 0) {
+  if (
+    !current ||
+    current.IsCooperative ||
+    current.DeletedAt != null ||
+    current.Items.length === 0
+  ) {
     return null;
   }
   return {
@@ -258,7 +263,7 @@ const {
             <dt class="text-sm text-muted-color">{{ t("graveCreatedAt") }}</dt>
             <dd class="m-0 tabular-nums">{{ formatDate(grave.CreatedAt) }}</dd>
           </div>
-          <div>
+          <div v-if="!deleted">
             <dt class="text-sm text-muted-color">{{ currentLabel }}</dt>
             <dd class="m-0">
               <Tag
@@ -316,7 +321,7 @@ const {
       </template>
     </Card>
 
-    <Card v-if="(grave?.Items.length ?? 0) > 0 && !grave?.IsCooperative">
+    <Card v-if="(grave?.Items.length ?? 0) > 0 && !grave?.IsCooperative && !deleted">
       <template #content>
         <GraveBillingPreview
           :assumes-one-recipient="(grave?.Recipients.length ?? 0) === 0"

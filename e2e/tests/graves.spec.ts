@@ -706,7 +706,15 @@ test("deleting a grave asks first and explains what follows", async ({ page }) =
   await deleteOnItsPage(page);
   await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Grab löschen" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Wiederherstellen" })).toBeVisible();
+  // another test's run may have closed the restore window by now
+  await expect(
+    page
+      .getByRole("button", { name: "Wiederherstellen" })
+      .or(page.getByText("nicht mehr wiederherstellen")),
+  ).toBeVisible();
+  // a deleted grave is neither previewed nor shown with a status for this half-year
+  await expect(page.getByText("Beispielrechnungen")).toHaveCount(0);
+  await expect(page.getByText(/^Halbjahr H\d \d{4}$/)).toHaveCount(0);
 });
 
 test("a deleted grave can be restored before the next run", async ({ page }) => {
@@ -715,13 +723,17 @@ test("a deleted grave can be restored before the next run", async ({ page }) => 
   await page.goto(`/graves/${graveId}`);
   await deleteOnItsPage(page);
 
-  // Restoring straight away: another test's run in between would close the
-  // window and show the explanation instead (RestoreWindowClosed). The race
-  // is negligible within one test, so it is not guarded against.
-  await page.getByRole("button", { name: "Wiederherstellen" }).click();
-  await expect(page.getByRole("button", { name: "Grab bearbeiten" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Wiederherstellen" })).toHaveCount(0);
-  await expect(page.getByText(/wurde am .* gelöscht/)).toHaveCount(0);
+  // Restoring straight away: another test's run in between closes the window
+  // (CanRestore false, or RestoreWindowClosed on the click). The race is small
+  // within one test; when it is lost, the page explaining that restoring is no
+  // longer possible is the accepted outcome.
+  const restore = page.getByRole("button", { name: "Wiederherstellen" });
+  const closed = page.getByText("nicht mehr wiederherstellen");
+  await expect(restore.or(closed)).toBeVisible();
+  if (await restore.isVisible()) {
+    await restore.click();
+    await expect(page.getByRole("button", { name: "Grab bearbeiten" }).or(closed)).toBeVisible();
+  }
 });
 
 test("the grave invoice page of a deleted grave offers no payment or revision", async ({

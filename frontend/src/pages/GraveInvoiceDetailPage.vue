@@ -50,6 +50,8 @@ const grave = useQuery({
   queryFn: () => fetchGraveDetails(props.graveId),
 });
 const deleted = computed(() => grave.data.value?.DeletedAt != null);
+// the actions wait for the answer: until it is in, the grave may be a deleted one
+const actionable = computed(() => grave.isSuccess.value && !deleted.value);
 // the siblings of this half-year, minus the invoice shown
 const others = computed(() =>
   (group.data.value?.Recipients ?? []).filter(
@@ -76,14 +78,14 @@ const halfYear = computed(() =>
       <PaidStatusTag :paid-on="latest.PaidOn" />
       <Tag v-if="deleted" :value="t('statusDeleted')" severity="warn" icon="pi pi-trash" />
       <Button
-        v-if="!deleted"
+        v-if="actionable"
         :icon="latest.PaidOn ? 'pi pi-undo' : 'pi pi-wallet'"
         :label="latest.PaidOn ? t('actionMarkUnpaid') : t('actionMarkPaid')"
         severity="secondary"
         outlined
         @click="togglePaid(latest.Id, latest.PaidOn)"
       />
-      <span v-if="!deleted" v-tooltip.bottom="latest.PaidOn ? t('editBlockedPaid') : undefined">
+      <span v-if="actionable" v-tooltip.bottom="latest.PaidOn ? t('editBlockedPaid') : undefined">
         <Button
           :label="t('actionEdit')"
           icon="pi pi-pencil"
