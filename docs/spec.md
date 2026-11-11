@@ -599,7 +599,9 @@ non-interactive until completion, and the task runs exactly once.
   item billed all year (without a quarter). A cooperative grave is exempt: it
   MAY have no item at all, an item without a price, and no all-year item.
 - **FR-020**: A grave MUST support one to four recipients. A cooperative grave
-  MAY have none, and at most four.
+  MAY have none, and at most four. An ordinary grave imported without recipients
+  (FR-058a) stays saveable without them until it is given some; generation
+  skips it until then.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
 - **FR-020b**: A grave's set of recipients MAY change until the grave has its
@@ -797,16 +799,16 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-058**: Validation MUST check cross-file consistency: every invoice item
   and recipient referenced in the mapping CSV MUST be defined in the items or
   recipients CSV file.
-- **FR-058a**: Validation MUST refuse a grave that could not be billed: a link to an item without a price of its own or on the
-  link, or prices that do not divide across the grave's recipients even after a
+- **FR-058a**: Validation MUST refuse a grave that could not be billed: a link
+  to an item without a price of its own or on the link, or prices that do not divide across the grave's recipients even after a
   rounding correction (FR-021a; the first failing invoice of a grave is reported
   with its label), a grave with item links but none billed all year, or more
   than four recipients (FR-020). A grave without recipient links, or without
   item links, imports: it is completed in the editor before its first invoice,
   and the checks that need what is missing (the split across recipients, the
   all-year item) wait until it is there.
-  A grave marked cooperative in its `Cooperative` column is exempt from all of these but the cap of four
-  recipients: it needs no recipient, no all-year item and no prices, and stores
+  A grave marked cooperative in its `Cooperative` column is exempt from all of
+  these but the cap of four recipients: it needs no recipient, no all-year item and no prices, and stores
   no rounding corrections.
   A price that merely needs a correction is accepted; the correction is stored
   with the grave without a confirmation. The archive is refused as a

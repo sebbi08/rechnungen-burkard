@@ -743,7 +743,11 @@ def write_pdf_report(path, root, archive, csv_name, found, grave_rows, plans, le
         )
 
     noted = {key: sorted(n for n in numbers if n in converted) for key, numbers in notes.items()}
-    noted = {key: numbers for key, numbers in noted.items() if numbers and key not in ("cooperative", "incomplete")}
+    noted = {
+        key: numbers
+        for key, numbers in noted.items()
+        if numbers and key not in ("cooperative", "incomplete")
+    }
     if noted:
         doc.heading("Vorbereitete Gräber mit Hinweisen", 2)
         doc.paragraph(

@@ -21,8 +21,8 @@ It writes four files next to `--out`:
 - `<name>-report.txt`, what was guessed or left out, by grave and item number;
 - `<name>-nie-abgerechnet.csv`, the graves FriedWin never billed for care, the
   ended ones left out and the active ones imported (the column `Übernommen als`
-  says `Genossenschaftsgrab`, `normales Grab`, or is empty for a left-out one; semicolon-separated for
-  Excel; this one names people).
+  says `Genossenschaftsgrab`, `normales Grab`, or is empty for a left-out one;
+  semicolon-separated for Excel; this one names people).
 
 Before importing, configure the VAT rates and create the cemeteries the report lists. The import
 inserts only, so it goes into an empty database.
