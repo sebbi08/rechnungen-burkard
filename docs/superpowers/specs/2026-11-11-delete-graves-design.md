@@ -2,7 +2,7 @@
 
 **Created**: 2026-11-11
 
-**Status**: Draft, waiting for the owner's approval
+**Status**: Approved design (pre-implementation), approved by the owner on 2026-11-11
 
 **Source**: GitHub issue #68 ("erlaube das „löschen“ von gräbern") and the
 owner's answers of 2026-11-11.
