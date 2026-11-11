@@ -39,6 +39,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/pages/CooperativeGravesPage.vue"),
   },
   {
+    path: "/inactive-graves",
+    meta: { titleKey: "menuInactiveGraves" },
+    component: () => import("@/pages/InactiveGravesPage.vue"),
+  },
+  {
     path: "/graves/:graveId",
     meta: { titleKey: "graveDetailTitle" },
     component: () => import("@/pages/GraveDetailPage.vue"),
@@ -51,6 +56,13 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: "graveDetailTitle" },
     component: () => import("@/pages/GraveDetailPage.vue"),
     props: (route) => ({ graveId: Number(route.params.graveId), list: "/cooperative-graves" }),
+  },
+  // ... and from the page of inactive graves.
+  {
+    path: "/inactive-graves/:graveId",
+    meta: { titleKey: "graveDetailTitle" },
+    component: () => import("@/pages/GraveDetailPage.vue"),
+    props: (route) => ({ graveId: Number(route.params.graveId), list: "/inactive-graves" }),
   },
   {
     path: "/graves/:graveId/invoices/:rootId",

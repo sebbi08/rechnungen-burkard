@@ -693,6 +693,17 @@ non-interactive until completion, and the task runs exactly once.
   graves are kept out of it. A grave's detail page
   opened from this list MUST keep the list marked in the menu and lead back to it
   through its breadcrumb, as one opened from the grave overview does for that.
+- **FR-024b**: The system MUST offer a page "Inaktive Gräber" with four panels:
+  "Beendete Gräber", "Gelöschte Gräber", "Beendete Genossenschaftsgräber" and
+  "Gelöschte Genossenschaftsgräber". A grave is listed in exactly one panel or
+  none: a deleted grave (FR-018e) in the panel of deleted graves, whether it has
+  ended or not; a grave that is not deleted and whose end lies before the first
+  month of the current half-year in the panel of ended graves; each in the
+  cooperative panel when the grave is cooperative. Each panel shows number, site
+  name, cemetery, term (and for cooperative graves the contract number, for deleted
+  ones the day of deletion) and offers a text search of its own. A grave opens
+  from it in its detail page, which MUST keep the page marked in the menu and lead
+  back to it through its breadcrumb.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
 - **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows

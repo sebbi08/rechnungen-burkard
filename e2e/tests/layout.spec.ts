@@ -260,6 +260,56 @@ for (const screen of LIST_SCREENS) {
   });
 }
 
+test("inactive-graves: its four panels fit the viewport", async ({ page }) => {
+  // a long number, as the list pages' rows have: it must wrap inside its card
+  const number = `L-${RUN}-BEENDET-SCHINELLER-BAECKE-NORD-ABSCHNITT`;
+  const year = new Date().getFullYear();
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: `${number}-item`,
+    Description: "Grabpflege",
+    VatRate: 7,
+    DefaultPrice: 12.5,
+  });
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Layout ${RUN} Inaktiv`,
+    Address: "Weg 1",
+  });
+  for (const isCooperative of [false, true]) {
+    await seedGrave(page, {
+      graveNumber: `${number}${isCooperative ? "-G" : ""}`,
+      items: isCooperative ? [] : [{ itemId: item.Id }],
+      recipientIds: isCooperative ? [] : [recipient.Id],
+      isCooperative,
+      startDate: `${year - 2}-01`,
+      endDate: `${year - 1}-12`,
+    });
+  }
+  await page.goto("/inactive-graves");
+  for (const title of [
+    "Beendete Gräber",
+    "Gelöschte Gräber",
+    "Beendete Genossenschaftsgräber",
+    "Gelöschte Genossenschaftsgräber",
+  ]) {
+    await expect(page.getByRole("heading", { level: 2, name: title, exact: true })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: `${title} durchsuchen` })).toBeVisible();
+  }
+  const link = page.getByRole("link", { name: number, exact: true });
+  await expect(link).toBeVisible();
+  await expectNoSidewaysScrolling(page);
+
+  // the number stays inside the viewport and the secondary columns drop out
+  const box = (await link.boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  const site = page.getByRole("columnheader", { name: "Grabstätte", exact: true }).first();
+  if (page.viewportSize()!.width < BREAKPOINTS.lg) {
+    await expect(site).toBeHidden();
+  } else {
+    await expect(site).toBeVisible();
+  }
+});
+
 test("recipients: the filter sheet", async ({ page }) => {
   await seed(page);
   await page.goto("/recipients");

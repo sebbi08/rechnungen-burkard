@@ -197,6 +197,41 @@ export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
   }));
 }
 
+/** One grave that has ended or was deleted, for the page of inactive graves. */
+export interface InactiveGraveRow {
+  Id: number;
+  GraveNumber: string;
+  SiteName: string;
+  CemeteryName: string;
+  StartDate: string;
+  EndDate: string | null;
+  IsCooperative: boolean;
+  ContractNumber: string | null;
+  /** When the grave was deleted; null for one that has only ended. */
+  DeletedAt: string | null;
+}
+
+/** The graves with an end or a deletion; the page cuts the ended ones at the
+ *  current half-year itself, as the other lists do. */
+export async function fetchInactiveGraves(): Promise<InactiveGraveRow[]> {
+  const url =
+    "/odata/Graves?$filter=DeletedAt ne null or EndDate ne null&$expand=Cemetery&$orderby=GraveNumber";
+  const { value } = await getJson<{
+    value: (Omit<InactiveGraveRow, "CemeteryName"> & { Cemetery: { Name: string } })[];
+  }>(url);
+  return value.map((grave) => ({
+    Id: grave.Id,
+    GraveNumber: grave.GraveNumber,
+    SiteName: grave.SiteName,
+    CemeteryName: grave.Cemetery.Name,
+    StartDate: grave.StartDate,
+    EndDate: grave.EndDate,
+    IsCooperative: grave.IsCooperative,
+    ContractNumber: grave.ContractNumber,
+    DeletedAt: grave.DeletedAt,
+  }));
+}
+
 export interface SaveGraveInput {
   graveId: number | null;
   graveNumber: string;

@@ -36,11 +36,16 @@ import { currentHalfYear, halfYearHasBilling, halfYearText } from "@/lib/halfYea
 const props = defineProps<{
   graveId: number;
   /** The list the page was opened from, which its breadcrumb leads back to. */
-  list: "/graves" | "/cooperative-graves";
+  list: "/graves" | "/cooperative-graves" | "/inactive-graves";
 }>();
 const { t } = useI18n();
+const LIST_LABELS = {
+  "/graves": "menuGraves",
+  "/cooperative-graves": "menuCooperativeGraves",
+  "/inactive-graves": "menuInactiveGraves",
+} as const;
 const listCrumb = computed(() => ({
-  label: t(props.list === "/cooperative-graves" ? "menuCooperativeGraves" : "menuGraves"),
+  label: t(LIST_LABELS[props.list]),
   to: listLocation(props.list),
 }));
 
