@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { withGenerationLock } from "../generation-lock";
 import { createRow, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
 
@@ -53,8 +54,11 @@ async function seedCooperative(
 }
 
 async function remove(page: Page, graveId: number): Promise<void> {
-  const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId } });
-  expect(deletion.ok()).toBe(true);
+  // the server refuses a delete while a run is going, so wait for the lock
+  await withGenerationLock(async () => {
+    const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId } });
+    expect(deletion.ok()).toBe(true);
+  });
 }
 
 /** Seeds one grave of each kind and answers the marker they share. */

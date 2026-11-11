@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { acquireStackLock } from "../lock";
+import { withGenerationLock } from "../generation-lock";
 import {
   createRow,
   ensureCemetery,
@@ -9,7 +9,6 @@ import {
   seedIncompleteGrave,
   type SeedGraveLine,
 } from "../seed";
-import { GENERATION_LOCK_PATH } from "../stack";
 import { unique } from "../unique";
 import {
   confirmation,
@@ -134,36 +133,6 @@ async function seedGraveGenerationData(page: Page, count: number): Promise<strin
     });
   }
   return `G-${RUN}-001`;
-}
-
-// The backend runs one generation at a time and refuses a second one while the
-// first is running (JobAlreadyRunning). The tests of this file run in parallel
-// workers, so the ones that generate take turns: through a lock file, the same
-// kind of machine-wide lock the stack itself is guarded by (../lock.ts).
-
-/** Runs `work` once no other test is generating, and keeps the others waiting until it is done. */
-async function withGenerationLock<T>(work: () => Promise<T>): Promise<T> {
-  // a step of its own, so a test that times out waiting says what it waited
-  // for, and on which file: one a dead process left can be removed by hand
-  const step = `wait until no other test is generating (lock ${GENERATION_LOCK_PATH})`;
-  const lock = await test.step(step, async () => {
-    for (;;) {
-      try {
-        return acquireStackLock(GENERATION_LOCK_PATH, { waitMs: 0 });
-      } catch (error) {
-        // a file system error is not contention
-        if ((error as NodeJS.ErrnoException).code) {
-          throw error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-  });
-  try {
-    return await work();
-  } finally {
-    lock.release();
-  }
 }
 
 interface PeriodInvoice {
@@ -678,9 +647,12 @@ test("a grave invoice's detail page shows its revisions and its siblings", async
 
 /** The grave detail page's request to delete, asked and confirmed. */
 async function deleteOnItsPage(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Grab löschen" }).click();
-  await confirmation(page).getByRole("button", { name: "Ja" }).click();
-  await expect(page.getByText(/wurde am .* gelöscht/)).toBeVisible();
+  // under the generation lock: the server refuses a delete while a run is going
+  await withGenerationLock(async () => {
+    await page.getByRole("button", { name: "Grab löschen" }).click();
+    await confirmation(page).getByRole("button", { name: "Ja" }).click();
+    await expect(page.getByText(/wurde am .* gelöscht/)).toBeVisible();
+  });
 }
 
 test("deleting a grave asks first and explains what follows", async ({ page }) => {
@@ -741,8 +713,11 @@ test("a deleted grave can be restored before the next run", async ({ page }) => 
   const closed = page.getByText("nicht mehr wiederherstellen");
   await expect(restore.or(closed)).toBeVisible();
   if (await restore.isVisible()) {
-    await restore.click();
-    await expect(page.getByRole("button", { name: "Grab bearbeiten" }).or(closed)).toBeVisible();
+    // under the generation lock: the server refuses a restore while a run is going
+    await withGenerationLock(async () => {
+      await restore.click();
+      await expect(page.getByRole("button", { name: "Grab bearbeiten" }).or(closed)).toBeVisible();
+    });
   }
 });
 
@@ -763,8 +738,10 @@ test("the grave invoice page of a deleted grave offers no payment or revision", 
   await expect(page.getByRole("button", { name: "Als bezahlt markieren" })).toBeVisible();
 
   // deleting through the API: the restore window is closed by that run anyway
-  const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId } });
-  expect(deletion.ok()).toBe(true);
+  await withGenerationLock(async () => {
+    const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId } });
+    expect(deletion.ok()).toBe(true);
+  });
 
   await page.reload();
   await expect(page.getByText("gelöscht", { exact: true })).toBeVisible();

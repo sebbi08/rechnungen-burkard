@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { withGenerationLock } from "../generation-lock";
 import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
@@ -44,8 +45,13 @@ test("the list shows only current and future cooperative graves", async ({ page 
     startDate: "2025-01",
     endDate: null,
   });
-  const deletion = await page.request.post("/odata/DeleteGrave", { data: { graveId: deletedId } });
-  expect(deletion.ok()).toBe(true);
+  // the server refuses a delete while a run is going, so wait for the lock
+  await withGenerationLock(async () => {
+    const deletion = await page.request.post("/odata/DeleteGrave", {
+      data: { graveId: deletedId },
+    });
+    expect(deletion.ok()).toBe(true);
+  });
   // a grave of the business is no cooperative one
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
