@@ -112,6 +112,15 @@ export interface Grave {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `ContractNumber` |
+   * | Type | `Edm.String` |
+   */
+  ContractNumber: string | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `Cemetery` |
    * | Type | `Burkard.Invoicing.Domain.Entities.Cemetery` |
    * | Nullable | `false` |
@@ -151,7 +160,7 @@ export interface EditableGrave
       | "CreatedAt"
       | "IsCooperative"
     >,
-    Partial<Pick<Grave, "Id" | "Position" | "EndDate">> {
+    Partial<Pick<Grave, "Id" | "Position" | "EndDate" | "ContractNumber">> {
   /**
    * Create "Cemetery" along with this entity (deep insert), or update it along with it (deep update).
    * Bind "Cemetery" to an already existing entity by its key.

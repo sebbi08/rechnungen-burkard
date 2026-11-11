@@ -6,6 +6,7 @@ import {
   ensureRow,
   SEED_CEMETERY,
   seedGrave as saveGrave,
+  seedIncompleteGrave,
   type SeedGraveLine,
 } from "../seed";
 import { GENERATION_LOCK_PATH } from "../stack";
@@ -280,6 +281,7 @@ test("a cooperative grave is saved without recipients and items", async ({ page 
   await page.goto("/graves");
   const editor = await startNewGrave(page, marker);
   await editor.getByLabel("Genossenschaftsgrab").check();
+  await editor.getByLabel("Vertragsnummer").fill("V-1");
   await saveEditor(editor);
 
   const graves = await (
@@ -297,6 +299,46 @@ test("a cooperative grave is saved without recipients and items", async ({ page 
   await expect(reopened.getByRole("listitem")).toHaveCount(0);
   await reopened.getByRole("button", { name: "Abbrechen" }).click();
   await expect(reopened).toHaveCount(0);
+});
+
+test("a cooperative grave needs its contract number", async ({ page }) => {
+  const marker = `CN-${unique()}`;
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  await editor.getByLabel("Genossenschaftsgrab").check();
+  await editor.getByRole("button", { name: "Speichern" }).click();
+
+  await expect(
+    toasts(page).filter({ hasText: "Ein Genossenschaftsgrab braucht eine Vertragsnummer." }),
+  ).toBeVisible();
+  await expect(editor).toBeVisible();
+
+  await editor.getByLabel("Vertragsnummer").fill("2023029");
+  await saveEditor(editor);
+  const graves = await (
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${marker}'&$select=Id`)
+  ).json();
+  await page.goto(`/graves/${graves.value[0].Id}`);
+  const facts = page.locator("dl").first();
+  await expect(facts).toContainText("Vertragsnummer");
+  await expect(facts).toContainText("2023029");
+});
+
+test("a recipient can be added to a grave without invoices", async ({ page }) => {
+  const marker = `GR-${unique()}`;
+  const graveId = await seedIncompleteGrave(page, marker);
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: `Spät ${marker}`,
+    Address: "Spätweg 1",
+  });
+
+  const editor = await editGraveOnItsPage(page, graveId);
+  await expect(editor).not.toContainText("Die Empfänger eines Grabs");
+  await addRecipient(page, editor, recipient.Name);
+  await saveEditor(editor);
+
+  await page.goto(`/graves/${graveId}`);
+  await expect(page.getByText(recipient.Name, { exact: true })).toBeVisible();
 });
 
 test("unticking a cooperative grave asks for a recipient", async ({ page }) => {
@@ -399,10 +441,11 @@ test("create a grave with item, price and recipient in one save (Story 5)", asyn
   await expect(editor.getByRole("spinbutton", { name: "Anzahl 1" })).toHaveValue("2");
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("55,00");
   await expect(editor).toContainText("nur auf künftig erstellte Rechnungen");
-  await expect(editor).toContainText("Die Empfänger eines Grabs");
+  // no invoice yet, so the recipients can still change
+  await expect(editor).not.toContainText("Die Empfänger eines Grabs");
   await expect(editor.getByRole("listitem").filter({ hasText: recipientName })).toBeVisible();
-  await expect(editor.getByRole("button", { name: "Hinzufügen", exact: true })).toHaveCount(0);
-  await expect(editor.getByRole("button", { name: "Löschen", exact: true })).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "Hinzufügen", exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "Löschen", exact: true })).toBeVisible();
   await editor.getByRole("button", { name: "Abbrechen" }).click();
   await expect(editor).toHaveCount(0);
 });
@@ -451,39 +494,21 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   expect(Number(links.value[0].UnitPrice)).toBe(40);
 });
 
-test("editing a grave warns about future invoices and freezes its recipients", async ({ page }) => {
-  const marker = unique();
-  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
-  const item = await createRow(page, "/odata/InvoiceItems", {
-    Number: `7100-${marker}`,
-    Description: "Grabpflege",
-    VatRate: 7,
-    DefaultPrice: 100,
-  });
-  const recipient = await createRow(page, "/odata/Recipients", {
-    Name: `Fest ${marker}`,
-    Address: "Festweg 1",
-  });
-  await saveGrave(page, {
-    graveNumber: `F-${marker}`,
-    items: [{ itemId: item.Id, count: 1 }],
-    recipientIds: [recipient.Id],
-  });
+test("editing a grave warns about future invoices and, once invoiced, freezes its recipients", async ({
+  page,
+}) => {
+  const marker = `GF-${unique()}`;
+  const name = `Fest ${marker}`;
+  // its own period, so the invoice below belongs to this test alone
+  const { graveId } = await seedGrave(page, marker, [name], [{}], term(2034, 2));
+  await generateFor(page, 2034, 2);
 
-  await page.goto("/graves");
-  await page
-    .getByRole("row")
-    .filter({ hasText: `F-${marker}` })
-    .getByRole("button", { name: "Bearbeiten" })
-    .click();
-  await waitForOverlayOpen(page);
-
-  const editor = drawer(page);
+  const editor = await editGraveOnItsPage(page, graveId);
   await expect(editor).toContainText("nur auf künftig erstellte Rechnungen");
   await expect(editor).toContainText("Die Empfänger eines Grabs");
   // the recipient stays visible but cannot be removed or added to; the line
   // editor has its own "Zeile löschen" and "Zeile hinzufügen", hence exact names
-  await expect(editor.getByRole("listitem").filter({ hasText: `Fest ${marker}` })).toBeVisible();
+  await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
   await expect(editor.getByRole("button", { name: "Hinzufügen", exact: true })).toHaveCount(0);
   await expect(editor.getByRole("button", { name: "Löschen", exact: true })).toHaveCount(0);
   await expect(editor.locator(`#${RECIPIENT}`)).toHaveCount(0);
@@ -1877,6 +1902,42 @@ test.describe("the half-year today falls in", () => {
     await page.goto(`/graves/${graveId}`);
     await expect(page.getByText(lastMonth)).toBeVisible();
   });
+});
+
+test("a hand-over to the cooperative asks for its contract number", async ({ page }) => {
+  const marker = `CK-${unique()}`;
+  // a term of its own far ahead, which no generation reaches: the grave stays
+  // without invoices, so the hand-over is not refused for them
+  const { graveId } = await seedGrave(page, marker, [`Alt ${marker}`], [{}], {
+    startDate: "2044-01",
+    endDate: null,
+  });
+
+  const editor = await editGraveOnItsPage(page, graveId);
+  await editor.getByRole("button", { name: "Ab Monat … über die Genossenschaft" }).click();
+  await waitForOverlayOpen(page);
+  const chooser = dialog(page, "Grab ab einem Monat übergeben");
+  await fillDate(page, chooser.getByLabel("Ab Monat"), "07/2045");
+  await chooser.getByRole("button", { name: "Weiter" }).click();
+
+  // the successor's editor: of the other kind, and it needs a number
+  await expect(editor.getByLabel("Grabnummer")).toHaveValue(marker);
+  await waitForOverlayOpen(page);
+  await expect(editor.getByLabel("Genossenschaftsgrab")).toBeChecked();
+  const number = editor.getByLabel("Vertragsnummer");
+  await expect(number).toHaveValue("");
+  await editor.getByRole("button", { name: "Speichern" }).click();
+  await expect(
+    toasts(page).filter({ hasText: "Ein Genossenschaftsgrab braucht eine Vertragsnummer." }),
+  ).toBeVisible();
+  await expect(editor).toBeVisible();
+
+  await number.fill("2023030");
+  await saveEditor(editor);
+  await page.goto("/cooperative-graves");
+  await searchColumn(page, "Grabnummer", marker);
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.locator("tbody tr")).toContainText("2023030");
 });
 
 // The job's id lived only in the page that started it. Reloaded mid-run, the

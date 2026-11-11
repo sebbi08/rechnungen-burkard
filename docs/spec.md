@@ -669,8 +669,8 @@ non-interactive until completion, and the task runs exactly once.
   half-year first. A grave whose cooperative flag was unticked is listed like any
   other, as open until it is invoiced.
 - **FR-024a**: The system MUST offer a list of the cooperative graves of its own,
-  with each grave's number, field, site name, cemetery, recipients and term,
-  ordered by grave number, from which a grave opens in the editor and a new
+  with each grave's number, field, site name, cemetery, contract number,
+  recipients and term, ordered by grave number, from which a grave opens in the editor and a new
   cooperative grave can be created. The list offers the search per column of
   FR-024 and a "Laufzeit" select: active graves (no end, or an end in the
   current month or later) by default, ended ones, or all. A grave's detail page

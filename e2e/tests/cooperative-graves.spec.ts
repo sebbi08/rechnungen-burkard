@@ -127,6 +127,24 @@ test("the list filters by column", async ({ page }) => {
   await expect(rows).toContainText(`${marker}-a`);
 });
 
+test("the list shows and searches the contract number", async ({ page }) => {
+  const marker = `GC-${unique()}`;
+  await seedCooperative(page, `${marker}-a`, { endDate: null, contractNumber: "V-111" });
+  await seedCooperative(page, `${marker}-b`, { endDate: null, contractNumber: "V-222" });
+
+  await page.goto("/cooperative-graves");
+  await searchColumn(page, "Grabnummer", marker);
+  const rows = page.locator("tbody tr");
+  await expect(rows).toHaveCount(2);
+  await expect(page.getByRole("columnheader", { name: "Vertragsnummer" })).toBeVisible();
+  await expect(rows.filter({ hasText: `${marker}-a` })).toContainText("V-111");
+  await expect(rows.filter({ hasText: `${marker}-b` })).toContainText("V-222");
+
+  await searchColumn(page, "Vertragsnummer", "222");
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(`${marker}-b`);
+});
+
 test("a new cooperative grave starts with the box ticked", async ({ page }) => {
   const marker = `GN-${unique()}`;
   const cemetery = await ensureCemetery(page);
@@ -145,6 +163,7 @@ test("a new cooperative grave starts with the box ticked", async ({ page }) => {
   });
   await pickOption(page, page.locator("#gravePosition"), "Doppelgrab außen");
   await fillDate(page, editor.getByLabel("Beginn"), "01/2026");
+  await editor.getByLabel("Vertragsnummer").fill("V-1");
   await saveEditor(editor);
 
   await searchColumn(page, "Grabnummer", marker);

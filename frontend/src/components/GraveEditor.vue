@@ -62,6 +62,7 @@ const form = reactive({
   StartDate: null as Date | null,
   EndDate: null as Date | null,
   IsCooperative: false,
+  ContractNumber: "",
 });
 // The position the grave was stored with. One the editor does not offer
 // (imported from the old program) is listed as well, so that the grave can be
@@ -120,6 +121,7 @@ function fill(grave: GraveDetails): void {
     StartDate: parseIsoDate(grave.StartDate),
     EndDate: parseIsoDate(grave.EndDate),
     IsCooperative: grave.IsCooperative,
+    ContractNumber: grave.ContractNumber ?? "",
   });
   storedPosition.value = grave.Position;
   // a link price is shown as stored -- already the gross on a VAT-included line
@@ -158,6 +160,7 @@ watch(visible, async (open) => {
     StartDate: null,
     EndDate: null,
     IsCooperative: props.initialCooperative ?? false,
+    ContractNumber: "",
   });
   stored.value = null;
   storedPosition.value = null;
@@ -172,6 +175,9 @@ watch(visible, async (open) => {
         StartDate: props.successorStart ?? null,
         EndDate: null,
         IsCooperative: !predecessor.IsCooperative,
+        // the predecessor's number is its own: a successor of an ordinary grave
+        // is given one, and one handed back to the business has none
+        ContractNumber: "",
       });
     }
     discard.markClean();
@@ -270,15 +276,17 @@ async function focusFailingInvoice(): Promise<void> {
 
 // The box is fixed once invoices exist: they were split by who bills them.
 const flagLocked = computed(() => stored.value?.HasInvoices === true || props.successorOf != null);
-// The recipients of a grave are fixed at creation -- unless it is a cooperative
-// one nobody has invoiced, which has no split to disagree with.
-const recipientsEditable = computed(
-  () => props.graveId == null || (stored.value?.IsCooperative && !stored.value.HasInvoices),
-);
+// The recipients of a grave can change until its first invoice: the invoices
+// were split among them.
+const recipientsEditable = computed(() => props.graveId == null || !stored.value?.HasInvoices);
 
 async function save(): Promise<void> {
   if (form.CemeteryId == null) {
     showError(new ApiError("CemeteryRequired"));
+    return;
+  }
+  if (form.IsCooperative && form.ContractNumber.trim() === "") {
+    showError(new ApiError("ContractNumberRequired"));
     return;
   }
   try {
@@ -386,6 +394,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
       items: toLineInputs(lines.value),
       recipientIds: recipients.value.map((recipient) => recipient.id),
       isCooperative: form.IsCooperative,
+      contractNumber: form.IsCooperative ? form.ContractNumber.trim() : null,
       succeedsGraveId: props.graveId == null ? (props.successorOf?.Id ?? null) : null,
       corrections: corrections.map((c) => ({
         kind: c.Kind,
@@ -494,6 +503,10 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
             show-clear
             fluid
           />
+        </div>
+        <div v-if="form.IsCooperative" class="flex flex-col gap-2">
+          <label for="graveContractNumber" class="font-medium">{{ t("contractNumber") }}</label>
+          <InputText id="graveContractNumber" v-model="form.ContractNumber" />
         </div>
         <div class="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
           <div class="flex items-center gap-2">

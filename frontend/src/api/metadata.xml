@@ -54,6 +54,7 @@
                 <Property Name="EndDate" Type="Edm.Date" />
                 <Property Name="CreatedAt" Type="Edm.Date" Nullable="false" />
                 <Property Name="IsCooperative" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="ContractNumber" Type="Edm.String" />
                 <NavigationProperty
                     Name="Cemetery"
                     Type="Burkard.Invoicing.Domain.Entities.Cemetery"

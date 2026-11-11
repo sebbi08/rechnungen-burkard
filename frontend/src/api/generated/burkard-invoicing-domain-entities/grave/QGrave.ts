@@ -28,6 +28,7 @@ export class QGrave extends QueryObject {
   public readonly EndDate = new QDatePath(this.withPrefix("EndDate"));
   public readonly CreatedAt = new QDatePath(this.withPrefix("CreatedAt"));
   public readonly IsCooperative = new QBooleanPath(this.withPrefix("IsCooperative"));
+  public readonly ContractNumber = new QStringPath(this.withPrefix("ContractNumber"));
   public readonly Cemetery = new QEntityPath(
     this.withPrefix("Cemetery"),
     () => QCemetery,

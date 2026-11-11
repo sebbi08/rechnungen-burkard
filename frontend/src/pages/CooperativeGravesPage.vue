@@ -32,6 +32,7 @@ const filters = useColumnFilters({
   site: "",
   cemetery: "",
   field: "",
+  contract: "",
   start: "",
   end: "",
   recipients: "",
@@ -68,6 +69,7 @@ const fields = computed<ColumnFilterField[]>(() => [
   { key: "site", header: t("graveSiteName"), kind: "text" },
   { key: "cemetery", header: t("graveCemetery"), kind: "select", options: cemeteryOptions.value },
   { key: "field", header: t("graveFieldNumber"), kind: "text" },
+  { key: "contract", header: t("contractNumber"), kind: "text" },
   { key: "start", header: t("startDate"), kind: "text" },
   { key: "end", header: t("endDate"), kind: "text" },
   { key: "recipients", header: t("graveRecipients"), kind: "text" },
@@ -97,6 +99,7 @@ const rows = computed(() => {
       matchesWords(applied.number, row.GraveNumber) &&
       matchesWords(applied.site, row.SiteName) &&
       matchesWords(applied.field, row.FieldNumber) &&
+      matchesWords(applied.contract, row.ContractNumber) &&
       matchesWords(applied.start, formatMonth(row.StartDate)) &&
       matchesWords(applied.end, row.EndDate == null ? null : formatMonth(row.EndDate)) &&
       matchesWords(
@@ -238,6 +241,18 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
           <template #body="{ data }">{{ data.FieldNumber || "–" }}</template>
           <template #filter>
             <ColumnFilterCell v-model="filters.values.field" :field="field('field')" />
+          </template>
+        </Column>
+        <Column
+          :header="t('contractNumber')"
+          header-class="hidden lg:table-cell"
+          body-class="hidden lg:table-cell"
+          :show-filter-menu="false"
+          :show-clear-button="false"
+        >
+          <template #body="{ data }">{{ data.ContractNumber || "–" }}</template>
+          <template #filter>
+            <ColumnFilterCell v-model="filters.values.contract" :field="field('contract')" />
           </template>
         </Column>
         <Column

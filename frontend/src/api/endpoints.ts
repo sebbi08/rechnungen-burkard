@@ -145,6 +145,7 @@ export interface CooperativeGraveRow {
   SiteName: string;
   CemeteryId: number;
   CemeteryName: string;
+  ContractNumber: string | null;
   StartDate: string;
   EndDate: string | null;
   Recipients: GraveStatusRecipient[];
@@ -157,6 +158,7 @@ interface CooperativeGraveAnswer {
   SiteName: string;
   CemeteryId: number;
   Cemetery: { Id: number; Name: string };
+  ContractNumber: string | null;
   StartDate: string;
   EndDate: string | null;
   /** The links, each with its own id: the order they were made in. */
@@ -178,6 +180,7 @@ export async function fetchCooperativeGraves(): Promise<CooperativeGraveRow[]> {
     SiteName: grave.SiteName,
     CemeteryId: grave.CemeteryId,
     CemeteryName: grave.Cemetery.Name,
+    ContractNumber: grave.ContractNumber,
     StartDate: grave.StartDate,
     EndDate: grave.EndDate,
     Recipients: [...grave.Recipients]
@@ -205,6 +208,8 @@ export interface SaveGraveInput {
   recipientIds: number[];
   /** A cooperative grave is invoiced by the cooperative, not by the business. */
   isCooperative: boolean;
+  /** Required for a cooperative grave, null for any other. */
+  contractNumber: string | null;
   /** The grave this one takes over from; only when graveId is null. */
   succeedsGraveId?: number | null;
   /** The rounding corrections the user confirmed; the save refuses when they
@@ -252,6 +257,8 @@ export interface GraveDetails {
   EndDate: string | null;
   CreatedAt: string;
   IsCooperative: boolean;
+  /** The cooperative's number for the grave; null for an ordinary grave. */
+  ContractNumber: string | null;
   /** Whether any invoice has been made for the grave. */
   HasInvoices: boolean;
   Items: GraveItemLink[];

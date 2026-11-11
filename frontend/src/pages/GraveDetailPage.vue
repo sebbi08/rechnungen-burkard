@@ -182,6 +182,10 @@ const {
             <dt class="text-sm text-muted-color">{{ t("endDate") }}</dt>
             <dd class="m-0 tabular-nums">{{ formatMonth(grave.EndDate) || "–" }}</dd>
           </div>
+          <div v-if="grave.IsCooperative">
+            <dt class="text-sm text-muted-color">{{ t("contractNumber") }}</dt>
+            <dd class="m-0">{{ grave.ContractNumber || "–" }}</dd>
+          </div>
           <div>
             <dt class="text-sm text-muted-color">{{ t("graveCreatedAt") }}</dt>
             <dd class="m-0 tabular-nums">{{ formatDate(grave.CreatedAt) }}</dd>

@@ -1,3 +1,4 @@
+import AdmZip from "adm-zip";
 import type { Page } from "@playwright/test";
 
 /**
@@ -110,6 +111,8 @@ export interface SeedGraveInput {
   recipientIds: number[];
   /** A cooperative grave skips the recipient, price and divide rules below. */
   isCooperative?: boolean;
+  /** A cooperative grave needs one; defaults to "V-1" for it. */
+  contractNumber?: string;
 }
 
 /**
@@ -142,6 +145,51 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
     })),
     recipientIds: grave.recipientIds,
     isCooperative: grave.isCooperative ?? false,
+    contractNumber: grave.isCooperative ? (grave.contractNumber ?? "V-1") : null,
   });
   return created.Id;
+}
+
+/**
+ * Creates an ordinary grave without recipients, the state a grave is in after
+ * an import that had none to link, and returns its id. SaveGrave refuses to
+ * create one, so this goes the way such a grave arises: a one-grave archive
+ * through ImportArchive, with one priced all-year item and no recipient link.
+ * The marker names the grave and its item, so it has to be new.
+ */
+export async function seedIncompleteGrave(page: Page, marker: string): Promise<number> {
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await ensureCemetery(page);
+  const zip = new AdmZip();
+  const files: Record<string, string> = {
+    "recipients.csv": "RecipientNumber,Name,Address,Email\r\n",
+    "items.csv":
+      "ItemNumber,Description,VatRate,Price,Quarter\r\n" +
+      `${marker}-item,Grabpflege,7,100.00,\r\n`,
+    "graves.csv":
+      "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative,ContractNumber\r\n" +
+      `${marker},1,Schineller Bäcke,${SEED_CEMETERY},SingleInside,2026-01,2040-12,,\r\n`,
+    "mapping.csv":
+      "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n" +
+      `Item,${marker},${marker}-item,1,,\r\n`,
+  };
+  for (const [name, content] of Object.entries(files)) {
+    zip.addFile(name, Buffer.from(content, "utf8"));
+  }
+  const response = await page.request.post("/odata/ImportArchive", {
+    multipart: {
+      file: { name: "import.zip", mimeType: "application/zip", buffer: zip.toBuffer() },
+    },
+  });
+  if (!response.ok()) {
+    throw new Error(`ImportArchive failed: HTTP ${response.status()} ${await response.text()}`);
+  }
+  const filter = encodeURIComponent(`GraveNumber eq '${marker}'`);
+  const found = (
+    await (await page.request.get(`/odata/Graves?$filter=${filter}&$select=Id`)).json()
+  ).value;
+  if (found.length !== 1) {
+    throw new Error(`grave "${marker}" not found after the import`);
+  }
+  return found[0].Id;
 }
