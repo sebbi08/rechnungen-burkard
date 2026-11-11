@@ -656,7 +656,9 @@ non-interactive until completion, and the task runs exactly once.
   MUST look in the names and addresses of all of the grave's recipients. The
   list is filtered in the browser, folding case including umlauts. The overview
   lists the graves the business bills: a cooperative grave MUST NOT appear in
-  it, only in the list of its own (FR-024a).
+  it, only in the list of its own (FR-024a); nor MUST a deleted grave (FR-018e),
+  even one that was invoiced before it was deleted. The graves an item bills
+  (the item dialog) leave deleted graves out as well.
 
 **Half-year grave invoicing**
 
@@ -669,6 +671,10 @@ non-interactive until completion, and the task runs exactly once.
   changing underneath a stored correction (for instance after an update).
   A cooperative grave is never invoiced: it is not due in any run, is left out of
   that check, and the generator skips it with the reason `Cooperative`.
+  A deleted grave (FR-018e) is treated the same way: not due in any run, left out
+  of that check, skipped by the generator with the reason `Deleted`. A run with
+  nothing due but deleted graves is refused like a half-year that is already
+  invoiced.
   A run MUST NOT reach further back than two half-years before the current one
   and MUST refuse an older half-year, naming the earliest one allowed.
 - **FR-026**: The system MUST record that a grave's invoices have been generated
@@ -758,7 +764,8 @@ non-interactive until completion, and the task runs exactly once.
 **Downloads**
 
 - **FR-045**: Users MUST be able to bulk-download the normal documents of the
-  grave invoices of a selected half-year.
+  grave invoices of a selected half-year, leaving out the invoices of deleted
+  graves (FR-018e).
 - **FR-046**: Bulk download of normal invoices MUST NOT include copies.
 - **FR-047**: A copy MUST be downloadable individually wherever an invoice is
   listed or shown; copies MUST NOT be downloadable in bulk.
@@ -895,7 +902,10 @@ non-interactive until completion, and the task runs exactly once.
 - **FR-070**: The system MUST record the day an invoice was marked paid. The user
   interface MUST show only whether an invoice is paid, never that day.
 - **FR-071**: Marking an invoice paid MUST apply to the individual invoice. Each
-  recipient of a grave's half-year MUST be markable independently.
+  recipient of a grave's half-year MUST be markable independently. The
+  invoices of a deleted grave (FR-018e) MUST NOT be marked paid, nor taken back
+  as unpaid, nor revised: the system MUST refuse with `GraveDeleted` until the
+  grave is restored.
 - **FR-072**: Taking a payment mark back MUST require a confirmation.
 - **FR-073**: The system MUST refuse to revise an invoice that is marked paid.
 - **FR-074**: The system MUST refuse to edit a grave invoice while any recipient

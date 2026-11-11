@@ -142,6 +142,28 @@ public class InvoiceActionsController : ODataController
         }
     }
 
+    /// <summary>The invoices of a deleted grave are frozen: they are no longer
+    /// listed, so neither a payment nor a revision may change them. Restoring the
+    /// grave lifts this.</summary>
+    private async Task<IActionResult?> RefuseIfGraveDeletedAsync(long invoiceId)
+    {
+        var deleted = await _db.Invoices.AnyAsync(
+            i =>
+                i.Id == invoiceId
+                && i.GraveId != null
+                && _db.Graves.Any(g => g.Id == i.GraveId && g.DeletedAt != null),
+            HttpContext.RequestAborted
+        );
+        return deleted
+            ? BadRequest(
+                new
+                {
+                    error = new { code = "GraveDeleted", message = "The grave has been deleted." },
+                }
+            )
+            : null;
+    }
+
     [HttpPost("CreateGraveInvoiceRevision")]
     public async Task<IActionResult> CreateGraveInvoiceRevision(
         [FromBody] CreateGraveInvoiceRevisionRequest? request
@@ -166,6 +188,11 @@ public class InvoiceActionsController : ODataController
             return BadRequest(
                 new { error = new { code = "NoLines", message = "At least one line is required." } }
             );
+        }
+
+        if (await RefuseIfGraveDeletedAsync(request.InvoiceId) is { } refused)
+        {
+            return refused;
         }
 
         try
@@ -209,6 +236,11 @@ public class InvoiceActionsController : ODataController
                     },
                 }
             );
+        }
+
+        if (await RefuseIfGraveDeletedAsync(request.InvoiceId) is { } refused)
+        {
+            return refused;
         }
 
         try

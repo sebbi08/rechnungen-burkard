@@ -70,6 +70,12 @@ public class BulkDownloadController : ODataController
             d.Kind == DocumentKind.Normal
             && d.Invoice != null
             && d.Invoice.IsLatestRevision
+            // a deleted grave's invoices are no longer listed, so they are not
+            // downloaded either
+            && (
+                d.Invoice.GraveId == null
+                || !_db.Graves.Any(g => g.Id == d.Invoice.GraveId && g.DeletedAt != null)
+            )
             && d.Invoice.PeriodYear == year
             && d.Invoice.PeriodHalf == request.Half
         );

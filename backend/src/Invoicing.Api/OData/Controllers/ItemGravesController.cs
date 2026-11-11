@@ -32,7 +32,7 @@ public class ItemGravesController : ODataController
         var links = await (
             from link in _db.GraveItems.AsNoTracking()
             join grave in _db.Graves.AsNoTracking() on link.GraveId equals grave.Id
-            where link.ItemId == itemId
+            where link.ItemId == itemId && grave.DeletedAt == null
             select new
             {
                 link.UnitPrice,

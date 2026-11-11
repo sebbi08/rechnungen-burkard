@@ -48,8 +48,9 @@ public class GraveInvoicingStatusController : ODataController
 
         var graves = await _db
             // the overview lists the graves the business bills; a cooperative
-            // grave is billed by the cooperative and has a list of its own
-            .Graves.Where(g => !g.IsCooperative)
+            // grave is billed by the cooperative and has a list of its own; a
+            // deleted grave is on the list of inactive graves instead
+            .Graves.Where(g => !g.IsCooperative && g.DeletedAt == null)
             // false sorts before true, so ordering by "is invoiced" puts the
             // graves that are still open at the top
             .OrderBy(g => invoicedIds.Contains(g.Id))
