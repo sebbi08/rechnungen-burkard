@@ -444,7 +444,8 @@ public class DeleteGraveTests
         using var withDeleted = await ODataJson.ReadAsync(
             await client.GetAsync($"/odata/ItemGraves?itemId={deletedItem}")
         );
-        Assert.False(withDeleted.RootElement.GetProperty("Linked").GetBoolean());
+        // the grave is not listed, but it still links the item, as the item's locks count it
+        Assert.True(withDeleted.RootElement.GetProperty("Linked").GetBoolean());
         Assert.Empty(withDeleted.RootElement.GetProperty("Groups").EnumerateArray());
         using var other = await ODataJson.ReadAsync(
             await client.GetAsync($"/odata/ItemGraves?itemId={keptItem}")

@@ -32,7 +32,7 @@ public class ItemGravesController : ODataController
         var links = await (
             from link in _db.GraveItems.AsNoTracking()
             join grave in _db.Graves.AsNoTracking() on link.GraveId equals grave.Id
-            where link.ItemId == itemId && grave.DeletedAt == null
+            where link.ItemId == itemId
             select new
             {
                 link.UnitPrice,
@@ -40,10 +40,14 @@ public class ItemGravesController : ODataController
                 grave.Id,
                 grave.GraveNumber,
                 grave.IsCooperative,
+                IsDeleted = grave.DeletedAt != null,
             }
         ).ToListAsync(HttpContext.RequestAborted);
 
+        // a deleted grave is not listed, but it still links the item: the item's
+        // locks count every link, so Linked does too
         var groups = links
+            .Where(l => !l.IsDeleted)
             .GroupBy(l => (Price: l.UnitPrice ?? item.DefaultPrice, l.PriceIncludesVat))
             .Select(g => new
             {
