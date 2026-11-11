@@ -517,6 +517,51 @@ public class CooperativeGraveTests
         );
     }
 
+    [Fact]
+    public async Task An_ordinary_grave_cannot_be_saved_without_the_recipients_it_has()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        var id = await SavedIdAsync(
+            await SaveAsync(client, null, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+        await AssertRefusedAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], []),
+            "NoRecipients"
+        );
+    }
+
+    [Fact]
+    public async Task An_ordinary_grave_with_no_recipients_stays_saveable()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var seed = await SeedAsync(client);
+
+        long id;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = new Grave
+            {
+                GraveNumber = "K-001",
+                CemeteryId = TestCemetery.Id,
+                StartDate = new DateOnly(2026, 1, 1),
+                CreatedAt = new DateOnly(2026, 1, 1),
+            };
+            db.Graves.Add(grave);
+            await db.SaveChangesAsync();
+            id = grave.Id;
+        }
+
+        await SavedIdAsync(await SaveAsync(client, id, false, [Link(seed.PricedItem)], []));
+        await SavedIdAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna])
+        );
+    }
+
     private static Task<HttpResponseMessage> SaveTermAsync(
         HttpClient client,
         string number,

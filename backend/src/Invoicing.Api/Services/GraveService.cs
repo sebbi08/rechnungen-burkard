@@ -86,6 +86,7 @@ public sealed class GraveService
                 {
                     g.IsCooperative,
                     HasInvoices = _db.Invoices.Any(i => i.GraveId == g.Id),
+                    HasRecipients = _db.GraveRecipients.Any(r => r.GraveId == g.Id),
                 })
                 .FirstOrDefaultAsync(ct)
             : null;
@@ -104,15 +105,17 @@ public sealed class GraveService
 
         // These come first: without recipients nothing is evaluated, so the
         // corrections check below would fail on every retry and hide this.
-        // A grave created without recipients could never be billed: generation
-        // would skip it, and once created its recipient set cannot change. A
-        // grave that predates this rule keeps its empty set and stays editable.
-        // A cooperative grave is never billed and needs none -- until it is
-        // unticked, which makes it an ordinary grave from then on.
+        // A grave without recipients could never be billed: generation would
+        // skip it. So an ordinary grave is created with some, a save does not
+        // empty the set of one that has them, and a cooperative grave -- never
+        // billed, and in need of none -- gets some when it is unticked. A grave
+        // whose set is already empty (it predates this rule, or was imported
+        // without a recipient) stays saveable without, to be completed step by
+        // step.
         if (
             !fields.IsCooperative
             && recipientIds.Count == 0
-            && (graveId is null || stored is { IsCooperative: true })
+            && (graveId is null || stored is { IsCooperative: true } or { HasRecipients: true })
         )
         {
             throw new ValidationException(
