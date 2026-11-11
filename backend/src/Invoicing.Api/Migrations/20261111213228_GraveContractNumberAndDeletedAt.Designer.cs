@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Burkard.Invoicing.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20261111205907_GraveDeletedAt")]
-    partial class GraveDeletedAt
+    [Migration("20261111213228_GraveContractNumberAndDeletedAt")]
+    partial class GraveContractNumberAndDeletedAt
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
