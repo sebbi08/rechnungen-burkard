@@ -5,6 +5,34 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.3.0 — 2026-11-12
+
+### Features
+- fold the panels of the inactive graves away (026846c)
+- show ten entries a page in every list (f143b03)
+- delete a grave from the lists, keep the confirmation narrow (a0df077)
+- list ended and deleted graves on a page of their own (4b5fa31)
+- delete and restore a grave from its page, list only current cooperative graves (5e063e0)
+- keep deleted graves and their invoices out of runs, lists and payments (2e47ee3)
+- delete a grave and restore it until the next invoice run (fa0931b)
+- **scripts**: classify cooperative graves by contract number and 2026 care invoices (6df2745)
+- show, search and require the contract number of a cooperative grave (3f4231e)
+- import contract numbers and ordinary graves still to be completed (347605f)
+- give a cooperative grave its contract number and free recipients until the first invoice (0593310)
+- list only the graves the business bills in the grave overview (808d3f4)
+
+### Fixes
+- show the deletion date in local time, share the half-year start month (ea31aad)
+- refuse deleting or restoring a grave while an invoice run is active (af7183a)
+- hide a deleted grave's preview and status, wait for its state (32721b7)
+- keep an item locked while only a deleted grave links it (bab610b)
+- **scripts**: restore the FriedWin README sections, report billed graves' customer record (05fcc3c)
+- keep an ordinary grave's recipients from being emptied by a save (abb8aa7)
+- load the cooperative graves without a semicolon in the query (b2b3af5)
+
+### Other changes
+- merge the unreleased grave migrations into one (9330328)
+
 ## v3.2.0 — 2026-11-09
 
 ### Features
