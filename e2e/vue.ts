@@ -185,13 +185,23 @@ export async function filterColumn(page: Page, header: string, option: string): 
 /**
  * Opens a PrimeVue Popover with the button that toggles it (and says so in
  * `aria-expanded`), and answers the popover once it has finished opening.
+ *
+ * A Popover closes when anything around its button scrolls, and the click
+ * itself may scroll: a table wider than its card is scrolled sideways to bring
+ * the button into view, and that scroll event can land after the popover has
+ * opened. So it clicks again until the popover stays open.
  */
 export async function openPopover(page: Page, button: Locator): Promise<Locator> {
-  await button.click();
   const popover = page.locator(".p-popover");
-  await expect(popover).toBeVisible();
-  await expect(popover).not.toHaveClass(/p-popover-enter-active/);
-  await expect(button).toHaveAttribute("aria-expanded", "true");
+  const step = { timeout: 3000 };
+  await expect(async () => {
+    if ((await button.getAttribute("aria-expanded")) !== "true") {
+      await button.click(step);
+    }
+    await expect(popover).toBeVisible(step);
+    await expect(popover).not.toHaveClass(/p-popover-enter-active/, step);
+    await expect(button).toHaveAttribute("aria-expanded", "true", step);
+  }).toPass({ timeout: 30_000 });
   return popover;
 }
 
