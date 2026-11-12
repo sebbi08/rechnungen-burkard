@@ -11,6 +11,8 @@ public static class DocumentTexts
 
     public const string Title = "**** RECHNUNG ****";
     public const string MetadataTitle = "Rechnung";
+    public const string QuoteHeading = "**** ANGEBOT ****";
+    public const string QuoteMetadataTitle = "Angebot";
     public const string MetadataAuthor = "Blumen Burkard";
     public const string LabelNumber = "NUMMER:";
     public const string LabelCustomerNumber = "KUNDEN-NR:";
@@ -44,6 +46,9 @@ public static class DocumentTexts
 
     public static string InvoiceTitle(string invoiceNumber) =>
         string.Format(Culture, "Rechnung {0}", invoiceNumber);
+
+    public static string QuoteTitle(string number) =>
+        string.Format(Culture, "{0} {1}", QuoteMetadataTitle, number);
 
     public static string GraveSite(string name) => $"GRABSTÄTTE: {name}";
 

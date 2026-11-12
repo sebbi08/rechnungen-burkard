@@ -26,7 +26,9 @@ internal sealed class InvoiceDocument : IDocument
         {
             // a browser shows the title in the tab of an opened PDF: German,
             // like everything else on the document
-            Title = $"{DocumentTexts.MetadataTitle} {_data.InvoiceNumber}",
+            Title = _data.IsQuote
+                ? DocumentTexts.QuoteTitle(_data.InvoiceNumber)
+                : $"{DocumentTexts.MetadataTitle} {_data.InvoiceNumber}",
             Author = DocumentTexts.MetadataAuthor,
             Creator = DocumentTexts.MetadataAuthor,
             Producer = "QuestPDF",
@@ -146,7 +148,10 @@ internal sealed class InvoiceDocument : IDocument
     private void Details(IContainer container) =>
         container.Column(column =>
         {
-            column.Item().PaddingBottom(2, Unit.Millimetre).Text(DocumentTexts.Title);
+            column
+                .Item()
+                .PaddingBottom(2, Unit.Millimetre)
+                .Text(_data.IsQuote ? DocumentTexts.QuoteHeading : DocumentTexts.Title);
             column
                 .Item()
                 .Table(table =>
@@ -200,7 +205,12 @@ internal sealed class InvoiceDocument : IDocument
             .PaddingBottom(6, Unit.Millimetre)
             .Text(text =>
             {
-                text.Span(DocumentTexts.InvoiceTitle(_data.InvoiceNumber)).SemiBold();
+                text.Span(
+                        _data.IsQuote
+                            ? DocumentTexts.QuoteTitle(_data.InvoiceNumber)
+                            : DocumentTexts.InvoiceTitle(_data.InvoiceNumber)
+                    )
+                    .SemiBold();
                 if (!string.IsNullOrWhiteSpace(_data.RecipientNumber))
                 {
                     text.Span($" · {DocumentTexts.CustomerNumberShort} {_data.RecipientNumber}");
