@@ -30,22 +30,47 @@ const ask = useConfirmAsync();
 const queryClient = useQueryClient();
 
 const settings = useSettingsQuery();
-const form = reactive({ StampWord: "", EndingText: "" });
+// what the form edits; the save sends exactly these
+const FIELDS = [
+  "StampWord",
+  "InvoiceEndingText",
+  "QuoteEndingText",
+  "GraveFirstHalfEndingText",
+  "GraveSecondHalfEndingText",
+] as const;
+type Field = (typeof FIELDS)[number];
+const form = reactive<Record<Field, string>>({
+  StampWord: "",
+  InvoiceEndingText: "",
+  QuoteEndingText: "",
+  GraveFirstHalfEndingText: "",
+  GraveSecondHalfEndingText: "",
+});
 watch(
   () => settings.data.value,
   (value) => {
     if (value) {
-      Object.assign(form, { StampWord: value.StampWord, EndingText: value.EndingText });
+      for (const field of FIELDS) {
+        form[field] = value[field];
+      }
     }
   },
   { immediate: true },
 );
 
+// one text per kind of document, in the order the page lists them
+const endingTexts = computed(() => [
+  { field: "InvoiceEndingText" as const, label: t("settingsInvoiceEndingText") },
+  { field: "QuoteEndingText" as const, label: t("settingsQuoteEndingText") },
+  { field: "GraveFirstHalfEndingText" as const, label: t("settingsGraveFirstHalfEndingText") },
+  { field: "GraveSecondHalfEndingText" as const, label: t("settingsGraveSecondHalfEndingText") },
+]);
+
 // Leaving with unsaved edits asks first -- inside the app, and on a reload or a
 // closed tab through the browser's own prompt.
 const dirty = computed(() => {
   const stored = settings.data.value;
-  return !!stored && (form.StampWord !== stored.StampWord || form.EndingText !== stored.EndingText);
+  return !!stored && FIELDS.some((field) => form[field] !== stored[field]);
 });
 onBeforeRouteLeave(async () => !dirty.value || (await ask(t("confirmDiscardSettings"))));
 function onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -189,9 +214,9 @@ async function deleteCemetery(id: number, name: string): Promise<void> {
             <label for="stampWord" class="font-medium">{{ t("settingsStampWord") }}</label>
             <InputText id="stampWord" v-model="form.StampWord" class="w-full md:w-80" />
           </div>
-          <div class="flex flex-col gap-2">
-            <label for="endingText" class="font-medium">{{ t("settingsEndingText") }}</label>
-            <Textarea id="endingText" v-model="form.EndingText" rows="6" class="w-full" />
+          <div v-for="text in endingTexts" :key="text.field" class="flex flex-col gap-2">
+            <label :for="text.field" class="font-medium">{{ text.label }}</label>
+            <Textarea :id="text.field" v-model="form[text.field]" rows="6" class="w-full" />
           </div>
           <div>
             <Button type="submit" :label="t('save')" icon="pi pi-check" :loading="saving" />

@@ -15,11 +15,41 @@ export interface GlobalSettings {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
-   * | Name | `EndingText` |
+   * | Name | `InvoiceEndingText` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
    */
-  EndingText: string;
+  InvoiceEndingText: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `QuoteEndingText` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  QuoteEndingText: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GraveFirstHalfEndingText` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  GraveFirstHalfEndingText: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
+   * | Name | `GraveSecondHalfEndingText` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  GraveSecondHalfEndingText: string;
   /**
    *
    * OData Attributes:
@@ -35,4 +65,13 @@ export interface GlobalSettings {
 export type GlobalSettingsId = number | { Id: number };
 
 export interface EditableGlobalSettings
-  extends Pick<GlobalSettings, "EndingText" | "StampWord">, Partial<Pick<GlobalSettings, "Id">> {}
+  extends
+    Pick<
+      GlobalSettings,
+      | "InvoiceEndingText"
+      | "QuoteEndingText"
+      | "GraveFirstHalfEndingText"
+      | "GraveSecondHalfEndingText"
+      | "StampWord"
+    >,
+    Partial<Pick<GlobalSettings, "Id">> {}

@@ -120,7 +120,7 @@ public class QuoteTests
         Assert.Equal("Familie Mahr", quote.RecipientName);
         Assert.Equal("Musterstraße 1\n12345 Musterstadt", quote.RecipientAddress);
         Assert.Equal("E-0004", quote.RecipientNumber);
-        Assert.Equal(settings.EndingText, quote.EndingText);
+        Assert.Equal(settings.QuoteEndingText, quote.EndingText);
         Assert.True(quote.IsLatestRevision);
         var line = Assert.Single(quote.Lines);
         Assert.Equal(2, line.Count);

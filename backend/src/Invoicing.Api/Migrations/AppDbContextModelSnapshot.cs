@@ -15,7 +15,7 @@ namespace Burkard.Invoicing.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.14");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Cemetery", b =>
                 {
@@ -71,7 +71,19 @@ namespace Burkard.Invoicing.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("EndingText")
+                    b.Property<string>("GraveFirstHalfEndingText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("GraveSecondHalfEndingText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceEndingText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("QuoteEndingText")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

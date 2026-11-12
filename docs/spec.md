@@ -41,7 +41,9 @@ exactly those values.
    all subsequent invoices.
 2. **Given** the user saves a multi-line ending text, **When** an invoice is
    generated, **Then** the ending text appears exactly as entered, line breaks
-   preserved.
+   preserved. Invoices, quotes and the grave invoices of each half-year each
+   carry their own text (FR-002); a grave invoice the text of the half-year it
+   bills.
 3. **Given** no stamp word has been configured, **When** a copy is generated,
    **Then** the word "Kopie" is stamped on it.
 4. **Given** the user tries to save an empty stamp word, **When** the setting is
@@ -585,7 +587,14 @@ revising it, and checking the numbers, the stored versions and the printout.
 **Global configuration**
 
 - **FR-001**: The system MUST allow configuring multiple VAT percentages globally.
-- **FR-002**: The system MUST allow configuring a multi-line ending text globally.
+- **FR-002**: The system MUST allow configuring four multi-line ending texts
+  globally, one per kind of document: ordinary invoices (including those
+  converted from a quote), quotes, grave invoices for the first half-year and
+  grave invoices for the second half-year. A grave invoice MUST take the text
+  of the half-year it bills, also when it is revised in another half-year.
+  Every document MUST take the text of its kind as it is set when the document
+  (or its revision) is made. Upgrading from the single ending text MUST put
+  that text into all four.
 - **FR-002a**: Users MUST be able to keep the cemeteries graves lie in, in the
   settings: list, add, rename and delete them. A cemetery has a name, required
   and trimmed, which MUST be unique ignoring case, umlauts included ("Südfriedhof"
@@ -1146,8 +1155,8 @@ revising it, and checking the numbers, the stored versions and the printout.
 - **FR-096**: A quote MUST be printed as the invoice document (FR-037a –
   FR-037d) with `**** ANGEBOT ****` in place of the invoice heading, and
   "Angebot <number>" as the PDF's title and on continuation pages. The VAT
-  block, the ending text from the settings, the letterhead and the footer MUST
-  read as on an invoice. The date MUST be the day the version was created.
+  block, the letterhead and the footer MUST read as on an invoice; the ending
+  text is the quotes' own from the settings (FR-002). The date MUST be the day the version was created.
 - **FR-097**: A quote version MUST have one PDF only, with no stamped copy, named
   after its number (`A2026-0001.pdf`). It MUST open in the browser like an
   invoice's normal document.
@@ -1163,7 +1172,7 @@ revising it, and checking the numbers, the stored versions and the printout.
   whichever version is addressed, with no editor in between. The invoice MUST be
   an ordinary new non-grave invoice (FR-030): the next free invoice number at
   that moment, of that year whatever year the quote was created in, that day's
-  date, the current ending text and stamp word, both documents (FR-037), and
+  date, the current invoice ending text (FR-002) and stamp word, both documents (FR-037), and
   the recipient's values as they are now. Its lines MUST be the
   latest version's lines as quoted — the same items, item numbers,
   descriptions, counts, net prices, VAT rates and VAT-included flags — even
@@ -1248,8 +1257,9 @@ revising it, and checking the numbers, the stored versions and the printout.
   it became.
 - **VAT Rate**: A globally configured percentage, assigned to invoice items and
   applied to their line totals.
-- **Global Settings**: Holds the VAT rates, the multi-line ending text, and the
-  copy stamp word (default "Kopie").
+- **Global Settings**: Holds the VAT rates, the four multi-line ending texts
+  (invoices, quotes, graves first half-year, graves second half-year; FR-002),
+  and the copy stamp word (default "Kopie").
 - **Cemetery**: Kept in the settings; has a name, unique ignoring case. Graves
   refer to it; it is not part of any invoice.
 - **Import Template**: A ZIP archive with four CSV files (recipients, items,

@@ -61,7 +61,14 @@ public class BackupTests
         var root = manifest.RootElement;
         Assert.Equal("rechnungen-burkard-backup", root.GetProperty("format").GetString());
         Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
-        Assert.Equal("20261112142130_Quotes", root.GetProperty("lastMigration").GetString());
+        // the newest migration the build knows, not a name that every new
+        // migration would have to update here
+        using var scope = host.Services.CreateScope();
+        var newest = scope
+            .ServiceProvider.GetRequiredService<AppDbContext>()
+            .Database.GetMigrations()
+            .Last();
+        Assert.Equal(newest, root.GetProperty("lastMigration").GetString());
     }
 
     [Fact]

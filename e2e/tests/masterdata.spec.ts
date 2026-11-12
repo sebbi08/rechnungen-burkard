@@ -37,9 +37,17 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
   });
   await expect(rates.getByRole("cell", { name: "7 %", exact: true })).toBeVisible();
 
-  // the ending text survives typing, save and a reload
-  const endingText = `E2E Schlusstext ${Date.now()}`;
-  await page.getByLabel("Schlusstext").fill(endingText);
+  // each of the four ending texts survives typing, save and a reload
+  const stamp = Date.now();
+  const endingTexts = {
+    "Schlusstext Rechnungen": `E2E Rechnung ${stamp}`,
+    "Schlusstext Angebote": `E2E Angebot ${stamp}`,
+    "Schlusstext Gräber 1. Halbjahr": `E2E H1 ${stamp}`,
+    "Schlusstext Gräber 2. Halbjahr": `E2E H2 ${stamp}`,
+  };
+  for (const [label, text] of Object.entries(endingTexts)) {
+    await page.getByLabel(label, { exact: true }).fill(text);
+  }
   const saved = page.waitForResponse(
     (response) =>
       response.url().includes("/odata/Settings") && response.request().method() === "PATCH",
@@ -47,7 +55,9 @@ test("settings: stamp word validation and VAT rate (Story 1)", async ({ page }) 
   await page.getByRole("button", { name: "Speichern" }).click();
   expect((await saved).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByLabel("Schlusstext")).toHaveValue(endingText);
+  for (const [label, text] of Object.entries(endingTexts)) {
+    await expect(page.getByLabel(label, { exact: true })).toHaveValue(text);
+  }
   await expect(page.getByLabel("Stempelwort")).toHaveValue("Kopie");
 });
 

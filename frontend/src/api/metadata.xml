@@ -237,7 +237,10 @@
                     <PropertyRef Name="Id" />
                 </Key>
                 <Property Name="Id" Type="Edm.Int64" Nullable="false" />
-                <Property Name="EndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="InvoiceEndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="QuoteEndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="GraveFirstHalfEndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="GraveSecondHalfEndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
             </EntityType>
             <EntityType Name="InvoiceLine">

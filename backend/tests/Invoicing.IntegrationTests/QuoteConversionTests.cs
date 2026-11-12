@@ -91,7 +91,7 @@ public class QuoteConversionTests
         Assert.Equal("Familie Mahr", invoice.RecipientName);
         Assert.Equal("Musterstraße 1\n12345 Musterstadt", invoice.RecipientAddress);
         Assert.Equal("E-0004", invoice.RecipientNumber);
-        Assert.Equal(settings.EndingText, invoice.EndingText);
+        Assert.Equal(settings.InvoiceEndingText, invoice.EndingText);
         Assert.Equal(settings.StampWord, invoice.StampWord);
         Assert.Equal(
             new[] { DocumentKind.Normal, DocumentKind.Copy },

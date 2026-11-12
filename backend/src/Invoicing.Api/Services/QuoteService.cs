@@ -276,7 +276,7 @@ public sealed class QuoteService
         quote.RecipientName = recipient.Name;
         quote.RecipientAddress = recipient.Address;
         quote.RecipientNumber = recipient.Number;
-        quote.EndingText = settings.EndingText;
+        quote.EndingText = settings.QuoteEndingText;
         quote.Lines = lines
             .Select(l => new QuoteLine
             {

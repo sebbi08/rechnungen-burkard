@@ -169,7 +169,8 @@ public sealed class GraveInvoiceRevisionService
                 GraveSiteName = grave.SiteName,
                 GraveFieldNumber = grave.FieldNumber,
                 GravePosition = grave.Position,
-                EndingText = settings.EndingText,
+                // the half-year the invoice bills, whenever it is revised
+                EndingText = settings.GraveEndingText(sibling.PeriodHalf!.Value),
                 StampWord = settings.StampWord,
                 GeneratedAt = now,
                 Lines = billedLines

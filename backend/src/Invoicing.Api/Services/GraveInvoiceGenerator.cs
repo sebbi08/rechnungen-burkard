@@ -169,7 +169,7 @@ public sealed class GraveInvoiceGenerator
                 GraveSiteName = grave.SiteName,
                 GraveFieldNumber = grave.FieldNumber,
                 GravePosition = grave.Position,
-                EndingText = settings.EndingText,
+                EndingText = settings.GraveEndingText(half),
                 StampWord = settings.StampWord,
                 GeneratedAt = now,
             };

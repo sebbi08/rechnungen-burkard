@@ -48,12 +48,12 @@ public class SettingsTests : IClassFixture<ApiTestHost>
         const string text = "Line one\nLine two";
         var response = await client.PatchAsync(
             "/odata/Settings",
-            ODataJson.Body(new { EndingText = text })
+            ODataJson.Body(new { InvoiceEndingText = text })
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var get = await client.GetAsync("/odata/Settings");
         using var json = await ODataJson.ReadAsync(get);
-        Assert.Equal(text, json.RootElement.GetProperty("EndingText").GetString());
+        Assert.Equal(text, json.RootElement.GetProperty("InvoiceEndingText").GetString());
     }
 }

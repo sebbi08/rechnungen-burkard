@@ -22,7 +22,7 @@ public class SeedTests : IClassFixture<ApiTestHost>
 
         Assert.Single(db.GlobalSettings);
         Assert.Equal("Kopie", db.GlobalSettings.Single().StampWord);
-        Assert.Equal("", db.GlobalSettings.Single().EndingText);
+        Assert.Equal("", db.GlobalSettings.Single().InvoiceEndingText);
 
         // all tables exist (smoke insert/read on one of them)
         db.VatRates.Add(new VatRate { Rate = 7m });
