@@ -449,39 +449,38 @@ test("graves: the recipients popover stays on the screen", async ({ page }) => {
   await expectNoSidewaysScrolling(page);
 });
 
-test("invoices: every row action stays reachable", async ({ page }) => {
+/**
+ * A list's row actions: buttons from the widest screens, a menu below them. The
+ * menu closes when anything behind it scrolls, so nothing may need to: its
+ * button is brought to the middle of the screen first, where the menu has room
+ * below it, and fully into the table's view, should the table be wider than its
+ * card. The menu has to fit the screen, and its first item has to lead where
+ * its button does.
+ */
+async function expectRowActionsReachable(
+  page: Page,
+  list: { route: string; actions: string[]; detailsUrl: RegExp },
+): Promise<void> {
   await seed(page);
-  await page.goto(`/invoices?${new URLSearchParams({ recipient: RECIPIENT_NAME })}`);
+  // a page holds ten rows, and other workers' rows would push this run's off it
+  await page.goto(`/${list.route}?${new URLSearchParams({ recipient: RECIPIENT_NAME })}`);
   const row = page.getByRole("row").filter({ hasText: RECIPIENT_NAME }).first();
   await expect(row).toBeVisible();
 
-  const actions = [
-    "Details",
-    "Rechnung herunterladen",
-    "Kopie herunterladen",
-    "Bearbeiten",
-    "Als bezahlt markieren",
-  ];
   if (page.viewportSize()!.width >= BREAKPOINTS.xl) {
-    for (const name of actions) {
+    for (const name of list.actions) {
       await expect(row.getByRole("button", { name: rowAction(name) })).toBeVisible();
     }
     return;
   }
 
-  // Below the widest screens there is no room for five buttons a row, beside
-  // the side bar or without it: they sit in a menu instead, and the menu has
-  // to fit the screen. The menu closes when anything behind
-  // it scrolls, so nothing may need to: its button is brought to the middle of
-  // the screen first, where the menu has room below it, and fully into the
-  // table's view, should the table be wider than its card.
   const more = row.getByRole("button", { name: rowAction("Weitere Aktionen") });
   await more.evaluate((element) => element.scrollIntoView({ block: "center", inline: "end" }));
   await more.click();
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
   await expect(page.locator(".p-menu")).not.toHaveClass(/p-connected-overlay-enter-active/);
-  for (const name of actions) {
+  for (const name of list.actions) {
     await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
   }
   const box = (await menu.boundingBox())!;
@@ -491,12 +490,12 @@ test("invoices: every row action stays reachable", async ({ page }) => {
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
 
-  // An item leads where its button does. Under load the open menu has been
-  // seen to close under the tap that was meant for it, so a tap that did not
-  // lead anywhere is made again, from a freshly opened menu.
+  // Under load the open menu has been seen to close under the tap that was
+  // meant for it, so a tap that did not lead anywhere is made again, from a
+  // freshly opened menu.
   const step = { timeout: 3000 };
   await expect(async () => {
-    if (!/\/invoices\/\d+$/.test(page.url())) {
+    if (!list.detailsUrl.test(page.url())) {
       if (!(await menu.isVisible())) {
         await more.click(step);
       }
@@ -506,62 +505,36 @@ test("invoices: every row action stays reachable", async ({ page }) => {
       );
       await menu.getByRole("menuitem", { name: "Details", exact: true }).click(step);
     }
-    await expect(page).toHaveURL(/\/invoices\/\d+$/, step);
+    await expect(page).toHaveURL(list.detailsUrl, step);
   }).toPass({ timeout: 30_000 });
+}
+
+test("invoices: every row action stays reachable", async ({ page }) => {
+  await expectRowActionsReachable(page, {
+    route: "invoices",
+    actions: [
+      "Details",
+      "Rechnung herunterladen",
+      "Kopie herunterladen",
+      "Bearbeiten",
+      "Als bezahlt markieren",
+    ],
+    detailsUrl: /\/invoices\/\d+$/,
+  });
 });
 
 test("quotes: every row action stays reachable", async ({ page }) => {
-  await seed(page);
-  await page.goto(`/quotes?${new URLSearchParams({ recipient: RECIPIENT_NAME })}`);
-  const row = page.getByRole("row").filter({ hasText: RECIPIENT_NAME }).first();
-  await expect(row).toBeVisible();
-
-  const actions = [
-    "Details",
-    "Angebot herunterladen",
-    "Bearbeiten",
-    "In Rechnung umwandeln",
-    "Ablehnen",
-  ];
-  if (page.viewportSize()!.width >= BREAKPOINTS.xl) {
-    for (const name of actions) {
-      await expect(row.getByRole("button", { name: rowAction(name) })).toBeVisible();
-    }
-    return;
-  }
-
-  // As on the invoice list: below the widest screens the actions sit in a menu,
-  // which has to fit the screen without anything behind it needing to scroll.
-  const more = row.getByRole("button", { name: rowAction("Weitere Aktionen") });
-  await more.evaluate((element) => element.scrollIntoView({ block: "center", inline: "end" }));
-  await more.click();
-  const menu = page.getByRole("menu");
-  await expect(menu).toBeVisible();
-  await expect(page.locator(".p-menu")).not.toHaveClass(/p-connected-overlay-enter-active/);
-  for (const name of actions) {
-    await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
-  }
-  const box = (await menu.boundingBox())!;
-  const viewport = page.viewportSize()!;
-  expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
-
-  const step = { timeout: 3000 };
-  await expect(async () => {
-    if (!/\/quotes\/\d+$/.test(page.url())) {
-      if (!(await menu.isVisible())) {
-        await more.click(step);
-      }
-      await expect(page.locator(".p-menu")).not.toHaveClass(
-        /p-connected-overlay-enter-active/,
-        step,
-      );
-      await menu.getByRole("menuitem", { name: "Details", exact: true }).click(step);
-    }
-    await expect(page).toHaveURL(/\/quotes\/\d+$/, step);
-  }).toPass({ timeout: 30_000 });
+  await expectRowActionsReachable(page, {
+    route: "quotes",
+    actions: [
+      "Details",
+      "Angebot herunterladen",
+      "Bearbeiten",
+      "In Rechnung umwandeln",
+      "Ablehnen",
+    ],
+    detailsUrl: /\/quotes\/\d+$/,
+  });
 });
 
 test("the navigation is reachable on every screen size", async ({ page }) => {
