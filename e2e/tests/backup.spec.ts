@@ -74,8 +74,14 @@ test("cancelling the confirmation changes nothing", async ({ page }) => {
     await expect(ask).toBeVisible();
     // the counts depend on the other tests' data: the wording and numbers only
     await expect(ask).toContainText(
-      /Die Sicherung vom .+ \(Version .+\) enthält \d+ Gräber, \d+ Empfänger und \d+ Rechnungen\. Alle Daten dieser Instanz werden durch sie ersetzt\./,
+      /Sicherung vom .+ \(Version .+\) – Gräber: [\d.]+, Empfänger: [\d.]+, Rechnungen: [\d.]+/,
     );
+    await expect(ask).toContainText(
+      "Alle Daten dieser Instanz werden durch die Sicherung ersetzt.",
+    );
+    await expect(ask.getByRole("button", { name: "Alle Daten ersetzen" })).toBeVisible();
+    // Enter must not replace everything
+    await expect(ask.getByRole("button", { name: "Abbrechen" })).toBeFocused();
     await ask.getByRole("button", { name: "Abbrechen" }).click();
     await expect(ask).toHaveCount(0);
   });

@@ -4,8 +4,8 @@
  * The server numbers the data it holds (X-Data-Generation on every answer) and
  * refuses a write that names another number (409 DataReplaced).
  *
- * The first number seen is kept and never replaced by a later one: during a
- * swap a 503 still carries the old number, and after a restore a stale tab's
+ * The first number seen on a successful answer is kept and never replaced by a
+ * later one: during a swap a 503 still carries the old number, and after a restore a stale tab's
  * background request would carry the new one -- adopting it would let that
  * tab write again. A reload starts fresh, which is how a tab recovers.
  */
@@ -47,7 +47,9 @@ export function installDataGenerationGuard(): void {
       }
     }
     const response = await original(nextInput, nextInit);
-    if (odata && generation === null) {
+    // only from an answer that succeeded: a tab opened during a swap would
+    // otherwise keep the old number from its 503 and write into the restored data
+    if (odata && generation === null && response.ok) {
       generation = response.headers.get(HEADER);
     }
     return response;

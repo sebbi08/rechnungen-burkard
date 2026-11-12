@@ -37,6 +37,11 @@ export function formatAmount(value: number | null | undefined): string {
   return `${value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
+/** A count the German way, with a thousands separator: "1.234". */
+export function formatCount(value: number): string {
+  return value.toLocaleString("de-DE", { maximumFractionDigits: 0 });
+}
+
 /** "19", or "7,7" where a rate has a decimal -- never "19.00". */
 export function formatVatRate(value: number | null | undefined): string {
   return value == null ? "" : value.toLocaleString("de-DE", { maximumFractionDigits: 2 });
