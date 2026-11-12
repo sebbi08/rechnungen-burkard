@@ -61,6 +61,31 @@ docker start rechnungen
 To restore, stop the container, put the copied files back into the data
 folder, and start it.
 
+### Backup from the app
+
+To move the app to another server, or to take a backup by hand, use the
+"Sicherung" card on the Import/Export page. "Sicherung herunterladen" gives one
+ZIP file, `rechnungen-sicherung-YYYY-MM-DD-HHmm.zip`, with everything the app
+keeps: graves, recipients, items, invoices with their PDFs, and the settings.
+It is taken while the app runs. The file holds personal data, so store it
+accordingly.
+
+On the other instance, "Sicherung einspielen" takes that file, checks it and
+shows what it holds. After you confirm, **all** data of that instance is
+replaced by the backup's. A backup from an older version is migrated; one from
+a newer version is refused, so update the target instance first. Neither
+download nor restore works while an invoice run or other job is active.
+
+The replaced database is not deleted. It stays next to the live one as
+`invoicing.db.before-restore-<yyyyMMdd-HHmmss>`, with its `-wal` and `-shm`
+files; the app never removes these, so delete them yourself when you no longer
+need them. If a restore fails, the old database is put back by itself. Should
+even that fail, the app answers every request with 503 until you stop it, move
+the safety copy back over `invoicing.db` by hand, and start it again.
+
+The scheduled file-copy backups above are not read by the app; restore them as
+described there.
+
 ## Upgrading
 
 Take a backup, then start the new version on the same data folder:

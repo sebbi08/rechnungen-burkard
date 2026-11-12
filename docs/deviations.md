@@ -10,14 +10,15 @@ follow the constitution as written.
 interface).
 
 **Deviation**: `SaveGrave`, `GraveInvoicingStatus`, `BulkDownloadDocuments`,
-`ImportTemplate`, `ImportArchive`, `GraveInvoiceGroup`, `ItemGraves`,
+`ImportTemplate`, `ImportArchive`, `DownloadBackup`, `UploadBackup`,
+`RestoreBackup`, `DiscardBackup`, `GraveInvoiceGroup`, `ItemGraves`,
 `ValidateGraveBilling` and `PreviewGraveBilling` are plain MVC routes mounted
 under the `/odata` prefix. They do not appear in `$metadata`.
 `Documents({key})/$value` is one too: it streams a document's PDF, while the
 EDM declares `Document` without a media stream and keeps its content out.
 
 **Why**: Their payloads are not entity graphs — a ZIP download, a multipart
-upload, a validation report, a half-year status projection, a PDF. Modelling
+upload, a backup file and a token for restoring it, a validation report, a half-year status projection, a PDF. Modelling
 them as EDM operations would force artificial entity types on responses that
 are files or reports, without making them any easier to consume.
 `GraveInvoiceGroup` reports the grave-level amounts behind a group of invoices,
@@ -31,7 +32,8 @@ the EDM serializer produces (`ODataJsonDefaults.PascalCase`), so a client reads
 data in one casing across the whole API. Two kinds of answer are camelCase
 instead, and the frontend reads them so: every error body
 (`{error: {code, message, args}}`, the same on EDM and non-EDM routes) and
-`ImportArchive`'s summary and problem report (`{summary: …}`, `{problems: […]}`).
+`ImportArchive`'s summary and problem report (`{summary: …}`, `{problems: […]}`),
+and `UploadBackup`'s answer (`{token, summary: {…}}`).
 All entity data — everything the UI lists, filters and sorts — goes through
 the EDM.
 
