@@ -74,7 +74,7 @@ test("cancelling the confirmation changes nothing", async ({ page }) => {
     await expect(ask).toBeVisible();
     // the counts depend on the other tests' data: the wording and numbers only
     await expect(ask).toContainText(
-      /Sicherung vom .+ \(Version .+\) – Gräber: [\d.]+, Empfänger: [\d.]+, Rechnungen: [\d.]+/,
+      /Sicherung vom .+ \(Version .+\) – Gräber: [\d.]+, Empfänger: [\d.]+, Rechnungen: [\d.]+, Angebote: [\d.]+/,
     );
     await expect(ask).toContainText(
       "Alle Daten dieser Instanz werden durch die Sicherung ersetzt.",

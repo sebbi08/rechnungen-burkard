@@ -425,6 +425,84 @@ public class BackupTests
     }
 
     [Fact]
+    public async Task Upload_BackupWithQuote_CountsQuoteChains()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (itemId, recipientId) = await QuoteTests.SeedAsync(host);
+        var created = await QuoteTests.CreateQuoteAsync(
+            client,
+            recipientId,
+            QuoteTests.Lines(itemId, 1)
+        );
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var response = await UploadAsync(client, await DownloadAsync(client));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var summary = json.RootElement.GetProperty("summary");
+        Assert.Equal(1, summary.GetProperty("quotes").GetInt32());
+        Assert.False(summary.GetProperty("newerInvoicesHere").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Upload_LiveHasNewerQuote_FlagsIt()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (itemId, recipientId) = await QuoteTests.SeedAsync(host);
+        var zip = await DownloadAsync(client);
+        var created = await QuoteTests.CreateQuoteAsync(
+            client,
+            recipientId,
+            QuoteTests.Lines(itemId, 1)
+        );
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        var response = await UploadAsync(client, zip);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        var summary = json.RootElement.GetProperty("summary");
+        Assert.Equal(0, summary.GetProperty("quotes").GetInt32());
+        Assert.True(summary.GetProperty("newerInvoicesHere").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Upload_BackupBeforeQuotes_CountsNoQuotes()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var path = Path.Combine(Path.GetTempPath(), $"backup-test-{Guid.NewGuid():N}.db");
+        try
+        {
+            using (
+                var db = new AppDbContext(
+                    new DbContextOptionsBuilder<AppDbContext>()
+                        .UseSqlite($"Data Source={path};Pooling=False")
+                        .Options
+                )
+            )
+            {
+                db.GetService<IMigrator>().Migrate("20261101095804_RecipientEmailAndCemeteries");
+            }
+
+            var response = await UploadAsync(client, BuildZip(path, ValidManifest));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = await ODataJson.ReadAsync(response);
+            var summary = json.RootElement.GetProperty("summary");
+            Assert.Equal(0, summary.GetProperty("quotes").GetInt32());
+            Assert.False(summary.GetProperty("newerInvoicesHere").GetBoolean());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Discard_RemovesStagingFile_AndUnknownTokenIsNoOp()
     {
         using var host = new ApiTestHost();

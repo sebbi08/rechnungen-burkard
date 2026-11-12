@@ -96,6 +96,7 @@ public class BackupController : ODataController
                             graves = s.Graves,
                             recipients = s.Recipients,
                             invoices = s.Invoices,
+                            quotes = s.Quotes,
                             newerInvoicesHere = s.NewerInvoicesHere,
                         },
                     }

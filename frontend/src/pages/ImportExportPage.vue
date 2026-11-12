@@ -122,6 +122,7 @@ function confirmRestore(summary: BackupSummary): Promise<boolean> {
       formatCount(summary.graves),
       formatCount(summary.recipients),
       formatCount(summary.invoices),
+      formatCount(summary.quotes),
     ]),
     newerInvoicesHere: summary.newerInvoicesHere,
   };

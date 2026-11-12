@@ -12,6 +12,7 @@ public sealed record BackupSummary(
     int Graves,
     int Recipients,
     int Invoices,
+    int Quotes,
     bool NewerInvoicesHere
 );
 
@@ -102,6 +103,7 @@ internal static class BackupStaging
         BackupManifest manifest,
         IReadOnlySet<string> knownMigrations,
         DateTime? liveLatestInvoice,
+        DateTime? liveLatestQuote,
         CancellationToken ct
     )
     {
@@ -162,17 +164,28 @@ internal static class BackupStaging
                 "SELECT MAX(GeneratedAt) FROM Invoices",
                 ct
             );
+
+            // a backup from before quotes existed has no table for them; restoring
+            // migrates it later
+            var hasQuotes =
+                await Scalar(
+                    connection,
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Quotes'",
+                    ct
+                )
+                is not null;
+            var quotes = hasQuotes
+                ? Convert.ToInt32(
+                    await Scalar(connection, "SELECT COUNT(DISTINCT RootId) FROM Quotes", ct)
+                )
+                : 0;
+            var backupLatestQuote = hasQuotes
+                ? await Scalar(connection, "SELECT MAX(GeneratedAt) FROM Quotes", ct)
+                : null;
+
             var newer =
-                liveLatestInvoice is { } live
-                && (
-                    backupLatest is not string text
-                    || live
-                        > DateTime.Parse(
-                            text,
-                            CultureInfo.InvariantCulture,
-                            DateTimeStyles.RoundtripKind
-                        )
-                );
+                IsNewer(liveLatestInvoice, backupLatest)
+                || IsNewer(liveLatestQuote, backupLatestQuote);
 
             return new BackupSummary(
                 manifest.CreatedAtUtc,
@@ -180,6 +193,7 @@ internal static class BackupStaging
                 graves,
                 recipients,
                 invoices,
+                quotes,
                 newer
             );
         }
@@ -188,6 +202,16 @@ internal static class BackupStaging
             throw new BackupRejectedException("BackupDamaged");
         }
     }
+
+    /// <summary>Whether the live database holds something the backup does not:
+    /// its newest <c>GeneratedAt</c> is later than the backup's, or the backup
+    /// has none. False when the live database has none.</summary>
+    private static bool IsNewer(DateTime? live, object? backupLatest) =>
+        live is { } l
+        && (
+            backupLatest is not string text
+            || l > DateTime.Parse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+        );
 
     /// <summary>Whether the database on <paramref name="connection"/> holds a job
     /// that is queued or running.</summary>

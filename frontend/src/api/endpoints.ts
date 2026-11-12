@@ -639,7 +639,8 @@ export interface BackupSummary {
   graves: number;
   recipients: number;
   invoices: number;
-  /** This instance holds invoices the backup does not: restoring loses them. */
+  quotes: number;
+  /** This instance holds invoices or quotes the backup does not: restoring loses them. */
   newerInvoicesHere: boolean;
 }
 

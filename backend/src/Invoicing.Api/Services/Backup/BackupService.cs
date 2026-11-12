@@ -523,11 +523,13 @@ public sealed class BackupService
             var manifest = await BackupStaging.ExtractAsync(zipPath, dbPath, ct);
             File.Delete(zipPath);
             var live = await _db.Invoices.Select(i => (DateTime?)i.GeneratedAt).MaxAsync(ct);
+            var liveQuote = await _db.Quotes.Select(q => (DateTime?)q.GeneratedAt).MaxAsync(ct);
             var summary = await BackupStaging.CheckAsync(
                 dbPath,
                 manifest,
                 _db.Database.GetMigrations().ToHashSet(),
                 live,
+                liveQuote,
                 ct
             );
             keep = true;

@@ -1079,13 +1079,14 @@ revising it, and checking the numbers, the stored versions and the printout.
 - **FR-082**: Restoring MUST be two steps. First the upload (up to 2 GB, not held
   in memory) MUST be checked without changing any data, and the system MUST
   answer with a summary: when the backup was taken, the application version,
-  and the numbers of graves, recipients and invoices. Then the user MUST confirm
+  and the numbers of graves, recipients, invoices and quotes (distinct chains,
+  0 for a backup from before quotes existed). Then the user MUST confirm
   explicitly, in a dialog that states that all data of this instance is
   replaced, whose accept button says so ("Alle Daten ersetzen") and whose
   default action is to cancel.
-- **FR-083**: When this instance holds invoices newer than the newest one in the
-  backup, the confirmation MUST say so in a warning of its own: those invoices
-  are lost, and their invoice numbers will be issued again.
+- **FR-083**: When this instance holds invoices or quotes newer than the newest
+  of each in the backup, the confirmation MUST say so in a warning of its own:
+  those invoices and quotes are lost, and their numbers will be issued again.
 - **FR-084**: A staged upload MUST be discarded when the user cancels, and
   otherwise once it is older than one hour, at the next upload or application
   start.
