@@ -768,6 +768,7 @@ public class BackupTests
     }
 
     private const string GenerationHeader = "X-Data-Generation";
+    private static readonly string StaleWriteName = $"Stale-{Guid.NewGuid():N}";
 
     private static async Task<string> GenerationAsync(HttpClient client)
     {
@@ -789,7 +790,7 @@ public class BackupTests
         var request = new HttpRequestMessage(HttpMethod.Post, "/odata/Recipients")
         {
             Content = ODataJson.Body(
-                new { Name = "G", Address = "Hauptstraße 1\n99999 Musterdorf" }
+                new { Name = StaleWriteName, Address = "Hauptstraße 1\n99999 Musterdorf" }
             ),
         };
         if (generation is not null)
@@ -823,7 +824,7 @@ public class BackupTests
 
         await AssertErrorAsync(response, HttpStatusCode.Conflict, "DataReplaced");
         Assert.NotEqual(before, Assert.Single(response.Headers.GetValues(GenerationHeader)));
-        Assert.DoesNotContain("G", await RecipientNamesAsync(client));
+        Assert.DoesNotContain(StaleWriteName, await RecipientNamesAsync(client));
     }
 
     [Fact]
@@ -859,6 +860,54 @@ public class BackupTests
         await RestoreOwnBackupAsync(client);
 
         Assert.Equal(HttpStatusCode.Created, (await PostRecipientAsync(client, null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task GateClosed_503CarriesGeneration()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var generation = await GenerationAsync(client);
+        var gate = host.Services.GetRequiredService<DatabaseGate>();
+
+        await gate.CloseAsync(CancellationToken.None);
+        var closed = await client.GetAsync("/odata/Recipients");
+        gate.Open();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, closed.StatusCode);
+        Assert.Equal(generation, Assert.Single(closed.Headers.GetValues(GenerationHeader)));
+    }
+
+    [Fact]
+    public async Task Load_ReadsWhatRestoreStored()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await RestoreOwnBackupAsync(client);
+        var served = await GenerationAsync(client);
+
+        // what a restart does: a new instance, the same file
+        var restarted = new DataGeneration();
+        using (var scope = host.Services.CreateScope())
+        {
+            restarted.Load(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        }
+
+        Assert.NotEqual(0, restarted.Current);
+        Assert.Equal(served, restarted.Current.ToString());
+    }
+
+    [Fact]
+    public async Task FreshDatabase_HasGenerationZero()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        Assert.Equal("0", await GenerationAsync(client));
+        var loaded = new DataGeneration();
+        using var scope = host.Services.CreateScope();
+        loaded.Load(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        Assert.Equal(0, loaded.Current);
     }
 
     [Fact]
