@@ -824,6 +824,33 @@ public class BackupTests
         Assert.DoesNotContain(StaleWriteName, await RecipientNamesAsync(client));
     }
 
+    // no quote exists: an action that got past the guard would answer 400
+    [Theory]
+    [InlineData("CreateQuote")]
+    [InlineData("CreateQuoteRevision")]
+    [InlineData("DeclineQuote")]
+    [InlineData("ReopenQuote")]
+    [InlineData("DeleteQuote")]
+    [InlineData("ConvertQuote")]
+    public async Task StaleGeneration_QuoteActionRefused(string action)
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var before = await GenerationAsync(client);
+        await RestoreOwnBackupAsync(client);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/odata/{action}")
+        {
+            Content = ODataJson.Body(new { quoteId = 1 }),
+        };
+        request.Headers.Add(GenerationHeader, before);
+
+        await AssertErrorAsync(
+            await client.SendAsync(request),
+            HttpStatusCode.Conflict,
+            "DataReplaced"
+        );
+    }
+
     [Fact]
     public async Task StaleGeneration_ReadAllowed()
     {
