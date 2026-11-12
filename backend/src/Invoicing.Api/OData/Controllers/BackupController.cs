@@ -130,6 +130,7 @@ public class BackupController : ODataController
             "JobAlreadyRunning" => StatusCodes.Status409Conflict,
             "BackupTokenUnknown" => StatusCodes.Status404NotFound,
             "RestoreFailed" => StatusCodes.Status500InternalServerError,
+            "RestoreInProgress" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest,
         };
         return StatusCode(status, new { error = new { code, message = Message(code) } });
@@ -145,6 +146,7 @@ public class BackupController : ODataController
             "BackupFromNewerVersion" => "The backup was written by a newer version.",
             "BackupTokenUnknown" => "The backup is no longer staged; upload it again.",
             "RestoreFailed" => "Restoring the backup failed; the server log says what happened.",
+            "RestoreInProgress" => "A backup is being restored; try again shortly.",
             _ => code,
         };
 }

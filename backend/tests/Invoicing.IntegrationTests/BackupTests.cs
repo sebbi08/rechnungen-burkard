@@ -701,6 +701,40 @@ public class BackupTests
         Assert.Equal(HttpStatusCode.OK, open.StatusCode);
     }
 
+    /// <summary>The restore request goes around the gate, so it has to keep off
+    /// the database by itself while another restore is swapping: standing
+    /// between moving the live file aside and moving the backup in, a query
+    /// would open an empty database at the live path.</summary>
+    [Fact]
+    public async Task RestoreWhileAnotherIsSwapping_Answers503_AndTouchesNoDatabase()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var token = await StageAsync(client, await DownloadAsync(client));
+        var gate = host.Services.GetRequiredService<DatabaseGate>();
+        var aside = host.DbFilePath + ".test-aside";
+
+        await gate.CloseAsync(CancellationToken.None);
+        SqliteConnection.ClearAllPools();
+        File.Move(host.DbFilePath, aside);
+        HttpResponseMessage response;
+        try
+        {
+            response = await RestoreAsync(client, token);
+            Assert.False(File.Exists(host.DbFilePath), "the restore request opened the database");
+        }
+        finally
+        {
+            File.Delete(host.DbFilePath);
+            File.Move(aside, host.DbFilePath);
+            gate.Open();
+        }
+
+        await AssertErrorAsync(response, HttpStatusCode.ServiceUnavailable, "RestoreInProgress");
+        // the token is still good once the other restore is done
+        Assert.Equal(HttpStatusCode.NoContent, (await RestoreAsync(client, token)).StatusCode);
+    }
+
     [Fact]
     public async Task JobRunner_StartsNoJobWhileGateClosed()
     {

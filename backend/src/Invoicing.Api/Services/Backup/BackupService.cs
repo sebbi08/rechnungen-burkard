@@ -135,10 +135,26 @@ public sealed class BackupService
     /// file is gone afterwards.</summary>
     public async Task RestoreAsync(string token, CancellationToken ct)
     {
-        // asked before closing the gate as well, so that a refusal does not hold
-        // up everyone else while the requests inside drain
-        CheckRestorable(token);
+        // Asked before closing the gate as well, so that a refusal does not hold
+        // up everyone else while the requests inside drain. This request goes
+        // around the gate's middleware, so it passes the gate here itself: while
+        // another restore is swapping, a query would open whatever is at the
+        // live path, or create an empty database there.
+        if (!_gate.TryEnter())
+        {
+            throw new BackupRejectedException("RestoreInProgress");
+        }
+        try
+        {
+            CheckRestorable(token);
+        }
+        finally
+        {
+            _gate.Exit();
+        }
 
+        // Another restore may close the gate after the check above; then this
+        // waits for it to open again, and the check below runs on its result.
         await _gate.CloseAsync(ct);
         var reopen = true;
         try
