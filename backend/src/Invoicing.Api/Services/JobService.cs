@@ -37,6 +37,9 @@ public sealed class JobService
         return job;
     }
 
+    public bool HasAnyActive() =>
+        _db.Jobs.Any(j => j.Status == JobStatus.Queued || j.Status == JobStatus.Running);
+
     public bool HasActive(string type) =>
         _db.Jobs.Any(j =>
             j.Type == type && (j.Status == JobStatus.Queued || j.Status == JobStatus.Running)
