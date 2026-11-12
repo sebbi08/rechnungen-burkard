@@ -604,7 +604,9 @@ test("mark an invoice paid, filter by payment, and take it back (Story 4)", asyn
     Address: "Zahlungsweg 1\n12345 Zahlungsstadt",
   });
 
-  await page.goto("/invoices");
+  // a page holds ten invoices: the search keeps other specs' off it, and lets
+  // the new one in once it is saved
+  await page.goto(`/invoices?recipient=${encodeURIComponent(recipientName)}`);
 
   // a row of this run's own, so the assertions below cannot pick up an invoice
   // another spec or an earlier run created

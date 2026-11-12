@@ -1,7 +1,7 @@
 /** How many rows a paged list shows at a time. */
-export const PAGE_SIZE = 100;
+export const PAGE_SIZE = 10;
 
-/** The paginator every paged list shows: the page links, then "1–100 von 163". */
+/** The paginator every paged list shows: the page links, then "1–10 von 163". */
 export const PAGINATOR_TEMPLATE =
   "FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport";
 

@@ -3,7 +3,7 @@ import Button from "primevue/button";
 import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { InvoiceItem } from "@/api/generated";
 import { useItemsQuery, useVatRatesQuery } from "@/api/queries";
@@ -12,7 +12,9 @@ import ColumnFilterSheet from "@/components/ColumnFilterSheet.vue";
 import ItemDialog from "@/components/ItemDialog.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { type ColumnFilterField, useColumnFilters } from "@/composables/useColumnFilters";
+import { usePageReport } from "@/composables/usePageReport";
 import { formatAmount, formatVatRate } from "@/lib/format";
+import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 import { QUARTERS, quarterLabelKey } from "@/lib/quarter";
 import { matchesAmount, matchesWords } from "@/lib/searchWords";
 
@@ -68,6 +70,21 @@ const rows = computed(() => {
   );
 });
 
+// the pages are cut from what the searches leave of the catalogue
+const first = ref(0);
+watch(filters.applied, () => {
+  first.value = 0;
+});
+watch(
+  () => rows.value.length,
+  (total) => {
+    if (first.value >= total) {
+      first.value = lastPageStart(total);
+    }
+  },
+);
+const pageReport = usePageReport();
+
 const dialogOpen = ref(false);
 const editing = ref<InvoiceItem | null>(null);
 
@@ -94,8 +111,13 @@ function open(item: InvoiceItem | null): void {
       />
 
       <DataTable
+        v-model:first="first"
         :value="rows"
         data-key="Id"
+        paginator
+        :rows="PAGE_SIZE"
+        :paginator-template="PAGINATOR_TEMPLATE"
+        :current-page-report-template="pageReport"
         :loading="items.isFetching.value"
         striped-rows
         filter-display="row"

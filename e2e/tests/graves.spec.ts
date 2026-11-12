@@ -433,7 +433,9 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   const recipientName = `Preis Beispiel ${RUN}`;
   await createRow(page, "/odata/Recipients", { Name: recipientName, Address: "Preisweg 1" });
 
-  await page.goto("/graves");
+  // a page holds ten graves: the search keeps other specs' off it, and lets
+  // the new one in once it is saved
+  await page.goto(`/graves?number=${encodeURIComponent(graveNumber)}`);
   const editor = await startNewGrave(page, graveNumber);
   await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
   await pickItem(page, 1, noPriceItemNumber);
@@ -777,10 +779,10 @@ function halfButton(scope: Page | Locator, half: number): Locator {
   return scope.getByRole("group", { name: "Halbjahr" }).getByRole("button", { name: `H${half}` });
 }
 
-test("the overview shows a hundred graves a page, of those the search leaves", async ({ page }) => {
+test("the overview shows ten graves a page, of those the search leaves", async ({ page }) => {
   const marker = `GS-${unique()}`;
   // A half-year far ahead that no test generates: a generation renders the
-  // documents of every grave due in its half-year, and 101 more of them would
+  // documents of every grave due in its half-year, and eleven more of them would
   // slow down whichever test started it.
   const year = CURRENT_YEAR + 9;
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
@@ -795,7 +797,7 @@ test("the overview shows a hundred graves a page, of those the search leaves", a
     Address: "Musterweg 1",
   });
   const numbers = Array.from(
-    { length: 101 },
+    { length: 11 },
     (_, i) => `${marker}-${String(i + 1).padStart(3, "0")}`,
   );
   for (let start = 0; start < numbers.length; start += 10) {
@@ -819,15 +821,14 @@ test("the overview shows a hundred graves a page, of those the search leaves", a
   // the pages are cut from the graves the search leaves, not from all of them
   await searchColumn(page, "Grabnummer", marker);
   const rows = page.getByRole("row").filter({ hasText: marker });
-  await expect(rows).toHaveCount(100);
-  await expect(page.getByText("1–100 von 101")).toBeVisible();
+  await expect(rows).toHaveCount(10);
+  await expect(page.getByText("1–10 von 11")).toBeVisible();
 
-  // a hundred rows are taller than the window, and the paginator stays in it
   const next = page.getByRole("button", { name: "Nächste Seite" });
   await expect(next).toBeInViewport();
   await next.click();
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText("101–101 von 101")).toBeVisible();
+  await expect(page.getByText("11–11 von 11")).toBeVisible();
 
   // a narrower search starts on page one again: 001 to 009
   await searchColumn(page, "Grabnummer", `${marker}-00`);
@@ -1689,7 +1690,8 @@ test.describe("the half-year today falls in", () => {
     await page.route(/\/odata\/Jobs\(\d+\)/, (route) =>
       lost++ < 2 ? route.abort("connectionreset") : route.continue(),
     );
-    await page.goto("/graves");
+    // a page holds ten graves: the search keeps other specs' off it
+    await page.goto(`/graves?number=${encodeURIComponent(marker)}`);
 
     await page.getByRole("button", { name: "Rechnungen erzeugen" }).click();
     await waitForOverlayOpen(page);
@@ -1917,7 +1919,8 @@ test.describe("the half-year today falls in", () => {
     await page.request.post("/odata/SetInvoicePaid", {
       data: { invoiceId: invoiceIds[0], paid: true },
     });
-    await page.goto("/graves");
+    // a page holds ten graves: the search keeps other specs' off it
+    await page.goto(`/graves?number=${encodeURIComponent(graveNumber)}`);
     const row = page.getByRole("row").filter({ hasText: graveNumber });
     // the count says how many of the grave's recipients have settled
     await expect(row).toContainText(`teilweise bezahlt (1 / ${invoiceIds.length})`);

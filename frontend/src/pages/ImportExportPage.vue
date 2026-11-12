@@ -16,12 +16,14 @@ import { ApiError } from "@/api/http";
 import PageHeader from "@/components/PageHeader.vue";
 import { useBlocking } from "@/composables/useBlocking";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { useShortTablePaging } from "@/composables/usePageReport";
 import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
 import { formatAmount, formatVatRate } from "@/lib/format";
 
 const i18n = useI18n();
 const { t } = i18n;
+const paging = useShortTablePaging();
 const { showError } = useErrorToast();
 const { run } = useBlocking();
 const queryClient = useQueryClient();
@@ -164,7 +166,7 @@ async function startImport(): Promise<void> {
     <Card v-if="problems.length">
       <template #title>{{ t("importProblemsHeader") }}</template>
       <template #content>
-        <DataTable :value="problems" size="small">
+        <DataTable :value="problems" v-bind="paging" size="small">
           <Column field="file" :header="t('importProblemFile')" />
           <Column field="row" :header="t('importProblemRow')" class="w-24" />
           <Column :header="t('importProblemMessage')">

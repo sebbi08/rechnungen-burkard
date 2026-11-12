@@ -4,14 +4,14 @@ import Card from "primevue/card";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import InputText from "primevue/inputtext";
-import { computed, reactive } from "vue";
+import { computed, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { fetchInactiveGraves, type InactiveGraveRow } from "@/api/endpoints";
 import PageHeader from "@/components/PageHeader.vue";
+import { useShortTablePaging } from "@/composables/usePageReport";
 import { formatDeletedDate, formatMonth } from "@/lib/format";
 import { currentHalfYearStartMonth } from "@/lib/halfYear";
-import { PAGE_SIZE } from "@/lib/paging";
 import { matchesWords } from "@/lib/searchWords";
 
 const { t } = useI18n();
@@ -93,6 +93,26 @@ function rowsOf(panel: Panel): InactiveGraveRow[] {
     ),
   );
 }
+
+// Each panel pages what its own search leaves, and a changed search starts on
+// page one. A panel that shrinks under its page, the paginator moves back itself.
+const firsts = reactive<Record<string, number>>({
+  ended: 0,
+  deleted: 0,
+  endedCooperative: 0,
+  deletedCooperative: 0,
+});
+watch(
+  () => ({ ...terms }),
+  (now, before) => {
+    for (const key of Object.keys(now)) {
+      if (now[key] !== before[key]) {
+        firsts[key] = 0;
+      }
+    }
+  },
+);
+const paging = useShortTablePaging();
 </script>
 
 <template>
@@ -111,10 +131,10 @@ function rowsOf(panel: Panel): InactiveGraveRow[] {
           :placeholder="t('filterSearchColumn', [panel.title])"
         />
         <DataTable
+          v-model:first="firsts[panel.key]"
           :value="rowsOf(panel)"
           data-key="Id"
-          :paginator="rowsOf(panel).length > PAGE_SIZE"
-          :rows="PAGE_SIZE"
+          v-bind="paging"
           :loading="graves.isFetching.value"
           striped-rows
           class="compact-cells"

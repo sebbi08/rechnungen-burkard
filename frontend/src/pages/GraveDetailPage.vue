@@ -23,6 +23,7 @@ import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGrav
 import { useDeleteGrave } from "@/composables/useDeleteGrave";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
+import { useShortTablePaging } from "@/composables/usePageReport";
 import {
   formatAmount,
   formatDate,
@@ -40,6 +41,7 @@ const props = defineProps<{
   list: "/graves" | "/cooperative-graves" | "/inactive-graves";
 }>();
 const { t } = useI18n();
+const paging = useShortTablePaging();
 const LIST_LABELS = {
   "/graves": "menuGraves",
   "/cooperative-graves": "menuCooperativeGraves",
@@ -358,7 +360,7 @@ const {
     <Card>
       <template #title>{{ t("graveInvoices") }}</template>
       <template #content>
-        <DataTable :value="detail.data.value.invoices" data-key="Id" size="small">
+        <DataTable :value="detail.data.value.invoices" data-key="Id" v-bind="paging" size="small">
           <template #empty>{{ t("noGraveInvoices") }}</template>
           <Column :header="t('halfYear')" body-class="whitespace-nowrap">
             <template #body="{ data }">{{

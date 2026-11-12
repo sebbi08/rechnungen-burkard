@@ -880,9 +880,14 @@ non-interactive until completion, and the task runs exactly once.
   recipient (name and address), the invoice date (as shown, `dd.MM.yyyy`) and
   the invoice total (gross; matched as an amount, FR-068b).
   These searches MUST be answered by the server, which pages the list.
-- **FR-068a**: The invoice list, the grave overview and the recipient list MUST
-  show 100 entries per page. The pages MUST be cut from the list as filtered,
-  and a changed column search MUST start on the first page.
+- **FR-068a**: The invoice list, the grave overview, the list of cooperative
+  graves, the recipient list and the item list MUST show 10 entries per page.
+  The pages MUST be cut from the list as filtered, and a changed column search
+  MUST start on the first page. Every other table that lists records (the
+  panels of "Inaktive Gräber", the VAT rates and cemeteries in the settings, a
+  grave's invoices and an import's problems) MUST show 10 entries per page as
+  well, its paginator appearing once there is a second page; a panel's search
+  starts on its first page.
   The paginator MUST stay visible at the lower edge of the window while the
   rows of a page scroll.
 - **FR-068b**: Every search (each column's search in the four lists, and the

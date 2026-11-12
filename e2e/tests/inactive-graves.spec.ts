@@ -136,3 +136,34 @@ test("a panel searches and opens a grave", async ({ page }) => {
   await crumb.click();
   await expect(page).toHaveURL(/\/inactive-graves(\?.*)?$/);
 });
+
+test("a panel shows ten graves a page, of those its search leaves", async ({ page }) => {
+  const marker = `IG-${unique()}`;
+  const year = new Date().getFullYear();
+  await Promise.all(
+    Array.from({ length: 11 }, (_, i) =>
+      seedCooperative(page, `${marker}-${String(i + 1).padStart(2, "0")}`, {
+        startDate: `${year - 2}-01`,
+        endDate: `${year - 1}-12`,
+      }),
+    ),
+  );
+
+  await page.goto("/inactive-graves");
+  const title = "Beendete Genossenschaftsgräber";
+  const ended = panel(page, title);
+  const field = ended.getByRole("textbox", { name: `${title} durchsuchen` });
+  await field.fill(marker);
+  const rows = ended.locator("tbody tr");
+  await expect(rows).toHaveCount(10);
+  await expect(ended.getByText("1–10 von 11")).toBeVisible();
+
+  await ended.getByRole("button", { name: "Nächste Seite" }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(ended.getByText("11–11 von 11")).toBeVisible();
+
+  // a narrower search starts on page one again, and needs no paginator
+  await field.fill(`${marker}-0`);
+  await expect(rows).toHaveCount(9);
+  await expect(ended.getByRole("button", { name: "Nächste Seite" })).toHaveCount(0);
+});

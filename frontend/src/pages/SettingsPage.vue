@@ -18,10 +18,12 @@ import { useCemeteriesQuery, useSettingsQuery, useVatRatesQuery } from "@/api/qu
 import PageHeader from "@/components/PageHeader.vue";
 import { useConfirmAsync } from "@/composables/useConfirmAsync";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { useShortTablePaging } from "@/composables/usePageReport";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatVatRate } from "@/lib/format";
 
 const { t } = useI18n();
+const paging = useShortTablePaging();
 const toast = useToast();
 const { showError } = useErrorToast();
 const ask = useConfirmAsync();
@@ -205,6 +207,7 @@ async function deleteCemetery(id: number, name: string): Promise<void> {
           <DataTable
             :value="vatRates.data.value ?? []"
             data-key="Id"
+            v-bind="paging"
             size="small"
             :loading="vatRates.isFetching.value"
           >
@@ -256,6 +259,7 @@ async function deleteCemetery(id: number, name: string): Promise<void> {
           <DataTable
             :value="cemeteries.data.value ?? []"
             data-key="Id"
+            v-bind="paging"
             size="small"
             :loading="cemeteries.isFetching.value"
           >

@@ -43,6 +43,9 @@ interface ListScreen {
   route: string;
   /** What this run's own row in the list shows. */
   seeded: string;
+  /** The column search, as the list's URL query, that leaves this run's row:
+   *  a page holds ten rows, and other specs' rows would push it off. */
+  search: Record<string, string>;
   /** The action that opens the create dialog or editor. */
   action: string;
   /** Secondary columns, each with the width from which the table shows it. */
@@ -53,24 +56,28 @@ const LIST_SCREENS: ListScreen[] = [
   {
     route: "items",
     seeded: ITEM_NUMBER,
+    search: { number: ITEM_NUMBER },
     action: "Leistung anlegen",
     secondary: { "MwSt.-Satz": "md", Standardpreis: "sm" },
   },
   {
     route: "recipients",
     seeded: RECIPIENT_NAME,
+    search: { name: RECIPIENT_NAME },
     action: "Empfänger anlegen",
     secondary: { Empfängernummer: "sm", Adresse: "md" },
   },
   {
     route: "invoices",
     seeded: RECIPIENT_NAME,
+    search: { recipient: RECIPIENT_NAME },
     action: "Rechnung erstellen",
     secondary: { Empfänger: "sm", Datum: "md", Betrag: "md", Zahlung: "sm" },
   },
   {
     route: "graves",
     seeded: GRAVE_NUMBER,
+    search: { number: GRAVE_NUMBER },
     action: "Grab anlegen",
     secondary: {
       Grabstätte: "lg",
@@ -85,6 +92,7 @@ const LIST_SCREENS: ListScreen[] = [
   {
     route: "cooperative-graves",
     seeded: COOPERATIVE_NUMBER,
+    search: { number: COOPERATIVE_NUMBER },
     action: "Neues Genossenschaftsgrab",
     secondary: {
       Grabstätte: "lg",
@@ -240,7 +248,7 @@ for (const screen of LIST_SCREENS) {
     page,
   }) => {
     await seed(page);
-    await page.goto(`/${screen.route}`);
+    await page.goto(`/${screen.route}?${new URLSearchParams(screen.search)}`);
     const row = page.locator("tbody tr").filter({ hasText: screen.seeded }).first();
     await expect(row).toBeVisible();
 

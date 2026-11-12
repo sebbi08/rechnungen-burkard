@@ -44,7 +44,7 @@ body {
   --p-datatable-body-cell-padding: 0.75rem 0.5rem;
 }
 
-/* A page of a hundred rows is taller than the window. The paginator stays at
+/* A page of rows can be taller than the window. The paginator stays at
    the window's lower edge while the rows scroll, rather than under the last
    of them; the line above it sets it off from the rows passing beneath. It is
    the table's own wrapper that sticks: the paginator inside fills it, and an

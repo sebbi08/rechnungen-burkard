@@ -55,9 +55,11 @@ test("settings: a cemetery is added, renamed for its graves and kept while they 
   page,
 }) => {
   const ts = unique();
-  const name = `Südfriedhof ${ts}`;
-  const renamed = `Hauptfriedhof ${ts}`;
-  const unused = `Leerer Friedhof ${ts}`;
+  // The list shows ten cemeteries a page, by name, and the other specs add
+  // theirs: a leading digit sorts this test's own onto the first page.
+  const name = `0 Südfriedhof ${ts}`;
+  const renamed = `0 Hauptfriedhof ${ts}`;
+  const unused = `0 Leerer Friedhof ${ts}`;
   await page.goto("/settings");
   const cemeteries = page.locator("table", {
     has: page.getByRole("columnheader", { name: "Name", exact: true }),
@@ -386,7 +388,9 @@ test("recipients: create and search a recipient (Story 3)", async ({ page }) => 
   const ts = unique();
   const first = `Familie Mahr ${ts}`;
   const second = `Zweiter Empfänger ${ts}`;
-  await page.goto("/recipients");
+  // a page holds ten recipients: the search keeps other specs' off it, and
+  // lets the new ones in once they are saved
+  await page.goto(`/recipients?name=${encodeURIComponent(ts)}`);
 
   const createRecipient = async (name: string) => {
     await page.getByRole("button", { name: "Empfänger anlegen" }).click();
@@ -537,21 +541,15 @@ test("recipients: a filter with special characters", async ({ page }) => {
   await expect(table).not.toContainText(decoy);
 });
 
-test("recipients: the list shows a hundred a page, of those the search leaves", async ({
-  page,
-}) => {
+test("recipients: the list shows ten a page, of those the search leaves", async ({ page }) => {
   const ts = unique();
   const names = Array.from(
-    { length: 101 },
+    { length: 11 },
     (_, i) => `Seite ${ts} ${String(i + 1).padStart(3, "0")}`,
   );
-  for (let start = 0; start < names.length; start += 10) {
-    await Promise.all(
-      names
-        .slice(start, start + 10)
-        .map((name) => createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" })),
-    );
-  }
+  await Promise.all(
+    names.map((name) => createRow(page, "/odata/Recipients", { Name: name, Address: "Weg 1" })),
+  );
 
   await page.goto("/recipients");
   await searchColumn(
@@ -561,15 +559,44 @@ test("recipients: the list shows a hundred a page, of those the search leaves", 
     (url) => url.includes("/odata/Recipients") && url.includes(`name=Seite ${ts}`),
   );
   const rows = page.getByRole("row").filter({ hasText: `Seite ${ts}` });
-  await expect(rows).toHaveCount(100);
-  await expect(page.getByText("1–100 von 101")).toBeVisible();
+  await expect(rows).toHaveCount(10);
+  await expect(page.getByText("1–10 von 11")).toBeVisible();
 
-  // a hundred rows are taller than the window, and the paginator stays in it
   const next = page.getByRole("button", { name: "Nächste Seite" });
   await expect(next).toBeInViewport();
   await next.click();
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText("101–101 von 101")).toBeVisible();
+  await expect(page.getByText("11–11 von 11")).toBeVisible();
+});
+
+test("items: the list shows ten a page, of those the search leaves", async ({ page }) => {
+  const marker = `IP-${unique()}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 7 });
+  await Promise.all(
+    Array.from({ length: 11 }, (_, i) =>
+      createRow(page, "/odata/InvoiceItems", {
+        Number: `${marker}-${String(i + 1).padStart(2, "0")}`,
+        Description: "Grabpflege",
+        VatRate: 7,
+        DefaultPrice: 10,
+      }),
+    ),
+  );
+
+  await page.goto("/items");
+  await searchColumn(page, "Nummer", marker);
+  const rows = page.getByRole("row").filter({ hasText: marker });
+  await expect(rows).toHaveCount(10);
+  await expect(page.getByText("1–10 von 11")).toBeVisible();
+
+  await page.getByRole("button", { name: "Nächste Seite" }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByText("11–11 von 11")).toBeVisible();
+
+  // a narrower search starts on page one again: 01 to 09
+  await searchColumn(page, "Nummer", `${marker}-0`);
+  await expect(rows).toHaveCount(9);
+  await expect(page.getByText("1–9 von 9")).toBeVisible();
 });
 
 test("recipients: an e-mail address is optional and checked", async ({ page }) => {
