@@ -26,16 +26,7 @@ public class BackupController : ODataController
     {
         if (_jobs.HasAnyActive())
         {
-            return Conflict(
-                new
-                {
-                    error = new
-                    {
-                        code = "JobAlreadyRunning",
-                        message = "A job is running; try again when it has finished.",
-                    },
-                }
-            );
+            return Rejected(new BackupRejectedException("JobAlreadyRunning"));
         }
 
         var fileName = $"rechnungen-sicherung-{_clock.GetLocalNow():yyyy-MM-dd-HHmm}.zip";
@@ -46,4 +37,84 @@ public class BackupController : ODataController
         buffer.Position = 0;
         return File(buffer, "application/zip", fileName);
     }
+
+    /// <summary>Checks an uploaded backup and holds it under a token until it is
+    /// restored or discarded.</summary>
+    [HttpPost("UploadBackup")]
+    [RequestSizeLimit(2_147_483_648)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 2_147_483_648)]
+    public async Task<IActionResult> Upload(CancellationToken ct)
+    {
+        if (_jobs.HasAnyActive())
+        {
+            return Rejected(new BackupRejectedException("JobAlreadyRunning"));
+        }
+
+        // read the upload off the form directly: OData's input formatters do not
+        // model-bind multipart bodies
+        var file = Request.HasFormContentType ? Request.Form.Files.GetFile("file") : null;
+        if (file is null)
+        {
+            return Rejected(new BackupRejectedException("ArchiveRequired"));
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            var staged = await _backup.StageAsync(stream, ct);
+            var s = staged.Summary;
+            return Ok(
+                new
+                {
+                    token = staged.Token,
+                    summary = new
+                    {
+                        createdAt = s.CreatedAtUtc,
+                        appVersion = s.AppVersion,
+                        graves = s.Graves,
+                        recipients = s.Recipients,
+                        invoices = s.Invoices,
+                        newerInvoicesHere = s.NewerInvoicesHere,
+                    },
+                }
+            );
+        }
+        catch (BackupRejectedException e)
+        {
+            return Rejected(e);
+        }
+    }
+
+    public sealed record DiscardRequest(string? Token);
+
+    [HttpPost("DiscardBackup")]
+    public IActionResult Discard([FromBody] DiscardRequest request)
+    {
+        _backup.Discard(request.Token ?? "");
+        return NoContent();
+    }
+
+    // the one place a rejection code becomes a status and an error body
+    private IActionResult Rejected(BackupRejectedException e)
+    {
+        var status = e.Code switch
+        {
+            "JobAlreadyRunning" => StatusCodes.Status409Conflict,
+            "BackupTokenUnknown" => StatusCodes.Status404NotFound,
+            _ => StatusCodes.Status400BadRequest,
+        };
+        return StatusCode(status, new { error = new { code = e.Code, message = Message(e.Code) } });
+    }
+
+    private static string Message(string code) =>
+        code switch
+        {
+            "JobAlreadyRunning" => "A job is running; try again when it has finished.",
+            "ArchiveRequired" => "Upload the backup as the multipart field 'file'.",
+            "BackupInvalid" => "The file is not a backup of this application.",
+            "BackupDamaged" => "The backup's database is damaged.",
+            "BackupFromNewerVersion" => "The backup was written by a newer version.",
+            "BackupTokenUnknown" => "The backup is no longer staged; upload it again.",
+            _ => code,
+        };
 }

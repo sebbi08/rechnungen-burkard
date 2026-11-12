@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Burkard.Invoicing.Api.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -82,6 +83,84 @@ public sealed class BackupService
         finally
         {
             File.Delete(temp);
+        }
+    }
+
+    private string StagingDirectory =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(DatabasePath))!, "restore-staging");
+
+    private static readonly Regex TokenPattern = new("^[0-9a-f]{32}$");
+
+    /// <summary>The staged database for <paramref name="token"/>, or null when the
+    /// token is malformed or nothing is staged under it.</summary>
+    public string? StagedPath(string token)
+    {
+        if (token is null || !TokenPattern.IsMatch(token))
+        {
+            return null;
+        }
+
+        var path = Path.Combine(StagingDirectory, $"{token}.db");
+        return File.Exists(path) ? path : null;
+    }
+
+    public void Discard(string token)
+    {
+        if (StagedPath(token) is { } path)
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>Saves an uploaded backup, checks it and leaves the database in the
+    /// staging folder under a new token. A rejected upload leaves nothing behind.
+    /// The ZIP goes to disk first: uploads can be gigabytes.</summary>
+    public async Task<StagedBackup> StageAsync(Stream upload, CancellationToken ct)
+    {
+        Directory.CreateDirectory(StagingDirectory);
+        foreach (var old in Directory.GetFiles(StagingDirectory))
+        {
+            if (File.GetLastWriteTimeUtc(old) < DateTime.UtcNow.AddHours(-1))
+            {
+                try
+                {
+                    File.Delete(old);
+                }
+                catch (IOException) { }
+            }
+        }
+
+        var token = Guid.NewGuid().ToString("N");
+        var zipPath = Path.Combine(StagingDirectory, $"upload-{token}.zip");
+        var dbPath = Path.Combine(StagingDirectory, $"{token}.db");
+        var keep = false;
+        try
+        {
+            await using (var zip = new FileStream(zipPath, FileMode.CreateNew, FileAccess.Write))
+            {
+                await upload.CopyToAsync(zip, ct);
+            }
+
+            var manifest = await BackupStaging.ExtractAsync(zipPath, dbPath, ct);
+            File.Delete(zipPath);
+            var live = await _db.Invoices.Select(i => (DateTime?)i.GeneratedAt).MaxAsync(ct);
+            var summary = await BackupStaging.CheckAsync(
+                dbPath,
+                manifest,
+                _db.Database.GetMigrations().ToHashSet(),
+                live,
+                ct
+            );
+            keep = true;
+            return new StagedBackup(token, summary);
+        }
+        finally
+        {
+            File.Delete(zipPath);
+            if (!keep)
+            {
+                File.Delete(dbPath);
+            }
         }
     }
 
