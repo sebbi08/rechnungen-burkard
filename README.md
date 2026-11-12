@@ -73,18 +73,48 @@ accordingly.
 On the other instance, "Sicherung einspielen" takes that file, checks it and
 shows what it holds. After you confirm, **all** data of that instance is
 replaced by the backup's. A backup from an older version is migrated; one from
-a newer version is refused, so update the target instance first. Neither
-download nor restore works while an invoice run or other job is active.
+a newer version is refused, so update the target instance first. Downloading,
+uploading and restoring are all refused while an invoice run or other job is
+active.
 
 The replaced database is not deleted. It stays next to the live one as
 `invoicing.db.before-restore-<yyyyMMdd-HHmmss>`, with its `-wal` and `-shm`
 files; the app never removes these, so delete them yourself when you no longer
-need them. If a restore fails, the old database is put back by itself. Should
-even that fail, the app answers every request with 503 until you stop it, move
-the safety copy back over `invoicing.db` by hand, and start it again.
+need them. If a restore fails, the old database is put back by itself.
 
 The scheduled file-copy backups above are not read by the app; restore them as
 described there.
+
+### Recovering from a failed restore
+
+Should putting the old database back fail too, the app says so ("Die
+Sicherung konnte nicht eingespielt werden, und die bisherigen Daten konnten
+nicht automatisch zurückgelegt werden …"), answers every request with 503, and
+leaves a marker file `invoicing.db.restore-incomplete` in the data folder. The
+marker holds the path of the safety copy, and the log names it too. While the
+marker is there the app refuses to start, so that it never runs on a half
+swapped database. To repair it by hand:
+
+1. Stop the container: `docker stop rechnungen`.
+2. In the data folder, delete whatever is at the live path: `invoicing.db`,
+   `invoicing.db-wal`, `invoicing.db-shm` and `invoicing.db-journal`, those of
+   them that exist. Do not leave the `-wal` or `-shm` file behind: SQLite would
+   apply it to the database you put back.
+3. Move the safety copy named in the marker back under the live name, together
+   with its `-wal` and `-shm` files if it has them, each to the matching live
+   name. The marker gives the path inside the container (`/data/…`); on the
+   host the file is in the data folder:
+
+   ```sh
+   cd /srv/rechnungen
+   copy=invoicing.db.before-restore-20261112-143000   # the file name in the marker
+   mv "$copy" invoicing.db
+   [ -e "$copy-wal" ] && mv "$copy-wal" invoicing.db-wal
+   [ -e "$copy-shm" ] && mv "$copy-shm" invoicing.db-shm
+   ```
+
+4. Delete the marker: `rm invoicing.db.restore-incomplete`.
+5. Start the container: `docker start rechnungen`.
 
 ## Upgrading
 

@@ -1027,17 +1027,21 @@ changes.
   answer with a summary: when the backup was taken, the application version,
   and the numbers of graves, recipients and invoices. Then the user MUST confirm
   explicitly, in a dialog that states that all data of this instance is
-  replaced.
+  replaced, whose accept button says so ("Alle Daten ersetzen") and whose
+  default action is to cancel.
 - **FR-083**: When this instance holds invoices newer than the newest one in the
-  backup, the confirmation MUST say so: those invoices are lost, and their
-  invoice numbers will be issued again.
+  backup, the confirmation MUST say so in a warning of its own: those invoices
+  are lost, and their invoice numbers will be issued again.
 - **FR-084**: A staged upload MUST be discarded when the user cancels, and
-  otherwise one hour after it was staged.
-- **FR-085**: The system MUST refuse a file that is not a backup (`BackupInvalid`)
-  and a backup that cannot be read or fails SQLite's integrity check
-  (`BackupDamaged`), and MUST leave the instance unchanged. A request that is not
-  a ZIP archive MUST be refused with `ArchiveRequired`; a token that is unknown
-  or expired with `BackupTokenUnknown`.
+  otherwise once it is older than one hour, at the next upload or application
+  start.
+- **FR-085**: The system MUST refuse a file that is not a backup, including one
+  that is not a ZIP archive at all (`BackupInvalid`), and a backup that cannot be
+  read, fails SQLite's integrity check or holds a queued or running job
+  (`BackupDamaged`), and MUST leave the instance unchanged. An upload without the
+  multipart field `file` MUST be refused with `ArchiveRequired`; a token that is
+  unknown or expired with `BackupTokenUnknown`. A download whose copy turns out
+  to hold a queued or running job MUST be refused with `JobAlreadyRunning`.
 - **FR-086**: A backup from an older application version MUST be accepted and
   migrated to the running version as part of the restore. A backup that holds a
   migration the running version does not know MUST be refused with
@@ -1048,9 +1052,12 @@ changes.
   `-shm` files, and the application MUST NOT delete it.
 - **FR-088**: When any step fails after the replaced database was moved aside,
   the system MUST put it back, so the instance is unchanged, and refuse with
-  `RestoreFailed`. When putting it back fails too, the system MUST keep
-  refusing requests with `RestoreInProgress` until the safety copy has been
-  moved back by hand.
+  `RestoreFailed`. When putting it back fails too, the system MUST answer
+  `RestoreRollbackFailed` (500), MUST keep refusing every other request with
+  `RestoreInProgress` until the instance has been repaired by hand as the
+  README describes, and MUST leave a marker `<database file name>.restore-incomplete`
+  naming the safety copy beside the database. While that marker exists, the
+  application MUST refuse to start, before it opens or migrates the database.
 - **FR-089**: While a restore is in progress, the system MUST NOT start a job
   and MUST NOT let another request read or write the database: such a request is
   refused with `RestoreInProgress` (503).
