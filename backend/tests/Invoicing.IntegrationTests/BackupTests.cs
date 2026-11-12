@@ -61,10 +61,7 @@ public class BackupTests
         var root = manifest.RootElement;
         Assert.Equal("rechnungen-burkard-backup", root.GetProperty("format").GetString());
         Assert.Equal(1, root.GetProperty("formatVersion").GetInt32());
-        Assert.Equal(
-            "20261111213228_GraveContractNumberAndDeletedAt",
-            root.GetProperty("lastMigration").GetString()
-        );
+        Assert.Equal("20261112142130_Quotes", root.GetProperty("lastMigration").GetString());
     }
 
     [Fact]
