@@ -22,7 +22,7 @@ import { useBlocking } from "@/composables/useBlocking";
 import { useConfirmAsync } from "@/composables/useConfirmAsync";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { useShortTablePaging } from "@/composables/usePageReport";
-import { showMessage } from "@/composables/useMessage";
+import { showMessage, showMessageAndWait } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
 import { formatAmount, formatDateTime, formatVatRate } from "@/lib/format";
 
@@ -131,7 +131,8 @@ async function onBackupChosen(event: Event): Promise<void> {
       return;
     }
     await run(t("backupRestoring"), () => restoreBackup(staged.token));
-    showMessage(t("backupHeader"), t("backupRestored"), "info");
+    // the reload waits for the owner to dismiss the message, or it is never seen
+    await showMessageAndWait(t("backupHeader"), t("backupRestored"), "info");
     window.location.reload();
   } catch (error) {
     showError(error);
