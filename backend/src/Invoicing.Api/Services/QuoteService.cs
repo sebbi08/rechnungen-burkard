@@ -90,6 +90,7 @@ public sealed class QuoteService
         var edited =
             await _db.Quotes.SingleOrDefaultAsync(q => q.Id == quoteId, ct)
             ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
+        RequireOpen(edited);
 
         var recipient = await RecipientAsync(recipientId, ct);
         var lines = await _lines.BuildAsync(lineInputs, ct);
@@ -140,6 +141,85 @@ public sealed class QuoteService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return revision;
+    }
+
+    /// <summary>Declines the whole quote, whichever of its versions is
+    /// addressed. Only an open quote can be declined.</summary>
+    public async Task<Quote> DeclineAsync(long quoteId, CancellationToken ct)
+    {
+        var chain = await ChainAsync(quoteId, ct);
+        RequireOpen(chain[0]);
+        return await SetStateAsync(chain, QuoteState.Declined, ct);
+    }
+
+    /// <summary>Opens a declined quote again; its versions stay as they were.</summary>
+    public async Task<Quote> ReopenAsync(long quoteId, CancellationToken ct)
+    {
+        var chain = await ChainAsync(quoteId, ct);
+        if (chain[0].State != QuoteState.Declined)
+        {
+            throw new ValidationException("QuoteNotDeclined", "The quote is not declined.");
+        }
+        return await SetStateAsync(chain, QuoteState.Open, ct);
+    }
+
+    /// <summary>Deletes every version of the quote with its lines and PDFs. Its
+    /// number is not given again, as the counter is kept apart from the rows. A
+    /// quote that became an invoice stays.</summary>
+    public async Task DeleteAsync(long quoteId, CancellationToken ct)
+    {
+        var chain = await ChainAsync(quoteId, ct);
+        if (chain.Any(q => q.State == QuoteState.Converted))
+        {
+            throw new ValidationException(
+                "QuoteConverted",
+                "A quote that became an invoice cannot be deleted."
+            );
+        }
+        // tracked with their lines and documents, so the cascade removes those too
+        await _db
+            .Quotes.Include(q => q.Lines)
+            .Include(q => q.Document)
+            .Where(q => q.RootId == chain[0].RootId)
+            .LoadAsync(ct);
+        _db.Quotes.RemoveRange(chain);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task<List<Quote>> ChainAsync(long quoteId, CancellationToken ct)
+    {
+        var rootId =
+            await _db
+                .Quotes.Where(q => q.Id == quoteId)
+                .Select(q => (long?)q.RootId)
+                .SingleOrDefaultAsync(ct)
+            ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
+        return await _db
+            .Quotes.Where(q => q.RootId == rootId)
+            .OrderByDescending(q => q.RevisionNumber)
+            .ToListAsync(ct);
+    }
+
+    private async Task<Quote> SetStateAsync(
+        List<Quote> chain,
+        QuoteState state,
+        CancellationToken ct
+    )
+    {
+        foreach (var quote in chain)
+        {
+            quote.State = state;
+        }
+        await _db.SaveChangesAsync(ct);
+        return chain.Single(q => q.IsLatestRevision);
+    }
+
+    private static void RequireOpen(Quote quote)
+    {
+        if (quote.State != QuoteState.Open)
+        {
+            throw new ValidationException("QuoteNotOpen", "The quote is not open.");
+        }
     }
 
     private async Task<Recipient> RecipientAsync(long recipientId, CancellationToken ct) =>

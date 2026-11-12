@@ -44,8 +44,8 @@ public class QuoteActionsController : ODataController
         }
         catch (Exception ex)
         {
-            // escaping, the exception would be rethrown on the test host's client
-            // instead of answered with a 500, unlike production
+            // Letting the exception escape would cause the test host to rethrow it on the
+            // client instead of producing a 500 response; mirror production behavior.
             _logger.LogError(ex, "CreateQuote failed");
             return InternalError();
         }
@@ -87,6 +87,60 @@ public class QuoteActionsController : ODataController
         }
     }
 
+    [HttpPost("DeclineQuote")]
+    public Task<IActionResult> DeclineQuote([FromBody] QuoteIdRequest? request) =>
+        RunAsync(
+            request,
+            "DeclineQuote",
+            async id => Ok(await _service.DeclineAsync(id, HttpContext.RequestAborted))
+        );
+
+    [HttpPost("ReopenQuote")]
+    public Task<IActionResult> ReopenQuote([FromBody] QuoteIdRequest? request) =>
+        RunAsync(
+            request,
+            "ReopenQuote",
+            async id => Ok(await _service.ReopenAsync(id, HttpContext.RequestAborted))
+        );
+
+    [HttpPost("DeleteQuote")]
+    public Task<IActionResult> DeleteQuote([FromBody] QuoteIdRequest? request) =>
+        RunAsync(
+            request,
+            "DeleteQuote",
+            async id =>
+            {
+                await _service.DeleteAsync(id, HttpContext.RequestAborted);
+                return NoContent();
+            }
+        );
+
+    private async Task<IActionResult> RunAsync(
+        QuoteIdRequest? request,
+        string action,
+        Func<long, Task<IActionResult>> run
+    )
+    {
+        if (request is null)
+        {
+            return MissingBody();
+        }
+
+        try
+        {
+            return await run(request.QuoteId);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "{Action} failed", action);
+            return InternalError();
+        }
+    }
+
     private BadRequestObjectResult MissingBody() =>
         BadRequest(
             new
@@ -105,6 +159,11 @@ public class QuoteActionsController : ODataController
             StatusCodes.Status500InternalServerError,
             new { error = new { code = "InternalError", message = "An internal error occurred." } }
         );
+
+    public sealed class QuoteIdRequest
+    {
+        public long QuoteId { get; set; }
+    }
 
     public sealed class CreateQuoteRequest
     {

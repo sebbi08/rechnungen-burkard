@@ -443,6 +443,12 @@ revising it, and checking the numbers, the stored versions and the printout.
 3. **Given** a mandatory field such as the recipient address is missing, **When**
    the user tries to save a quote, **Then** the system blocks saving as it does
    for an invoice.
+4. **Given** an open quote, **When** the user declines it, **Then** every version
+   of it is marked declined and it can no longer be edited; **When** the user
+   reopens it, **Then** it is open again with its versions unchanged.
+5. **Given** a quote that has not become an invoice, **When** the user deletes it,
+   **Then** every version and PDF is removed and its number is not given to a
+   later quote.
 
 ---
 
@@ -1005,6 +1011,13 @@ revising it, and checking the numbers, the stored versions and the printout.
 - **FR-083**: A quote version MUST have one PDF only, with no stamped copy, named
   after its number (`A2026-0001.pdf`). It MUST open in the browser like an
   invoice's normal document.
+- **FR-084**: A quote MUST be open, declined or converted, as a whole whichever
+  version is addressed. Only an open quote MUST be editable or declinable; only a
+  declined quote MUST be reopenable. Declining and reopening MUST change every
+  version at once and leave the versions and their PDFs as they are.
+- **FR-085**: Users MUST be able to delete a quote that is open or declined; all
+  its versions, lines and PDFs MUST then be removed. A converted quote MUST NOT
+  be deletable. A deleted quote's number MUST NOT be given again (FR-079).
 
 ### Key Entities _(include if feature involves data)_
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -355,5 +356,232 @@ public class QuoteTests
 
         var unknown = await client.GetAsync($"/odata/Quotes({id + 1000})/Pdf");
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> QuoteActionAsync(
+        HttpClient client,
+        string action,
+        long quoteId
+    ) => client.PostAsync($"/odata/{action}", ODataJson.Body(new { quoteId }));
+
+    private static async Task<List<QuoteState>> StatesAsync(ApiTestHost host, long rootId)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.Quotes.Where(q => q.RootId == rootId).Select(q => q.State).ToListAsync();
+    }
+
+    private static async Task SetChainStateAsync(ApiTestHost host, long rootId, QuoteState state)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        foreach (var quote in await db.Quotes.Where(q => q.RootId == rootId).ToListAsync())
+        {
+            quote.State = state;
+        }
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Declining_and_reopening_change_the_whole_chain()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (originalId, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        var (revisionId, _) = await CreatedAsync(
+            await ReviseQuoteAsync(client, originalId, recipientId, Lines(itemId, 2))
+        );
+
+        var declined = await QuoteActionAsync(client, "DeclineQuote", originalId);
+
+        Assert.Equal(HttpStatusCode.OK, declined.StatusCode);
+        using (var json = await ODataJson.ReadAsync(declined))
+        {
+            Assert.Equal(revisionId, json.RootElement.GetProperty("Id").GetInt64());
+            Assert.Equal("Declined", json.RootElement.GetProperty("State").GetString());
+        }
+        Assert.All(await StatesAsync(host, originalId), s => Assert.Equal(QuoteState.Declined, s));
+
+        var reopened = await QuoteActionAsync(client, "ReopenQuote", revisionId);
+
+        Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
+        using (var json = await ODataJson.ReadAsync(reopened))
+        {
+            Assert.Equal(revisionId, json.RootElement.GetProperty("Id").GetInt64());
+            Assert.Equal("Open", json.RootElement.GetProperty("State").GetString());
+        }
+        var states = await StatesAsync(host, originalId);
+        Assert.Equal(2, states.Count);
+        Assert.All(states, s => Assert.Equal(QuoteState.Open, s));
+    }
+
+    [Fact]
+    public async Task A_declined_quote_cannot_be_revised_or_declined_again()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (id, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+
+        Assert.Equal(
+            "QuoteNotDeclined",
+            await ErrorCodeAsync(await QuoteActionAsync(client, "ReopenQuote", id))
+        );
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await QuoteActionAsync(client, "DeclineQuote", id)).StatusCode
+        );
+
+        Assert.Equal(
+            "QuoteNotOpen",
+            await ErrorCodeAsync(await QuoteActionAsync(client, "DeclineQuote", id))
+        );
+        Assert.Equal(
+            "QuoteNotOpen",
+            await ErrorCodeAsync(await ReviseQuoteAsync(client, id, recipientId, Lines(itemId, 2)))
+        );
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.Quotes.CountAsync());
+    }
+
+    [Fact]
+    public async Task Deleting_removes_every_version_and_pdf()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (originalId, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        var (revisionId, _) = await CreatedAsync(
+            await ReviseQuoteAsync(client, originalId, recipientId, Lines(itemId, 2))
+        );
+        var (otherId, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+
+        var response = await QuoteActionAsync(client, "DeleteQuote", originalId);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var left = Assert.Single(await db.Quotes.ToListAsync());
+            Assert.Equal(otherId, left.Id);
+            Assert.Single(await db.QuoteLines.ToListAsync());
+            Assert.Single(await db.QuoteDocuments.ToListAsync());
+        }
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync($"/odata/Quotes({originalId})/Pdf")).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.NotFound,
+            (await client.GetAsync($"/odata/Quotes({revisionId})/Pdf")).StatusCode
+        );
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await QuoteActionAsync(client, "DeclineQuote", otherId)).StatusCode
+        );
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await QuoteActionAsync(client, "DeleteQuote", otherId)).StatusCode
+        );
+        using var verifyScope = host.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Empty(await verifyDb.Quotes.ToListAsync());
+        Assert.Empty(await verifyDb.QuoteLines.ToListAsync());
+        Assert.Empty(await verifyDb.QuoteDocuments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task A_deleted_number_is_never_given_again()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (_, first) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        var (secondId, second) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        Assert.Equal("A2026-0001", first);
+        Assert.Equal("A2026-0002", second);
+
+        Assert.Equal(
+            HttpStatusCode.NoContent,
+            (await QuoteActionAsync(client, "DeleteQuote", secondId)).StatusCode
+        );
+
+        var (_, third) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        Assert.Equal("A2026-0003", third);
+    }
+
+    [Fact]
+    public async Task A_converted_quote_cannot_be_deleted_declined_or_revised()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (id, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        await SetChainStateAsync(host, id, QuoteState.Converted);
+
+        Assert.Equal(
+            "QuoteConverted",
+            await ErrorCodeAsync(await QuoteActionAsync(client, "DeleteQuote", id))
+        );
+        Assert.Equal(
+            "QuoteNotOpen",
+            await ErrorCodeAsync(await QuoteActionAsync(client, "DeclineQuote", id))
+        );
+        Assert.Equal(
+            "QuoteNotOpen",
+            await ErrorCodeAsync(await ReviseQuoteAsync(client, id, recipientId, Lines(itemId, 2)))
+        );
+        Assert.Equal(
+            "QuoteNotDeclined",
+            await ErrorCodeAsync(await QuoteActionAsync(client, "ReopenQuote", id))
+        );
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var quote = await db.Quotes.SingleAsync();
+        Assert.Equal(QuoteState.Converted, quote.State);
+        Assert.Single(await db.QuoteLines.ToListAsync());
+        Assert.Single(await db.QuoteDocuments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task An_unknown_quote_is_refused_by_every_action()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+
+        foreach (var action in new[] { "DeclineQuote", "ReopenQuote", "DeleteQuote" })
+        {
+            Assert.Equal(
+                "QuoteNotFound",
+                await ErrorCodeAsync(await QuoteActionAsync(client, action, 4711))
+            );
+        }
+        Assert.Equal(
+            "QuoteNotFound",
+            await ErrorCodeAsync(
+                await ReviseQuoteAsync(client, 4711, recipientId, Lines(itemId, 1))
+            )
+        );
     }
 }
