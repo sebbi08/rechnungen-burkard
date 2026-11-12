@@ -5,6 +5,35 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.4.0 — 2026-11-12
+
+### Features
+- count quotes in the backup summary (27ec4ed)
+- **frontend**: a quote's detail page and its conversion into an invoice (cfb9bb8)
+- mark a grave's open invoices paid from the grave list (85d42eb)
+- **frontend**: a list of quotes with their editor and actions (7df13f5)
+- list and search quotes (a2552e9)
+- convert a quote into an invoice (e3461f8)
+- decline, reopen and delete quotes (1d60c2b)
+- create and revise quotes with their own numbering and PDF (715b343)
+- **frontend**: download and restore a backup from the import page (532d263)
+- refuse writes from pages that still show replaced data (cb45540)
+- **documents**: print a quote headed Angebot (ebf8d0d)
+- restore a backup, keep the replaced database, roll back on failure (dcd9aaa)
+- upload a backup and check it before restoring (c3bdc7f)
+- download a backup of the whole database (482a515)
+- **scripts**: import the items of ordinary FriedWin invoices since 2021 (37e76b4)
+
+### Fixes
+- **frontend**: fit the grave overview's row actions on a laptop (c88f6c8)
+- **frontend**: ask for a restore with "Abbrechen" focused (14372a6)
+- stream backups through disk and report a failed rollback (6cc2432)
+- **frontend**: reload after the restore message is dismissed (4752467)
+- refuse a restore while another one is swapping (b0757e1)
+
+### Other changes
+- delete quotes without loading their PDFs (25f4f1a)
+
 ## v3.3.0 — 2026-11-12
 
 ### Features
