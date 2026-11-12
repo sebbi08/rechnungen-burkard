@@ -712,7 +712,9 @@ non-interactive until completion, and the task runs exactly once.
   name, cemetery, term (and for cooperative graves the contract number, for deleted
   ones the day of deletion) and offers a text search of its own. A grave opens
   from it in its detail page, which MUST keep the page marked in the menu and lead
-  back to it through its breadcrumb.
+  back to it through its breadcrumb. Each panel MUST fold away and open again
+  from its heading, keeping its search; the browser remembers which panels are
+  folded.
 - **FR-029**: Users MUST be able to select a half-year to view graves invoiced in
   past or future half-years.
 - **FR-029a**: The grave overview MUST show each grave's cemetery, as it shows

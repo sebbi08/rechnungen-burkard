@@ -137,6 +137,44 @@ test("a panel searches and opens a grave", async ({ page }) => {
   await expect(page).toHaveURL(/\/inactive-graves(\?.*)?$/);
 });
 
+test("a panel folds from its heading and is remembered folded", async ({ page }) => {
+  const marker = `IG-${unique()}`;
+  const year = new Date().getFullYear();
+  await seedCooperative(page, `${marker}-coop-ended`, {
+    startDate: `${year - 2}-01`,
+    endDate: `${year - 1}-12`,
+  });
+
+  await page.goto("/inactive-graves");
+  const title = "Beendete Genossenschaftsgräber";
+  const ended = panel(page, title);
+  const toggle = ended.getByRole("button", { name: title, exact: true });
+  const field = ended.getByRole("textbox", { name: `${title} durchsuchen` });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await field.fill(marker);
+  await expect(ended.locator("tbody tr")).toHaveCount(1);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(field).toHaveCount(0);
+  await expect(ended.locator("table")).toHaveCount(0);
+  // the others stay open
+  await expect(
+    panel(page, "Beendete Gräber").getByRole("textbox", { name: "Beendete Gräber durchsuchen" }),
+  ).toBeVisible();
+
+  // opened again, it has kept its search
+  await toggle.click();
+  await expect(field).toHaveValue(marker);
+  await expect(ended.locator("tbody tr")).toHaveCount(1);
+
+  // folded, it stays folded across a reload
+  await toggle.click();
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(field).toHaveCount(0);
+});
+
 test("a panel shows ten graves a page, of those its search leaves", async ({ page }) => {
   const marker = `IG-${unique()}`;
   const year = new Date().getFullYear();

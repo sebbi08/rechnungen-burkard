@@ -54,6 +54,30 @@ const terms = reactive<Record<string, string>>({
   deletedCooperative: "",
 });
 
+// Which panels are folded away. Remembered in this browser, so coming back
+// from a grave's page, or another day, shows the page as it was left.
+const COLLAPSED_KEY = "invoicing-inactive-graves-collapsed";
+
+function storedCollapsed(): Record<string, boolean> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "{}");
+    return typeof value === "object" && value != null ? (value as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+const collapsed = reactive<Record<string, boolean>>(storedCollapsed());
+
+function toggle(panel: Panel): void {
+  collapsed[panel.key] = !collapsed[panel.key];
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
+  } catch {
+    // storage unavailable (private mode): the choice lasts for this page only
+  }
+}
+
 // A grave is in exactly one panel or none: deleted wins over ended, and one
 // that has not ended (by the first month of the current half-year, as the
 // other lists count it) and is not deleted is in none.
@@ -121,77 +145,96 @@ const paging = useShortTablePaging();
   <div class="flex flex-col gap-6">
     <Card v-for="panel in panels" :key="panel.key" :data-testid="`panel-${panel.key}`">
       <template #title>
-        <h2 class="m-0 text-xl font-semibold">{{ panel.title }}</h2>
+        <!-- the whole heading folds the panel, not just an icon at its edge -->
+        <h2 class="m-0 text-xl font-semibold">
+          <button
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-3 text-left"
+            :aria-expanded="!collapsed[panel.key]"
+            :aria-controls="collapsed[panel.key] ? undefined : `panel-${panel.key}-content`"
+            @click="toggle(panel)"
+          >
+            <i
+              class="pi pi-chevron-down text-base transition-transform"
+              :class="{ '-rotate-90': collapsed[panel.key] }"
+              aria-hidden="true"
+            />
+            {{ panel.title }}
+          </button>
+        </h2>
       </template>
-      <template #content>
-        <InputText
-          v-model="terms[panel.key]"
-          class="mb-3 w-full sm:w-80"
-          :aria-label="t('filterSearchColumn', [panel.title])"
-          :placeholder="t('filterSearchColumn', [panel.title])"
-        />
-        <DataTable
-          v-model:first="firsts[panel.key]"
-          :value="rowsOf(panel)"
-          data-key="Id"
-          v-bind="paging"
-          :loading="graves.isFetching.value"
-          striped-rows
-          class="compact-cells"
-        >
-          <template #empty>{{ t("noData") }}</template>
-          <Column :header="t('graveNumber')">
-            <template #body="{ data }">
-              <!-- may break anywhere: a grave number has no space to break at -->
-              <RouterLink
-                :to="`/inactive-graves/${data.Id}`"
-                class="font-medium [overflow-wrap:anywhere] text-primary hover:underline"
-              >
-                {{ data.GraveNumber }}
-              </RouterLink>
-            </template>
-          </Column>
-          <Column
-            :header="t('graveSiteName')"
-            header-class="hidden lg:table-cell"
-            body-class="hidden lg:table-cell"
+      <!-- a folded panel keeps its search and its page for when it opens again -->
+      <template v-if="!collapsed[panel.key]" #content>
+        <div :id="`panel-${panel.key}-content`">
+          <InputText
+            v-model="terms[panel.key]"
+            class="mb-3 w-full sm:w-80"
+            :aria-label="t('filterSearchColumn', [panel.title])"
+            :placeholder="t('filterSearchColumn', [panel.title])"
+          />
+          <DataTable
+            v-model:first="firsts[panel.key]"
+            :value="rowsOf(panel)"
+            data-key="Id"
+            v-bind="paging"
+            :loading="graves.isFetching.value"
+            striped-rows
+            class="compact-cells"
           >
-            <template #body="{ data }">{{ data.SiteName || "–" }}</template>
-          </Column>
-          <Column
-            :header="t('graveCemetery')"
-            header-class="hidden lg:table-cell"
-            body-class="hidden lg:table-cell"
-          >
-            <template #body="{ data }">{{ data.CemeteryName }}</template>
-          </Column>
-          <Column
-            v-if="panel.cooperative"
-            :header="t('contractNumber')"
-            header-class="hidden lg:table-cell"
-            body-class="hidden lg:table-cell"
-          >
-            <template #body="{ data }">{{ data.ContractNumber || "–" }}</template>
-          </Column>
-          <Column
-            :header="t('startDate')"
-            header-class="hidden md:table-cell"
-            body-class="hidden md:table-cell tabular-nums"
-          >
-            <template #body="{ data }">{{ formatMonth(data.StartDate) }}</template>
-          </Column>
-          <Column :header="t('endDate')" body-class="tabular-nums">
-            <template #body="{ data }">{{ formatMonth(data.EndDate) || "–" }}</template>
-          </Column>
-          <Column
-            v-if="panel.deleted"
-            :header="t('deletedOn')"
-            header-class="hidden sm:table-cell"
-            body-class="hidden sm:table-cell tabular-nums"
-          >
-            <template #body="{ data }">{{ formatDeletedDate(data.DeletedAt) }}</template>
-          </Column>
-        </DataTable>
+            <template #empty>{{ t("noData") }}</template>
+            <Column :header="t('graveNumber')">
+              <template #body="{ data }">
+                <!-- may break anywhere: a grave number has no space to break at -->
+                <RouterLink
+                  :to="`/inactive-graves/${data.Id}`"
+                  class="font-medium [overflow-wrap:anywhere] text-primary hover:underline"
+                >
+                  {{ data.GraveNumber }}
+                </RouterLink>
+              </template>
+            </Column>
+            <Column
+              :header="t('graveSiteName')"
+              header-class="hidden lg:table-cell"
+              body-class="hidden lg:table-cell"
+            >
+              <template #body="{ data }">{{ data.SiteName || "–" }}</template>
+            </Column>
+            <Column
+              :header="t('graveCemetery')"
+              header-class="hidden lg:table-cell"
+              body-class="hidden lg:table-cell"
+            >
+              <template #body="{ data }">{{ data.CemeteryName }}</template>
+            </Column>
+            <Column
+              v-if="panel.cooperative"
+              :header="t('contractNumber')"
+              header-class="hidden lg:table-cell"
+              body-class="hidden lg:table-cell"
+            >
+              <template #body="{ data }">{{ data.ContractNumber || "–" }}</template>
+            </Column>
+            <Column
+              :header="t('startDate')"
+              header-class="hidden md:table-cell"
+              body-class="hidden md:table-cell tabular-nums"
+            >
+              <template #body="{ data }">{{ formatMonth(data.StartDate) }}</template>
+            </Column>
+            <Column :header="t('endDate')" body-class="tabular-nums">
+              <template #body="{ data }">{{ formatMonth(data.EndDate) || "–" }}</template>
+            </Column>
+            <Column
+              v-if="panel.deleted"
+              :header="t('deletedOn')"
+              header-class="hidden sm:table-cell"
+              body-class="hidden sm:table-cell tabular-nums"
+            >
+              <template #body="{ data }">{{ formatDeletedDate(data.DeletedAt) }}</template>
+            </Column>
+          </DataTable>
+        </div>
       </template>
     </Card>
   </div>
