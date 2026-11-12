@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { createRow, ensureCemetery, ensureRow, SEED_CEMETERY, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, SEED_CEMETERY, seedGrave, seedQuote } from "../seed";
 import { unique } from "../unique";
 import {
   dialog,
@@ -75,6 +75,13 @@ const LIST_SCREENS: ListScreen[] = [
     secondary: { Empfänger: "sm", Datum: "md", Betrag: "md", Zahlung: "sm" },
   },
   {
+    route: "quotes",
+    seeded: RECIPIENT_NAME,
+    search: { recipient: RECIPIENT_NAME },
+    action: "Neues Angebot",
+    secondary: { Empfänger: "sm", Datum: "md", Betrag: "md", Status: "sm" },
+  },
+  {
     route: "graves",
     seeded: GRAVE_NUMBER,
     search: { number: GRAVE_NUMBER },
@@ -110,15 +117,15 @@ const LIST_SCREENS: ListScreen[] = [
 // collides with rows an earlier attempt left in a stack that kept its data.
 // Every test that needs them calls `seed` itself, so it runs alone or in any
 // order; a worker only keeps from seeding them twice.
-let seeding: Promise<number> | undefined;
+let seeding: Promise<{ invoiceRootId: number; quoteRootId: number }> | undefined;
 
-/** Seeds this worker's rows once, and answers its invoice's root id. */
-function seed(page: Page): Promise<number> {
+/** Seeds this worker's rows once, and answers its invoice's and quote's root ids. */
+function seed(page: Page): Promise<{ invoiceRootId: number; quoteRootId: number }> {
   seeding ??= seedRows(page);
   return seeding;
 }
 
-async function seedRows(page: Page): Promise<number> {
+async function seedRows(page: Page): Promise<{ invoiceRootId: number; quoteRootId: number }> {
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const item = await createRow(page, "/odata/InvoiceItems", {
     Number: ITEM_NUMBER,
@@ -146,7 +153,11 @@ async function seedRows(page: Page): Promise<number> {
     recipientId: recipient.Id,
     lines: [{ itemId: item.Id, count: 2, unitPrice: 12.5 }],
   });
-  return invoice.RootId;
+  const quote = await seedQuote(page, {
+    recipientId: recipient.Id,
+    lines: [{ itemId: item.Id, count: 2, unitPrice: 12.5 }],
+  });
+  return { invoiceRootId: invoice.RootId, quoteRootId: quote.id };
 }
 
 // Layout bugs these specs found in the frontend, left for a session of their
@@ -440,7 +451,7 @@ test("graves: the recipients popover stays on the screen", async ({ page }) => {
 
 test("invoices: every row action stays reachable", async ({ page }) => {
   await seed(page);
-  await page.goto("/invoices");
+  await page.goto(`/invoices?${new URLSearchParams({ recipient: RECIPIENT_NAME })}`);
   const row = page.getByRole("row").filter({ hasText: RECIPIENT_NAME }).first();
   await expect(row).toBeVisible();
 
@@ -496,6 +507,60 @@ test("invoices: every row action stays reachable", async ({ page }) => {
       await menu.getByRole("menuitem", { name: "Details", exact: true }).click(step);
     }
     await expect(page).toHaveURL(/\/invoices\/\d+$/, step);
+  }).toPass({ timeout: 30_000 });
+});
+
+test("quotes: every row action stays reachable", async ({ page }) => {
+  await seed(page);
+  await page.goto(`/quotes?${new URLSearchParams({ recipient: RECIPIENT_NAME })}`);
+  const row = page.getByRole("row").filter({ hasText: RECIPIENT_NAME }).first();
+  await expect(row).toBeVisible();
+
+  const actions = [
+    "Details",
+    "Angebot herunterladen",
+    "Bearbeiten",
+    "In Rechnung umwandeln",
+    "Ablehnen",
+  ];
+  if (page.viewportSize()!.width >= BREAKPOINTS.xl) {
+    for (const name of actions) {
+      await expect(row.getByRole("button", { name: rowAction(name) })).toBeVisible();
+    }
+    return;
+  }
+
+  // As on the invoice list: below the widest screens the actions sit in a menu,
+  // which has to fit the screen without anything behind it needing to scroll.
+  const more = row.getByRole("button", { name: rowAction("Weitere Aktionen") });
+  await more.evaluate((element) => element.scrollIntoView({ block: "center", inline: "end" }));
+  await more.click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  await expect(page.locator(".p-menu")).not.toHaveClass(/p-connected-overlay-enter-active/);
+  for (const name of actions) {
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
+  }
+  const box = (await menu.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  const step = { timeout: 3000 };
+  await expect(async () => {
+    if (!/\/quotes\/\d+$/.test(page.url())) {
+      if (!(await menu.isVisible())) {
+        await more.click(step);
+      }
+      await expect(page.locator(".p-menu")).not.toHaveClass(
+        /p-connected-overlay-enter-active/,
+        step,
+      );
+      await menu.getByRole("menuitem", { name: "Details", exact: true }).click(step);
+    }
+    await expect(page).toHaveURL(/\/quotes\/\d+$/, step);
   }).toPass({ timeout: 30_000 });
 });
 
@@ -706,9 +771,18 @@ test("invoices: the editor spends its width on the fields", async ({ page }) => 
 // generated grave invoice, and generation belongs to graves.spec.ts alone. It
 // shares its revision panels with the invoice detail page, covered below.
 test("the invoice detail page fits the viewport", async ({ page }) => {
-  const rootId = await seed(page);
+  const { invoiceRootId } = await seed(page);
 
-  await page.goto(`/invoices/${rootId}`);
+  await page.goto(`/invoices/${invoiceRootId}`);
+  await expect(page.locator(".p-accordionpanel").first()).toContainText(ITEM_NUMBER);
+  await expectHeaderActionsFit(page);
+  await expectNoSidewaysScrolling(page);
+});
+
+test("the quote detail page fits the viewport", async ({ page }) => {
+  const { quoteRootId } = await seed(page);
+
+  await page.goto(`/quotes/${quoteRootId}`);
   await expect(page.locator(".p-accordionpanel").first()).toContainText(ITEM_NUMBER);
   await expectHeaderActionsFit(page);
   await expectNoSidewaysScrolling(page);
