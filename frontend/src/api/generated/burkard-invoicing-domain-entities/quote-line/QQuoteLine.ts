@@ -18,6 +18,7 @@ export class QQuoteLine extends QueryObject {
   public readonly UnitPrice = new QNumberPath(this.withPrefix("UnitPrice"));
   public readonly VatRate = new QNumberPath(this.withPrefix("VatRate"));
   public readonly PriceIncludesVat = new QBooleanPath(this.withPrefix("PriceIncludesVat"));
+  public readonly Comment = new QStringPath(this.withPrefix("Comment"));
   public readonly LineNumber = new QNumberPath(this.withPrefix("LineNumber"));
 }
 

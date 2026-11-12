@@ -199,6 +199,16 @@ export interface Invoice {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `IntroText` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  IntroText: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `EndingText` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
@@ -307,6 +317,7 @@ export interface EditableInvoice
       | "RecipientId"
       | "RecipientName"
       | "RecipientAddress"
+      | "IntroText"
       | "EndingText"
       | "StampWord"
       | "GeneratedAt"

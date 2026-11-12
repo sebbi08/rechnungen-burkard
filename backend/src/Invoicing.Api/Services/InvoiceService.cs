@@ -11,6 +11,10 @@ public sealed class InvoiceLineInput
     public int Count { get; set; }
     public decimal? UnitPrice { get; set; }
     public bool PriceIncludesVat { get; set; }
+
+    /// <summary>A note printed under the line on an ordinary invoice or a
+    /// quote. A grave takes its lines without one and ignores it.</summary>
+    public string? Comment { get; set; }
 }
 
 public sealed class InvoiceService
@@ -38,6 +42,7 @@ public sealed class InvoiceService
 
     public async Task<Invoice> CreateAsync(
         long recipientId,
+        string? introText,
         IReadOnlyList<InvoiceLineInput> lineInputs,
         CancellationToken ct
     )
@@ -56,7 +61,14 @@ public sealed class InvoiceService
         // used to read it first and retry on the unique index, and a request that
         // lost the race three times in a row came back as a 500.)
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
-        var invoice = await PersistAsync(recipient, settings, lines, quoteId: null, ct);
+        var invoice = await PersistAsync(
+            recipient,
+            settings,
+            LineBuilder.CleanText(introText),
+            lines,
+            quoteId: null,
+            ct
+        );
         await tx.CommitAsync(ct);
         return invoice;
     }
@@ -64,8 +76,8 @@ public sealed class InvoiceService
     /// <summary>Turns the latest version of an open quote into an ordinary new
     /// invoice: the next invoice number, today's date, the current ending text
     /// and stamp word and both PDFs, as <see cref="CreateAsync"/> gives them,
-    /// with the lines exactly as they were quoted and the recipient as it is
-    /// now. Every version of the quote becomes converted and points at the
+    /// with the lines, their comments and the free text exactly as they were
+    /// quoted and the recipient as it is now. Every version of the quote becomes converted and points at the
     /// invoice; the invoice points back at the quote's root.</summary>
     public async Task<Invoice> CreateFromQuoteAsync(long quoteId, CancellationToken ct)
     {
@@ -110,11 +122,12 @@ public sealed class InvoiceService
                 UnitPrice = l.UnitPrice,
                 VatRate = l.VatRate,
                 PriceIncludesVat = l.PriceIncludesVat,
+                Comment = l.Comment,
                 LineNumber = l.LineNumber,
             })
             .ToListAsync(ct);
 
-        var invoice = await PersistAsync(recipient, settings, lines, rootId, ct);
+        var invoice = await PersistAsync(recipient, settings, latest.IntroText, lines, rootId, ct);
 
         foreach (var quote in chain)
         {
@@ -129,6 +142,7 @@ public sealed class InvoiceService
     public async Task<Invoice> CreateRevisionAsync(
         long invoiceId,
         long recipientId,
+        string? introText,
         IReadOnlyList<InvoiceLineInput> lineInputs,
         CancellationToken ct
     )
@@ -206,6 +220,7 @@ public sealed class InvoiceService
             GraveSiteName = edited.GraveSiteName,
             GraveFieldNumber = edited.GraveFieldNumber,
             GravePosition = edited.GravePosition,
+            IntroText = LineBuilder.CleanText(introText),
             EndingText = settings.InvoiceEndingText,
             StampWord = settings.StampWord,
             GeneratedAt = now,
@@ -313,6 +328,7 @@ public sealed class InvoiceService
     private async Task<Invoice> PersistAsync(
         Recipient recipient,
         GlobalSettings settings,
+        string introText,
         List<InvoiceLine> lines,
         long? quoteId,
         CancellationToken ct
@@ -334,6 +350,7 @@ public sealed class InvoiceService
             RecipientName = recipient.Name,
             RecipientAddress = recipient.Address,
             RecipientNumber = recipient.Number,
+            IntroText = introText,
             EndingText = settings.InvoiceEndingText,
             StampWord = settings.StampWord,
             GeneratedAt = now,

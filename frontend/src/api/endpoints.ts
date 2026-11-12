@@ -16,18 +16,25 @@ export interface InvoiceLineInput {
   count: number;
   unitPrice: number | null;
   priceIncludesVat: boolean;
+  /** Only on ordinary invoices and quotes; a grave ignores it. */
+  comment?: string;
 }
 
-export async function createInvoice(recipientId: number, lines: InvoiceLineInput[]): Promise<void> {
-  await postJson("/odata/CreateInvoice", { recipientId, lines });
+export async function createInvoice(
+  recipientId: number,
+  introText: string,
+  lines: InvoiceLineInput[],
+): Promise<void> {
+  await postJson("/odata/CreateInvoice", { recipientId, introText, lines });
 }
 
 export async function createRevision(
   invoiceId: number,
   recipientId: number,
+  introText: string,
   lines: InvoiceLineInput[],
 ): Promise<void> {
-  await postJson("/odata/CreateRevision", { invoiceId, recipientId, lines });
+  await postJson("/odata/CreateRevision", { invoiceId, recipientId, introText, lines });
 }
 
 /** Revises every recipient invoice of the grave and half-year the invoice
@@ -51,6 +58,12 @@ export async function markInvoicesPaid(invoiceIds: number[]): Promise<void> {
 
 export async function fetchInvoiceLines(invoiceId: number): Promise<InvoiceLine[]> {
   return (await getJson<{ value: InvoiceLine[] }>(`/odata/Invoices(${invoiceId})/Lines`)).value;
+}
+
+/** The free text the invoice prints above its lines. */
+export async function fetchInvoiceIntroText(invoiceId: number): Promise<string> {
+  return (await getJson<{ IntroText: string }>(`/odata/Invoices(${invoiceId})?$select=IntroText`))
+    .IntroText;
 }
 
 export type DocumentKindName = "Normal" | "Copy";
@@ -79,21 +92,32 @@ export function bulkDownload(kind: DocumentKindName, year: number, half: number)
 
 // ---- quotes ---------------------------------------------------------------
 
-export async function createQuote(recipientId: number, lines: InvoiceLineInput[]): Promise<void> {
-  await postJson("/odata/CreateQuote", { recipientId, lines });
+export async function createQuote(
+  recipientId: number,
+  introText: string,
+  lines: InvoiceLineInput[],
+): Promise<void> {
+  await postJson("/odata/CreateQuote", { recipientId, introText, lines });
 }
 
 /** A new version of the quote; any row id of its chain addresses it. */
 export async function createQuoteRevision(
   quoteId: number,
   recipientId: number,
+  introText: string,
   lines: InvoiceLineInput[],
 ): Promise<void> {
-  await postJson("/odata/CreateQuoteRevision", { quoteId, recipientId, lines });
+  await postJson("/odata/CreateQuoteRevision", { quoteId, recipientId, introText, lines });
 }
 
 export async function fetchQuoteLines(quoteId: number): Promise<QuoteLine[]> {
   return (await getJson<{ value: QuoteLine[] }>(`/odata/Quotes(${quoteId})/Lines`)).value;
+}
+
+/** The free text the quote prints above its lines. */
+export async function fetchQuoteIntroText(quoteId: number): Promise<string> {
+  return (await getJson<{ IntroText: string }>(`/odata/Quotes(${quoteId})?$select=IntroText`))
+    .IntroText;
 }
 
 export async function declineQuote(quoteId: number): Promise<void> {

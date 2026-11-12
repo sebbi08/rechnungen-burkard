@@ -296,6 +296,10 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<string>("GraveSiteName")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IntroText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("InvoiceNumber")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -402,6 +406,10 @@ namespace Burkard.Invoicing.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Count")
                         .HasColumnType("INTEGER");
 
@@ -499,6 +507,10 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<DateTime>("GeneratedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IntroText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<long?>("InvoiceId")
                         .HasColumnType("INTEGER");
 
@@ -584,6 +596,10 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Count")
                         .HasColumnType("INTEGER");

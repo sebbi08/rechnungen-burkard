@@ -38,6 +38,11 @@ public sealed class Invoice
     public string? GraveSiteName { get; set; }
     public string? GraveFieldNumber { get; set; }
     public GravePosition? GravePosition { get; set; }
+
+    /// <summary>A free text the document prints above the lines, as entered for
+    /// this version of an ordinary invoice; empty when none was. Always empty on
+    /// grave invoices.</summary>
+    public string IntroText { get; set; } = "";
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
     public DateTime GeneratedAt { get; set; } // UTC
@@ -93,5 +98,10 @@ public sealed class InvoiceLine
     /// it was converted to; this records how that net was arrived at, so a
     /// revision dialog can show the gross again and take it back unchanged.</summary>
     public bool PriceIncludesVat { get; set; }
+
+    /// <summary>A note the document prints under the line's description, as
+    /// entered with the line; empty when none was, and always on grave
+    /// invoices.</summary>
+    public string Comment { get; set; } = "";
     public int LineNumber { get; set; }
 }

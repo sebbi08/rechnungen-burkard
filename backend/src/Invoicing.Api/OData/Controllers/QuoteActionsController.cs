@@ -39,6 +39,7 @@ public class QuoteActionsController : ODataController
         {
             var quote = await _service.CreateAsync(
                 request.RecipientId,
+                request.IntroText,
                 request.Lines,
                 HttpContext.RequestAborted
             );
@@ -77,6 +78,7 @@ public class QuoteActionsController : ODataController
             var quote = await _service.CreateRevisionAsync(
                 request.QuoteId,
                 request.RecipientId,
+                request.IntroText,
                 request.Lines,
                 HttpContext.RequestAborted
             );
@@ -188,6 +190,7 @@ public class QuoteActionsController : ODataController
     public sealed class CreateQuoteRequest
     {
         public long RecipientId { get; set; }
+        public string? IntroText { get; set; }
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }
 
@@ -195,6 +198,7 @@ public class QuoteActionsController : ODataController
     {
         public long QuoteId { get; set; }
         public long RecipientId { get; set; }
+        public string? IntroText { get; set; }
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }
 }

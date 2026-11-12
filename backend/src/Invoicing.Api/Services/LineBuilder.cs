@@ -82,6 +82,7 @@ public sealed class LineBuilder
                     ),
                     VatRate = item.VatRate,
                     PriceIncludesVat = input.PriceIncludesVat,
+                    Comment = CleanText(input.Comment),
                     LineNumber = index + 1,
                 }
             );
@@ -89,4 +90,10 @@ public sealed class LineBuilder
 
         return result;
     }
+
+    /// <summary>A free text or line comment as it is kept: without the blank
+    /// lines and spaces around it, and empty when nothing but those was
+    /// entered. The line breaks inside it stay.</summary>
+    public static string CleanText(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? "" : text.Trim();
 }

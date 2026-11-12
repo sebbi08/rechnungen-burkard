@@ -94,6 +94,16 @@ export interface QuoteLine {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `Comment` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  Comment: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `LineNumber` |
    * | Type | `Edm.Int32` |
    * | Nullable | `false` |
@@ -114,6 +124,7 @@ export interface EditableQuoteLine
       | "UnitPrice"
       | "VatRate"
       | "PriceIncludesVat"
+      | "Comment"
       | "LineNumber"
     >,
     Partial<Pick<QuoteLine, "Id" | "ItemId">> {}

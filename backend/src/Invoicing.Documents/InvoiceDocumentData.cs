@@ -18,6 +18,10 @@ public sealed class InvoiceDocumentData
     public string? GravePosition { get; set; }
 
     public string? ShareText { get; set; }
+
+    /// <summary>A free text printed above the first line, starting where the
+    /// descriptions start. Empty prints nothing; never set on grave invoices.</summary>
+    public string IntroText { get; set; } = "";
     public string EndingText { get; set; } = "";
     public string StampWord { get; set; } = "";
 
@@ -56,7 +60,9 @@ public sealed class InvoiceDocumentData
         decimal LineTotal,
         decimal VatAmount,
         // the price was entered gross; UnitPrice is still the net
-        bool PriceIncludesVat = false
+        bool PriceIncludesVat = false,
+        // printed under the description, in that column; empty prints nothing
+        string Comment = ""
     );
 
     public sealed record VatSummary(

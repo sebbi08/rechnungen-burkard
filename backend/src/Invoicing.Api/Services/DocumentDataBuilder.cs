@@ -15,7 +15,8 @@ public sealed class DocumentDataBuilder
                 l.Count,
                 l.UnitPrice,
                 l.VatRate,
-                l.PriceIncludesVat
+                l.PriceIncludesVat,
+                l.Comment
             ))
         );
 
@@ -68,6 +69,7 @@ public sealed class DocumentDataBuilder
             GraveFieldNumber = invoice.GraveFieldNumber,
             GravePosition = invoice.GravePosition?.ToString(),
             ShareText = shareText,
+            IntroText = invoice.IntroText,
             EndingText = invoice.EndingText,
             StampWord = invoice.StampWord,
             Lines = lines,
@@ -92,7 +94,8 @@ public sealed class DocumentDataBuilder
                 l.Count,
                 l.UnitPrice,
                 l.VatRate,
-                l.PriceIncludesVat
+                l.PriceIncludesVat,
+                l.Comment
             ))
         );
 
@@ -105,6 +108,7 @@ public sealed class DocumentDataBuilder
             RecipientName = quote.RecipientName,
             RecipientAddress = quote.RecipientAddress,
             RecipientNumber = quote.RecipientNumber,
+            IntroText = quote.IntroText,
             EndingText = quote.EndingText,
             StampWord = "",
             Lines = lines,
@@ -123,7 +127,8 @@ public sealed class DocumentDataBuilder
         int Count,
         decimal UnitPrice,
         decimal VatRate,
-        bool PriceIncludesVat
+        bool PriceIncludesVat,
+        string Comment
     );
 
     /// <summary>The printed lines, the VAT block and the totals in cents: each
@@ -158,7 +163,8 @@ public sealed class DocumentDataBuilder
                     l.VatRate,
                     lineTotal,
                     vatAmount,
-                    l.PriceIncludesVat
+                    l.PriceIncludesVat,
+                    l.Comment
                 );
             })
             .ToArray();

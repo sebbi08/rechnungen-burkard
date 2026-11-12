@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Drawer from "primevue/drawer";
 import ProgressSpinner from "primevue/progressspinner";
+import Textarea from "primevue/textarea";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -10,7 +11,9 @@ import {
   createQuote,
   createQuoteRevision,
   createRevision,
+  fetchInvoiceIntroText,
   fetchInvoiceLines,
+  fetchQuoteIntroText,
   fetchQuoteLines,
   type InvoiceLineInput,
 } from "@/api/endpoints";
@@ -49,17 +52,20 @@ const { run } = useBlocking();
 const queryClient = useQueryClient();
 
 const recipientId = ref<number | null>(null);
+const introText = ref("");
 const lines = ref<DraftLine[]>([]);
 const loading = ref(false);
 // What the user can change. A new invoice's recipient is left out: the picker
 // fills it in by itself, after the editor has opened.
 const discard = useDiscardGuard(visible, () => ({
   recipient: props.target ? recipientId.value : null,
-  lines: lines.value.map(({ itemId, count, unitPrice, priceIncludesVat }) => ({
+  introText: introText.value,
+  lines: lines.value.map(({ itemId, count, unitPrice, priceIncludesVat, comment }) => ({
     itemId,
     count,
     unitPrice,
     priceIncludesVat,
+    comment,
   })),
 }));
 // Which opening a load belongs to: lines that arrive after the drawer was
@@ -76,6 +82,7 @@ watch(visible, async (open) => {
     return;
   }
   recipientId.value = props.target?.recipientId ?? null;
+  introText.value = "";
   lines.value = [newLine()];
   if (!props.target) {
     discard.markClean();
@@ -83,15 +90,16 @@ watch(visible, async (open) => {
   }
   loading.value = true;
   try {
-    const [existing, rates] = await Promise.all([
-      props.kind === "quote"
-        ? fetchQuoteLines(props.target.id)
-        : fetchInvoiceLines(props.target.id),
+    const quote = props.kind === "quote";
+    const [existing, intro, rates] = await Promise.all([
+      quote ? fetchQuoteLines(props.target.id) : fetchInvoiceLines(props.target.id),
+      quote ? fetchQuoteIntroText(props.target.id) : fetchInvoiceIntroText(props.target.id),
       loadItemVatRates(queryClient),
     ]);
     if (current !== opening) {
       return;
     }
+    introText.value = intro;
     lines.value = existing
       .slice()
       .sort((a, b) => a.LineNumber - b.LineNumber)
@@ -107,6 +115,7 @@ watch(visible, async (open) => {
             (line.ItemId != null ? rates.get(line.ItemId) : undefined) ?? line.VatRate,
           ),
           priceIncludesVat: line.PriceIncludesVat,
+          comment: line.Comment,
         }),
       );
     discard.markClean();
@@ -130,7 +139,7 @@ async function save(): Promise<void> {
   }
   let inputs: InvoiceLineInput[];
   try {
-    inputs = toLineInputs(lines.value);
+    inputs = toLineInputs(lines.value, { withComments: true });
   } catch (error) {
     showError(error);
     return;
@@ -143,6 +152,7 @@ async function save(): Promise<void> {
     return;
   }
   const recipient = recipientId.value;
+  const intro = introText.value;
   try {
     // The refetch runs under the overlay too: a drawer left open while the lists
     // reload, with the busy guard already released, takes a second Save and
@@ -151,12 +161,12 @@ async function save(): Promise<void> {
     await run(t(quote ? "quoteRunning" : "invoiceRunning"), async () => {
       if (quote) {
         await (target
-          ? createQuoteRevision(target.id, recipient, inputs)
-          : createQuote(recipient, inputs));
+          ? createQuoteRevision(target.id, recipient, intro, inputs)
+          : createQuote(recipient, intro, inputs));
       } else {
         await (target
-          ? createRevision(target.id, recipient, inputs)
-          : createInvoice(recipient, inputs));
+          ? createRevision(target.id, recipient, intro, inputs)
+          : createInvoice(recipient, intro, inputs));
       }
       await queryClient.invalidateQueries();
     });
@@ -191,8 +201,18 @@ async function save(): Promise<void> {
         />
       </div>
       <div class="flex flex-col gap-2">
+        <label for="invoiceIntroText" class="font-medium">{{ t("introText") }}</label>
+        <Textarea
+          id="invoiceIntroText"
+          v-model="introText"
+          rows="2"
+          auto-resize
+          :placeholder="t('introTextPlaceholder')"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
         <span class="font-medium">{{ t("menuItems") }}</span>
-        <LineEditor v-model="lines" />
+        <LineEditor v-model="lines" with-comments />
       </div>
     </form>
     <template #footer>

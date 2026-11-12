@@ -257,6 +257,19 @@ internal sealed class InvoiceDocument : IDocument
                 .SemiBold();
         }
 
+        // the free text starts where the descriptions start, not under the
+        // item numbers, and may run on under the figures
+        if (!string.IsNullOrWhiteSpace(_data.IntroText))
+        {
+            table.Cell();
+            table
+                .Cell()
+                .ColumnSpan(5)
+                .PaddingTop(site.Count == 0 ? 2 : 0, Unit.Millimetre)
+                .PaddingBottom(3, Unit.Millimetre)
+                .Text(_data.IntroText);
+        }
+
         foreach (var line in _data.Lines)
         {
             // A VAT-included line prints the gross it was entered as. A grave
@@ -284,6 +297,15 @@ internal sealed class InvoiceDocument : IDocument
                 .Cell()
                 .AlignRight()
                 .Text(line.PriceIncludesVat ? $"{rate} {DocumentTexts.VatIncluded}" : rate);
+
+            // under the description and only in its column, a little smaller so
+            // it reads as a note on the line rather than a line of its own
+            if (!string.IsNullOrWhiteSpace(line.Comment))
+            {
+                table.Cell();
+                table.Cell().PaddingBottom(1, Unit.Millimetre).Text(line.Comment).FontSize(9);
+                table.Cell().ColumnSpan(4);
+            }
         }
     }
 

@@ -37,6 +37,7 @@ export class QInvoice extends QueryObject {
   public readonly GraveSiteName = new QStringPath(this.withPrefix("GraveSiteName"));
   public readonly GraveFieldNumber = new QStringPath(this.withPrefix("GraveFieldNumber"));
   public readonly GravePosition = new QEnumPath(this.withPrefix("GravePosition"), GravePosition);
+  public readonly IntroText = new QStringPath(this.withPrefix("IntroText"));
   public readonly EndingText = new QStringPath(this.withPrefix("EndingText"));
   public readonly StampWord = new QStringPath(this.withPrefix("StampWord"));
   public readonly GeneratedAt = new QDateTimeOffsetPath(this.withPrefix("GeneratedAt"));

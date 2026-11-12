@@ -67,6 +67,7 @@ public class InvoiceActionsController : ODataController
         {
             var invoice = await _service.CreateAsync(
                 request.RecipientId,
+                request.IntroText,
                 request.Lines,
                 HttpContext.RequestAborted
             );
@@ -120,6 +121,7 @@ public class InvoiceActionsController : ODataController
             var invoice = await _service.CreateRevisionAsync(
                 request.InvoiceId,
                 request.RecipientId,
+                request.IntroText,
                 request.Lines,
                 HttpContext.RequestAborted
             );
@@ -451,6 +453,7 @@ public class InvoiceActionsController : ODataController
     public sealed class CreateInvoiceRequest
     {
         public long RecipientId { get; set; }
+        public string? IntroText { get; set; }
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }
 
@@ -458,6 +461,7 @@ public class InvoiceActionsController : ODataController
     {
         public long InvoiceId { get; set; }
         public long RecipientId { get; set; }
+        public string? IntroText { get; set; }
         public List<InvoiceLineInput> Lines { get; set; } = new();
     }
 

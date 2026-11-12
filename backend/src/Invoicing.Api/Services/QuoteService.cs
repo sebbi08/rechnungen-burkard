@@ -35,6 +35,7 @@ public sealed class QuoteService
 
     public async Task<Quote> CreateAsync(
         long recipientId,
+        string? introText,
         IReadOnlyList<InvoiceLineInput> lineInputs,
         CancellationToken ct
     )
@@ -68,7 +69,7 @@ public sealed class QuoteService
             State = QuoteState.Open,
             GeneratedAt = now,
         };
-        Snapshot(quote, recipient, settings, lines);
+        Snapshot(quote, recipient, settings, introText, lines);
 
         _db.Quotes.Add(quote);
         await _db.SaveChangesAsync(ct);
@@ -83,6 +84,7 @@ public sealed class QuoteService
     public async Task<Quote> CreateRevisionAsync(
         long quoteId,
         long recipientId,
+        string? introText,
         IReadOnlyList<InvoiceLineInput> lineInputs,
         CancellationToken ct
     )
@@ -140,7 +142,7 @@ public sealed class QuoteService
             InvoiceId = edited.InvoiceId,
             GeneratedAt = now,
         };
-        Snapshot(revision, recipient, settings, lines);
+        Snapshot(revision, recipient, settings, introText, lines);
 
         // the chain has exactly one latest version, and it is now this one
         var superseded = await _db
@@ -269,6 +271,7 @@ public sealed class QuoteService
         Quote quote,
         Recipient recipient,
         GlobalSettings settings,
+        string? introText,
         List<InvoiceLine> lines
     )
     {
@@ -276,6 +279,7 @@ public sealed class QuoteService
         quote.RecipientName = recipient.Name;
         quote.RecipientAddress = recipient.Address;
         quote.RecipientNumber = recipient.Number;
+        quote.IntroText = LineBuilder.CleanText(introText);
         quote.EndingText = settings.QuoteEndingText;
         quote.Lines = lines
             .Select(l => new QuoteLine
@@ -287,6 +291,7 @@ public sealed class QuoteService
                 UnitPrice = l.UnitPrice,
                 VatRate = l.VatRate,
                 PriceIncludesVat = l.PriceIncludesVat,
+                Comment = l.Comment,
                 LineNumber = l.LineNumber,
             })
             .ToList();

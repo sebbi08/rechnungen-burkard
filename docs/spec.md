@@ -1175,8 +1175,9 @@ revising it, and checking the numbers, the stored versions and the printout.
   date, the current invoice ending text (FR-002) and stamp word, both documents (FR-037), and
   the recipient's values as they are now. Its lines MUST be the
   latest version's lines as quoted — the same items, item numbers,
-  descriptions, counts, net prices, VAT rates and VAT-included flags — even
-  where an item has changed since. In the same transaction every version of the
+  descriptions, counts, net prices, VAT rates, VAT-included flags and comments
+  (FR-101e) — even where an item has changed since, and its free text above the
+  lines MUST be the latest version's (FR-101d). In the same transaction every version of the
   quote MUST become converted, so a quote is converted at most once, also when
   two conversions arrive at the same time. A refused conversion (the quote not
   open, the recipient's address missing) MUST create no invoice and use no
@@ -1219,6 +1220,27 @@ revising it, and checking the numbers, the stored versions and the printout.
   linking to the invoice. The detail page of an invoice converted from a quote
   MUST show "Aus Angebot <number>", linking to the quote's page.
 
+#### Free text and line comments
+
+- **FR-101d**: When creating or editing an ordinary invoice or a quote, users
+  MUST be able to enter an optional multi-line free text ("Text über den
+  Positionen"). The document MUST print it above the first line, below the
+  column heads, starting where the item descriptions start rather than under
+  the item numbers, with its line breaks. Editing opens on the edited
+  version's text; each version keeps the text it was created with, so a later
+  revision never alters an earlier version or its PDF.
+- **FR-101e**: In the same editors, every line MUST take an optional multi-line
+  comment, entered with that line rather than kept on the item. The document
+  MUST print it under the line's description, in the description column only,
+  set a little smaller than the description, with its line breaks. Editing
+  opens on the edited version's comments; each version keeps its own.
+- **FR-101f**: Grave invoices MUST carry neither a free text nor line comments:
+  the grave editors offer no such fields, and a grave invoice revision ignores
+  any that are sent. For FR-101d and FR-101e, a text consisting only of spaces
+  and blank lines MUST be kept as no text, and the spaces and blank lines
+  around a text MUST be dropped. Invoices and quotes created before these
+  fields existed MUST print as before.
+
 ### Key Entities _(include if feature involves data)_
 
 - **Recipient**: A person or organization; has a recipient number, a name, and an
@@ -1234,13 +1256,14 @@ revising it, and checking the numbers, the stored versions and the printout.
   invoice per recipient carrying the grave's own lines in full, at the same
   amount for every recipient, together with a percentage note stating their
   share) or to a single recipient (non-grave). Carries invoice lines, VAT,
-  ending text, generation date, and a unique invoice number. It snapshots the
+  ending text, a free text above the lines (non-grave only, FR-101d),
+  generation date, and a unique invoice number. It snapshots the
   recipient's number and, on a grave invoice, the grave's number, site name, field
   number and position, as it does the recipient's name and address. Edits create new
   revisions; previous revisions are preserved and invoices cannot be deleted. An
   invoice converted from a quote, and each of its revisions, names that quote.
 - **Invoice Line**: A single item on an invoice; has a count, a price per item,
-  and a line total. On a grave invoice generated before recipients were billed
+  a line total and, on a non-grave invoice, an optional comment (FR-101e). On a grave invoice generated before recipients were billed
   the grave's lines directly, the stored price is one recipient's share, and
   the line also carries the price it was split from before that split; both
   are null on non-grave invoices and on grave invoices billed in the grave's
@@ -1250,8 +1273,8 @@ revising it, and checking the numbers, the stored versions and the printout.
 - **Invoice Document**: The generated PDF for an invoice revision; each revision
   has two documents — a normal document and a stamped copy.
 - **Quote**: One version of an offer to a recipient, stored apart from invoices;
-  has its own quote number, the recipient values, lines and ending text it was
-  created with, and one PDF. Edits create new versions; previous versions are
+  has its own quote number, the recipient values, lines with their comments,
+  free text and ending text it was created with, and one PDF. Edits create new versions; previous versions are
   preserved. Its lines have the shape of a non-grave invoice's lines. A quote is
   open, declined or converted as a whole; a converted quote names the invoice
   it became.

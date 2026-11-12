@@ -221,7 +221,7 @@ public class EndingTextTests
 
     /// <summary>One grave billed all year to one recipient, due in both
     /// half-years of 2026. Answers the item's id.</summary>
-    private static async Task<long> SeedGraveAsync(ApiTestHost host)
+    internal static async Task<long> SeedGraveAsync(ApiTestHost host)
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -269,7 +269,7 @@ public class EndingTextTests
     }
 
     /// <summary>The latest revision of the grave invoice for a half-year of 2026.</summary>
-    private static async Task<Invoice> GraveInvoiceAsync(ApiTestHost host, int half)
+    internal static async Task<Invoice> GraveInvoiceAsync(ApiTestHost host, int half)
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();

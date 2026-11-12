@@ -2,6 +2,7 @@
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputNumber from "primevue/inputnumber";
+import Textarea from "primevue/textarea";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { InvoiceItem } from "@/api/generated";
@@ -14,6 +15,8 @@ import { quarterLabelKey } from "@/lib/quarter";
 import ItemPicker from "./ItemPicker.vue";
 
 const lines = defineModel<DraftLine[]>({ required: true });
+/** Ordinary invoices and quotes print a note under a line; a grave does not. */
+const props = defineProps<{ withComments?: boolean }>();
 
 const { t } = useI18n();
 const items = useItemsQuery(ref(""));
@@ -156,6 +159,16 @@ const totals = computed(() => {
         class="justify-self-end"
         :aria-label="t('deleteLine')"
         @click="removeLine(line.key)"
+      />
+      <!-- under the item, as the document prints it under the description -->
+      <Textarea
+        v-if="props.withComments"
+        v-model="line.comment"
+        rows="1"
+        auto-resize
+        class="col-span-2 md:col-span-4"
+        :placeholder="t('lineCommentPlaceholder')"
+        :aria-label="`${t('lineComment')} ${index + 1}`"
       />
     </div>
 

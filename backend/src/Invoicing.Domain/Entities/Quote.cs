@@ -38,6 +38,9 @@ public sealed class Quote
     public string RecipientName { get; set; } = "";
     public string RecipientAddress { get; set; } = "";
     public string? RecipientNumber { get; set; }
+
+    /// <summary>The free text above the lines, as on <see cref="Invoice.IntroText"/>.</summary>
+    public string IntroText { get; set; } = "";
     public string EndingText { get; set; } = "";
     public DateTime GeneratedAt { get; set; } // local wall-clock, like Invoice's
     public List<QuoteLine> Lines { get; set; } = new();
@@ -65,6 +68,9 @@ public sealed class QuoteLine
     public decimal UnitPrice { get; set; } // always net, as on InvoiceLine
     public decimal VatRate { get; set; }
     public bool PriceIncludesVat { get; set; }
+
+    /// <summary>The note under the line, as on <see cref="InvoiceLine.Comment"/>.</summary>
+    public string Comment { get; set; } = "";
     public int LineNumber { get; set; }
 }
 

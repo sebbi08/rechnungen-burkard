@@ -27,6 +27,7 @@ export class QQuote extends QueryObject {
   public readonly RecipientName = new QStringPath(this.withPrefix("RecipientName"));
   public readonly RecipientAddress = new QStringPath(this.withPrefix("RecipientAddress"));
   public readonly RecipientNumber = new QStringPath(this.withPrefix("RecipientNumber"));
+  public readonly IntroText = new QStringPath(this.withPrefix("IntroText"));
   public readonly EndingText = new QStringPath(this.withPrefix("EndingText"));
   public readonly GeneratedAt = new QDateTimeOffsetPath(this.withPrefix("GeneratedAt"));
   public readonly NetTotal = new QNumberPath(this.withPrefix("NetTotal"));

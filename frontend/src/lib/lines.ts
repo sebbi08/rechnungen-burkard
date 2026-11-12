@@ -9,6 +9,9 @@ export interface DraftLine {
   count: number | null;
   unitPrice: number | null;
   priceIncludesVat: boolean;
+  /** The note under the line on an ordinary invoice or a quote; a grave's
+   *  lines have none. */
+  comment: string;
 }
 
 let nextKey = 1;
@@ -20,6 +23,7 @@ export function newLine(init: Partial<Omit<DraftLine, "key">> = {}): DraftLine {
     count: 1,
     unitPrice: null,
     priceIncludesVat: false,
+    comment: "",
     ...init,
   };
 }
@@ -27,8 +31,13 @@ export function newLine(init: Partial<Omit<DraftLine, "key">> = {}): DraftLine {
 /** The payload for any line-taking endpoint. Every line needs an item
  *  (ItemRequired) and a whole count above zero (InvalidCount; the field lets a
  *  typed "1,5" stand so it can be refused here). An empty price is sent as
- *  null -- the item's default is billed -- while 0 is kept as a real price. */
-export function toLineInputs(lines: DraftLine[]): InvoiceLineInput[] {
+ *  null -- the item's default is billed -- while 0 is kept as a real price.
+ *  Comments go along only where the document prints them: ordinary invoices
+ *  and quotes, never a grave. */
+export function toLineInputs(
+  lines: DraftLine[],
+  { withComments = false }: { withComments?: boolean } = {},
+): InvoiceLineInput[] {
   return lines.map((line) => {
     if (line.itemId == null) {
       throw new ApiError("ItemRequired");
@@ -41,6 +50,7 @@ export function toLineInputs(lines: DraftLine[]): InvoiceLineInput[] {
       count: line.count,
       unitPrice: line.unitPrice,
       priceIncludesVat: line.priceIncludesVat,
+      ...(withComments ? { comment: line.comment } : {}),
     };
   });
 }

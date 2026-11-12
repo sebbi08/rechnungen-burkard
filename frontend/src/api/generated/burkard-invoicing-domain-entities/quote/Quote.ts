@@ -136,6 +136,16 @@ export interface Quote {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `IntroText` |
+   * | Type | `Edm.String` |
+   * | Nullable | `false` |
+   */
+  IntroText: string;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `EndingText` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
@@ -217,6 +227,7 @@ export interface EditableQuote
       | "RecipientId"
       | "RecipientName"
       | "RecipientAddress"
+      | "IntroText"
       | "EndingText"
       | "GeneratedAt"
       | "NetTotal"

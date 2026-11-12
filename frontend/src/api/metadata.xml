@@ -141,6 +141,7 @@
                     Name="GravePosition"
                     Type="Burkard.Invoicing.Domain.Entities.GravePosition"
                 />
+                <Property Name="IntroText" Type="Edm.String" Nullable="false" />
                 <Property Name="EndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
                 <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
@@ -200,6 +201,7 @@
                 <Property Name="RecipientName" Type="Edm.String" Nullable="false" />
                 <Property Name="RecipientAddress" Type="Edm.String" Nullable="false" />
                 <Property Name="RecipientNumber" Type="Edm.String" />
+                <Property Name="IntroText" Type="Edm.String" Nullable="false" />
                 <Property Name="EndingText" Type="Edm.String" Nullable="false" />
                 <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
                 <Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
@@ -257,6 +259,7 @@
                 <Property Name="GraveUnitPrice" Type="Edm.Decimal" Scale="variable" />
                 <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="Comment" Type="Edm.String" Nullable="false" />
                 <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
             </EntityType>
             <EntityType Name="QuoteLine">
@@ -272,6 +275,7 @@
                 <Property Name="UnitPrice" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="Comment" Type="Edm.String" Nullable="false" />
                 <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
             </EntityType>
             <EnumType Name="BillingQuarter">
