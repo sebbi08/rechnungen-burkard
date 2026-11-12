@@ -414,6 +414,67 @@ non-interactive until completion, and the task runs exactly once.
 
 ---
 
+### User Story 14 - Download a Backup (Priority: P2)
+
+The owner downloads one file that holds everything the application keeps, so
+the whole instance can be moved to another server or kept as a manual backup.
+
+**Why this priority**: Without a complete copy, moving the application or
+recovering from a lost instance means rebuilding invoices, revisions, payments
+and PDFs by hand.
+
+**Independent Test**: Can be fully tested by downloading a backup of an
+instance that holds graves, invoices and settings, and verifying the file name
+and that the archive holds a manifest and the database.
+
+**Acceptance Scenarios**:
+
+1. **Given** the user opens the import/export section, **When** they trigger
+   the backup download, **Then** a ZIP archive named
+   `rechnungen-sicherung-YYYY-MM-DD-HHmm.zip` is downloaded.
+2. **Given** a job is queued or running, **When** the user triggers the backup
+   download, **Then** the system refuses with a message that a job is running
+   and downloads nothing.
+
+---
+
+### User Story 15 - Restore a Backup (Priority: P2)
+
+The owner uploads a backup. The system checks it without changing anything and
+shows what it holds. After an explicit confirmation, it replaces all data of the
+instance with the backup's.
+
+**Why this priority**: A backup is worth only as much as the ability to restore
+it, on the same instance or on a new one.
+
+**Independent Test**: Can be fully tested by downloading a backup, changing
+data, restoring the backup and verifying the data is as it was; and by
+uploading files that are not backups and verifying they are refused and nothing
+changes.
+
+**Acceptance Scenarios**:
+
+1. **Given** a valid backup, **When** the user uploads it, **Then** the system
+   shows when it was taken, from which application version, and how many
+   graves, recipients and invoices it holds, and asks for confirmation before
+   replacing anything.
+2. **Given** the checked backup, **When** the user confirms, **Then** all data of
+   the instance is replaced by the backup's, a success message is shown, and the
+   page reloads once the message is dismissed.
+3. **Given** the checked backup, **When** the user cancels, **Then** nothing is
+   changed and the staged upload is discarded.
+4. **Given** a file that is not a backup, or a damaged one, or one from a newer
+   application version, **When** the user uploads it, **Then** the system
+   refuses with a message saying why and the instance is unchanged.
+5. **Given** the instance holds invoices newer than the backup's newest,
+   **When** the confirmation is shown, **Then** it warns that those invoices are
+   lost and their invoice numbers will be issued again.
+6. **Given** another browser still shows the data from before a restore,
+   **When** it tries to save something, **Then** the system refuses and asks to
+   reload.
+
+---
+
 ### Edge Cases
 
 - What happens when an invoice item without a price is used and no price is
@@ -957,6 +1018,68 @@ non-interactive until completion, and the task runs exactly once.
   box MUST tick all of that recipient's invoices, and each invoice MUST be
   tickable on its own. What is ticked MUST be marked paid all together or not
   at all.
+
+**Backup and restore**
+
+- **FR-078**: The system MUST offer, on the import/export page, a download of
+  the whole instance as one backup: a ZIP archive holding a copy of the
+  database, with the invoices, revisions, payments, PDF documents, deleted
+  graves, invoice runs and settings in it, and a manifest naming the application
+  version, the newest migration and the time it was taken.
+- **FR-079**: The backup file MUST be named
+  `rechnungen-sicherung-YYYY-MM-DD-HHmm.zip`, in local time (Europe/Berlin).
+- **FR-080**: The backup MUST be a consistent copy, taken while the application
+  runs, and MUST NOT be a plain copy of a database file that is in use.
+- **FR-081**: The system MUST refuse to download a backup, to take an upload and
+  to restore one while any job is queued or running, with `JobAlreadyRunning`.
+- **FR-082**: Restoring MUST be two steps. First the upload (up to 2 GB, not held
+  in memory) MUST be checked without changing any data, and the system MUST
+  answer with a summary: when the backup was taken, the application version,
+  and the numbers of graves, recipients and invoices. Then the user MUST confirm
+  explicitly, in a dialog that states that all data of this instance is
+  replaced, whose accept button says so ("Alle Daten ersetzen") and whose
+  default action is to cancel.
+- **FR-083**: When this instance holds invoices newer than the newest one in the
+  backup, the confirmation MUST say so in a warning of its own: those invoices
+  are lost, and their invoice numbers will be issued again.
+- **FR-084**: A staged upload MUST be discarded when the user cancels, and
+  otherwise once it is older than one hour, at the next upload or application
+  start.
+- **FR-085**: The system MUST refuse a file that is not a backup, including one
+  that is not a ZIP archive at all (`BackupInvalid`), and a backup that cannot be
+  read, fails SQLite's integrity check or holds a queued or running job
+  (`BackupDamaged`), and MUST leave the instance unchanged. An upload without the
+  multipart field `file` MUST be refused with `ArchiveRequired`; a token that is
+  unknown or expired with `BackupTokenUnknown`. A download whose copy turns out
+  to hold a queued or running job MUST be refused with `JobAlreadyRunning`.
+- **FR-086**: A backup from an older application version MUST be accepted and
+  migrated to the running version as part of the restore. A backup that holds a
+  migration the running version does not know MUST be refused with
+  `BackupFromNewerVersion`.
+- **FR-087**: Restoring MUST replace all data of the instance with the backup's.
+  The replaced database MUST be kept next to the database file as
+  `<database file name>.before-restore-yyyyMMdd-HHmmss`, with its `-wal` and
+  `-shm` files, and the application MUST NOT delete it.
+- **FR-088**: When any step fails after the replaced database was moved aside,
+  the system MUST put it back, so the instance is unchanged, and refuse with
+  `RestoreFailed`. When putting it back fails too, the system MUST answer
+  `RestoreRollbackFailed` (500), MUST keep refusing every other request with
+  `RestoreInProgress` until the instance has been repaired by hand as the
+  README describes, and MUST leave a marker `<database file name>.restore-incomplete`
+  naming the safety copy beside the database. While that marker exists, the
+  application MUST refuse to start, before it opens or migrates the database.
+- **FR-089**: While a restore is in progress, the system MUST NOT start a job
+  and MUST NOT let another request read or write the database: such a request is
+  refused with `RestoreInProgress` (503).
+- **FR-090**: The restore MUST run behind the blocking progress indicator
+  (User Story 13). After it succeeds, the page MUST show "Die Sicherung
+  ist eingespielt." and reload once the message is dismissed, so nothing shown
+  comes from the replaced data.
+- **FR-091**: Every response under `/odata` MUST carry the data generation in an
+  `X-Data-Generation` header; the generation is stored in the database and
+  renewed by every restore. A write that sends an outdated generation MUST be
+  refused with `DataReplaced` (409), asking the user to reload. A write that
+  sends none is allowed.
 
 ### Key Entities _(include if feature involves data)_
 

@@ -46,9 +46,11 @@ function validArchive(suffix: string): Buffer {
 
 /** Chooses the archive and starts the import. */
 async function importArchive(page: Page, buffer: Buffer): Promise<void> {
-  // the field itself is hidden behind a button of the same name
+  // the field itself is hidden behind a button of the same name; the backup
+  // card's field comes after this one
   await page
     .locator("input[type='file']")
+    .first()
     .setInputFiles({ name: "import.zip", mimeType: "application/zip", buffer });
   // the chosen file is named beside the button
   await expect(page.getByText("import.zip", { exact: true })).toBeVisible();

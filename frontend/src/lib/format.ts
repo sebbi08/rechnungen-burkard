@@ -19,11 +19,27 @@ export function formatDate(value: Date | string | null | undefined): string {
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+/** An instant (UTC ISO) as German local date and time, "01.10.2026, 14:30". */
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatAmount(value: number | null | undefined): string {
   if (value == null) {
     return "";
   }
   return `${value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+}
+
+/** A count the German way, with a thousands separator: "1.234". */
+export function formatCount(value: number): string {
+  return value.toLocaleString("de-DE", { maximumFractionDigits: 0 });
 }
 
 /** "19", or "7,7" where a rate has a decimal -- never "19.00". */
