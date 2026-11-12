@@ -1683,7 +1683,10 @@ test("a grave can be saved without an end", async ({ page }) => {
   expect(graves.value[0].StartDate).toBe("2026-01-01");
   expect(graves.value[0].EndDate).toBeNull();
 
-  // reopened, the open end reads as an empty field
+  // reopened, the open end reads as an empty field. Narrowed to this grave: the
+  // generation group seeds dozens of graves due in the current half-year, which
+  // sort before it and push it off the first page when they run alongside.
+  await page.goto(`/graves?number=${graveNumber}`);
   await page
     .getByRole("row")
     .filter({ hasText: graveNumber })
