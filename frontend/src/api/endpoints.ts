@@ -1,11 +1,11 @@
 /**
- * Everything the EDM does not describe (D-001), and the five actions whose
+ * Everything the EDM does not describe (D-001), and the actions whose
  * parameters $metadata leaves out, typed by hand after the backend's
  * controllers.
  */
 import type { GravePositionName } from "@/lib/gravePosition";
 import type { QuarterName } from "@/lib/quarter";
-import { type InvoiceLine, type Job, JobStatus } from "./generated";
+import { type InvoiceLine, type Job, JobStatus, type QuoteLine } from "./generated";
 import { ApiError, getBlob, getJson, isTransient, postBlob, postJson, request } from "./http";
 import { odata } from "./odata";
 
@@ -70,6 +70,50 @@ export function documentUrl(documentId: number): string {
 /** The latest-revision Normal PDFs of a half-year's grave invoices, as a ZIP. */
 export function bulkDownload(kind: DocumentKindName, year: number, half: number): Promise<Blob> {
   return postBlob("/odata/BulkDownloadDocuments", { kind, year, half });
+}
+
+// ---- quotes ---------------------------------------------------------------
+
+export async function createQuote(recipientId: number, lines: InvoiceLineInput[]): Promise<void> {
+  await postJson("/odata/CreateQuote", { recipientId, lines });
+}
+
+/** A new version of the quote; any row id of its chain addresses it. */
+export async function createQuoteRevision(
+  quoteId: number,
+  recipientId: number,
+  lines: InvoiceLineInput[],
+): Promise<void> {
+  await postJson("/odata/CreateQuoteRevision", { quoteId, recipientId, lines });
+}
+
+export async function fetchQuoteLines(quoteId: number): Promise<QuoteLine[]> {
+  return (await getJson<{ value: QuoteLine[] }>(`/odata/Quotes(${quoteId})/Lines`)).value;
+}
+
+export async function declineQuote(quoteId: number): Promise<void> {
+  await postJson("/odata/DeclineQuote", { quoteId });
+}
+
+export async function reopenQuote(quoteId: number): Promise<void> {
+  await postJson("/odata/ReopenQuote", { quoteId });
+}
+
+/** Removes the quote with every version; refused once it is converted. */
+export async function deleteQuote(quoteId: number): Promise<void> {
+  await postJson("/odata/DeleteQuote", { quoteId });
+}
+
+/** Creates the invoice from the quote's latest version and answers its id,
+ *  which is also its root id. */
+export async function convertQuote(quoteId: number): Promise<number> {
+  const invoice = await postJson<{ Id: number }>("/odata/ConvertQuote", { quoteId });
+  return Number(invoice.Id);
+}
+
+/** The version's one PDF, served inline so the browser displays it. */
+export function quotePdfUrl(quoteId: number): string {
+  return `/odata/Quotes(${quoteId})/Pdf`;
 }
 
 // ---- recipients and items -------------------------------------------------

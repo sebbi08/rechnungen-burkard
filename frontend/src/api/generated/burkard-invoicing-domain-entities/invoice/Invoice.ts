@@ -238,6 +238,15 @@ export interface Invoice {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `QuoteId` |
+   * | Type | `Edm.Int64` |
+   */
+  QuoteId: number | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `NetTotal` |
    * | Type | `Edm.Decimal` |
    * | Nullable | `false` |
@@ -320,6 +329,7 @@ export interface EditableInvoice
         | "GraveFieldNumber"
         | "GravePosition"
         | "PaidOn"
+        | "QuoteId"
       >
     > {
   /** Create "Lines" along with this entity (deep insert), or update it along with it (deep update). */

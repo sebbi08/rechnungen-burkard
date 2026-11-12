@@ -1052,6 +1052,21 @@ revising it, and checking the numbers, the stored versions and the printout.
   filtering on the state and on the latest version. No read of invoices — the
   list, a single invoice, marking paid, revising — MUST ever find a quote, nor
   the quote list an invoice.
+- **FR-087b**: The user interface MUST offer a page "Angebote", reached from the
+  menu directly below "Rechnungen", built like the invoice list: one row per
+  quote showing its latest version — the number with the revision badge, the
+  recipient, the date, the gross total and the state (Offen, Abgelehnt,
+  Umgewandelt) — every state unless filtered, newest first, 10 per page
+  (FR-068a), with a search per column (FR-068c) and the state as a select
+  ("Alle", Offen, Abgelehnt, Umgewandelt), kept in the URL query (FR-068d). A
+  converted row MUST show the number of its invoice, linking to it. "Neues
+  Angebot" MUST open the invoice editor for a quote. Each row MUST offer what
+  its state allows: every quote its details and "Angebot herunterladen"; an
+  open one also editing, "In Rechnung umwandeln", "Ablehnen" and "Angebot
+  löschen"; a declined one "Wieder öffnen" and "Angebot löschen". Deleting and
+  converting MUST ask first; converting names the quote and says that an
+  invoice with the next invoice number is created and cannot be deleted, runs
+  behind the blocking progress indicator and then opens the new invoice.
 
 ### Key Entities _(include if feature involves data)_
 

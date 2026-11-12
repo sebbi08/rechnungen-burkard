@@ -93,10 +93,10 @@ watch(
 const pageReport = usePageReport();
 
 const editorOpen = ref(false);
-const editorTarget = ref<{ invoiceId: number; recipientId: number } | null>(null);
+const editorTarget = ref<{ id: number; recipientId: number } | null>(null);
 
 function openEditor(invoice: Invoice | null): void {
-  editorTarget.value = invoice ? { invoiceId: invoice.Id, recipientId: invoice.RecipientId } : null;
+  editorTarget.value = invoice ? { id: invoice.Id, recipientId: invoice.RecipientId } : null;
   editorOpen.value = true;
 }
 </script>

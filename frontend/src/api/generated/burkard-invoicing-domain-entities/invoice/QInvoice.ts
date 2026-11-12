@@ -41,6 +41,7 @@ export class QInvoice extends QueryObject {
   public readonly StampWord = new QStringPath(this.withPrefix("StampWord"));
   public readonly GeneratedAt = new QDateTimeOffsetPath(this.withPrefix("GeneratedAt"));
   public readonly PaidOn = new QDatePath(this.withPrefix("PaidOn"));
+  public readonly QuoteId = new QNumberPath(this.withPrefix("QuoteId"));
   public readonly NetTotal = new QNumberPath(this.withPrefix("NetTotal"));
   public readonly VatTotal = new QNumberPath(this.withPrefix("VatTotal"));
   public readonly GrossTotal = new QNumberPath(this.withPrefix("GrossTotal"));

@@ -41,7 +41,7 @@ watch(
 );
 const number = computed(() => formatInvoiceNumber(latest.value?.InvoiceNumber));
 const editorTarget = computed(() =>
-  latest.value ? { invoiceId: latest.value.Id, recipientId: latest.value.RecipientId } : null,
+  latest.value ? { id: latest.value.Id, recipientId: latest.value.RecipientId } : null,
 );
 
 const editorOpen = ref(false);

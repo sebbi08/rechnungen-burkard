@@ -145,6 +145,7 @@
                 <Property Name="StampWord" Type="Edm.String" Nullable="false" />
                 <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
                 <Property Name="PaidOn" Type="Edm.Date" />
+                <Property Name="QuoteId" Type="Edm.Int64" />
                 <Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="VatTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="GrossTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
@@ -177,6 +178,38 @@
                 >
                     <ReferentialConstraint Property="InvoiceId" ReferencedProperty="Id" />
                 </NavigationProperty>
+            </EntityType>
+            <EntityType Name="Quote">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RootId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RevisionNumber" Type="Edm.Int32" Nullable="false" />
+                <Property Name="IsLatestRevision" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="Year" Type="Edm.Int32" Nullable="false" />
+                <Property Name="Sequence" Type="Edm.Int32" Nullable="false" />
+                <Property Name="QuoteNumber" Type="Edm.String" Nullable="false" />
+                <Property
+                    Name="State"
+                    Type="Burkard.Invoicing.Domain.Entities.QuoteState"
+                    Nullable="false"
+                />
+                <Property Name="InvoiceId" Type="Edm.Int64" />
+                <Property Name="RecipientId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="RecipientName" Type="Edm.String" Nullable="false" />
+                <Property Name="RecipientAddress" Type="Edm.String" Nullable="false" />
+                <Property Name="RecipientNumber" Type="Edm.String" />
+                <Property Name="EndingText" Type="Edm.String" Nullable="false" />
+                <Property Name="GeneratedAt" Type="Edm.DateTimeOffset" Nullable="false" />
+                <Property Name="NetTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
+                <Property Name="VatTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
+                <Property Name="GrossTotal" Type="Edm.Decimal" Nullable="false" Scale="variable" />
+                <Property Name="InvoiceNumber" Type="Edm.String" />
+                <NavigationProperty
+                    Name="Lines"
+                    Type="Collection(Burkard.Invoicing.Domain.Entities.QuoteLine)"
+                />
             </EntityType>
             <EntityType Name="Job">
                 <Key>
@@ -219,6 +252,21 @@
                 <Property Name="Count" Type="Edm.Int32" Nullable="false" />
                 <Property Name="UnitPrice" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="GraveUnitPrice" Type="Edm.Decimal" Scale="variable" />
+                <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="variable" />
+                <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
+                <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
+            </EntityType>
+            <EntityType Name="QuoteLine">
+                <Key>
+                    <PropertyRef Name="Id" />
+                </Key>
+                <Property Name="Id" Type="Edm.Int64" Nullable="false" />
+                <Property Name="QuoteId" Type="Edm.Int64" Nullable="false" />
+                <Property Name="ItemId" Type="Edm.Int64" />
+                <Property Name="ItemNumber" Type="Edm.String" Nullable="false" />
+                <Property Name="Description" Type="Edm.String" Nullable="false" />
+                <Property Name="Count" Type="Edm.Int32" Nullable="false" />
+                <Property Name="UnitPrice" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="VatRate" Type="Edm.Decimal" Nullable="false" Scale="variable" />
                 <Property Name="PriceIncludesVat" Type="Edm.Boolean" Nullable="false" />
                 <Property Name="LineNumber" Type="Edm.Int32" Nullable="false" />
@@ -271,6 +319,11 @@
                 <Member Name="Normal" Value="0" />
                 <Member Name="Copy" Value="1" />
             </EnumType>
+            <EnumType Name="QuoteState">
+                <Member Name="Open" Value="0" />
+                <Member Name="Declined" Value="1" />
+                <Member Name="Converted" Value="2" />
+            </EnumType>
             <EnumType Name="JobStatus">
                 <Member Name="Queued" Value="0" />
                 <Member Name="Running" Value="1" />
@@ -292,6 +345,22 @@
                 <ReturnType Type="Burkard.Invoicing.Domain.Entities.Job" />
             </Action>
             <Action Name="SetInvoicePaid">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" />
+            </Action>
+            <Action Name="CreateQuote">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Quote" />
+            </Action>
+            <Action Name="CreateQuoteRevision">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Quote" />
+            </Action>
+            <Action Name="DeclineQuote">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Quote" />
+            </Action>
+            <Action Name="ReopenQuote">
+                <ReturnType Type="Burkard.Invoicing.Domain.Entities.Quote" />
+            </Action>
+            <Action Name="DeleteQuote" />
+            <Action Name="ConvertQuote">
                 <ReturnType Type="Burkard.Invoicing.Domain.Entities.Invoice" />
             </Action>
             <EntityContainer Name="Container">
@@ -335,6 +404,7 @@
                 <EntitySet Name="Documents" EntityType="Burkard.Invoicing.Domain.Entities.Document">
                     <NavigationPropertyBinding Path="Invoice" Target="Invoices" />
                 </EntitySet>
+                <EntitySet Name="Quotes" EntityType="Burkard.Invoicing.Domain.Entities.Quote" />
                 <EntitySet Name="Jobs" EntityType="Burkard.Invoicing.Domain.Entities.Job" />
                 <Singleton
                     Name="Settings"
@@ -363,6 +433,24 @@
                 <ActionImport
                     Name="SetInvoicePaid"
                     Action="Default.SetInvoicePaid"
+                    EntitySet="Invoices"
+                />
+                <ActionImport Name="CreateQuote" Action="Default.CreateQuote" EntitySet="Quotes" />
+                <ActionImport
+                    Name="CreateQuoteRevision"
+                    Action="Default.CreateQuoteRevision"
+                    EntitySet="Quotes"
+                />
+                <ActionImport
+                    Name="DeclineQuote"
+                    Action="Default.DeclineQuote"
+                    EntitySet="Quotes"
+                />
+                <ActionImport Name="ReopenQuote" Action="Default.ReopenQuote" EntitySet="Quotes" />
+                <ActionImport Name="DeleteQuote" Action="Default.DeleteQuote" />
+                <ActionImport
+                    Name="ConvertQuote"
+                    Action="Default.ConvertQuote"
                     EntitySet="Invoices"
                 />
             </EntityContainer>

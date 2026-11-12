@@ -11,6 +11,7 @@ import type { GraveRecipientId } from "./burkard-invoicing-domain-entities/grave
 import type { GraveInvoiceRunId } from "./burkard-invoicing-domain-entities/grave-invoice-run/GraveInvoiceRun.js";
 import type { InvoiceId, Invoice } from "./burkard-invoicing-domain-entities/invoice/Invoice.js";
 import type { DocumentId } from "./burkard-invoicing-domain-entities/document/Document.js";
+import type { QuoteId, Quote } from "./burkard-invoicing-domain-entities/quote/Quote.js";
 import type { JobId, Job } from "./burkard-invoicing-domain-entities/job/Job.js";
 import {
   VatRateService,
@@ -53,6 +54,10 @@ import {
   DocumentCollectionService,
 } from "./burkard-invoicing-domain-entities/document/DocumentService.js";
 import {
+  QuoteService,
+  QuoteCollectionService,
+} from "./burkard-invoicing-domain-entities/quote/QuoteService.js";
+import {
   JobService,
   JobCollectionService,
 } from "./burkard-invoicing-domain-entities/job/JobService.js";
@@ -63,6 +68,12 @@ import {
   QCreateGraveInvoiceRevision,
   QGenerateGraveInvoices,
   QSetInvoicePaid,
+  QCreateQuote,
+  QCreateQuoteRevision,
+  QDeclineQuote,
+  QReopenQuote,
+  QDeleteQuote,
+  QConvertQuote,
 } from "./QInvoicing.js";
 
 export class InvoicingService extends ODataService {
@@ -72,6 +83,12 @@ export class InvoicingService extends ODataService {
   private _QCreateGraveInvoiceRevision?: QCreateGraveInvoiceRevision;
   private _QGenerateGraveInvoices?: QGenerateGraveInvoices;
   private _QSetInvoicePaid?: QSetInvoicePaid;
+  private _QCreateQuote?: QCreateQuote;
+  private _QCreateQuoteRevision?: QCreateQuoteRevision;
+  private _QDeclineQuote?: QDeclineQuote;
+  private _QReopenQuote?: QReopenQuote;
+  private _QDeleteQuote?: QDeleteQuote;
+  private _QConvertQuote?: QConvertQuote;
 
   public VatRates(): VatRateCollectionService;
   public VatRates(id: VatRateId): VatRateService;
@@ -187,6 +204,18 @@ export class InvoicingService extends ODataService {
     const fieldName = "Documents";
     const { client, path, options } = this.__base;
     const collection = new DocumentCollectionService(client, path, fieldName, {
+      ...options,
+      subtype: false,
+    });
+    return typeof id === "undefined" || id === null ? collection : collection.byId(id);
+  }
+
+  public Quotes(): QuoteCollectionService;
+  public Quotes(id: QuoteId): QuoteService;
+  public Quotes(id?: QuoteId | undefined) {
+    const fieldName = "Quotes";
+    const { client, path, options } = this.__base;
+    const collection = new QuoteCollectionService(client, path, fieldName, {
       ...options,
       subtype: false,
     });
@@ -310,6 +339,119 @@ export class InvoicingService extends ODataService {
       {
         headers: getDefaultHeaders(),
         mainResponseConverter: this._QSetInvoicePaid.getResponseConverter(),
+      },
+    );
+  }
+
+  public CreateQuote() {
+    if (!this._QCreateQuote) {
+      this._QCreateQuote = new QCreateQuote();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QCreateQuote.buildUrl());
+
+    return new UrlRequestCmd<ODataModelResponseV4<Quote>>(
+      client,
+      ODataHttpMethods.Post,
+      url,
+      undefined,
+      {
+        headers: getDefaultHeaders(),
+        mainResponseConverter: this._QCreateQuote.getResponseConverter(),
+      },
+    );
+  }
+
+  public CreateQuoteRevision() {
+    if (!this._QCreateQuoteRevision) {
+      this._QCreateQuoteRevision = new QCreateQuoteRevision();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QCreateQuoteRevision.buildUrl());
+
+    return new UrlRequestCmd<ODataModelResponseV4<Quote>>(
+      client,
+      ODataHttpMethods.Post,
+      url,
+      undefined,
+      {
+        headers: getDefaultHeaders(),
+        mainResponseConverter: this._QCreateQuoteRevision.getResponseConverter(),
+      },
+    );
+  }
+
+  public DeclineQuote() {
+    if (!this._QDeclineQuote) {
+      this._QDeclineQuote = new QDeclineQuote();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QDeclineQuote.buildUrl());
+
+    return new UrlRequestCmd<ODataModelResponseV4<Quote>>(
+      client,
+      ODataHttpMethods.Post,
+      url,
+      undefined,
+      {
+        headers: getDefaultHeaders(),
+        mainResponseConverter: this._QDeclineQuote.getResponseConverter(),
+      },
+    );
+  }
+
+  public ReopenQuote() {
+    if (!this._QReopenQuote) {
+      this._QReopenQuote = new QReopenQuote();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QReopenQuote.buildUrl());
+
+    return new UrlRequestCmd<ODataModelResponseV4<Quote>>(
+      client,
+      ODataHttpMethods.Post,
+      url,
+      undefined,
+      {
+        headers: getDefaultHeaders(),
+        mainResponseConverter: this._QReopenQuote.getResponseConverter(),
+      },
+    );
+  }
+
+  public DeleteQuote() {
+    if (!this._QDeleteQuote) {
+      this._QDeleteQuote = new QDeleteQuote();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QDeleteQuote.buildUrl());
+
+    return new UrlRequestCmd<undefined>(client, ODataHttpMethods.Post, url, undefined, {
+      headers: getDefaultHeaders(),
+    });
+  }
+
+  public ConvertQuote() {
+    if (!this._QConvertQuote) {
+      this._QConvertQuote = new QConvertQuote();
+    }
+
+    const { addFullPath, client, getDefaultHeaders } = this.__base;
+    const url = addFullPath(this._QConvertQuote.buildUrl());
+
+    return new UrlRequestCmd<ODataModelResponseV4<Invoice>>(
+      client,
+      ODataHttpMethods.Post,
+      url,
+      undefined,
+      {
+        headers: getDefaultHeaders(),
+        mainResponseConverter: this._QConvertQuote.getResponseConverter(),
       },
     );
   }

@@ -194,3 +194,31 @@ export async function seedIncompleteGrave(page: Page, marker: string): Promise<n
   }
   return found[0].Id;
 }
+
+/** One line of a quote `seedQuote` creates; a `unitPrice` left out bills the
+ *  item's default price, which the item must then have. */
+export interface SeedQuoteLine {
+  itemId: number;
+  count: number;
+  unitPrice?: number;
+}
+
+/**
+ * Creates an open quote the way the editor does — one POST to CreateQuote —
+ * and returns its id and number.
+ */
+export async function seedQuote(
+  page: Page,
+  input: { recipientId: number; lines: SeedQuoteLine[] },
+): Promise<{ id: number; number: string }> {
+  const created = await createRow(page, "/odata/CreateQuote", {
+    recipientId: input.recipientId,
+    lines: input.lines.map((line) => ({
+      itemId: line.itemId,
+      count: line.count,
+      unitPrice: line.unitPrice ?? null,
+      priceIncludesVat: false,
+    })),
+  });
+  return { id: created.Id, number: created.QuoteNumber };
+}

@@ -3,12 +3,15 @@ import { useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Drawer from "primevue/drawer";
 import ProgressSpinner from "primevue/progressspinner";
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   createInvoice,
+  createQuote,
+  createQuoteRevision,
   createRevision,
   fetchInvoiceLines,
+  fetchQuoteLines,
   type InvoiceLineInput,
 } from "@/api/endpoints";
 import { ApiError } from "@/api/http";
@@ -22,10 +25,23 @@ import { priceFieldValue } from "@/lib/money";
 import LineEditor from "./LineEditor.vue";
 import RecipientPicker from "./RecipientPicker.vue";
 
-const props = defineProps<{ target: { invoiceId: number; recipientId: number } | null }>();
+const props = withDefaults(
+  defineProps<{
+    /** The invoice or quote to revise (any row of its chain), or null for a new one. */
+    target: { id: number; recipientId: number } | null;
+    /** A quote is entered exactly like an ordinary invoice; only the calls differ. */
+    kind?: "invoice" | "quote";
+  }>(),
+  { kind: "invoice" },
+);
 const visible = defineModel<boolean>("visible", { required: true });
 
 const { t } = useI18n();
+const title = computed(() =>
+  props.kind === "quote"
+    ? t(props.target ? "editQuote" : "createQuote")
+    : t(props.target ? "editInvoice" : "createInvoice"),
+);
 const { showError } = useErrorToast();
 const drawerFocus = useDrawerFocus();
 const formEl = ref<HTMLFormElement | null>(null);
@@ -68,7 +84,9 @@ watch(visible, async (open) => {
   loading.value = true;
   try {
     const [existing, rates] = await Promise.all([
-      fetchInvoiceLines(props.target.invoiceId),
+      props.kind === "quote"
+        ? fetchQuoteLines(props.target.id)
+        : fetchInvoiceLines(props.target.id),
       loadItemVatRates(queryClient),
     ]);
     if (current !== opening) {
@@ -129,10 +147,17 @@ async function save(): Promise<void> {
     // The refetch runs under the overlay too: a drawer left open while the lists
     // reload, with the busy guard already released, takes a second Save and
     // creates the invoice twice.
-    await run(t("invoiceRunning"), async () => {
-      await (target
-        ? createRevision(target.invoiceId, recipient, inputs)
-        : createInvoice(recipient, inputs));
+    const quote = props.kind === "quote";
+    await run(t(quote ? "quoteRunning" : "invoiceRunning"), async () => {
+      if (quote) {
+        await (target
+          ? createQuoteRevision(target.id, recipient, inputs)
+          : createQuote(recipient, inputs));
+      } else {
+        await (target
+          ? createRevision(target.id, recipient, inputs)
+          : createInvoice(recipient, inputs));
+      }
       await queryClient.invalidateQueries();
     });
     visible.value = false;
@@ -147,8 +172,8 @@ async function save(): Promise<void> {
     :visible="visible"
     :close-on-escape="false"
     position="right"
-    :header="target ? t('editInvoice') : t('createInvoice')"
-    :aria-label="target ? t('editInvoice') : t('createInvoice')"
+    :header="title"
+    :aria-label="title"
     :style="{ width: 'min(100vw, 60rem)' }"
     @after-show="drawerFocus.focusFirst(formEl)"
     @after-hide="drawerFocus.restore()"
