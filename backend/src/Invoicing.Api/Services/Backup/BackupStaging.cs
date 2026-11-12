@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text.Json;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.Data.Sqlite;
 
 namespace Burkard.Invoicing.Api.Services.Backup;
@@ -140,6 +141,13 @@ internal static class BackupStaging
                 }
             }
 
+            // a download refuses such a copy; one that holds a queued or running
+            // job anyway would block every backup and restore after restoring
+            if (await HasActiveJobsAsync(connection, ct))
+            {
+                throw new BackupRejectedException("BackupDamaged");
+            }
+
             var graves = Convert.ToInt32(
                 await Scalar(connection, "SELECT COUNT(*) FROM Graves", ct)
             );
@@ -180,6 +188,21 @@ internal static class BackupStaging
             throw new BackupRejectedException("BackupDamaged");
         }
     }
+
+    /// <summary>Whether the database on <paramref name="connection"/> holds a job
+    /// that is queued or running.</summary>
+    public static async Task<bool> HasActiveJobsAsync(
+        SqliteConnection connection,
+        CancellationToken ct
+    ) =>
+        Convert.ToInt64(
+            await Scalar(
+                connection,
+                $"SELECT EXISTS (SELECT 1 FROM Jobs WHERE Status IN "
+                    + $"({(int)JobStatus.Queued}, {(int)JobStatus.Running}))",
+                ct
+            )
+        ) != 0;
 
     private static async Task<object?> Scalar(
         SqliteConnection connection,

@@ -44,17 +44,52 @@ public sealed class BackupService
 
     /// <summary>The live database file. Read off the context, not the
     /// configuration: tests swap the connection string.</summary>
-    public string DatabasePath =>
-        new SqliteConnectionStringBuilder(_db.Database.GetConnectionString()).DataSource;
+    public string DatabasePath => DatabasePathOf(_db);
+
+    public static string DatabasePathOf(AppDbContext db) =>
+        Path.GetFullPath(
+            new SqliteConnectionStringBuilder(db.Database.GetConnectionString()).DataSource
+        );
+
+    private static string DirectoryOf(string databasePath) =>
+        Path.GetDirectoryName(Path.GetFullPath(databasePath))!;
+
+    /// <summary>The backup as a ZIP in a temporary file beside the database,
+    /// positioned at its start. Closing the stream deletes the file; a file left
+    /// by a crash is swept at the next start (<see cref="SweepLeftovers"/>).
+    /// Written to disk rather than memory: the backup has no small size limit,
+    /// and building it whole first keeps the answer an error if it fails.</summary>
+    public async Task<Stream> CreateBackupAsync(CancellationToken ct)
+    {
+        var path = Path.Combine(DirectoryOf(DatabasePath), $"backup-{Guid.NewGuid():N}.zip");
+        var stream = new FileStream(
+            path,
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None,
+            bufferSize: 81920,
+            FileOptions.Asynchronous | FileOptions.DeleteOnClose
+        );
+        try
+        {
+            await WriteBackupAsync(stream, ct);
+            stream.Position = 0;
+            return stream;
+        }
+        catch
+        {
+            await stream.DisposeAsync();
+            throw;
+        }
+    }
 
     /// <summary>Writes a ZIP of <c>manifest.json</c> and a consistent copy of the
     /// database to <paramref name="output"/>. The copy is made with
     /// <c>VACUUM INTO</c> on a fresh connection, which includes what is still in
     /// the write-ahead log.</summary>
-    public async Task WriteBackupAsync(Stream output, CancellationToken ct)
+    private async Task WriteBackupAsync(Stream output, CancellationToken ct)
     {
-        var directory = Path.GetDirectoryName(Path.GetFullPath(DatabasePath))!;
-        var temp = Path.Combine(directory, $"backup-{Guid.NewGuid():N}.db");
+        var temp = Path.Combine(DirectoryOf(DatabasePath), $"backup-{Guid.NewGuid():N}.db");
         try
         {
             await using (
@@ -66,6 +101,20 @@ public sealed class BackupService
                 command.CommandText = "VACUUM INTO $path";
                 command.Parameters.AddWithValue("$path", temp);
                 await command.ExecuteNonQueryAsync(ct);
+            }
+
+            // The caller asked before the copy, but a job created between that
+            // and the copy's snapshot is in it, and a restored instance would
+            // refuse every backup and restore until a restart.
+            await using (
+                var copy = new SqliteConnection($"Data Source={temp};Mode=ReadOnly;Pooling=False")
+            )
+            {
+                await copy.OpenAsync(ct);
+                if (await BackupStaging.HasActiveJobsAsync(copy, ct))
+                {
+                    throw new BackupRejectedException("JobAlreadyRunning");
+                }
             }
 
             var manifest = new BackupManifest(
@@ -104,8 +153,10 @@ public sealed class BackupService
         }
     }
 
-    private string StagingDirectory =>
-        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(DatabasePath))!, "restore-staging");
+    private string StagingDirectory => StagingDirectoryOf(DatabasePath);
+
+    private static string StagingDirectoryOf(string databasePath) =>
+        Path.Combine(DirectoryOf(databasePath), "restore-staging");
 
     private static readonly Regex TokenPattern = new("^[0-9a-f]{32}$");
 
@@ -191,7 +242,8 @@ public sealed class BackupService
     /// is not cancellable: once files move, it finishes or rolls back. Leaves
     /// <paramref name="reopen"/> false only when the rollback failed too, so that
     /// nothing reads or writes whatever is at the live path until someone has
-    /// looked.</summary>
+    /// looked; and then leaves the marker that keeps the app from starting on it
+    /// (<see cref="RefuseStartAfterIncompleteRestore"/>).</summary>
     private void Swap(string staged, ref bool reopen)
     {
         var live = Path.GetFullPath(DatabasePath);
@@ -211,23 +263,30 @@ public sealed class BackupService
         {
             // nothing new is in place: put back the part of the set that moved
             _logger.LogError(e, "Restoring a backup failed while moving the live database aside");
+            var rolledBack = true;
             try
             {
                 MoveBack(movedAside);
             }
             catch (Exception rollback)
             {
-                reopen = false;
-                LogRollbackFailed(rollback, aside);
+                rolledBack = reopen = false;
+                RollbackFailed(rollback, live, aside);
             }
             DeleteSetQuietly(staged);
-            throw new RestoreFailedException(e);
+            throw new RestoreFailedException(e, rolledBack);
         }
 
         // from here on every file at the live path belongs to the backup
         try
         {
             MoveSet(staged, live, null);
+            // MoveSet skips what is missing; migrating nothing would create an
+            // empty database and call it a restore
+            if (!File.Exists(live))
+            {
+                throw new IOException("The staged backup did not arrive at the database path.");
+            }
             // a context of its own: the request's has seen the old database
             using var scope = _scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -241,6 +300,7 @@ public sealed class BackupService
         catch (Exception e)
         {
             _logger.LogError(e, "Restoring a backup failed; putting the replaced database back");
+            var rolledBack = true;
             try
             {
                 SqliteConnection.ClearAllPools();
@@ -249,11 +309,11 @@ public sealed class BackupService
             }
             catch (Exception rollback)
             {
-                reopen = false;
-                LogRollbackFailed(rollback, aside);
+                rolledBack = reopen = false;
+                RollbackFailed(rollback, live, aside);
             }
             DeleteSetQuietly(staged);
-            throw new RestoreFailedException(e);
+            throw new RestoreFailedException(e, rolledBack);
         }
 
         _logger.LogInformation(
@@ -262,15 +322,119 @@ public sealed class BackupService
         );
     }
 
-    private void LogRollbackFailed(Exception e, string aside) =>
+    private const string RecoverySection =
+        "README.md, section \"Recovering from a failed restore\"";
+
+    /// <summary>Next to the database while a failed rollback has not been
+    /// repaired by hand. Holds the path of the safety copy.</summary>
+    public static string IncompleteRestoreMarker(string databasePath) =>
+        Path.GetFullPath(databasePath) + ".restore-incomplete";
+
+    /// <summary>Logs the failed rollback and leaves the marker. The marker is what
+    /// survives a restart: without it the next start would migrate and seed
+    /// whatever is at the live path, or a new empty database.</summary>
+    private void RollbackFailed(Exception e, string live, string aside)
+    {
         _logger.LogCritical(
             e,
             "Restoring a backup failed and the replaced database could not be put back. "
                 + "It is kept as {SafetyCopy} (with its -wal and -shm files, if any) beside "
-                + "the database. Every request is refused until it has been put back by hand "
-                + "and the app restarted.",
-            aside
+                + "the database. Every request is refused, and the app will not start again, "
+                + "until it has been put back by hand as described in {Section}.",
+            aside,
+            RecoverySection
         );
+        try
+        {
+            File.WriteAllText(IncompleteRestoreMarker(live), aside + Environment.NewLine);
+        }
+        catch (Exception marker) when (marker is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogCritical(
+                marker,
+                "The marker {Marker} could not be written; do not restart the app before "
+                    + "putting the replaced database back by hand",
+                IncompleteRestoreMarker(live)
+            );
+        }
+    }
+
+    /// <summary>Called at startup, before anything opens the database: refuses to
+    /// start while a failed rollback has not been repaired by hand.</summary>
+    public static void RefuseStartAfterIncompleteRestore(string databasePath, ILogger logger)
+    {
+        var marker = IncompleteRestoreMarker(databasePath);
+        if (!File.Exists(marker))
+        {
+            return;
+        }
+
+        logger.LogCritical(
+            "A restore failed and the replaced database was not put back; it is named in "
+                + "{Marker}. Put it back by hand as described in {Section}, delete the marker, "
+                + "and start the app again.",
+            marker,
+            RecoverySection
+        );
+        throw new InvalidOperationException(
+            $"Refusing to start: a restore was not completed ({marker}). "
+                + $"See {RecoverySection}."
+        );
+    }
+
+    private static readonly Regex DownloadLeftover = new(
+        @"^backup-[0-9a-f]{32}\.(db|zip)(-journal|-wal|-shm)?$"
+    );
+
+    /// <summary>Called at startup: removes the temporary files of downloads a
+    /// crash interrupted, and staged uploads older than an hour. Nothing is in
+    /// use yet, so every download leftover can go.</summary>
+    public static void SweepLeftovers(string databasePath, ILogger logger)
+    {
+        var directory = DirectoryOf(databasePath);
+        if (Directory.Exists(directory))
+        {
+            foreach (var file in Directory.EnumerateFiles(directory, "backup-*"))
+            {
+                if (DownloadLeftover.IsMatch(Path.GetFileName(file)))
+                {
+                    DeleteQuietly(file, logger);
+                }
+            }
+        }
+
+        SweepStaging(StagingDirectoryOf(databasePath), logger);
+    }
+
+    /// <summary>Staged uploads, and the ZIPs they came in, are kept for an
+    /// hour.</summary>
+    private static void SweepStaging(string staging, ILogger logger)
+    {
+        if (!Directory.Exists(staging))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.GetFiles(staging))
+        {
+            if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow.AddHours(-1))
+            {
+                DeleteQuietly(file, logger);
+            }
+        }
+    }
+
+    private static void DeleteQuietly(string file, ILogger logger)
+    {
+        try
+        {
+            File.Delete(file);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(e, "A leftover backup file could not be deleted");
+        }
+    }
 
     /// <summary>The database file and the files SQLite keeps beside it under its
     /// name. They only make sense together, so they move together.</summary>
@@ -317,7 +481,7 @@ public sealed class BackupService
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            // the staging folder is swept of old files on the next upload
+            // the staging folder is swept of old files on the next upload or start
             _logger.LogWarning(e, "A staged backup could not be deleted");
         }
     }
@@ -343,17 +507,7 @@ public sealed class BackupService
     public async Task<StagedBackup> StageAsync(Stream upload, CancellationToken ct)
     {
         Directory.CreateDirectory(StagingDirectory);
-        foreach (var old in Directory.GetFiles(StagingDirectory))
-        {
-            if (File.GetLastWriteTimeUtc(old) < DateTime.UtcNow.AddHours(-1))
-            {
-                try
-                {
-                    File.Delete(old);
-                }
-                catch (IOException) { }
-            }
-        }
+        SweepStaging(StagingDirectory, _logger);
 
         var token = Guid.NewGuid().ToString("N");
         var zipPath = Path.Combine(StagingDirectory, $"upload-{token}.zip");

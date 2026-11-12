@@ -64,6 +64,12 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    // before anything opens the database: after a restore whose rollback
+    // failed, migrating would bring up whatever is at the live path, or a new
+    // empty database
+    var databasePath = BackupService.DatabasePathOf(db);
+    BackupService.RefuseStartAfterIncompleteRestore(databasePath, app.Logger);
+    BackupService.SweepLeftovers(databasePath, app.Logger);
     db.Database.Migrate();
     DatabaseSeeder.Seed(db);
     app.Services.GetRequiredService<DataGeneration>().Load(db);

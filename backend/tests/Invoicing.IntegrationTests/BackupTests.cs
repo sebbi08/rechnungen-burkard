@@ -959,4 +959,206 @@ public class BackupTests
         await gate.CloseAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
         gate.Open();
     }
+
+    private static string[] TemporaryBackupFiles(ApiTestHost host) =>
+        Directory
+            .GetFiles(Path.GetDirectoryName(host.DbFilePath)!, "backup-*")
+            .Select(f => Path.GetFileName(f))
+            .ToArray();
+
+    [Fact]
+    public async Task Download_LeavesNoTemporaryFiles()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        var response = await client.GetAsync("/odata/DownloadBackup");
+        await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(TemporaryBackupFiles(host));
+    }
+
+    /// <summary>The job check before the copy cannot see a job created between it
+    /// and VACUUM INTO's snapshot, so the copy itself is asked again. Called on
+    /// the service: the request's own check would answer first.</summary>
+    [Fact]
+    public async Task CreateBackup_CopyHoldingActiveJob_IsRefused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Jobs.Add(ActiveJob());
+        await db.SaveChangesAsync();
+        var backup = scope.ServiceProvider.GetRequiredService<BackupService>();
+
+        var e = await Assert.ThrowsAsync<BackupRejectedException>(() =>
+            backup.CreateBackupAsync(CancellationToken.None)
+        );
+
+        Assert.Equal("JobAlreadyRunning", e.Code);
+        Assert.Empty(TemporaryBackupFiles(host));
+    }
+
+    [Fact]
+    public async Task Upload_BackupHoldingActiveJob_IsBackupDamaged()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var before = StagingFiles(host);
+        var path = ExtractDb(await DownloadAsync(client));
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText =
+                    "INSERT INTO Jobs (Type, Status, ProgressPercent, TotalCount, ProcessedCount, CreatedAt) "
+                    + "VALUES ('GraveInvoices', 0, 0, 1, 0, '2026-10-06 12:00:00')";
+                command.ExecuteNonQuery();
+            }
+
+            await AssertRejectedAsync(
+                await UploadAsync(client, BuildZip(path, ValidManifest)),
+                "BackupDamaged"
+            );
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+        Assert.Empty(StagingFiles(host).Except(before));
+    }
+
+    [Fact]
+    public async Task Upload_NotMultipart_IsArchiveRequired()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var content = new ByteArrayContent(await DownloadAsync(client));
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            "application/zip"
+        );
+
+        var response = await client.PostAsync("/odata/UploadBackup", content);
+
+        await AssertRejectedAsync(response, "ArchiveRequired");
+    }
+
+    [Fact]
+    public async Task Upload_FileAfterOtherFields_IsStaged()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent("x"), "other" },
+            { new ByteArrayContent(await DownloadAsync(client)), "file", "sicherung.zip" },
+        };
+
+        var response = await client.PostAsync("/odata/UploadBackup", form);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    /// <summary>A directory under the name of the database's journal: the
+    /// restored database's migration fails beside it, and the rollback cannot
+    /// delete it, so putting the old database back fails too.</summary>
+    [Fact]
+    public async Task Restore_RollbackFails_IsReported_KeepsGateClosed_AndLeavesMarker()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var path = ExtractDb(await DownloadAsync(client));
+        HttpResponseMessage response;
+        try
+        {
+            // the migration fails as in Restore_MigrationFails_PutsOldDatabaseBack
+            using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText =
+                    "DELETE FROM __EFMigrationsHistory WHERE MigrationId = "
+                    + "(SELECT MAX(MigrationId) FROM __EFMigrationsHistory)";
+                command.ExecuteNonQuery();
+            }
+            await CreateRecipientAsync(client, "Live");
+            var token = await StageAsync(client, BuildZip(path, ValidManifest));
+            Directory.CreateDirectory(host.DbFilePath + "-journal");
+
+            response = await RestoreAsync(client, token);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        await AssertErrorAsync(
+            response,
+            HttpStatusCode.InternalServerError,
+            "RestoreRollbackFailed"
+        );
+        await AssertErrorAsync(
+            await client.GetAsync("/odata/Recipients"),
+            HttpStatusCode.ServiceUnavailable,
+            "RestoreInProgress"
+        );
+        var safetyCopy = host.DbFilePath + ".before-restore-20261006-120000";
+        Assert.Equal(1, CountRecipients(safetyCopy, "Live"));
+        var marker = host.DbFilePath + ".restore-incomplete";
+        Assert.True(File.Exists(marker));
+        Assert.Contains(safetyCopy, File.ReadAllText(marker));
+    }
+
+    /// <summary>After a failed rollback the live path holds whatever the swap
+    /// left, or nothing; starting on it would migrate and seed an empty
+    /// database and open the gate again.</summary>
+    [Fact]
+    public void Startup_WithIncompleteRestoreMarker_Refuses()
+    {
+        using var host = new ApiTestHost();
+        File.WriteAllText(host.DbFilePath + ".restore-incomplete", "x");
+
+        var e = Assert.ThrowsAny<Exception>(() => host.CreateClient());
+
+        Assert.Contains("restore-incomplete", e.ToString());
+        Assert.False(File.Exists(host.DbFilePath), "the database was created or migrated");
+    }
+
+    [Fact]
+    public void Startup_SweepsLeftoversOfDownloadsAndOldUploads()
+    {
+        using var host = new ApiTestHost();
+        var directory = Path.GetDirectoryName(host.DbFilePath)!;
+        var staging = Directory
+            .CreateDirectory(Path.Combine(directory, "restore-staging"))
+            .FullName;
+        static string Touch(string dir, string name)
+        {
+            var path = Path.Combine(dir, name);
+            File.WriteAllText(path, "x");
+            return path;
+        }
+        var hex = Guid.NewGuid().ToString("N");
+        var leftovers = new[]
+        {
+            Touch(directory, $"backup-{hex}.db"),
+            Touch(directory, $"backup-{hex}.db-journal"),
+            Touch(directory, $"backup-{hex}.zip"),
+        };
+        var oldUpload = Touch(staging, $"{hex}.db");
+        File.SetLastWriteTimeUtc(oldUpload, DateTime.UtcNow.AddHours(-2));
+        var freshUpload = Touch(staging, $"{Guid.NewGuid():N}.db");
+        var ownFile = Touch(directory, "backup-mine.db");
+
+        using var client = host.CreateClient();
+
+        Assert.All(leftovers, f => Assert.False(File.Exists(f), f));
+        Assert.False(File.Exists(oldUpload));
+        Assert.True(File.Exists(freshUpload));
+        Assert.True(File.Exists(ownFile));
+    }
 }
