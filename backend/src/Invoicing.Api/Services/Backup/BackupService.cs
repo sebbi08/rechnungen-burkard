@@ -17,11 +17,26 @@ public sealed class BackupService
 
     private readonly AppDbContext _db;
     private readonly IClock _clock;
+    private readonly JobService _jobs;
+    private readonly DatabaseGate _gate;
+    private readonly IServiceScopeFactory _scopes;
+    private readonly ILogger<BackupService> _logger;
 
-    public BackupService(AppDbContext db, IClock clock)
+    public BackupService(
+        AppDbContext db,
+        IClock clock,
+        JobService jobs,
+        DatabaseGate gate,
+        IServiceScopeFactory scopes,
+        ILogger<BackupService> logger
+    )
     {
         _db = db;
         _clock = clock;
+        _jobs = jobs;
+        _gate = gate;
+        _scopes = scopes;
+        _logger = logger;
     }
 
     /// <summary>The live database file. Read off the context, not the
@@ -108,8 +123,196 @@ public sealed class BackupService
     {
         if (StagedPath(token) is { } path)
         {
-            File.Delete(path);
+            DeleteSet(path);
         }
+    }
+
+    /// <summary>Replaces the live database with the one staged under
+    /// <paramref name="token"/>, behind the closed <see cref="DatabaseGate"/>.
+    /// The replaced database stays beside it as a safety copy. If anything goes
+    /// wrong once the swap has begun, the replaced database is put back and
+    /// <see cref="RestoreFailedException"/> is thrown. Either way the staged
+    /// file is gone afterwards.</summary>
+    public async Task RestoreAsync(string token, CancellationToken ct)
+    {
+        // asked before closing the gate as well, so that a refusal does not hold
+        // up everyone else while the requests inside drain
+        CheckRestorable(token);
+
+        await _gate.CloseAsync(ct);
+        var reopen = true;
+        try
+        {
+            // and again behind it: a discard, a second restore of the same
+            // token or a new job may have come in meanwhile
+            var staged = CheckRestorable(token);
+            Swap(staged, ref reopen);
+        }
+        finally
+        {
+            if (reopen)
+            {
+                _gate.Open();
+            }
+        }
+    }
+
+    private string CheckRestorable(string token)
+    {
+        var staged = StagedPath(token) ?? throw new BackupRejectedException("BackupTokenUnknown");
+        if (_jobs.HasAnyActive())
+        {
+            throw new BackupRejectedException("JobAlreadyRunning");
+        }
+
+        return staged;
+    }
+
+    /// <summary>The swap itself. Runs with the gate closed and nobody inside, and
+    /// is not cancellable: once files move, it finishes or rolls back. Leaves
+    /// <paramref name="reopen"/> false only when the rollback failed too, so that
+    /// nothing reads or writes whatever is at the live path until someone has
+    /// looked.</summary>
+    private void Swap(string staged, ref bool reopen)
+    {
+        var live = Path.GetFullPath(DatabasePath);
+        var aside = SafetyCopyPath(live);
+        var movedAside = new List<(string From, string To)>();
+
+        // Nobody is inside the gate, so every pooled connection is idle (this
+        // request's context closed its connection after its last query).
+        // Closing them checkpoints the write-ahead log into the file and
+        // removes it; whatever is left of it moves along with the file.
+        SqliteConnection.ClearAllPools();
+        try
+        {
+            MoveSet(live, aside, movedAside);
+        }
+        catch (Exception e)
+        {
+            // nothing new is in place: put back the part of the set that moved
+            _logger.LogError(e, "Restoring a backup failed while moving the live database aside");
+            try
+            {
+                MoveBack(movedAside);
+            }
+            catch (Exception rollback)
+            {
+                reopen = false;
+                LogRollbackFailed(rollback, aside);
+            }
+            DeleteSetQuietly(staged);
+            throw new RestoreFailedException(e);
+        }
+
+        // from here on every file at the live path belongs to the backup
+        try
+        {
+            MoveSet(staged, live, null);
+            // a context of its own: the request's has seen the old database
+            using var scope = _scopes.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.Migrate();
+            db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL");
+            DatabaseSeeder.Seed(db);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Restoring a backup failed; putting the replaced database back");
+            try
+            {
+                SqliteConnection.ClearAllPools();
+                DeleteSet(live);
+                MoveBack(movedAside);
+            }
+            catch (Exception rollback)
+            {
+                reopen = false;
+                LogRollbackFailed(rollback, aside);
+            }
+            DeleteSetQuietly(staged);
+            throw new RestoreFailedException(e);
+        }
+
+        _logger.LogInformation(
+            "Restored a backup; the replaced database was kept as {SafetyCopy}",
+            Path.GetFileName(aside)
+        );
+    }
+
+    private void LogRollbackFailed(Exception e, string aside) =>
+        _logger.LogCritical(
+            e,
+            "Restoring a backup failed and the replaced database could not be put back. "
+                + "It is kept as {SafetyCopy} (with its -wal and -shm files, if any) beside "
+                + "the database. Every request is refused until it has been put back by hand "
+                + "and the app restarted.",
+            aside
+        );
+
+    /// <summary>The database file and the files SQLite keeps beside it under its
+    /// name. They only make sense together, so they move together.</summary>
+    private static readonly string[] SetSuffixes = ["", "-wal", "-shm", "-journal"];
+
+    private static IEnumerable<string> Set(string path) => SetSuffixes.Select(s => path + s);
+
+    /// <summary>Moves those files of <paramref name="from"/>'s set that exist,
+    /// never over an existing file. Records each move in
+    /// <paramref name="moved"/> as it happens.</summary>
+    private static void MoveSet(string from, string to, List<(string From, string To)>? moved)
+    {
+        foreach (var suffix in SetSuffixes)
+        {
+            if (File.Exists(from + suffix))
+            {
+                File.Move(from + suffix, to + suffix, overwrite: false);
+                moved?.Add((from + suffix, to + suffix));
+            }
+        }
+    }
+
+    private static void MoveBack(List<(string From, string To)> moved)
+    {
+        for (var i = moved.Count - 1; i >= 0; i--)
+        {
+            File.Move(moved[i].To, moved[i].From, overwrite: false);
+        }
+    }
+
+    private static void DeleteSet(string path)
+    {
+        foreach (var file in Set(path))
+        {
+            File.Delete(file);
+        }
+    }
+
+    private void DeleteSetQuietly(string path)
+    {
+        try
+        {
+            DeleteSet(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // the staging folder is swept of old files on the next upload
+            _logger.LogWarning(e, "A staged backup could not be deleted");
+        }
+    }
+
+    /// <summary>Beside the live database, named after the local time, as
+    /// <c>scripts/reset-dev-db.sh</c> keeps the old one. A second restore within
+    /// the same second gets a numbered name rather than failing.</summary>
+    private string SafetyCopyPath(string live)
+    {
+        var stem = $"{live}.before-restore-{_clock.GetLocalNow():yyyyMMdd-HHmmss}";
+        var path = stem;
+        for (var n = 2; Set(path).Any(File.Exists); n++)
+        {
+            path = $"{stem}-{n}";
+        }
+
+        return path;
     }
 
     /// <summary>Saves an uploaded backup, checks it and leaves the database in the

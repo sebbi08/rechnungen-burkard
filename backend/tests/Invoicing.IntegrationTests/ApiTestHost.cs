@@ -17,10 +17,12 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class ApiTestHost : WebApplicationFactory<Program>
 {
-    private readonly string _dbFile = Path.Combine(
-        Path.GetTempPath(),
-        $"invoicing-test-{Guid.NewGuid():N}.db"
-    );
+    // a directory of its own per host: the restore staging folder and the
+    // safety copies of a restore sit beside the database, and hosts of test
+    // classes running in parallel must not see each other's
+    private readonly string _directory = Directory
+        .CreateDirectory(Path.Combine(Path.GetTempPath(), $"invoicing-test-{Guid.NewGuid():N}"))
+        .FullName;
 
     /// <summary>The moment the app's clock stands at: 2026-10-06, in H2 2026, so
     /// a term starting in 2026 has already begun. Set it in an initializer
@@ -32,7 +34,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
     /// in which the two days differ. Defaults to <see cref="Now"/>.</summary>
     public DateTime? UtcNow { get; init; }
 
-    public string DbFilePath => _dbFile;
+    public string DbFilePath => Path.Combine(_directory, "invoicing.db");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -43,7 +45,7 @@ public class ApiTestHost : WebApplicationFactory<Program>
                 d.ServiceType == typeof(DbContextOptions<AppDbContext>)
             );
             services.Remove(descriptor);
-            services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbFile}"));
+            services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={DbFilePath}"));
             services.AddSingleton<IJobHandler, TestJobHandler>();
             services.AddSingleton<IJobHandler, UnrecordableJobHandler>();
             services.RemoveAll<IClock>();
@@ -67,7 +69,10 @@ public class ApiTestHost : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (File.Exists(_dbFile))
-            File.Delete(_dbFile);
+        try
+        {
+            Directory.Delete(_directory, recursive: true);
+        }
+        catch (IOException) { }
     }
 }

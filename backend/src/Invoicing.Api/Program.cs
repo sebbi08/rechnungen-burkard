@@ -52,6 +52,7 @@ builder.Services.AddScoped<RecipientNumberService>();
 builder.Services.AddScoped<ImportValidator>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<BackupService>();
+builder.Services.AddSingleton<DatabaseGate>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<IJobHandler, GraveInvoicesJobHandler>();
@@ -65,6 +66,12 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
     DatabaseSeeder.Seed(db);
 }
+
+// Every request that can reach the database passes the gate a restore closes
+// while it swaps the file (BackupService.RestoreAsync). It comes before
+// routing, so nothing about a request is looked at while the gate is closed.
+app.UseMiddleware<DatabaseGateMiddleware>();
+app.UseRouting();
 
 // Serve the frontend's build from wwwroot (combined release image). Vue Router
 // uses HTML5 history, so /invoices/42 is a page rather than a file, and a

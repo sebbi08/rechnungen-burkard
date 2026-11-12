@@ -94,16 +94,45 @@ public class BackupController : ODataController
         return NoContent();
     }
 
-    // the one place a rejection code becomes a status and an error body
-    private IActionResult Rejected(BackupRejectedException e)
+    public sealed record RestoreRequest(string? Token);
+
+    /// <summary>Replaces all data with the backup staged under the token. Other
+    /// requests are answered 503 meanwhile (DatabaseGateMiddleware).</summary>
+    [HttpPost("RestoreBackup")]
+    public async Task<IActionResult> Restore(
+        [FromBody] RestoreRequest request,
+        CancellationToken ct
+    )
     {
-        var status = e.Code switch
+        try
+        {
+            await _backup.RestoreAsync(request.Token ?? "", ct);
+            return NoContent();
+        }
+        catch (BackupRejectedException e)
+        {
+            return Rejected(e);
+        }
+        catch (RestoreFailedException)
+        {
+            // logged where it happened, with what was put back
+            return Error("RestoreFailed");
+        }
+    }
+
+    private IActionResult Rejected(BackupRejectedException e) => Error(e.Code);
+
+    // the one place an error code becomes a status and an error body
+    private IActionResult Error(string code)
+    {
+        var status = code switch
         {
             "JobAlreadyRunning" => StatusCodes.Status409Conflict,
             "BackupTokenUnknown" => StatusCodes.Status404NotFound,
+            "RestoreFailed" => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status400BadRequest,
         };
-        return StatusCode(status, new { error = new { code = e.Code, message = Message(e.Code) } });
+        return StatusCode(status, new { error = new { code, message = Message(code) } });
     }
 
     private static string Message(string code) =>
@@ -115,6 +144,7 @@ public class BackupController : ODataController
             "BackupDamaged" => "The backup's database is damaged.",
             "BackupFromNewerVersion" => "The backup was written by a newer version.",
             "BackupTokenUnknown" => "The backup is no longer staged; upload it again.",
+            "RestoreFailed" => "Restoring the backup failed; the server log says what happened.",
             _ => code,
         };
 }

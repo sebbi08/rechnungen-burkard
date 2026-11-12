@@ -4,10 +4,16 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Api.Services.Backup;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -441,5 +447,325 @@ public class BackupTests
         Assert.Equal(HttpStatusCode.NoContent, discarded.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, unknown.StatusCode);
         Assert.DoesNotContain(StagingFiles(host), f => f.EndsWith($"{token}.db"));
+    }
+
+    private static Task<HttpResponseMessage> RestoreAsync(HttpClient client, string token) =>
+        client.PostAsync("/odata/RestoreBackup", ODataJson.Body(new { token }));
+
+    private static async Task AssertErrorAsync(
+        HttpResponseMessage response,
+        HttpStatusCode status,
+        string code
+    )
+    {
+        Assert.Equal(status, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        Assert.Equal(code, json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    private static async Task CreateRecipientAsync(HttpClient client, string name)
+    {
+        var response = await client.PostAsync(
+            "/odata/Recipients",
+            ODataJson.Body(new { Name = name, Address = "Hauptstraße 1\n99999 Musterdorf" })
+        );
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task<string[]> RecipientNamesAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/odata/Recipients?$select=Name");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = await ODataJson.ReadAsync(response);
+        return json
+            .RootElement.GetProperty("value")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("Name").GetString()!)
+            .ToArray();
+    }
+
+    private static async Task SetStampWordAsync(HttpClient client, string word) =>
+        (
+            await client.PatchAsync("/odata/Settings", ODataJson.Body(new { StampWord = word }))
+        ).EnsureSuccessStatusCode();
+
+    private static async Task<string> StampWordAsync(HttpClient client)
+    {
+        using var json = await ODataJson.ReadAsync(await client.GetAsync("/odata/Settings"));
+        return json.RootElement.GetProperty("StampWord").GetString()!;
+    }
+
+    private static string[] SafetyCopies(ApiTestHost host) =>
+        Directory
+            .GetFiles(Path.GetDirectoryName(host.DbFilePath)!, "*.before-restore-*")
+            .Select(f => Path.GetFileName(f))
+            .Order()
+            .ToArray();
+
+    private static long CountRecipients(string dbPath, string name)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM Recipients WHERE Name = $name";
+        command.Parameters.AddWithValue("$name", name);
+        return (long)command.ExecuteScalar()!;
+    }
+
+    private static Job ActiveJob() =>
+        new()
+        {
+            Type = "GraveInvoices",
+            Status = JobStatus.Queued,
+            TotalCount = 1,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+    [Fact]
+    public async Task Restore_ReplacesAllData_AndKeepsSafetyCopy()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await SetStampWordAsync(client, "Vorher");
+        await CreateRecipientAsync(client, "A");
+        var zip = await DownloadAsync(client);
+        await CreateRecipientAsync(client, "B");
+        await SetStampWordAsync(client, "Nachher");
+        var token = await StageAsync(client, zip);
+
+        var response = await RestoreAsync(client, token);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var names = await RecipientNamesAsync(client);
+        Assert.Contains("A", names);
+        Assert.DoesNotContain("B", names);
+        Assert.Equal("Vorher", await StampWordAsync(client));
+        // the replaced database, whole, with what was still in its write-ahead log
+        var safetyCopy = host.DbFilePath + ".before-restore-20261006-120000";
+        Assert.True(File.Exists(safetyCopy));
+        Assert.Equal(1, CountRecipients(safetyCopy, "B"));
+        Assert.DoesNotContain(StagingFiles(host), f => Path.GetFileName(f).StartsWith(token));
+        using var connection = new SqliteConnection($"Data Source={host.DbFilePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA journal_mode";
+        Assert.Equal("wal", command.ExecuteScalar());
+    }
+
+    [Fact]
+    public async Task Restore_Twice_KeepsBothSafetyCopies()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var zip = await DownloadAsync(client);
+
+        var first = await RestoreAsync(client, await StageAsync(client, zip));
+        var second = await RestoreAsync(client, await StageAsync(client, zip));
+
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
+        Assert.Equal(
+            new[]
+            {
+                "invoicing.db.before-restore-20261006-120000",
+                "invoicing.db.before-restore-20261006-120000-2",
+            },
+            SafetyCopies(host)
+        );
+    }
+
+    [Fact]
+    public async Task Restore_OlderBackup_IsMigrated()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var path = Path.Combine(Path.GetTempPath(), $"backup-test-{Guid.NewGuid():N}.db");
+        try
+        {
+            using (
+                var db = new AppDbContext(
+                    new DbContextOptionsBuilder<AppDbContext>()
+                        .UseSqlite($"Data Source={path};Pooling=False")
+                        .Options
+                )
+            )
+            {
+                db.GetService<IMigrator>().Migrate("20261101095804_RecipientEmailAndCemeteries");
+            }
+            var token = await StageAsync(client, BuildZip(path, ValidManifest));
+
+            var response = await RestoreAsync(client, token);
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            var graves = await client.GetAsync("/odata/Graves?$select=ContractNumber");
+            Assert.Equal(HttpStatusCode.OK, graves.StatusCode);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Restore_MigrationFails_PutsOldDatabaseBack()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var path = ExtractDb(await DownloadAsync(client));
+        try
+        {
+            // the last migration then runs again on a schema that already has it
+            using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                connection.Open();
+                using var command = connection.CreateCommand();
+                command.CommandText =
+                    "DELETE FROM __EFMigrationsHistory WHERE MigrationId = "
+                    + "(SELECT MAX(MigrationId) FROM __EFMigrationsHistory)";
+                Assert.Equal(1, command.ExecuteNonQuery());
+            }
+            await CreateRecipientAsync(client, "Live");
+            var token = await StageAsync(client, BuildZip(path, ValidManifest));
+
+            var response = await RestoreAsync(client, token);
+
+            await AssertErrorAsync(response, HttpStatusCode.InternalServerError, "RestoreFailed");
+            Assert.Contains("Live", await RecipientNamesAsync(client));
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/healthz")).StatusCode);
+            Assert.Empty(SafetyCopies(host));
+            Assert.DoesNotContain(StagingFiles(host), f => Path.GetFileName(f).StartsWith(token));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task Restore_TokenUsedOrDiscarded_IsUnknown()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var zip = await DownloadAsync(client);
+        var used = await StageAsync(client, zip);
+        Assert.Equal(HttpStatusCode.NoContent, (await RestoreAsync(client, used)).StatusCode);
+
+        var again = await RestoreAsync(client, used);
+
+        await AssertErrorAsync(again, HttpStatusCode.NotFound, "BackupTokenUnknown");
+
+        var discarded = await StageAsync(client, zip);
+        await client.PostAsync("/odata/DiscardBackup", ODataJson.Body(new { token = discarded }));
+
+        var afterDiscard = await RestoreAsync(client, discarded);
+
+        await AssertErrorAsync(afterDiscard, HttpStatusCode.NotFound, "BackupTokenUnknown");
+    }
+
+    [Fact]
+    public async Task Restore_WhileJobActive_Is409()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var token = await StageAsync(client, await DownloadAsync(client));
+        await CreateRecipientAsync(client, "Live");
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Jobs.Add(ActiveJob());
+            await db.SaveChangesAsync();
+        }
+
+        var response = await RestoreAsync(client, token);
+
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "JobAlreadyRunning");
+        Assert.Contains("Live", await RecipientNamesAsync(client));
+        Assert.Empty(SafetyCopies(host));
+    }
+
+    [Fact]
+    public async Task RequestsWhileGateClosed_Answer503()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var gate = host.Services.GetRequiredService<DatabaseGate>();
+
+        await gate.CloseAsync(CancellationToken.None);
+        var closed = await client.GetAsync("/odata/Recipients");
+        var health = await client.GetAsync("/healthz");
+        gate.Open();
+        var open = await client.GetAsync("/odata/Recipients");
+
+        await AssertErrorAsync(closed, HttpStatusCode.ServiceUnavailable, "RestoreInProgress");
+        await AssertErrorAsync(health, HttpStatusCode.ServiceUnavailable, "RestoreInProgress");
+        Assert.Equal(HttpStatusCode.OK, open.StatusCode);
+    }
+
+    [Fact]
+    public async Task JobRunner_StartsNoJobWhileGateClosed()
+    {
+        using var host = new ApiTestHost();
+        var gate = host.Services.GetRequiredService<DatabaseGate>();
+        await gate.CloseAsync(CancellationToken.None);
+        long jobId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var jobs = scope.ServiceProvider.GetRequiredService<JobService>();
+            jobId = (await jobs.EnqueueAsync("Test", null, 10, CancellationToken.None)).Id;
+        }
+
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        Assert.Equal(JobStatus.Queued, await JobStatusAsync(host, jobId));
+        gate.Open();
+
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (await JobStatusAsync(host, jobId) != JobStatus.Succeeded)
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the job did not run after the gate opened");
+            await Task.Delay(50);
+        }
+    }
+
+    private static async Task<JobStatus> JobStatusAsync(ApiTestHost host, long jobId)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return (await db.Jobs.SingleAsync(j => j.Id == jobId)).Status;
+    }
+
+    [Fact]
+    public async Task Gate_CloseWaitsForThoseInside_AndRefusesNewcomers()
+    {
+        var gate = new DatabaseGate();
+        Assert.True(gate.TryEnter());
+
+        var closing = gate.CloseAsync(CancellationToken.None);
+
+        Assert.True(gate.IsClosed);
+        Assert.False(gate.TryEnter());
+        Assert.False(closing.IsCompleted);
+        gate.Exit();
+        await closing.WaitAsync(TimeSpan.FromSeconds(5));
+        gate.Open();
+        Assert.False(gate.IsClosed);
+        Assert.True(gate.TryEnter());
+    }
+
+    [Fact]
+    public async Task Gate_CloseCancelled_OpensAgain()
+    {
+        var gate = new DatabaseGate();
+        Assert.True(gate.TryEnter());
+        using var cts = new CancellationTokenSource();
+
+        var closing = gate.CloseAsync(cts.Token);
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => closing);
+        Assert.False(gate.IsClosed);
+        gate.Exit();
+        // and it closes again afterwards
+        await gate.CloseAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        gate.Open();
     }
 }

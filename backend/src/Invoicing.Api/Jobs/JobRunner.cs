@@ -1,4 +1,5 @@
 using Burkard.Invoicing.Api.Persistence;
+using Burkard.Invoicing.Api.Services.Backup;
 using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,12 +10,19 @@ public sealed class JobRunner : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly JobQueue _queue;
     private readonly ILogger<JobRunner> _logger;
+    private readonly DatabaseGate _gate;
 
-    public JobRunner(IServiceScopeFactory scopeFactory, JobQueue queue, ILogger<JobRunner> logger)
+    public JobRunner(
+        IServiceScopeFactory scopeFactory,
+        JobQueue queue,
+        ILogger<JobRunner> logger,
+        DatabaseGate gate
+    )
     {
         _scopeFactory = scopeFactory;
         _queue = queue;
         _logger = logger;
+        _gate = gate;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -22,6 +30,21 @@ public sealed class JobRunner : BackgroundService
         RecoverStuckJobs();
         await foreach (var jobId in _queue.ReadAllAsync(stoppingToken))
         {
+            try
+            {
+                // through the same gate as the requests: a restore refuses to
+                // start while a job is queued or running, and this keeps a job
+                // from starting while the database file is being swapped
+                while (!_gate.TryEnter())
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+
             try
             {
                 await ProcessAsync(jobId, stoppingToken);
@@ -34,6 +57,10 @@ public sealed class JobRunner : BackgroundService
             {
                 _logger.LogError(ex, "Job {JobId} failed unexpectedly", jobId);
                 await RecordFailureAsync(jobId, stoppingToken);
+            }
+            finally
+            {
+                _gate.Exit();
             }
         }
     }
