@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -405,6 +406,91 @@ public class QuoteConversionTests
             Assert.NotNull(revision.PaidOn);
         }
         Assert.Equal(before, await QuoteRowsAsync(host, originalId));
+    }
+
+    [Fact]
+    public async Task Converting_and_declining_at_once_leave_a_consistent_chain()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (quoteId, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+
+        var responses = await Task.WhenAll(
+            Task.Run(() => ConvertAsync(client, quoteId)),
+            Task.Run(() => QuoteActionAsync(client, "DeclineQuote", quoteId))
+        );
+
+        Assert.Contains(
+            responses,
+            r => r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.OK
+        );
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chain = await db.Quotes.Where(q => q.RootId == quoteId).ToListAsync();
+        var invoices = await db.Invoices.Where(i => i.QuoteId == quoteId).ToListAsync();
+        Assert.Single(chain.Select(q => q.State).Distinct());
+        if (chain[0].State == QuoteState.Converted)
+        {
+            var invoice = Assert.Single(invoices);
+            Assert.All(chain, q => Assert.Equal(invoice.Id, q.InvoiceId));
+        }
+        else
+        {
+            Assert.Equal(QuoteState.Declined, chain[0].State);
+            Assert.All(chain, q => Assert.Null(q.InvoiceId));
+            Assert.Empty(invoices);
+            Assert.Equal(0, await db.Invoices.CountAsync());
+        }
+    }
+
+    [Fact]
+    public async Task The_invoice_documents_do_not_mention_the_quote()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (quoteId, quoteNumber) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        await ConvertedAsync(await ConvertAsync(client, quoteId));
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoice = await db.Invoices.Include(i => i.Documents).SingleAsync();
+        foreach (var document in invoice.Documents)
+        {
+            using var pdf = PdfDocument.Open(document.Content);
+            var text = string.Concat(pdf.GetPages().Select(p => p.Text));
+            Assert.Contains("2026-0001", text);
+            Assert.DoesNotContain("ANGEBOT", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(quoteNumber, text);
+        }
+    }
+
+    [Fact]
+    public async Task Converting_through_a_revisions_id_names_the_original_quote()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var (originalId, _) = await CreatedAsync(
+            await CreateQuoteAsync(client, recipientId, Lines(itemId, 1))
+        );
+        var (revisionId, _) = await CreatedAsync(
+            await ReviseQuoteAsync(client, originalId, recipientId, Lines(itemId, 2))
+        );
+
+        var (invoiceId, _) = await ConvertedAsync(await ConvertAsync(client, revisionId));
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoice = await db.Invoices.SingleAsync(i => i.Id == invoiceId);
+        Assert.Equal(originalId, invoice.QuoteId);
+        var chain = await db.Quotes.Where(q => q.RootId == originalId).ToListAsync();
+        Assert.All(chain, q => Assert.Equal(invoiceId, q.InvoiceId));
     }
 
     private static async Task<string> QuoteRowsAsync(ApiTestHost host, long rootId)

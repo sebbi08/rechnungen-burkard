@@ -1043,6 +1043,15 @@ revising it, and checking the numbers, the stored versions and the printout.
   The invoice MUST otherwise stay an ordinary invoice: it MUST be revisable
   (FR-035) and markable as paid (FR-070) as any other, neither of which changes
   the quote, and its documents MUST NOT mention the quote.
+- **FR-087a**: The system MUST list quotes for the user interface, each version
+  stamped with the net, VAT and gross total as its PDF prints them and, once
+  converted, the number the invoice was first given. The list MUST offer the
+  same per-column searches as the invoice list (FR-068, FR-068b): the quote
+  number (a search for the base number finds every version), the recipient, the
+  date as shown and the total, answered by the server and combinable with
+  filtering on the state and on the latest version. No read of invoices — the
+  list, a single invoice, marking paid, revising — MUST ever find a quote, nor
+  the quote list an invoice.
 
 ### Key Entities _(include if feature involves data)_
 
