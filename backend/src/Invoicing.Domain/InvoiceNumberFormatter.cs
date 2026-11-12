@@ -9,6 +9,11 @@ public static class InvoiceNumberFormatter
     public static string ForOriginal(int year, int sequence) =>
         string.Create(CultureInfo.InvariantCulture, $"{year}-{sequence:D4}");
 
+    /// <summary>A quote's number: its own sequence, apart from the invoices',
+    /// told apart by the leading A. Revisions take the same -R marker.</summary>
+    public static string ForQuote(int year, int sequence) =>
+        string.Create(CultureInfo.InvariantCulture, $"A{year}-{sequence:D4}");
+
     public static string ForRevision(string baseNumber, int revisionNumber) =>
         $"{baseNumber}{RevisionMarker}{revisionNumber}";
 

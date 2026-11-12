@@ -25,4 +25,12 @@ public class InvoiceNumberFormatterTests
         Assert.Equal("2026-0001", InvoiceNumberFormatter.StripRevision("2026-0001-R2"));
         Assert.Equal("2026-0001", InvoiceNumberFormatter.StripRevision("2026-0001"));
     }
+
+    [Fact]
+    public void Quote_numbers_are_A_year_dash_four_digits()
+    {
+        Assert.Equal("A2026-0001", InvoiceNumberFormatter.ForQuote(2026, 1));
+        Assert.Equal("A2026-0001-R2", InvoiceNumberFormatter.ForRevision("A2026-0001", 2));
+        Assert.Equal("A2026-0001", InvoiceNumberFormatter.StripRevision("A2026-0001-R2"));
+    }
 }

@@ -300,6 +300,9 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.Property<int?>("PeriodYear")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("QuoteId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("RecipientAddress")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -337,6 +340,8 @@ namespace Burkard.Invoicing.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("QuoteId");
 
                     b.HasIndex("RootId");
 
@@ -469,6 +474,154 @@ namespace Burkard.Invoicing.Api.Migrations
                     b.ToTable("Jobs");
                 });
 
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Quote", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EndingText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("InvoiceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsLatestRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("QuoteNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientAddress")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RecipientId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientNumber")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("RootId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("RootId");
+
+                    b.HasIndex("Year", "Sequence", "RevisionNumber")
+                        .IsUnique();
+
+                    b.ToTable("Quotes");
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.QuoteDocument", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("QuoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuoteId")
+                        .IsUnique();
+
+                    b.ToTable("QuoteDocuments");
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.QuoteLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ItemNumber")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("PriceIncludesVat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("QuoteId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatRate")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuoteId");
+
+                    b.ToTable("QuoteLines");
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.QuoteNumberCounter", b =>
+                {
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LastSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Year");
+
+                    b.ToTable("QuoteNumberCounters");
+                });
+
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Recipient", b =>
                 {
                     b.Property<long>("Id")
@@ -597,6 +750,24 @@ namespace Burkard.Invoicing.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.QuoteDocument", b =>
+                {
+                    b.HasOne("Burkard.Invoicing.Domain.Entities.Quote", null)
+                        .WithOne("Document")
+                        .HasForeignKey("Burkard.Invoicing.Domain.Entities.QuoteDocument", "QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.QuoteLine", b =>
+                {
+                    b.HasOne("Burkard.Invoicing.Domain.Entities.Quote", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("QuoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Grave", b =>
                 {
                     b.Navigation("Corrections");
@@ -609,6 +780,13 @@ namespace Burkard.Invoicing.Api.Migrations
             modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Invoice", b =>
                 {
                     b.Navigation("Documents");
+
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Quote", b =>
+                {
+                    b.Navigation("Document");
 
                     b.Navigation("Lines");
                 });

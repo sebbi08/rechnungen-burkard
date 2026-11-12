@@ -17,18 +17,21 @@ public sealed class InvoiceService
 {
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
+    private readonly LineBuilder _lines;
     private readonly InvoiceDocumentFactory _documentFactory;
     private readonly IClock _clock;
 
     public InvoiceService(
         AppDbContext db,
         InvoiceNumberService numbers,
+        LineBuilder lines,
         InvoiceDocumentFactory documentFactory,
         IClock clock
     )
     {
         _db = db;
         _numbers = numbers;
+        _lines = lines;
         _documentFactory = documentFactory;
         _clock = clock;
     }
@@ -43,7 +46,7 @@ public sealed class InvoiceService
             await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
-        var lines = await BuildLinesAsync(lineInputs, ct);
+        var lines = await _lines.BuildAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
 
         return await PersistAsync(recipient, settings, lines, ct);
@@ -88,7 +91,7 @@ public sealed class InvoiceService
             await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
-        var lines = await BuildLinesAsync(lineInputs, ct);
+        var lines = await _lines.BuildAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
 
         if (string.IsNullOrWhiteSpace(recipient.Address))
@@ -192,80 +195,6 @@ public sealed class InvoiceService
 
         await _db.SaveChangesAsync(ct);
         return invoice;
-    }
-
-    private async Task<List<InvoiceLine>> BuildLinesAsync(
-        IReadOnlyList<InvoiceLineInput> inputs,
-        CancellationToken ct
-    )
-    {
-        if (inputs.Count == 0)
-        {
-            throw new ValidationException("NoLines", "At least one line is required.");
-        }
-
-        var itemIds = inputs.Select(l => l.ItemId).ToArray();
-        var items = await _db
-            .InvoiceItems.Where(i => itemIds.Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id, ct);
-
-        var result = new List<InvoiceLine>(inputs.Count);
-        foreach (var (input, index) in inputs.Select((l, i) => (l, i)))
-        {
-            if (!items.TryGetValue(input.ItemId, out var item))
-            {
-                throw new ValidationException(
-                    $"ItemNotFound:{input.ItemId}",
-                    $"The item {input.ItemId} does not exist."
-                );
-            }
-
-            if (input.Count <= 0)
-            {
-                throw new ValidationException("InvalidCount", "The count must be positive.");
-            }
-
-            var unitPrice = input.UnitPrice ?? item.DefaultPrice;
-            if (unitPrice is null)
-            {
-                throw new ValidationException(
-                    "PriceRequired",
-                    $"A price is required for item '{item.Number}'."
-                );
-            }
-
-            // the document prints the price to the cent and multiplies the
-            // unrounded one, so 3 x 10,125 showed 10,13 and a total of 30,38
-            if (input.UnitPrice is { } typed && !GraveBilling.IsWholeCents(typed))
-            {
-                throw new ValidationException(
-                    "InvalidPrice",
-                    $"The price for item '{item.Number}' has more than two decimals."
-                );
-            }
-
-            result.Add(
-                new InvoiceLine
-                {
-                    ItemId = item.Id,
-                    ItemNumber = item.Number,
-                    Description = item.Description,
-                    Count = input.Count,
-                    // a line priced VAT-included is entered as the gross the
-                    // customer pays; the line itself is always net
-                    UnitPrice = VatInclusivePrice.NetOf(
-                        unitPrice.Value,
-                        item.VatRate,
-                        input.PriceIncludesVat
-                    ),
-                    VatRate = item.VatRate,
-                    PriceIncludesVat = input.PriceIncludesVat,
-                    LineNumber = index + 1,
-                }
-            );
-        }
-
-        return result;
     }
 
     private async Task<Invoice> PersistAsync(

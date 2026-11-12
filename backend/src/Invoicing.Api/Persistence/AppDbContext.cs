@@ -21,6 +21,10 @@ public sealed class AppDbContext : DbContext
     public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<GraveInvoiceRun> GraveInvoiceRuns => Set<GraveInvoiceRun>();
+    public DbSet<Quote> Quotes => Set<Quote>();
+    public DbSet<QuoteLine> QuoteLines => Set<QuoteLine>();
+    public DbSet<QuoteDocument> QuoteDocuments => Set<QuoteDocument>();
+    public DbSet<QuoteNumberCounter> QuoteNumberCounters => Set<QuoteNumberCounter>();
     public DbSet<Job> Jobs => Set<Job>();
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -55,6 +59,10 @@ public sealed class AppDbContext : DbContext
                 i.IsLatestRevision,
                 i.PaidOn,
             });
+        // the invoice a quote became, and the quote an invoice came from: plain
+        // columns, indexed for the links between the two detail pages, with no
+        // foreign key that could cascade a delete from one side to the other
+        mb.Entity<Invoice>().HasIndex(i => i.QuoteId);
         mb.Entity<InvoiceLine>().HasIndex(l => l.InvoiceId);
         mb.Entity<Document>().HasIndex(d => d.InvoiceId);
         mb.Entity<GraveInvoiceRun>()
@@ -72,6 +80,27 @@ public sealed class AppDbContext : DbContext
         mb.Entity<InvoiceItem>().Property(i => i.Quarter).HasConversion<string>();
         mb.Entity<GraveBillingCorrection>().Property(c => c.Kind).HasConversion<string>();
         mb.Entity<Invoice>().Property(i => i.GravePosition).HasConversion<string>();
+        mb.Entity<Quote>()
+            .HasIndex(q => new
+            {
+                q.Year,
+                q.Sequence,
+                q.RevisionNumber,
+            })
+            .IsUnique();
+        mb.Entity<Quote>().HasIndex(q => q.RootId);
+        mb.Entity<Quote>().HasIndex(q => q.InvoiceId);
+        // by name, like the other enums
+        mb.Entity<Quote>().Property(q => q.State).HasConversion<string>();
+        // derived at read time, never persisted
+        mb.Entity<Quote>().Ignore(q => q.NetTotal);
+        mb.Entity<Quote>().Ignore(q => q.VatTotal);
+        mb.Entity<Quote>().Ignore(q => q.GrossTotal);
+        mb.Entity<Quote>().Ignore(q => q.InvoiceNumber);
+        mb.Entity<QuoteLine>().HasIndex(l => l.QuoteId);
+        mb.Entity<QuoteNumberCounter>().HasKey(c => c.Year);
+        // the year is the key as given, never generated
+        mb.Entity<QuoteNumberCounter>().Property(c => c.Year).ValueGeneratedNever();
         // cascade children when their parent goes
         mb.Entity<Grave>()
             .HasMany(g => g.Items)
@@ -92,6 +121,17 @@ public sealed class AppDbContext : DbContext
             .HasMany(i => i.Documents)
             .WithOne(d => d.Invoice)
             .HasForeignKey(d => d.InvoiceId)
+            .OnDelete(DeleteBehavior.Cascade);
+        mb.Entity<Quote>()
+            .HasMany(q => q.Lines)
+            .WithOne()
+            .HasForeignKey(l => l.QuoteId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // one PDF per version; the foreign key's index is unique for that
+        mb.Entity<Quote>()
+            .HasOne(q => q.Document)
+            .WithOne()
+            .HasForeignKey<QuoteDocument>(d => d.QuoteId)
             .OnDelete(DeleteBehavior.Cascade);
         // a grave link must not vanish together with the referenced item/recipient;
         // deleting a referenced row is blocked (handled as a 400 in the controllers)

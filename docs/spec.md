@@ -414,6 +414,38 @@ non-interactive until completion, and the task runs exactly once.
 
 ---
 
+### User Story 14 - Quotes (Priority: P2)
+
+Before some jobs the owner sends the customer a quote ("Angebot"). It often goes
+back and forth a few times — the customer asks for changes, the owner sends a
+new version — until the customer either declines or accepts. A quote is entered
+exactly like a non-grave invoice and printed like one, titled "Angebot" instead
+of "Rechnung", with a number series of its own. Every round of changes is a new
+version, and every earlier version stays stored. A declined quote is kept so the
+owner can look up later what was offered; an accepted one becomes an invoice
+from its latest version, so the invoice is not typed in again.
+
+**Why this priority**: Quotes live outside the app today, and every accepted one
+is typed in a second time as an invoice.
+
+**Independent Test**: Can be fully tested by creating a quote for one recipient,
+revising it, and checking the numbers, the stored versions and the printout.
+
+**Acceptance Scenarios**:
+
+1. **Given** a recipient and invoice items exist, **When** the user creates a
+   quote with one or more lines, **Then** it gets the next quote number of the
+   year (`A2026-0001`) and one PDF headed `**** ANGEBOT ****`, and no invoice
+   number is used.
+2. **Given** an open quote, **When** the user edits and saves it, **Then** a new
+   version numbered as a revision (`A2026-0001-R1`) is created, and the previous
+   version and its PDF remain unchanged.
+3. **Given** a mandatory field such as the recipient address is missing, **When**
+   the user tries to save a quote, **Then** the system blocks saving as it does
+   for an invoice.
+
+---
+
 ### Edge Cases
 
 - What happens when an invoice item without a price is used and no price is
@@ -948,6 +980,32 @@ non-interactive until completion, and the task runs exactly once.
   (FR-068c) MUST be able to narrow the list to the graves that still have an
   unpaid invoice in that half-year.
 
+**Quotes**
+
+- **FR-078**: Users MUST be able to create a quote for one recipient with one or
+  more lines, entered and validated exactly like a non-grave invoice (FR-030 –
+  FR-032, FR-008, FR-014). Quotes MUST NOT exist for graves.
+- **FR-079**: Quotes MUST be numbered apart from invoices: `A<year>-<sequence>`
+  with four digits (`A2026-0001`), counted per year from 1, the year being the
+  local year the quote was created in. A quote number MUST never be given twice.
+  A quote MUST NOT take or reserve an invoice number.
+- **FR-080**: A quote version MUST store what it prints — the recipient's name,
+  address and number, the lines with item number, description, count, net price,
+  VAT rate and VAT-included flag, and the ending text — so a later change to a
+  recipient, an item or the settings never alters it.
+- **FR-081**: Editing a quote MUST create a new version with the revision marker
+  of invoices (`A2026-0001-R1`, FR-035), continuing the revision numbers of the
+  whole quote whichever version was edited, and keeping the year of the original
+  quote. Every earlier version and its PDF MUST be preserved unchanged.
+- **FR-082**: A quote MUST be printed as the invoice document (FR-037a –
+  FR-037d) with `**** ANGEBOT ****` in place of the invoice heading, and
+  "Angebot <number>" as the PDF's title and on continuation pages. The VAT
+  block, the ending text from the settings, the letterhead and the footer MUST
+  read as on an invoice. The date MUST be the day the version was created.
+- **FR-083**: A quote version MUST have one PDF only, with no stamped copy, named
+  after its number (`A2026-0001.pdf`). It MUST open in the browser like an
+  invoice's normal document.
+
 ### Key Entities _(include if feature involves data)_
 
 - **Recipient**: A person or organization; has a recipient number, a name, and an
@@ -977,6 +1035,10 @@ non-interactive until completion, and the task runs exactly once.
   calculation that can be a cent or two off for very small amounts.
 - **Invoice Document**: The generated PDF for an invoice revision; each revision
   has two documents — a normal document and a stamped copy.
+- **Quote**: One version of an offer to a recipient, stored apart from invoices;
+  has its own quote number, the recipient values, lines and ending text it was
+  created with, and one PDF. Edits create new versions; previous versions are
+  preserved. Its lines have the shape of a non-grave invoice's lines.
 - **VAT Rate**: A globally configured percentage, assigned to invoice items and
   applied to their line totals.
 - **Global Settings**: Holds the VAT rates, the multi-line ending text, and the
