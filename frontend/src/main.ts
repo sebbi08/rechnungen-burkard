@@ -12,9 +12,11 @@ import Tooltip from "primevue/tooltip";
 import { createApp } from "vue";
 import App from "./App.vue";
 import { applyStoredTheme } from "./composables/useTheme";
+import { installDataGenerationGuard } from "./api/dataGeneration";
 import { i18n } from "./i18n";
 import { router } from "./router";
 
+installDataGenerationGuard();
 applyStoredTheme();
 document.title = i18n.global.t("appTitle");
 // "Gräber – Rechnungen": every tab and history entry read just "Rechnungen"

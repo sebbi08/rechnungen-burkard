@@ -7,19 +7,24 @@ import DataTable from "primevue/datatable";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
+  discardBackup,
+  downloadBackup,
   downloadImportTemplate,
   importArchive,
   type ImportProblem,
   ImportRejectedError,
+  restoreBackup,
+  uploadBackup,
 } from "@/api/endpoints";
 import { ApiError } from "@/api/http";
 import PageHeader from "@/components/PageHeader.vue";
 import { useBlocking } from "@/composables/useBlocking";
+import { useConfirmAsync } from "@/composables/useConfirmAsync";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { useShortTablePaging } from "@/composables/usePageReport";
 import { showMessage } from "@/composables/useMessage";
 import { downloadBlob } from "@/lib/download";
-import { formatAmount, formatVatRate } from "@/lib/format";
+import { formatAmount, formatDateTime, formatVatRate } from "@/lib/format";
 
 const i18n = useI18n();
 const { t } = i18n;
@@ -27,11 +32,14 @@ const paging = useShortTablePaging();
 const { showError } = useErrorToast();
 const { run } = useBlocking();
 const queryClient = useQueryClient();
+const confirmAsync = useConfirmAsync();
 
 const fileInput = ref<HTMLInputElement>();
 const file = ref<File | null>(null);
 const problems = ref<ImportProblem[]>([]);
 const downloading = ref(false);
+const backupInput = ref<HTMLInputElement>();
+const downloadingBackup = ref(false);
 
 function onFileChosen(event: Event): void {
   file.value = (event.target as HTMLInputElement).files?.[0] ?? null;
@@ -74,6 +82,59 @@ async function downloadTemplate(): Promise<void> {
     showError(error);
   } finally {
     downloading.value = false;
+  }
+}
+
+async function downloadBackupFile(): Promise<void> {
+  downloadingBackup.value = true;
+  try {
+    const { blob, fileName } = await downloadBackup();
+    downloadBlob(blob, fileName);
+  } catch (error) {
+    showError(error);
+  } finally {
+    downloadingBackup.value = false;
+  }
+}
+
+/** Clears the input first, as chooseFile does: the same file twice fires no change. */
+function chooseBackup(): void {
+  if (backupInput.value) {
+    backupInput.value.value = "";
+    backupInput.value.click();
+  }
+}
+
+/** Uploads the chosen backup for checking, asks, then replaces all data with it. */
+async function onBackupChosen(event: Event): Promise<void> {
+  const chosen = (event.target as HTMLInputElement).files?.[0];
+  if (!chosen) {
+    return;
+  }
+  let token: string | null = null;
+  try {
+    const staged = await run(t("backupChecking"), () => uploadBackup(chosen));
+    token = staged.token;
+    const { summary } = staged;
+    let message = t("backupConfirm", [
+      formatDateTime(summary.createdAt),
+      summary.appVersion,
+      summary.graves,
+      summary.recipients,
+      summary.invoices,
+    ]);
+    if (summary.newerInvoicesHere) {
+      message += ` ${t("backupConfirmNewer")}`;
+    }
+    if (!(await confirmAsync(message))) {
+      await discardBackup(token).catch(() => undefined);
+      return;
+    }
+    await run(t("backupRestoring"), () => restoreBackup(staged.token));
+    showMessage(t("backupHeader"), t("backupRestored"), "info");
+    window.location.reload();
+  } catch (error) {
+    showError(error);
   }
 }
 
@@ -159,6 +220,38 @@ async function startImport(): Promise<void> {
             file?.name ?? t("noFileChosen")
           }}</span>
           <Button :label="t('importStart')" icon="pi pi-upload" @click="startImport" />
+        </div>
+      </template>
+    </Card>
+
+    <Card>
+      <template #title>{{ t("backupHeader") }}</template>
+      <template #content>
+        <p class="mt-0 text-muted-color">{{ t("backupHint") }}</p>
+        <div class="flex flex-wrap items-center gap-3">
+          <input
+            ref="backupInput"
+            type="file"
+            accept=".zip,application/zip"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+            @change="onBackupChosen"
+          />
+          <Button
+            :label="t('backupDownload')"
+            icon="pi pi-download"
+            outlined
+            :loading="downloadingBackup"
+            @click="downloadBackupFile"
+          />
+          <Button
+            :label="t('backupRestore')"
+            icon="pi pi-upload"
+            severity="secondary"
+            outlined
+            @click="chooseBackup"
+          />
         </div>
       </template>
     </Card>

@@ -19,6 +19,17 @@ export function formatDate(value: Date | string | null | undefined): string {
   return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+/** An instant (UTC ISO) as German local date and time, "01.10.2026, 14:30". */
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatAmount(value: number | null | undefined): string {
   if (value == null) {
     return "";

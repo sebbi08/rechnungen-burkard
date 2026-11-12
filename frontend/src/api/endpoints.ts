@@ -578,3 +578,48 @@ export async function importArchive(file: File): Promise<ImportSummary> {
     throw error;
   }
 }
+
+// ---- backup ---------------------------------------------------------------
+
+export interface BackupSummary {
+  /** UTC, ISO 8601. */
+  createdAt: string;
+  appVersion: string;
+  graves: number;
+  recipients: number;
+  invoices: number;
+  /** This instance holds invoices the backup does not: restoring loses them. */
+  newerInvoicesHere: boolean;
+}
+
+export interface StagedBackup {
+  token: string;
+  summary: BackupSummary;
+}
+
+export async function downloadBackup(): Promise<{ blob: Blob; fileName: string }> {
+  const response = await request("/odata/DownloadBackup");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const name = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const plain = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  return {
+    blob: await response.blob(),
+    fileName: name ? decodeURIComponent(name) : (plain ?? "sicherung.zip"),
+  };
+}
+
+/** Stages the backup on the server and checks it; nothing is replaced yet. */
+export async function uploadBackup(file: File): Promise<StagedBackup> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await request("/odata/UploadBackup", { method: "POST", body });
+  return (await response.json()) as StagedBackup;
+}
+
+export async function restoreBackup(token: string): Promise<void> {
+  await postJson("/odata/RestoreBackup", { token });
+}
+
+export async function discardBackup(token: string): Promise<void> {
+  await postJson("/odata/DiscardBackup", { token });
+}
