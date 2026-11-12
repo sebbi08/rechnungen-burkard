@@ -1052,7 +1052,7 @@ revising it, and checking the numbers, the stored versions and the printout.
   beside it already reports that. The overview's payment status search
   (FR-068c) MUST be able to narrow the list to the graves that still have an
   unpaid invoice in that half-year.
-- **FR-078**: Each row of the grave overview MUST offer to mark the grave's
+- **FR-077a**: Each row of the grave overview MUST offer to mark the grave's
   unpaid invoices paid — those of every half-year, not just the selected one;
   the action MUST be unavailable while the grave has none. A single unpaid
   invoice MUST be marked only after a confirmation naming its number, half-year
