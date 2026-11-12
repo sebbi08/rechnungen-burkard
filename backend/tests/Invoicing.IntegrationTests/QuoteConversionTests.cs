@@ -423,10 +423,20 @@ public class QuoteConversionTests
             Task.Run(() => QuoteActionAsync(client, "DeclineQuote", quoteId))
         );
 
-        Assert.Contains(
+        Assert.DoesNotContain(responses, r => r.StatusCode >= HttpStatusCode.InternalServerError);
+        var winner = Assert.Single(
             responses,
             r => r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.OK
         );
+        var loser = Assert.Single(responses, r => r != winner);
+        Assert.Equal(HttpStatusCode.BadRequest, loser.StatusCode);
+        using (var error = JsonDocument.Parse(await loser.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(
+                "QuoteNotOpen",
+                error.RootElement.GetProperty("error").GetProperty("code").GetString()
+            );
+        }
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var chain = await db.Quotes.Where(q => q.RootId == quoteId).ToListAsync();

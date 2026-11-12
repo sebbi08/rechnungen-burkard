@@ -204,12 +204,8 @@ public sealed class QuoteService
                 "A quote that became an invoice cannot be deleted."
             );
         }
-        // tracked with their lines and documents, so the cascade removes those too
-        await _db
-            .Quotes.Include(q => q.Lines)
-            .Include(q => q.Document)
-            .Where(q => q.RootId == chain[0].RootId)
-            .LoadAsync(ct);
+        // the lines and PDFs go with the rows through ON DELETE CASCADE, without
+        // loading any PDF
         _db.Quotes.RemoveRange(chain);
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

@@ -112,8 +112,8 @@ function chooseBackup(): void {
 
 /** Asks before all data is replaced. A dialog of its own rather than the
  *  yes/no one: Enter must not replace everything, so "Abbrechen" has the
- *  focus; the button says what it does; and the newer-invoices warning
- *  stands apart from the summary. */
+ *  focus; the button says what it does; and the newer-invoices-or-quotes
+ *  warning stands apart from the summary. */
 function confirmRestore(summary: BackupSummary): Promise<boolean> {
   restoreQuestion.value = {
     summary: t("backupConfirm", [
