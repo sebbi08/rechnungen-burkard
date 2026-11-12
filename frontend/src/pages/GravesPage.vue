@@ -544,6 +544,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
         </Column>
         <Column class="w-0 whitespace-nowrap">
           <template #body="{ data }">
+            <!-- small: four of them have to fit beside the columns on a laptop -->
             <div class="flex justify-end">
               <!-- the grave number already links here; until the widest screens that
                    is enough, and it leaves the room for the delete button -->
@@ -553,6 +554,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 icon="pi pi-eye"
                 text
                 rounded
+                size="small"
                 :aria-label="`${t('actionDetails')}: ${data.GraveNumber}`"
                 @click="router.push(`/graves/${data.Id}`)"
               />
@@ -562,6 +564,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 icon="pi pi-wallet"
                 text
                 rounded
+                size="small"
                 :aria-label="`${t('actionMarkPaid')}: ${data.GraveNumber}`"
                 :disabled="data.OpenInvoiceCount === 0"
                 @click="markPaid.start(data.Id, data.GraveNumber)"
@@ -571,6 +574,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 icon="pi pi-pencil"
                 text
                 rounded
+                size="small"
                 :aria-label="`${t('edit')}: ${data.GraveNumber}`"
                 @click="openEditor(data.Id)"
               />
@@ -581,6 +585,7 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 severity="danger"
                 text
                 rounded
+                size="small"
                 :aria-label="`${t('deleteGrave')}: ${data.GraveNumber}`"
                 :disabled="deleting"
                 @click="removeGrave(data.Id)"
