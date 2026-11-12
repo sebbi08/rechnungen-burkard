@@ -19,6 +19,7 @@ public sealed class BackupService
     private readonly IClock _clock;
     private readonly JobService _jobs;
     private readonly DatabaseGate _gate;
+    private readonly DataGeneration _generation;
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<BackupService> _logger;
 
@@ -27,6 +28,7 @@ public sealed class BackupService
         IClock clock,
         JobService jobs,
         DatabaseGate gate,
+        DataGeneration generation,
         IServiceScopeFactory scopes,
         ILogger<BackupService> logger
     )
@@ -35,6 +37,7 @@ public sealed class BackupService
         _clock = clock;
         _jobs = jobs;
         _gate = gate;
+        _generation = generation;
         _scopes = scopes;
         _logger = logger;
     }
@@ -231,6 +234,9 @@ public sealed class BackupService
             db.Database.Migrate();
             db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL");
             DatabaseSeeder.Seed(db);
+            // last, and before the gate opens: no request sees the restored data
+            // under the old name
+            _generation.Renew(db);
         }
         catch (Exception e)
         {

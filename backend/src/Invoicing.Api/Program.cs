@@ -53,6 +53,7 @@ builder.Services.AddScoped<ImportValidator>();
 builder.Services.AddScoped<ImportService>();
 builder.Services.AddScoped<BackupService>();
 builder.Services.AddSingleton<DatabaseGate>();
+builder.Services.AddSingleton<DataGeneration>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<IJobHandler, GraveInvoicesJobHandler>();
@@ -65,6 +66,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     DatabaseSeeder.Seed(db);
+    app.Services.GetRequiredService<DataGeneration>().Load(db);
 }
 
 // Every request that can reach the database passes the gate a restore closes

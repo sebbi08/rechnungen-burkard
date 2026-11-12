@@ -767,6 +767,114 @@ public class BackupTests
         return (await db.Jobs.SingleAsync(j => j.Id == jobId)).Status;
     }
 
+    private const string GenerationHeader = "X-Data-Generation";
+
+    private static async Task<string> GenerationAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/odata/Recipients?$top=1");
+        return Assert.Single(response.Headers.GetValues(GenerationHeader));
+    }
+
+    private static async Task RestoreOwnBackupAsync(HttpClient client)
+    {
+        var token = await StageAsync(client, await DownloadAsync(client));
+        Assert.Equal(HttpStatusCode.NoContent, (await RestoreAsync(client, token)).StatusCode);
+    }
+
+    private static Task<HttpResponseMessage> PostRecipientAsync(
+        HttpClient client,
+        string? generation
+    )
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/odata/Recipients")
+        {
+            Content = ODataJson.Body(
+                new { Name = "G", Address = "Hauptstraße 1\n99999 Musterdorf" }
+            ),
+        };
+        if (generation is not null)
+        {
+            request.Headers.Add(GenerationHeader, generation);
+        }
+
+        return client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task Responses_CarryGeneration()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+
+        Assert.False(string.IsNullOrEmpty(await GenerationAsync(client)));
+        var missing = await client.GetAsync("/odata/NoSuchSet");
+        Assert.True(missing.Headers.Contains(GenerationHeader));
+    }
+
+    [Fact]
+    public async Task StaleGeneration_WriteRefused()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var before = await GenerationAsync(client);
+        await RestoreOwnBackupAsync(client);
+
+        var response = await PostRecipientAsync(client, before);
+
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "DataReplaced");
+        Assert.NotEqual(before, Assert.Single(response.Headers.GetValues(GenerationHeader)));
+        Assert.DoesNotContain("G", await RecipientNamesAsync(client));
+    }
+
+    [Fact]
+    public async Task StaleGeneration_ReadAllowed()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var before = await GenerationAsync(client);
+        await RestoreOwnBackupAsync(client);
+        var request = new HttpRequestMessage(HttpMethod.Get, "/odata/Recipients");
+        request.Headers.Add(GenerationHeader, before);
+
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(request)).StatusCode);
+    }
+
+    [Fact]
+    public async Task CurrentGeneration_WriteAllowed()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await RestoreOwnBackupAsync(client);
+
+        var response = await PostRecipientAsync(client, await GenerationAsync(client));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NoGenerationHeader_WriteAllowed()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await RestoreOwnBackupAsync(client);
+
+        Assert.Equal(HttpStatusCode.Created, (await PostRecipientAsync(client, null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Generation_IsStoredInDatabase()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        await RestoreOwnBackupAsync(client);
+
+        using var connection = new SqliteConnection($"Data Source={host.DbFilePath};Pooling=False");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+        Assert.Equal(await GenerationAsync(client), ((long)command.ExecuteScalar()!).ToString());
+    }
+
     [Fact]
     public async Task Gate_CloseWaitsForThoseInside_AndRefusesNewcomers()
     {
