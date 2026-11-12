@@ -5,7 +5,7 @@ import { currentHalfYear } from "@/lib/halfYear";
 import { priceFieldValue } from "@/lib/money";
 import { PAGE_SIZE } from "@/lib/paging";
 import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
-import type { Invoice, InvoiceItem, QRecipient } from "./generated";
+import type { Invoice, InvoiceItem, QRecipient, Quote } from "./generated";
 import { odata } from "./odata";
 
 /** The backend caps $top at 200 (Program.cs, SetMaxTop). */
@@ -237,6 +237,49 @@ export async function loadChain(rootId: number): Promise<Invoice[]> {
       .execute()
   ).data.value;
   return single.length ? byRoot(single[0].RootId) : [];
+}
+
+/** A quote chain, newest version first, lines expanded, as loadChain reads an
+ *  invoice's. Takes the root id; any other version's id resolves through one
+ *  extra read. */
+export async function loadQuoteChain(rootId: number): Promise<Quote[]> {
+  const byRoot = (root: number) =>
+    readAll(async (skip, top) => {
+      const response = await odata
+        .Quotes()
+        .query((b, q) => {
+          b.filter(q.RootId.eq(root))
+            .orderBy(q.RevisionNumber.desc())
+            .expanding("Lines", (e) => e)
+            .skip(skip)
+            .top(top);
+        })
+        .execute();
+      return response.data.value;
+    });
+
+  const rows = await byRoot(rootId);
+  if (rows.length) {
+    return rows;
+  }
+  const single = (
+    await odata
+      .Quotes()
+      .query((b, q) => {
+        b.filter(q.Id.eq(rootId)).select("RootId");
+      })
+      .execute()
+  ).data.value;
+  return single.length ? byRoot(single[0].RootId) : [];
+}
+
+/** One quote version, or nothing for no id: the quote an invoice came from. */
+export function useQuoteQuery(id: Ref<number | null>) {
+  return useQuery({
+    queryKey: ["quotes", "one", id],
+    queryFn: async () => (await odata.Quotes(id.value!).query().execute()).data,
+    enabled: () => id.value != null,
+  });
 }
 
 export interface GraveLineView {

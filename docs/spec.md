@@ -1067,6 +1067,14 @@ revising it, and checking the numbers, the stored versions and the printout.
   converting MUST ask first; converting names the quote and says that an
   invoice with the next invoice number is created and cannot be deleted, runs
   behind the blocking progress indicator and then opens the new invoice.
+- **FR-087c**: Each quote MUST have a detail page (`/quotes/<id>`), built like an
+  invoice's (FR-067): the quote's number, its state, the recipient, and every
+  version, newest first, each with its lines, totals and one download,
+  "Angebot herunterladen" (FR-083). It MUST offer the same actions as the
+  quote's row (FR-087b), asking first in the same way; deleting returns to the
+  list. A converted quote's page MUST show "Umgewandelt in Rechnung <number>",
+  linking to the invoice. The detail page of an invoice converted from a quote
+  MUST show "Aus Angebot <number>", linking to the quote's page.
 
 ### Key Entities _(include if feature involves data)_
 

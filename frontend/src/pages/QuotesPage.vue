@@ -230,7 +230,7 @@ function openEditor(quote: Quote | null): void {
               :quote-id="data.Id"
               :state="data.State"
               :details-to="`/quotes/${data.RootId}`"
-              :row-label="formatInvoiceNumber(data.QuoteNumber)"
+              :number="formatInvoiceNumber(data.QuoteNumber)"
               @edit="openEditor(data)"
             />
           </template>

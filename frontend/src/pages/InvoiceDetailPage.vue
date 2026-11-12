@@ -6,9 +6,9 @@ import Message from "primevue/message";
 import ProgressSpinner from "primevue/progressspinner";
 import { computed, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { isNotFound } from "@/api/http";
-import { loadChain } from "@/api/queries";
+import { loadChain, useQuoteQuery } from "@/api/queries";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
@@ -16,6 +16,7 @@ import RevisionList from "@/components/RevisionList.vue";
 import { listLocation } from "@/composables/useColumnFilters";
 import { usePaidToggle } from "@/composables/usePaidToggle";
 import { formatInvoiceNumber } from "@/lib/format";
+import { buildRevisions } from "@/lib/revisions";
 
 const props = defineProps<{ rootId: number }>();
 const { t } = useI18n();
@@ -26,6 +27,12 @@ const chain = useQuery({
   queryFn: () => loadChain(props.rootId),
 });
 const latest = computed(() => chain.data.value?.[0]);
+const revisions = computed(() => buildRevisions(chain.data.value ?? []));
+
+// the quote the invoice was converted from, named by its number
+const quoteId = computed(() => latest.value?.QuoteId ?? null);
+const quote = useQuoteQuery(quoteId);
+const quoteNumber = computed(() => formatInvoiceNumber(quote.data.value?.QuoteNumber));
 
 // A grave invoice is revised through its grave; here its editor would only be
 // refused. A link or bookmark to one lands on its own page instead.
@@ -85,9 +92,16 @@ const editorOpen = ref(false);
       <template #content>
         <div class="text-lg font-semibold">{{ latest.RecipientName }}</div>
         <div class="whitespace-pre-line text-muted-color">{{ latest.RecipientAddress }}</div>
+        <RouterLink
+          v-if="quoteId != null && quoteNumber"
+          :to="`/quotes/${quoteId}`"
+          class="mt-3 inline-block text-primary hover:underline"
+        >
+          {{ t("invoiceFromQuote", [quoteNumber]) }}
+        </RouterLink>
       </template>
     </Card>
-    <RevisionList :chain="chain.data.value ?? []" />
+    <RevisionList :revisions="revisions" kind="invoice" />
   </div>
 
   <InvoiceEditor v-model:visible="editorOpen" :target="editorTarget" />

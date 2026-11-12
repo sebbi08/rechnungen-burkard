@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/pages/QuotesPage.vue"),
   },
   {
+    path: "/quotes/:rootId",
+    meta: { titleKey: "quoteDetailTitle" },
+    component: () => import("@/pages/QuoteDetailPage.vue"),
+    props: (route) => ({ rootId: Number(route.params.rootId) }),
+  },
+  {
     path: "/graves",
     meta: { titleKey: "menuGraves" },
     component: () => import("@/pages/GravesPage.vue"),

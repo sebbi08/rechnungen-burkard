@@ -14,8 +14,9 @@ const props = defineProps<{
   quoteId: number;
   state: QuoteState;
   detailsTo: RouteLocationRaw;
-  /** Which row, for screen readers: every row has the same buttons. */
-  rowLabel?: string;
+  /** The quote's number: it names the row for screen readers, since every row
+   *  has the same buttons, and the quote in the convert and delete questions. */
+  number: string;
 }>();
 const emit = defineEmits<{ edit: [] }>();
 
@@ -25,7 +26,7 @@ const actions = useQuoteActions();
 const menu = ref<InstanceType<typeof Menu>>();
 
 function named(label: string): string {
-  return props.rowLabel ? `${label}: ${props.rowLabel}` : label;
+  return `${label}: ${props.number}`;
 }
 
 function download(): void {
@@ -44,7 +45,7 @@ interface Action {
 // what the state allows: an open quote everything, a declined one reopening
 // and deleting, a converted one looking only
 const available = computed<Action[]>(() => {
-  const label = props.rowLabel ?? "";
+  const label = props.number;
   const list: Action[] = [
     {
       key: "details",

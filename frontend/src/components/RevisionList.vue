@@ -5,17 +5,17 @@ import AccordionHeader from "primevue/accordionheader";
 import AccordionPanel from "primevue/accordionpanel";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Invoice } from "@/api/generated";
 import { formatDate } from "@/lib/format";
-import { buildRevisions } from "@/lib/revisions";
+import type { RevisionView } from "@/lib/revisions";
 import RevisionPanel from "./RevisionPanel.vue";
 
-const props = defineProps<{ chain: Invoice[] }>();
+/** Every version of an invoice or a quote, newest first: the caller builds
+ *  them (buildRevisions, buildQuoteRevisions). */
+const props = defineProps<{ revisions: RevisionView[]; kind: "invoice" | "quote" }>();
 const { t } = useI18n();
 
-const revisions = computed(() => buildRevisions(props.chain));
 // the current revision opens; the history stays collapsed
-const opened = computed(() => (revisions.value.length ? [String(revisions.value[0].Id)] : []));
+const opened = computed(() => (props.revisions.length ? [String(props.revisions[0].Id)] : []));
 </script>
 
 <template>
@@ -31,14 +31,14 @@ const opened = computed(() => (revisions.value.length ? [String(revisions.value[
             }}
           </span>
           <span class="text-sm text-muted-color tabular-nums">
-            {{ revision.InvoiceNumber }} · {{ formatDate(revision.GeneratedAt) }}
+            {{ revision.Number }} · {{ formatDate(revision.GeneratedAt) }}
           </span>
         </span>
       </AccordionHeader>
       <!-- the content is a grid whose wrapper would grow to the table's width,
            which pushed the columns past the card instead of letting it scroll -->
       <AccordionContent :pt="{ contentWrapper: { class: 'min-w-0' } }">
-        <RevisionPanel :revision="revision" />
+        <RevisionPanel :revision="revision" :kind="kind" />
       </AccordionContent>
     </AccordionPanel>
   </Accordion>

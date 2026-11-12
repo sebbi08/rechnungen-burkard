@@ -20,6 +20,7 @@ import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import { usePaidToggle } from "@/composables/usePaidToggle";
 import { formatInvoiceNumber, formatShare } from "@/lib/format";
 import { halfYearText } from "@/lib/halfYear";
+import { buildRevisions } from "@/lib/revisions";
 
 const props = defineProps<{ graveId: number; rootId: number }>();
 const { t } = useI18n();
@@ -37,6 +38,7 @@ const latest = computed(() => {
   return first?.GraveId === props.graveId ? first : undefined;
 });
 const number = computed(() => formatInvoiceNumber(latest.value?.InvoiceNumber));
+const revisions = computed(() => buildRevisions(chain.data.value ?? []));
 
 const latestId = computed(() => latest.value?.Id);
 const group = useQuery({
@@ -147,7 +149,7 @@ const halfYear = computed(() =>
       </template>
     </Card>
 
-    <RevisionList :chain="chain.data.value ?? []" />
+    <RevisionList :revisions="revisions" kind="invoice" />
   </div>
 
   <GraveInvoiceEditor v-model:visible="editorOpen" :draft="draft" />

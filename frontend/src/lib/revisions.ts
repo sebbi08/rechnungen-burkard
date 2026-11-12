@@ -1,4 +1,4 @@
-import type { Invoice } from "@/api/generated";
+import type { Invoice, InvoiceLine, Quote, QuoteLine } from "@/api/generated";
 import { grossPerLine, lineNet } from "./money";
 
 export interface RevisionLineView {
@@ -16,7 +16,9 @@ export interface RevisionLineView {
 
 export interface RevisionView {
   Id: number;
-  InvoiceNumber: string;
+  /** The version's own number, with its revision marker: an invoice's or a
+   *  quote's. */
+  Number: string;
   RevisionNumber: number;
   GeneratedAt: string;
   Lines: RevisionLineView[];
@@ -25,41 +27,66 @@ export interface RevisionView {
   GrossTotal: number;
 }
 
+/** What an invoice and a quote version have in common for the panel. */
+interface VersionRow {
+  Id: number;
+  RevisionNumber: number;
+  GeneratedAt: string;
+  NetTotal: number;
+  VatTotal: number;
+  GrossTotal: number;
+}
+
+function buildView(
+  row: VersionRow,
+  number: string,
+  rowLines: (InvoiceLine | QuoteLine)[],
+  recipientCount: number,
+): RevisionView {
+  const lines: RevisionLineView[] = rowLines
+    .slice()
+    .sort((a, b) => a.LineNumber - b.LineNumber)
+    .map((line) => ({
+      ItemNumber: line.ItemNumber,
+      Description: line.Description,
+      Count: line.Count,
+      UnitPrice: line.UnitPrice,
+      VatRate: line.VatRate,
+      PriceIncludesVat: line.PriceIncludesVat,
+      LineTotal: lineNet(line.Count, line.UnitPrice),
+      GrossTotal: 0,
+    }));
+  const shares = grossPerLine(
+    lines.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
+    recipientCount,
+  );
+  lines.forEach((line, index) => {
+    line.GrossTotal = shares[index];
+  });
+  return {
+    Id: row.Id,
+    Number: number,
+    RevisionNumber: row.RevisionNumber,
+    GeneratedAt: row.GeneratedAt,
+    Lines: lines,
+    NetTotal: row.NetTotal,
+    VatTotal: row.VatTotal,
+    GrossTotal: row.GrossTotal,
+  };
+}
+
 /** Newest first, as loadChain returns them. On a grave invoice the lines are
  *  the whole grave while the totals are this recipient's share, so the
  *  recipient count is the divisor that puts the gross column in the net
  *  column's terms. */
 export function buildRevisions(chain: Invoice[]): RevisionView[] {
-  return chain.map((invoice) => {
-    const lines: RevisionLineView[] = (invoice.Lines ?? [])
-      .slice()
-      .sort((a, b) => a.LineNumber - b.LineNumber)
-      .map((line) => ({
-        ItemNumber: line.ItemNumber,
-        Description: line.Description,
-        Count: line.Count,
-        UnitPrice: line.UnitPrice,
-        VatRate: line.VatRate,
-        PriceIncludesVat: line.PriceIncludesVat,
-        LineTotal: lineNet(line.Count, line.UnitPrice),
-        GrossTotal: 0,
-      }));
-    const shares = grossPerLine(
-      lines.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
-      invoice.RecipientCount ?? 1,
-    );
-    lines.forEach((line, index) => {
-      line.GrossTotal = shares[index];
-    });
-    return {
-      Id: invoice.Id,
-      InvoiceNumber: invoice.InvoiceNumber,
-      RevisionNumber: invoice.RevisionNumber,
-      GeneratedAt: invoice.GeneratedAt,
-      Lines: lines,
-      NetTotal: invoice.NetTotal,
-      VatTotal: invoice.VatTotal,
-      GrossTotal: invoice.GrossTotal,
-    };
-  });
+  return chain.map((invoice) =>
+    buildView(invoice, invoice.InvoiceNumber, invoice.Lines ?? [], invoice.RecipientCount ?? 1),
+  );
+}
+
+/** Newest first, as loadQuoteChain returns them. A quote has one recipient,
+ *  who is charged the whole of every line. */
+export function buildQuoteRevisions(chain: Quote[]): RevisionView[] {
+  return chain.map((quote) => buildView(quote, quote.QuoteNumber, quote.Lines ?? [], 1));
 }

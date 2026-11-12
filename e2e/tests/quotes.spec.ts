@@ -166,6 +166,9 @@ test("delete a quote after confirming", async ({ page }) => {
   const row = await openListFor(page, number);
 
   await row.getByRole("button", { name: rowAction("Angebot löschen") }).click();
+  await waitForOverlayOpen(page);
+  // the question names the quote, so a misclick on the wrong row shows
+  await expect(confirmation(page)).toContainText(number);
   await confirmation(page).getByRole("button", { name: "Ja" }).click();
   await expect(row).toHaveCount(0);
   const left = await (await page.request.get(`/odata/Quotes?$filter=RootId eq ${id}`)).json();
@@ -234,4 +237,128 @@ test("the list searches its columns and filters by state", async ({ page }) => {
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(quoteRow(page, declined.number)).toContainText("Abgelehnt");
   await expect(page).toHaveURL(/state=Declined/);
+});
+
+/** One version's panel of the detail page, found by its header. */
+function versionPanel(page: Page, label: RegExp) {
+  return page
+    .locator(".p-accordionpanel")
+    .filter({ has: page.getByRole("button", { name: label }) });
+}
+
+/** What an open quote's page offers to change, none of which a converted one
+ *  offers. */
+const CHANGES = ["Bearbeiten", "In Rechnung umwandeln", "Ablehnen", "Angebot löschen"];
+
+test("convert a quote into an invoice", async ({ page }) => {
+  const { id, number, itemNumber } = await seedOneQuote(page);
+  await page.goto(`/quotes/${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(number);
+  await expect(page.getByText("Offen", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "In Rechnung umwandeln" }).click();
+  await waitForOverlayOpen(page);
+  await expect(confirmation(page)).toContainText(number);
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+
+  // the new invoice's page, with the quote's lines and the way back to it
+  await expect(page).toHaveURL(/\/invoices\/\d+$/);
+  const invoiceId = Number(new URL(page.url()).pathname.split("/").pop());
+  await expect(page.locator(".p-accordionpanel").first()).toContainText(itemNumber);
+  const back = page.getByRole("link", { name: `Aus Angebot ${number}` });
+  await expect(back).toHaveText(new RegExp(`^Aus Angebot A${new Date().getFullYear()}-\\d{4}$`));
+  const invoiceNumber = (await page.getByRole("heading", { level: 1 }).textContent())!.trim();
+
+  await back.click();
+  await expect(page).toHaveURL(new RegExp(`/quotes/${id}$`));
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(number);
+  await expect(page.getByText("Umgewandelt", { exact: true })).toBeVisible();
+  const forward = page.getByRole("link", { name: `Umgewandelt in Rechnung ${invoiceNumber}` });
+  await expect(forward).toHaveAttribute("href", `/invoices/${invoiceId}`);
+  for (const name of CHANGES) {
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  }
+});
+
+test("cancelling the confirmation converts nothing", async ({ page }) => {
+  const { id, number, recipientId } = await seedOneQuote(page);
+  await page.goto(`/quotes/${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(number);
+
+  await page.getByRole("button", { name: "In Rechnung umwandeln" }).click();
+  await waitForOverlayOpen(page);
+  await expect(confirmation(page)).toContainText(number);
+  await confirmation(page).getByRole("button", { name: "Abbrechen" }).click();
+  await expect(confirmation(page)).toHaveCount(0);
+
+  await expect(page).toHaveURL(new RegExp(`/quotes/${id}$`));
+  await expect(page.getByText("Offen", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "In Rechnung umwandeln" })).toBeVisible();
+  const invoices = await (
+    await page.request.get(`/odata/Invoices?$filter=RecipientId eq ${recipientId}`)
+  ).json();
+  expect(invoices.value).toHaveLength(0);
+});
+
+test("the detail page lists every version", async ({ page }) => {
+  const { id, number, recipientId, itemId } = await seedOneQuote(page);
+  await createRow(page, "/odata/CreateQuoteRevision", {
+    quoteId: id,
+    recipientId,
+    lines: [{ itemId, count: 3, unitPrice: 100, priceIncludesVat: false }],
+  });
+  await page.goto(`/quotes/${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(number);
+  // the breadcrumb leads back to the list
+  await expect(
+    page.getByRole("navigation", { name: "Seitenpfad" }).getByRole("link", { name: "Angebote" }),
+  ).toHaveAttribute("href", "/quotes");
+
+  // newest first, the revision open and the original collapsed
+  const headers = page.locator(".p-accordionheader");
+  await expect(headers).toHaveCount(2);
+  await expect(headers.nth(0)).toContainText("Revision 1");
+  await expect(headers.nth(0)).toContainText(`${number}-R1`);
+  await expect(headers.nth(1)).toContainText("Original");
+
+  const revision = versionPanel(page, /^Revision 1/);
+  // 3 × 100,00 net + 7 % = 321,00
+  await expect(revision.locator("dl")).toContainText("Gesamt321,00 €");
+  const original = versionPanel(page, /^Original/);
+  await original.getByRole("button", { name: /^Original/ }).click();
+  await expect(original.locator("dl")).toContainText("Gesamt107,00 €");
+
+  // one document per version, and no copy
+  for (const panel of [revision, original]) {
+    await expect(panel.getByRole("button", { name: "Angebot herunterladen" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Rechnung herunterladen" })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "Kopie herunterladen" })).toHaveCount(0);
+  }
+
+  // each version downloads its own PDF
+  const tabPromise = page.context().waitForEvent("page");
+  const pdfRequest = page
+    .context()
+    .waitForEvent("request", (request) => /\/odata\/Quotes\(\d+\)\/Pdf$/.test(request.url()));
+  await original.getByRole("button", { name: "Angebot herunterladen" }).click();
+  const tab = await tabPromise;
+  const pdfUrl = (await pdfRequest).url();
+  await tab.close();
+  expect(pdfUrl).toMatch(new RegExp(`/odata/Quotes\\(${id}\\)/Pdf$`));
+});
+
+test("deleting from the detail page returns to the list", async ({ page }) => {
+  const { id, number } = await seedOneQuote(page);
+  await page.goto(`/quotes/${id}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(number);
+
+  await page.getByRole("button", { name: "Angebot löschen" }).click();
+  await waitForOverlayOpen(page);
+  await expect(confirmation(page)).toContainText(number);
+  await confirmation(page).getByRole("button", { name: "Ja" }).click();
+
+  await expect(page).toHaveURL(/\/quotes$/);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Angebote");
+  const left = await (await page.request.get(`/odata/Quotes?$filter=RootId eq ${id}`)).json();
+  expect(left.value).toHaveLength(0);
 });

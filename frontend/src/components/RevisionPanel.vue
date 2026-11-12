@@ -3,24 +3,39 @@ import Button from "primevue/button";
 import Column from "primevue/column";
 import DataTable from "primevue/datatable";
 import { useI18n } from "vue-i18n";
-import type { DocumentKindName } from "@/api/endpoints";
+import { type DocumentKindName, quotePdfUrl } from "@/api/endpoints";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { openDocument } from "@/lib/download";
 import { formatAmount, formatVatRate } from "@/lib/format";
 import type { RevisionView } from "@/lib/revisions";
 
-const props = defineProps<{ revision: RevisionView }>();
+const props = defineProps<{ revision: RevisionView; kind: "invoice" | "quote" }>();
 const { t } = useI18n();
 const { showError } = useErrorToast();
 
 function open(kind: DocumentKindName): void {
   openDocument(props.revision.Id, kind).catch(showError);
 }
+
+/** A quote has one PDF, no copy. */
+function openQuote(): void {
+  // opened inside the click, or the browser blocks it as a popup
+  window.open(quotePdfUrl(props.revision.Id), "_blank");
+}
 </script>
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <div class="flex flex-wrap gap-2">
+    <div v-if="kind === 'quote'" class="flex flex-wrap gap-2">
+      <Button
+        :label="t('actionDownloadQuote')"
+        icon="pi pi-file-pdf"
+        size="small"
+        outlined
+        @click="openQuote"
+      />
+    </div>
+    <div v-else class="flex flex-wrap gap-2">
       <Button
         :label="t('actionDownloadNormal')"
         icon="pi pi-file-pdf"
