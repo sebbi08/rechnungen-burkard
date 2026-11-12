@@ -26,11 +26,13 @@ import ColumnFilterCell from "@/components/ColumnFilterCell.vue";
 import ColumnFilterSheet from "@/components/ColumnFilterSheet.vue";
 import GenerateDialog from "@/components/GenerateDialog.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
+import GraveMarkPaidDialog from "@/components/GraveMarkPaidDialog.vue";
 import GraveRecipientsCell from "@/components/GraveRecipientsCell.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import { useBlocking } from "@/composables/useBlocking";
 import { type ColumnFilterField, useColumnFilters } from "@/composables/useColumnFilters";
 import { useErrorToast } from "@/composables/useErrorToast";
+import { useGraveMarkPaid } from "@/composables/useGraveMarkPaid";
 import { showMessage } from "@/composables/useMessage";
 import { usePageReport } from "@/composables/usePageReport";
 import { downloadBlob } from "@/lib/download";
@@ -44,6 +46,7 @@ import { matchesWords } from "@/lib/searchWords";
 const { t } = useI18n();
 // the same confirmation and refresh as on the grave's page
 const { removeGrave, deleting } = useDeleteGrave();
+const markPaid = useGraveMarkPaid();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -553,6 +556,16 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 :aria-label="`${t('actionDetails')}: ${data.GraveNumber}`"
                 @click="router.push(`/graves/${data.Id}`)"
               />
+              <!-- every half-year's open invoices, not just the one shown -->
+              <Button
+                v-tooltip.top="t('actionMarkPaid')"
+                icon="pi pi-wallet"
+                text
+                rounded
+                :aria-label="`${t('actionMarkPaid')}: ${data.GraveNumber}`"
+                :disabled="data.OpenInvoiceCount === 0"
+                @click="markPaid.start(data.Id, data.GraveNumber)"
+              />
               <Button
                 v-tooltip.top="t('edit')"
                 icon="pi pi-pencil"
@@ -591,5 +604,12 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
     :successor-of="successorOf"
     :successor-start="successorStart"
     @hand-over="openSuccessor"
+  />
+  <GraveMarkPaidDialog
+    v-model:visible="markPaid.dialog.visible"
+    :grave-number="markPaid.dialog.graveNumber"
+    :invoices="markPaid.dialog.invoices"
+    :busy="markPaid.dialog.busy"
+    @confirm="markPaid.confirm"
   />
 </template>

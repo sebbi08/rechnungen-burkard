@@ -44,6 +44,11 @@ export async function setInvoicePaid(invoiceId: number, paid: boolean): Promise<
   await postJson("/odata/SetInvoicePaid", { invoiceId, paid });
 }
 
+/** Marks these invoices paid today, all of them or -- on a refusal -- none. */
+export async function markInvoicesPaid(invoiceIds: number[]): Promise<void> {
+  await postJson("/odata/MarkInvoicesPaid", { invoiceIds });
+}
+
 export async function fetchInvoiceLines(invoiceId: number): Promise<InvoiceLine[]> {
   return (await getJson<{ value: InvoiceLine[] }>(`/odata/Invoices(${invoiceId})/Lines`)).value;
 }
@@ -128,6 +133,8 @@ export interface GraveStatusRow {
   Invoiced: boolean;
   InvoiceCount: number;
   PaidCount: number;
+  /** Unpaid invoices of every half-year, not just the one asked for. */
+  OpenInvoiceCount: number;
   /** In the order they were linked; empty for a grave without any. */
   Recipients: GraveStatusRecipient[];
 }

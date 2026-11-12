@@ -44,8 +44,8 @@ public sealed class Invoice
 
     /// <summary>The day the invoice was marked paid; null while it is unpaid.
     /// Nullability carries the whole meaning — there is no second flag to
-    /// disagree with it. Only SetInvoicePaid writes it, and the UI reads it as
-    /// paid/unpaid without ever showing the date.</summary>
+    /// disagree with it. Only SetInvoicePaid and MarkInvoicesPaid write it, and
+    /// the UI reads it as paid/unpaid without ever showing the date.</summary>
     public DateOnly? PaidOn { get; set; }
     public List<InvoiceLine> Lines { get; set; } = new();
     public List<Document> Documents { get; set; } = new();

@@ -947,6 +947,16 @@ non-interactive until completion, and the task runs exactly once.
   beside it already reports that. The overview's payment status search
   (FR-068c) MUST be able to narrow the list to the graves that still have an
   unpaid invoice in that half-year.
+- **FR-078**: Each row of the grave overview MUST offer to mark the grave's
+  unpaid invoices paid — those of every half-year, not just the selected one;
+  the action MUST be unavailable while the grave has none. A single unpaid
+  invoice MUST be marked only after a confirmation naming its number, half-year
+  and amount. Several MUST open a dialog that lists them grouped by recipient,
+  each with its half-year, number and amount, a subtotal per recipient and the
+  total of what is ticked; nothing MUST be ticked when it opens, a recipient's
+  box MUST tick all of that recipient's invoices, and each invoice MUST be
+  tickable on its own. What is ticked MUST be marked paid all together or not
+  at all.
 
 ### Key Entities _(include if feature involves data)_
 

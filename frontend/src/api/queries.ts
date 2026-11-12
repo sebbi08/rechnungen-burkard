@@ -349,3 +349,21 @@ export function useGraveYearRange() {
     },
   });
 }
+
+/** A grave's unpaid invoices of every half-year, latest revisions only:
+ *  oldest half-year first, and within one in the order generation wrote them,
+ *  which is the order the grave's recipients were linked in. */
+export async function fetchOpenGraveInvoices(graveId: number): Promise<Invoice[]> {
+  return readAll(async (skip, top) => {
+    const response = await odata
+      .Invoices()
+      .query((b, q) => {
+        b.filter(q.GraveId.eq(graveId).and(q.IsLatestRevision.isTrue()).and(q.PaidOn.isNull()))
+          .orderBy(q.PeriodYear.asc(), q.PeriodHalf.asc(), q.Id.asc())
+          .skip(skip)
+          .top(top);
+      })
+      .execute();
+    return response.data.value;
+  });
+}
