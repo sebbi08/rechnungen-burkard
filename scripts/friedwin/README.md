@@ -62,6 +62,23 @@ contract number, whether a customer record exists, care price) and a section
 record alone that lack a recipient and/or a care price, with what is missing
 (note `incomplete`; to be completed in the app).
 
+## Items of ordinary invoices
+
+Besides the graves' items, `items.csv` holds every article FriedWin billed on an
+ordinary invoice (one without a care line, whoever it went to) dated from 1 January
+2021, so it can be picked for an invoice in the app. They link to no grave and have
+no quarter. An article the graves already bring keeps the graves' price and VAT
+rate.
+
+- price: the one the article was billed at on every one of its invoices, if it was
+  billed on more than one and the price is not 0; otherwise none. FriedWin's
+  article master (`Artstam1.dat`) holds no sales price to take instead: the packed
+  amounts in it are sales figures (quantity and turnover per year).
+- VAT rate: the newest invoice's;
+- description: the text the article was billed under most often.
+
+The report counts these items and how many are without a price.
+
 ## Where the data comes from
 
 | App            | FriedWin                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |

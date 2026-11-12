@@ -15,6 +15,10 @@ Where the data comes from:
   issued. A grave's items are read off its last care invoice of each half-year:
   the "Grabpflege" line as the all-year item, and the lines under "Fruehjahr",
   "Sommer", "Herbst" and "Winter" as the items of that quarter.
+- items.csv also holds every article billed on an ordinary invoice (one without
+  a care line) since 2021 that the graves do not bring already: at the price it
+  was billed at on every invoice when that is more than one, else without a
+  price, at the newest invoice's VAT rate, under its most frequent text.
 
 The report on stdout names graves by number only. It lists what could not be
 converted and what was guessed, so it can be fixed in FriedWin or in the app.
@@ -70,6 +74,9 @@ CEMETERIES = {
 CEMETERY_SUFFIX = re.compile(
     r"\s+(" + "|".join(re.escape(c) for c in sorted(CEMETERIES, key=len, reverse=True)) + r")$"
 )
+# Ordinary invoices from this date on give the app the items billed outside the
+# graves' care.
+SOLD_SINCE = datetime.date(2021, 1, 1)
 # Suffix of an item number when one FriedWin article is billed in several quarters.
 QUARTER_SUFFIX = {"Spring": "F", "Summer": "S", "Autumn": "H", "Winter": "W"}
 
@@ -449,8 +456,12 @@ def is_care_line(line):
     return line.text.startswith("Grabpflege")
 
 
-def read_invoices(root, customers):
-    """The care invoices of the given customers, by customer, from the print archive."""
+def read_invoices(root, customers, since):
+    """(care invoices of the given customers by customer, other invoices dated from `since`).
+
+    Both come off the print archive; an invoice is a care invoice when one of its
+    lines is the care, and an ordinary one otherwise, whoever it went to.
+    """
     path = os.path.join(root, "frieddat", "ARCHIVX1.DAT")
     invoices = collections.defaultdict(dict)
     with open(path, "rb") as fh:
@@ -464,11 +475,11 @@ def read_invoices(root, customers):
             if f[1].startswith("****"):
                 quarter = None
                 current = None
-                if f[8] not in customers:
-                    continue
                 try:
                     date = datetime.datetime.strptime(f[9], "%d.%m.%Y").date()
                 except ValueError:
+                    continue
+                if f[8] not in customers and date < since:
                     continue
                 # A second page repeats the header of the same invoice.
                 current = invoices[f[8]].setdefault(
@@ -496,7 +507,42 @@ def read_invoices(root, customers):
             if (amount(f[48]) or 0) > 0:
                 current.rates = {f[35]: amount(f[48]), f[36]: amount(f[49])}
         data.close()
-    return {c: [i for i in invs.values() if i.is_care] for c, invs in invoices.items()}
+    care = {c: [i for i in invs.values() if i.is_care] for c, invs in invoices.items() if c in customers}
+    other = [i for invs in invoices.values() for i in invs.values() if not i.is_care and i.date >= since]
+    return care, other
+
+
+def sold_items(invoices, taken):
+    """Rows of items.csv for the articles billed on ordinary invoices, and how many have no price.
+
+    An article already in `taken` (an item number the graves produced) stays as the
+    graves have it. Price: the one the article was billed at on every invoice, if
+    that is more than one invoice; else none. VAT rate: the newest invoice's.
+    Description: the text it was billed under most often.
+    """
+    lines = collections.defaultdict(list)  # article -> [(date, number, invoice, line)]
+    for inv in invoices:
+        for line in inv.lines:
+            if line.article.strip("0 ") and line.article not in taken:
+                lines[line.article].append((inv.date, inv.number, inv, line))
+    rows, unpriced, no_vat = [], 0, []
+    for article in sorted(lines):
+        billed = sorted(lines[article], key=lambda e: (e[0], e[1]), reverse=True)
+        vat = next((v for v in (vat_of(inv, line) for _, _, inv, line in billed) if v is not None), None)
+        if vat is None:
+            no_vat.append(article)
+            continue
+        prices = {line.price for _, _, _, line in billed}
+        once = len({number for _, number, _, _ in billed}) == 1
+        price = prices.pop() if len(prices) == 1 and not once else None
+        if price is None or price <= 0:
+            price = None
+            unpriced += 1
+        rows.append(
+            [article, most_common(line.text for _, _, _, line in billed), f"{vat.normalize():f}",
+             money(price) if price is not None else "", ""]
+        )
+    return rows, unpriced, no_vat
 
 
 CENT = Decimal("0.01")
@@ -810,7 +856,7 @@ def main():
     customers = read_customers(args.root)
     cemeteries = read_cemeteries(args.root)
     graves = read_graves(args.root)
-    invoices = read_invoices(args.root, {g.customer for g in graves})
+    invoices, ordinary = read_invoices(args.root, {g.customer for g in graves}, SOLD_SINCE)
 
     # ---- recipients
     recipient_rows = []
@@ -995,6 +1041,11 @@ def main():
             [n, most_common(texts[n]), f"{most_common(vats[n]).normalize():f}", money(default_price[n]),
              quarter_of[n] or ""]
         )
+    # The articles of ordinary invoices, unless the graves already brought them.
+    sold_rows, sold_unpriced, sold_no_vat = sold_items(ordinary, set(texts))
+    item_rows = sorted(item_rows + sold_rows, key=lambda r: r[0])
+    if sold_no_vat:
+        attention["item of ordinary invoices without a VAT rate (left out)"] += sold_no_vat
 
     mapping_rows = []
     for number, (customer, items, _) in plans.items():
@@ -1048,6 +1099,8 @@ def main():
             ["Kunden ohne Name oder Anschrift, weggelassen (Kundennummern im Textbericht)",
              str(len(attention["recipient without name or address (left out)"]))],
             ["Leistungen", str(len(item_rows))],
+            [f"davon aus normalen Rechnungen seit {SOLD_SINCE:%d.%m.%Y}", str(len(sold_rows))],
+            ["davon ohne Preis (verschiedene Preise oder nur einmal berechnet)", str(sold_unpriced)],
             ["Zuordnungen von Empfängern und Leistungen zu Gräbern", str(len(mapping_rows))],
         ],
         "Vor dem Import müssen in den Einstellungen der App die Steuersätze "
@@ -1059,6 +1112,8 @@ def main():
         f"wrote {args.out}, {stem}-report.pdf and {stem}-nie-abgerechnet.csv",
         f"  recipients {len(recipient_rows)}, items {len(item_rows)}, graves {len(grave_rows)}, "
         f"links {len(mapping_rows)}",
+        f"  items of ordinary invoices since {SOLD_SINCE}: {len(sold_rows)}, of which without price: "
+        f"{sold_unpriced}",
         f"  VAT rates used: {sorted({r[2] for r in item_rows})} (must exist in the app before importing)",
         f"  cemeteries used: {sorted({r[3] for r in grave_rows})} (must exist in the settings before importing)",
     ]
