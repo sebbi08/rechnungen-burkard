@@ -3,6 +3,7 @@ using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
+using Burkard.Invoicing.Api.Services.Backup;
 using Burkard.Invoicing.Api.Services.Import;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,9 @@ builder.Services.AddScoped<GraveCorrectionCheck>();
 builder.Services.AddScoped<RecipientNumberService>();
 builder.Services.AddScoped<ImportValidator>();
 builder.Services.AddScoped<ImportService>();
+builder.Services.AddScoped<BackupService>();
+builder.Services.AddSingleton<DatabaseGate>();
+builder.Services.AddSingleton<DataGeneration>();
 builder.Services.AddSingleton<JobQueue>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddScoped<IJobHandler, GraveInvoicesJobHandler>();
@@ -62,9 +66,22 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    // before anything opens the database: after a restore whose rollback
+    // failed, migrating would bring up whatever is at the live path, or a new
+    // empty database
+    var databasePath = BackupService.DatabasePathOf(db);
+    BackupService.RefuseStartAfterIncompleteRestore(databasePath, app.Logger);
+    BackupService.SweepLeftovers(databasePath, app.Logger);
     db.Database.Migrate();
     DatabaseSeeder.Seed(db);
+    app.Services.GetRequiredService<DataGeneration>().Load(db);
 }
+
+// Every request that can reach the database passes the gate a restore closes
+// while it swaps the file (BackupService.RestoreAsync). It comes before
+// routing, so nothing about a request is looked at while the gate is closed.
+app.UseMiddleware<DatabaseGateMiddleware>();
+app.UseRouting();
 
 // Serve the frontend's build from wwwroot (combined release image). Vue Router
 // uses HTML5 history, so /invoices/42 is a page rather than a file, and a

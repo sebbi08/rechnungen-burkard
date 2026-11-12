@@ -774,6 +774,91 @@ test("the grave invoice page of a deleted grave offers no payment or revision", 
   await expect(page.getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
 });
 
+/** A grave's invoices, latest revisions only, as the API lists them. */
+async function graveInvoices(
+  page: Page,
+  graveId: number,
+): Promise<
+  {
+    InvoiceNumber: string;
+    RecipientName: string;
+    PeriodYear: number;
+    PeriodHalf: number;
+    PaidOn: string | null;
+  }[]
+> {
+  const response = await page.request.get(
+    `/odata/Invoices?$filter=GraveId eq ${graveId} and IsLatestRevision eq true&$orderby=Id`,
+  );
+  expect(response.ok()).toBe(true);
+  return (await response.json()).value;
+}
+
+test("the list marks a grave's open invoices of every half-year paid", async ({ page }) => {
+  const marker = `GP-${unique()}`;
+  const anna = `Anna ${marker}`;
+  const bernd = `Bernd ${marker}`;
+  // its own year, so these generations reach no other test's grave of this kind
+  const { graveId } = await seedGrave(
+    page,
+    marker,
+    [anna, bernd],
+    [{}],
+    term(2039, 1, { year: 2039, half: 2 }),
+  );
+  await generateFor(page, 2039, 1);
+  await generateFor(page, 2039, 2);
+  const invoices = await graveInvoices(page, graveId);
+  expect(invoices).toHaveLength(4);
+  const numberOf = (recipient: string, half: number): string =>
+    invoices.find((i) => i.RecipientName === recipient && i.PeriodHalf === half)!.InvoiceNumber;
+
+  // the list shows the second half, yet the first half's invoices are offered too
+  await page.goto(`/graves?period=2039-2&number=${encodeURIComponent(marker)}`);
+  const row = page.getByRole("row").filter({ hasText: marker });
+  const markPaid = row.getByRole("button", { name: rowAction("Als bezahlt markieren") });
+  await markPaid.click();
+  await waitForOverlayOpen(page);
+  const box = dialog(page, "Rechnungen als bezahlt markieren");
+  await expect(box).toContainText(marker);
+  for (const invoice of invoices) {
+    await expect(box).toContainText(invoice.InvoiceNumber);
+  }
+  // nothing is ticked until the user says who has paid
+  for (const checkbox of await box.getByRole("checkbox").all()) {
+    await expect(checkbox).not.toBeChecked();
+  }
+  const confirm = box.getByRole("button", { name: "Als bezahlt markieren" });
+  await expect(confirm).toBeDisabled();
+
+  // a recipient's box ticks all of theirs; each share is half of 107,00 €
+  await box.getByRole("checkbox", { name: anna, exact: true }).check();
+  await expect(box).toContainText("Ausgewählt: 2 · 107,00 €");
+  await box.getByRole("checkbox", { name: `Rechnung ${numberOf(bernd, 1)}` }).check();
+  await expect(box).toContainText("Ausgewählt: 3 · 160,50 €");
+  await expect(box.getByRole("checkbox", { name: bernd, exact: true })).not.toBeChecked();
+  await confirm.click();
+  await expect(box).toHaveCount(0);
+
+  await expect(row).toContainText("teilweise bezahlt (1 / 2)");
+  const paid = (await graveInvoices(page, graveId))
+    .filter((i) => i.PaidOn != null)
+    .map((i) => i.InvoiceNumber)
+    .sort();
+  expect(paid).toEqual([numberOf(anna, 1), numberOf(anna, 2), numberOf(bernd, 1)].sort());
+
+  // the one invoice left needs no list, only a yes
+  await markPaid.click();
+  const question = confirmation(page);
+  await expect(question).toContainText(numberOf(bernd, 2));
+  await expect(question).toContainText("53,50 €");
+  await question.getByRole("button", { name: "Ja" }).click();
+  await expect(row).toContainText("bezahlt");
+  await expect(row).not.toContainText("teilweise");
+  // nothing is open any more
+  await expect(markPaid).toBeDisabled();
+});
+
 /** The H1/H2 toggle of a form: the button of this half, pressed or not. */
 function halfButton(scope: Page | Locator, half: number): Locator {
   return scope.getByRole("group", { name: "Halbjahr" }).getByRole("button", { name: `H${half}` });
@@ -1422,9 +1507,10 @@ test("the overview fits its card on a laptop and on a wide screen", async ({ pag
 
     // and every row's actions are inside the card
     for (const row of await rows.all()) {
-      // edit and delete; details only on a wide screen (the number links there too)
+      // mark paid, edit and delete; details only on a wide screen (the number
+      // links there too)
       const actions = row.locator("td").last().getByRole("button").filter({ visible: true });
-      expect(await actions.count()).toBe(width < 1536 ? 2 : 3);
+      expect(await actions.count()).toBe(width < 1536 ? 3 : 4);
       for (const action of await actions.all()) {
         const box = (await action.boundingBox())!;
         const name = `${width}px ${await action.getAttribute("aria-label")}`;

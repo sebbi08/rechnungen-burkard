@@ -269,6 +269,65 @@ public class InvoiceActionsController : ODataController
         }
     }
 
+    /// <summary>The grave list's "mark paid": the invoices the user ticked, all
+    /// marked or none.</summary>
+    [HttpPost("MarkInvoicesPaid")]
+    public async Task<IActionResult> MarkInvoicesPaid([FromBody] MarkInvoicesPaidRequest? request)
+    {
+        if (request is null || request.InvoiceIds is null || request.InvoiceIds.Count == 0)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = "InvalidRequest",
+                        message = "At least one invoice is required.",
+                    },
+                }
+            );
+        }
+
+        var ids = request.InvoiceIds;
+        var onDeletedGrave = await _db.Invoices.AnyAsync(
+            i =>
+                ids.Contains(i.Id)
+                && i.GraveId != null
+                && _db.Graves.Any(g => g.Id == i.GraveId && g.DeletedAt != null),
+            HttpContext.RequestAborted
+        );
+        if (onDeletedGrave)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new { code = "GraveDeleted", message = "The grave has been deleted." },
+                }
+            );
+        }
+
+        try
+        {
+            await _service.MarkPaidAsync(ids, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "MarkInvoicesPaid failed");
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                new
+                {
+                    error = new { code = "InternalError", message = "An internal error occurred." },
+                }
+            );
+        }
+    }
+
     [HttpPost("GenerateGraveInvoices")]
     public async Task<IActionResult> GenerateGraveInvoices(
         [FromBody] GenerateGraveInvoicesRequest? request
@@ -415,5 +474,10 @@ public class InvoiceActionsController : ODataController
     {
         public long InvoiceId { get; set; }
         public bool Paid { get; set; }
+    }
+
+    public sealed class MarkInvoicesPaidRequest
+    {
+        public List<long>? InvoiceIds { get; set; }
     }
 }

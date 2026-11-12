@@ -414,7 +414,68 @@ non-interactive until completion, and the task runs exactly once.
 
 ---
 
-### User Story 14 - Quotes (Priority: P2)
+### User Story 14 - Download a Backup (Priority: P2)
+
+The owner downloads one file that holds everything the application keeps, so
+the whole instance can be moved to another server or kept as a manual backup.
+
+**Why this priority**: Without a complete copy, moving the application or
+recovering from a lost instance means rebuilding invoices, revisions, payments
+and PDFs by hand.
+
+**Independent Test**: Can be fully tested by downloading a backup of an
+instance that holds graves, invoices and settings, and verifying the file name
+and that the archive holds a manifest and the database.
+
+**Acceptance Scenarios**:
+
+1. **Given** the user opens the import/export section, **When** they trigger
+   the backup download, **Then** a ZIP archive named
+   `rechnungen-sicherung-YYYY-MM-DD-HHmm.zip` is downloaded.
+2. **Given** a job is queued or running, **When** the user triggers the backup
+   download, **Then** the system refuses with a message that a job is running
+   and downloads nothing.
+
+---
+
+### User Story 15 - Restore a Backup (Priority: P2)
+
+The owner uploads a backup. The system checks it without changing anything and
+shows what it holds. After an explicit confirmation, it replaces all data of the
+instance with the backup's.
+
+**Why this priority**: A backup is worth only as much as the ability to restore
+it, on the same instance or on a new one.
+
+**Independent Test**: Can be fully tested by downloading a backup, changing
+data, restoring the backup and verifying the data is as it was; and by
+uploading files that are not backups and verifying they are refused and nothing
+changes.
+
+**Acceptance Scenarios**:
+
+1. **Given** a valid backup, **When** the user uploads it, **Then** the system
+   shows when it was taken, from which application version, and how many
+   graves, recipients and invoices it holds, and asks for confirmation before
+   replacing anything.
+2. **Given** the checked backup, **When** the user confirms, **Then** all data of
+   the instance is replaced by the backup's, a success message is shown, and the
+   page reloads once the message is dismissed.
+3. **Given** the checked backup, **When** the user cancels, **Then** nothing is
+   changed and the staged upload is discarded.
+4. **Given** a file that is not a backup, or a damaged one, or one from a newer
+   application version, **When** the user uploads it, **Then** the system
+   refuses with a message saying why and the instance is unchanged.
+5. **Given** the instance holds invoices newer than the backup's newest,
+   **When** the confirmation is shown, **Then** it warns that those invoices are
+   lost and their invoice numbers will be issued again.
+6. **Given** another browser still shows the data from before a restore,
+   **When** it tries to save something, **Then** the system refuses and asks to
+   reload.
+
+---
+
+### User Story 16 - Quotes (Priority: P2)
 
 Before some jobs the owner sends the customer a quote ("Angebot"). It often goes
 back and forth a few times — the customer asks for changes, the owner sends a
@@ -991,41 +1052,113 @@ revising it, and checking the numbers, the stored versions and the printout.
   beside it already reports that. The overview's payment status search
   (FR-068c) MUST be able to narrow the list to the graves that still have an
   unpaid invoice in that half-year.
+- **FR-078**: Each row of the grave overview MUST offer to mark the grave's
+  unpaid invoices paid — those of every half-year, not just the selected one;
+  the action MUST be unavailable while the grave has none. A single unpaid
+  invoice MUST be marked only after a confirmation naming its number, half-year
+  and amount. Several MUST open a dialog that lists them grouped by recipient,
+  each with its half-year, number and amount, a subtotal per recipient and the
+  total of what is ticked; nothing MUST be ticked when it opens, a recipient's
+  box MUST tick all of that recipient's invoices, and each invoice MUST be
+  tickable on its own. What is ticked MUST be marked paid all together or not
+  at all.
+
+**Backup and restore**
+
+- **FR-078**: The system MUST offer, on the import/export page, a download of
+  the whole instance as one backup: a ZIP archive holding a copy of the
+  database, with the invoices, revisions, payments, PDF documents, deleted
+  graves, invoice runs and settings in it, and a manifest naming the application
+  version, the newest migration and the time it was taken.
+- **FR-079**: The backup file MUST be named
+  `rechnungen-sicherung-YYYY-MM-DD-HHmm.zip`, in local time (Europe/Berlin).
+- **FR-080**: The backup MUST be a consistent copy, taken while the application
+  runs, and MUST NOT be a plain copy of a database file that is in use.
+- **FR-081**: The system MUST refuse to download a backup, to take an upload and
+  to restore one while any job is queued or running, with `JobAlreadyRunning`.
+- **FR-082**: Restoring MUST be two steps. First the upload (up to 2 GB, not held
+  in memory) MUST be checked without changing any data, and the system MUST
+  answer with a summary: when the backup was taken, the application version,
+  and the numbers of graves, recipients and invoices. Then the user MUST confirm
+  explicitly, in a dialog that states that all data of this instance is
+  replaced, whose accept button says so ("Alle Daten ersetzen") and whose
+  default action is to cancel.
+- **FR-083**: When this instance holds invoices newer than the newest one in the
+  backup, the confirmation MUST say so in a warning of its own: those invoices
+  are lost, and their invoice numbers will be issued again.
+- **FR-084**: A staged upload MUST be discarded when the user cancels, and
+  otherwise once it is older than one hour, at the next upload or application
+  start.
+- **FR-085**: The system MUST refuse a file that is not a backup, including one
+  that is not a ZIP archive at all (`BackupInvalid`), and a backup that cannot be
+  read, fails SQLite's integrity check or holds a queued or running job
+  (`BackupDamaged`), and MUST leave the instance unchanged. An upload without the
+  multipart field `file` MUST be refused with `ArchiveRequired`; a token that is
+  unknown or expired with `BackupTokenUnknown`. A download whose copy turns out
+  to hold a queued or running job MUST be refused with `JobAlreadyRunning`.
+- **FR-086**: A backup from an older application version MUST be accepted and
+  migrated to the running version as part of the restore. A backup that holds a
+  migration the running version does not know MUST be refused with
+  `BackupFromNewerVersion`.
+- **FR-087**: Restoring MUST replace all data of the instance with the backup's.
+  The replaced database MUST be kept next to the database file as
+  `<database file name>.before-restore-yyyyMMdd-HHmmss`, with its `-wal` and
+  `-shm` files, and the application MUST NOT delete it.
+- **FR-088**: When any step fails after the replaced database was moved aside,
+  the system MUST put it back, so the instance is unchanged, and refuse with
+  `RestoreFailed`. When putting it back fails too, the system MUST answer
+  `RestoreRollbackFailed` (500), MUST keep refusing every other request with
+  `RestoreInProgress` until the instance has been repaired by hand as the
+  README describes, and MUST leave a marker `<database file name>.restore-incomplete`
+  naming the safety copy beside the database. While that marker exists, the
+  application MUST refuse to start, before it opens or migrates the database.
+- **FR-089**: While a restore is in progress, the system MUST NOT start a job
+  and MUST NOT let another request read or write the database: such a request is
+  refused with `RestoreInProgress` (503).
+- **FR-090**: The restore MUST run behind the blocking progress indicator
+  (User Story 13). After it succeeds, the page MUST show "Die Sicherung
+  ist eingespielt." and reload once the message is dismissed, so nothing shown
+  comes from the replaced data.
+- **FR-091**: Every response under `/odata` MUST carry the data generation in an
+  `X-Data-Generation` header; the generation is stored in the database and
+  renewed by every restore. A write that sends an outdated generation MUST be
+  refused with `DataReplaced` (409), asking the user to reload. A write that
+  sends none is allowed.
 
 **Quotes**
 
-- **FR-078**: Users MUST be able to create a quote for one recipient with one or
+- **FR-092**: Users MUST be able to create a quote for one recipient with one or
   more lines, entered and validated exactly like a non-grave invoice (FR-030 –
   FR-032, FR-008, FR-014). Quotes MUST NOT exist for graves.
-- **FR-079**: Quotes MUST be numbered apart from invoices: `A<year>-<sequence>`
+- **FR-093**: Quotes MUST be numbered apart from invoices: `A<year>-<sequence>`
   with four digits (`A2026-0001`), counted per year from 1, the year being the
   local year the quote was created in. A quote number MUST never be given twice.
   A quote MUST NOT take or reserve an invoice number.
-- **FR-080**: A quote version MUST store what it prints — the recipient's name,
+- **FR-094**: A quote version MUST store what it prints — the recipient's name,
   address and number, the lines with item number, description, count, net price,
   VAT rate and VAT-included flag, and the ending text — so a later change to a
   recipient, an item or the settings never alters it.
-- **FR-081**: Editing a quote MUST create a new version with the revision marker
+- **FR-095**: Editing a quote MUST create a new version with the revision marker
   of invoices (`A2026-0001-R1`, FR-035), continuing the revision numbers of the
   whole quote whichever version was edited, and keeping the year of the original
   quote. Every earlier version and its PDF MUST be preserved unchanged.
-- **FR-082**: A quote MUST be printed as the invoice document (FR-037a –
+- **FR-096**: A quote MUST be printed as the invoice document (FR-037a –
   FR-037d) with `**** ANGEBOT ****` in place of the invoice heading, and
   "Angebot <number>" as the PDF's title and on continuation pages. The VAT
   block, the ending text from the settings, the letterhead and the footer MUST
   read as on an invoice. The date MUST be the day the version was created.
-- **FR-083**: A quote version MUST have one PDF only, with no stamped copy, named
+- **FR-097**: A quote version MUST have one PDF only, with no stamped copy, named
   after its number (`A2026-0001.pdf`). It MUST open in the browser like an
   invoice's normal document.
-- **FR-084**: A quote MUST be open, declined or converted, as a whole whichever
+- **FR-098**: A quote MUST be open, declined or converted, as a whole whichever
   version is addressed. Only an open quote MUST be editable, declinable or
-  convertible (FR-086); only a declined quote MUST be reopenable. Declining and
+  convertible (FR-100); only a declined quote MUST be reopenable. Declining and
   reopening MUST change every version at once and leave the versions and their
   PDFs as they are.
-- **FR-085**: Users MUST be able to delete a quote that is open or declined; all
+- **FR-099**: Users MUST be able to delete a quote that is open or declined; all
   its versions, lines and PDFs MUST then be removed. A converted quote MUST NOT
-  be deletable. A deleted quote's number MUST NOT be given again (FR-079).
-- **FR-086**: Users MUST be able to convert an open quote into an invoice, from
+  be deletable. A deleted quote's number MUST NOT be given again (FR-093).
+- **FR-100**: Users MUST be able to convert an open quote into an invoice, from
   whichever version is addressed, with no editor in between. The invoice MUST be
   an ordinary new non-grave invoice (FR-030): the next free invoice number at
   that moment, of that year whatever year the quote was created in, that day's
@@ -1038,12 +1171,12 @@ revising it, and checking the numbers, the stored versions and the printout.
   two conversions arrive at the same time. A refused conversion (the quote not
   open, the recipient's address missing) MUST create no invoice and use no
   invoice number.
-- **FR-087**: A converted quote MUST record the invoice it became, and that
+- **FR-101**: A converted quote MUST record the invoice it became, and that
   invoice and every later revision of it MUST record the quote it came from.
   The invoice MUST otherwise stay an ordinary invoice: it MUST be revisable
   (FR-035) and markable as paid (FR-070) as any other, neither of which changes
   the quote, and its documents MUST NOT mention the quote.
-- **FR-087a**: The system MUST list quotes for the user interface, each version
+- **FR-101a**: The system MUST list quotes for the user interface, each version
   stamped with the net, VAT and gross total as its PDF prints them and, once
   converted, the number the invoice was first given. The list MUST offer the
   same per-column searches as the invoice list (FR-068, FR-068b): the quote
@@ -1052,7 +1185,7 @@ revising it, and checking the numbers, the stored versions and the printout.
   filtering on the state and on the latest version. No read of invoices — the
   list, a single invoice, marking paid, revising — MUST ever find a quote, nor
   the quote list an invoice.
-- **FR-087b**: The user interface MUST offer a page "Angebote", reached from the
+- **FR-101b**: The user interface MUST offer a page "Angebote", reached from the
   menu directly below "Rechnungen", built like the invoice list: one row per
   quote showing its latest version — the number with the revision badge, the
   recipient, the date, the gross total and the state (Offen, Abgelehnt,
@@ -1067,11 +1200,11 @@ revising it, and checking the numbers, the stored versions and the printout.
   converting MUST ask first; converting names the quote and says that an
   invoice with the next invoice number is created and cannot be deleted, runs
   behind the blocking progress indicator and then opens the new invoice.
-- **FR-087c**: Each quote MUST have a detail page (`/quotes/<id>`), built like an
+- **FR-101c**: Each quote MUST have a detail page (`/quotes/<id>`), built like an
   invoice's (FR-067): the quote's number, its state, the recipient, and every
   version, newest first, each with its lines, totals and one download,
-  "Angebot herunterladen" (FR-083). It MUST offer the same actions as the
-  quote's row (FR-087b), asking first in the same way; deleting returns to the
+  "Angebot herunterladen" (FR-097). It MUST offer the same actions as the
+  quote's row (FR-101b), asking first in the same way; deleting returns to the
   list. A converted quote's page MUST show "Umgewandelt in Rechnung <number>",
   linking to the invoice. The detail page of an invoice converted from a quote
   MUST show "Aus Angebot <number>", linking to the quote's page.

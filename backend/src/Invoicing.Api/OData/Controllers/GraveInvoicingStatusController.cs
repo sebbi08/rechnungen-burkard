@@ -46,6 +46,15 @@ public class GraveInvoicingStatusController : ODataController
             })
             .ToDictionaryAsync(row => row.GraveId);
 
+        // Every half-year's unpaid invoices per grave, not just this one's: the
+        // list's "mark paid" covers them all, and is offered only where there
+        // is one.
+        var open = await _db
+            .Invoices.Where(i => i.GraveId != null && i.IsLatestRevision && i.PaidOn == null)
+            .GroupBy(i => i.GraveId!.Value)
+            .Select(g => new { GraveId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(row => row.GraveId, row => row.Count);
+
         var graves = await _db
             // the overview lists the graves the business bills; a cooperative
             // grave is billed by the cooperative and has a list of its own; a
@@ -114,6 +123,7 @@ public class GraveInvoicingStatusController : ODataController
                 Invoiced = invoicedIds.Contains(g.Id),
                 InvoiceCount = payment.TryGetValue(g.Id, out var counts) ? counts.InvoiceCount : 0,
                 PaidCount = payment.TryGetValue(g.Id, out var paid) ? paid.PaidCount : 0,
+                OpenInvoiceCount = open.GetValueOrDefault(g.Id),
                 Recipients = recipients.GetValueOrDefault(g.Id) ?? [],
             });
 

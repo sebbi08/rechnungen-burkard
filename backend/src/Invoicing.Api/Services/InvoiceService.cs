@@ -266,6 +266,35 @@ public sealed class InvoiceService
         return invoice;
     }
 
+    /// <summary>Marks several invoices paid at once, all or none: an unknown id
+    /// or a superseded revision among them refuses the whole set before anything
+    /// is written. Like <see cref="SetPaidAsync"/>, an invoice that already
+    /// carries a day keeps it.</summary>
+    public async Task MarkPaidAsync(IReadOnlyCollection<long> invoiceIds, CancellationToken ct)
+    {
+        var invoices = await _db.Invoices.Where(i => invoiceIds.Contains(i.Id)).ToListAsync(ct);
+        if (invoices.Count != invoiceIds.Distinct().Count())
+        {
+            throw new ValidationException("InvoiceNotFound", "An invoice does not exist.");
+        }
+
+        if (invoices.Any(i => !i.IsLatestRevision))
+        {
+            throw new ValidationException(
+                "NotLatestRevision",
+                "Only the latest revision of an invoice can be marked as paid."
+            );
+        }
+
+        var today = DateOnly.FromDateTime(_clock.GetLocalNow());
+        foreach (var invoice in invoices)
+        {
+            invoice.PaidOn ??= today;
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     private static void RequireAddress(Recipient recipient)
     {
         if (string.IsNullOrWhiteSpace(recipient.Address))
