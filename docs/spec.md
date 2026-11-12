@@ -449,6 +449,12 @@ revising it, and checking the numbers, the stored versions and the printout.
 5. **Given** a quote that has not become an invoice, **When** the user deletes it,
    **Then** every version and PDF is removed and its number is not given to a
    later quote.
+6. **Given** an open quote, **When** the user converts it into an invoice,
+   **Then** an ordinary invoice with the next invoice number, today's date and
+   both PDFs is created from the quote's latest version, with its lines exactly
+   as quoted, and the quote is marked converted and links to that invoice.
+7. **Given** a converted or declined quote, **When** the user tries to convert
+   it, **Then** the system refuses and no invoice number is used.
 
 ---
 
@@ -1012,12 +1018,31 @@ revising it, and checking the numbers, the stored versions and the printout.
   after its number (`A2026-0001.pdf`). It MUST open in the browser like an
   invoice's normal document.
 - **FR-084**: A quote MUST be open, declined or converted, as a whole whichever
-  version is addressed. Only an open quote MUST be editable or declinable; only a
-  declined quote MUST be reopenable. Declining and reopening MUST change every
-  version at once and leave the versions and their PDFs as they are.
+  version is addressed. Only an open quote MUST be editable, declinable or
+  convertible (FR-086); only a declined quote MUST be reopenable. Declining and
+  reopening MUST change every version at once and leave the versions and their
+  PDFs as they are.
 - **FR-085**: Users MUST be able to delete a quote that is open or declined; all
   its versions, lines and PDFs MUST then be removed. A converted quote MUST NOT
   be deletable. A deleted quote's number MUST NOT be given again (FR-079).
+- **FR-086**: Users MUST be able to convert an open quote into an invoice, from
+  whichever version is addressed, with no editor in between. The invoice MUST be
+  an ordinary new non-grave invoice (FR-030): the next free invoice number at
+  that moment, of that year whatever year the quote was created in, that day's
+  date, the current ending text and stamp word, both documents (FR-037), and
+  the recipient's values as they are now. Its lines MUST be the
+  latest version's lines as quoted — the same items, item numbers,
+  descriptions, counts, net prices, VAT rates and VAT-included flags — even
+  where an item has changed since. In the same transaction every version of the
+  quote MUST become converted, so a quote is converted at most once, also when
+  two conversions arrive at the same time. A refused conversion (the quote not
+  open, the recipient's address missing) MUST create no invoice and use no
+  invoice number.
+- **FR-087**: A converted quote MUST record the invoice it became, and that
+  invoice and every later revision of it MUST record the quote it came from.
+  The invoice MUST otherwise stay an ordinary invoice: it MUST be revisable
+  (FR-035) and markable as paid (FR-070) as any other, neither of which changes
+  the quote, and its documents MUST NOT mention the quote.
 
 ### Key Entities _(include if feature involves data)_
 
@@ -1037,7 +1062,8 @@ revising it, and checking the numbers, the stored versions and the printout.
   ending text, generation date, and a unique invoice number. It snapshots the
   recipient's number and, on a grave invoice, the grave's number, site name, field
   number and position, as it does the recipient's name and address. Edits create new
-  revisions; previous revisions are preserved and invoices cannot be deleted.
+  revisions; previous revisions are preserved and invoices cannot be deleted. An
+  invoice converted from a quote, and each of its revisions, names that quote.
 - **Invoice Line**: A single item on an invoice; has a count, a price per item,
   and a line total. On a grave invoice generated before recipients were billed
   the grave's lines directly, the stored price is one recipient's share, and
@@ -1051,7 +1077,9 @@ revising it, and checking the numbers, the stored versions and the printout.
 - **Quote**: One version of an offer to a recipient, stored apart from invoices;
   has its own quote number, the recipient values, lines and ending text it was
   created with, and one PDF. Edits create new versions; previous versions are
-  preserved. Its lines have the shape of a non-grave invoice's lines.
+  preserved. Its lines have the shape of a non-grave invoice's lines. A quote is
+  open, declined or converted as a whole; a converted quote names the invoice
+  it became.
 - **VAT Rate**: A globally configured percentage, assigned to invoice items and
   applied to their line totals.
 - **Global Settings**: Holds the VAT rates, the multi-line ending text, and the

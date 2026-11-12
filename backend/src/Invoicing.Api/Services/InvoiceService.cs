@@ -48,8 +48,82 @@ public sealed class InvoiceService
 
         var lines = await _lines.BuildAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
+        RequireAddress(recipient);
 
-        return await PersistAsync(recipient, settings, lines, ct);
+        // SQLite opens the transaction with BEGIN IMMEDIATE, so it holds the
+        // write lock from before the highest number is read until the invoice is
+        // in: creates at once take turns rather than read the same number. (They
+        // used to read it first and retry on the unique index, and a request that
+        // lost the race three times in a row came back as a 500.)
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var invoice = await PersistAsync(recipient, settings, lines, quoteId: null, ct);
+        await tx.CommitAsync(ct);
+        return invoice;
+    }
+
+    /// <summary>Turns the latest version of an open quote into an ordinary new
+    /// invoice: the next invoice number, today's date, the current ending text
+    /// and stamp word and both PDFs, as <see cref="CreateAsync"/> gives them,
+    /// with the lines exactly as they were quoted and the recipient as it is
+    /// now. Every version of the quote becomes converted and points at the
+    /// invoice; the invoice points back at the quote's root.</summary>
+    public async Task<Invoice> CreateFromQuoteAsync(long quoteId, CancellationToken ct)
+    {
+        // Everything happens inside the one transaction that allocates the
+        // number. Being BEGIN IMMEDIATE, it makes conversions take turns with
+        // each other and with every other write to quotes: the state read here
+        // cannot change before it is written, so a quote converts once. A
+        // refusal throws before anything is saved, and the rollback leaves no
+        // invoice behind and so uses no number.
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
+        var rootId =
+            await _db
+                .Quotes.Where(q => q.Id == quoteId)
+                .Select(q => (long?)q.RootId)
+                .SingleOrDefaultAsync(ct)
+            ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
+        var chain = await _db.Quotes.Where(q => q.RootId == rootId).ToListAsync(ct);
+        var latest = chain.Single(q => q.IsLatestRevision);
+        if (latest.State != QuoteState.Open)
+        {
+            throw new ValidationException("QuoteNotOpen", "The quote is not open.");
+        }
+
+        var recipient =
+            await _db.Recipients.FindAsync(new object[] { latest.RecipientId }, ct)
+            ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
+        RequireAddress(recipient);
+        var settings = await _db.GlobalSettings.FirstAsync(ct);
+
+        // as quoted, not through LineBuilder: a price or description changed on
+        // the item since does not reach the invoice
+        var lines = await _db
+            .QuoteLines.Where(l => l.QuoteId == latest.Id)
+            .OrderBy(l => l.LineNumber)
+            .Select(l => new InvoiceLine
+            {
+                ItemId = l.ItemId,
+                ItemNumber = l.ItemNumber,
+                Description = l.Description,
+                Count = l.Count,
+                UnitPrice = l.UnitPrice,
+                VatRate = l.VatRate,
+                PriceIncludesVat = l.PriceIncludesVat,
+                LineNumber = l.LineNumber,
+            })
+            .ToListAsync(ct);
+
+        var invoice = await PersistAsync(recipient, settings, lines, rootId, ct);
+
+        foreach (var quote in chain)
+        {
+            quote.State = QuoteState.Converted;
+            quote.InvoiceId = invoice.Id;
+        }
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return invoice;
     }
 
     public async Task<Invoice> CreateRevisionAsync(
@@ -93,14 +167,7 @@ public sealed class InvoiceService
 
         var lines = await _lines.BuildAsync(lineInputs, ct);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
-
-        if (string.IsNullOrWhiteSpace(recipient.Address))
-        {
-            throw new ValidationException(
-                "RecipientAddressRequired",
-                "The recipient address is required."
-            );
-        }
+        RequireAddress(recipient);
 
         // The revision number continues the whole chain, not just the row that was
         // edited: editing an older revision (or the same one twice) must still
@@ -127,6 +194,8 @@ public sealed class InvoiceService
             PeriodYear = edited.PeriodYear,
             PeriodHalf = edited.PeriodHalf,
             SharePercent = edited.SharePercent,
+            // a revision is still the invoice the quote became
+            QuoteId = edited.QuoteId,
             RecipientId = recipient.Id,
             RecipientName = recipient.Name,
             RecipientAddress = recipient.Address,
@@ -197,12 +266,7 @@ public sealed class InvoiceService
         return invoice;
     }
 
-    private async Task<Invoice> PersistAsync(
-        Recipient recipient,
-        GlobalSettings settings,
-        List<InvoiceLine> lines,
-        CancellationToken ct
-    )
+    private static void RequireAddress(Recipient recipient)
     {
         if (string.IsNullOrWhiteSpace(recipient.Address))
         {
@@ -211,13 +275,20 @@ public sealed class InvoiceService
                 "The recipient address is required."
             );
         }
+    }
 
-        // SQLite opens the transaction with BEGIN IMMEDIATE, so it holds the
-        // write lock from before the highest number is read until the invoice is
-        // in: creates at once take turns rather than read the same number. (They
-        // used to read it first and retry on the unique index, and a request that
-        // lost the race three times in a row came back as a 500.)
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+    /// <summary>Inserts a new original invoice with the next number and its
+    /// PDFs. The caller opens the transaction, before reading anything the
+    /// invoice depends on, and commits it: the number read here is only safe
+    /// while that transaction holds SQLite's write lock.</summary>
+    private async Task<Invoice> PersistAsync(
+        Recipient recipient,
+        GlobalSettings settings,
+        List<InvoiceLine> lines,
+        long? quoteId,
+        CancellationToken ct
+    )
+    {
         var (number, year, sequence) = await _numbers.AllocateAsync(ct);
         // the wall-clock here, like the number's year: the day it names is the
         // issue date the document prints, and until one or two in the morning
@@ -237,6 +308,7 @@ public sealed class InvoiceService
             EndingText = settings.EndingText,
             StampWord = settings.StampWord,
             GeneratedAt = now,
+            QuoteId = quoteId,
             Lines = lines,
         };
 
@@ -247,7 +319,6 @@ public sealed class InvoiceService
         invoice.Documents = _documentFactory.Build(invoice, now);
 
         await _db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
         return invoice;
     }
 }

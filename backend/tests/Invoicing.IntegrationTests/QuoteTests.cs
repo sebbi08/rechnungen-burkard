@@ -15,7 +15,7 @@ namespace Burkard.Invoicing.IntegrationTests;
 
 public class QuoteTests
 {
-    private static async Task<(long ItemId, long RecipientId)> SeedAsync(ApiTestHost host)
+    internal static async Task<(long ItemId, long RecipientId)> SeedAsync(ApiTestHost host)
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -39,7 +39,7 @@ public class QuoteTests
         return (item.Id, recipient.Id);
     }
 
-    private static object Lines(long itemId, int count, decimal? unitPrice = null) =>
+    internal static object Lines(long itemId, int count, decimal? unitPrice = null) =>
         new[]
         {
             new
@@ -50,13 +50,13 @@ public class QuoteTests
             },
         };
 
-    private static Task<HttpResponseMessage> CreateQuoteAsync(
+    internal static Task<HttpResponseMessage> CreateQuoteAsync(
         HttpClient client,
         long recipientId,
         object lines
     ) => client.PostAsync("/odata/CreateQuote", ODataJson.Body(new { recipientId, lines }));
 
-    private static Task<HttpResponseMessage> ReviseQuoteAsync(
+    internal static Task<HttpResponseMessage> ReviseQuoteAsync(
         HttpClient client,
         long quoteId,
         long recipientId,
@@ -74,7 +74,7 @@ public class QuoteTests
             )
         );
 
-    private static async Task<(long Id, string Number)> CreatedAsync(HttpResponseMessage response)
+    internal static async Task<(long Id, string Number)> CreatedAsync(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
@@ -84,7 +84,7 @@ public class QuoteTests
         );
     }
 
-    private static async Task<string?> ErrorCodeAsync(HttpResponseMessage response)
+    internal static async Task<string?> ErrorCodeAsync(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = await ODataJson.ReadAsync(response);
@@ -358,13 +358,13 @@ public class QuoteTests
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
     }
 
-    private static Task<HttpResponseMessage> QuoteActionAsync(
+    internal static Task<HttpResponseMessage> QuoteActionAsync(
         HttpClient client,
         string action,
         long quoteId
     ) => client.PostAsync($"/odata/{action}", ODataJson.Body(new { quoteId }));
 
-    private static async Task<List<QuoteState>> StatesAsync(ApiTestHost host, long rootId)
+    internal static async Task<List<QuoteState>> StatesAsync(ApiTestHost host, long rootId)
     {
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -570,7 +570,9 @@ public class QuoteTests
         var (itemId, recipientId) = await SeedAsync(host);
         using var client = host.CreateClient();
 
-        foreach (var action in new[] { "DeclineQuote", "ReopenQuote", "DeleteQuote" })
+        foreach (
+            var action in new[] { "DeclineQuote", "ReopenQuote", "DeleteQuote", "ConvertQuote" }
+        )
         {
             Assert.Equal(
                 "QuoteNotFound",

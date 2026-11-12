@@ -99,6 +99,23 @@ public sealed class QuoteService
 
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
+        // the state again, now that the transaction holds the write lock: a
+        // conversion, decline or delete may have got in since it was first
+        // read, and a revision must not add an open row to a chain that is no
+        // longer open
+        var states = await _db
+            .Quotes.Where(q => q.RootId == edited.RootId)
+            .Select(q => q.State)
+            .ToListAsync(ct);
+        if (states.Count == 0)
+        {
+            throw new ValidationException("QuoteNotFound", "The quote does not exist.");
+        }
+        if (states.Any(s => s != QuoteState.Open))
+        {
+            throw new ValidationException("QuoteNotOpen", "The quote is not open.");
+        }
+
         // the revision number continues the whole chain, not the row that was
         // edited, as for invoices: editing an older version must not collide on
         // (Year, Sequence, RevisionNumber)
@@ -147,20 +164,30 @@ public sealed class QuoteService
     /// addressed. Only an open quote can be declined.</summary>
     public async Task<Quote> DeclineAsync(long quoteId, CancellationToken ct)
     {
+        // Each state change reads the state inside a transaction opened before
+        // the chain is read: SQLite's BEGIN IMMEDIATE makes it take turns with
+        // a conversion (InvoiceService.CreateFromQuoteAsync), so a decline that
+        // read "open" cannot overwrite a conversion that got in between.
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var chain = await ChainAsync(quoteId, ct);
         RequireOpen(chain[0]);
-        return await SetStateAsync(chain, QuoteState.Declined, ct);
+        var latest = await SetStateAsync(chain, QuoteState.Declined, ct);
+        await tx.CommitAsync(ct);
+        return latest;
     }
 
     /// <summary>Opens a declined quote again; its versions stay as they were.</summary>
     public async Task<Quote> ReopenAsync(long quoteId, CancellationToken ct)
     {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var chain = await ChainAsync(quoteId, ct);
         if (chain[0].State != QuoteState.Declined)
         {
             throw new ValidationException("QuoteNotDeclined", "The quote is not declined.");
         }
-        return await SetStateAsync(chain, QuoteState.Open, ct);
+        var latest = await SetStateAsync(chain, QuoteState.Open, ct);
+        await tx.CommitAsync(ct);
+        return latest;
     }
 
     /// <summary>Deletes every version of the quote with its lines and PDFs. Its
@@ -168,6 +195,7 @@ public sealed class QuoteService
     /// quote that became an invoice stays.</summary>
     public async Task DeleteAsync(long quoteId, CancellationToken ct)
     {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var chain = await ChainAsync(quoteId, ct);
         if (chain.Any(q => q.State == QuoteState.Converted))
         {
@@ -184,6 +212,7 @@ public sealed class QuoteService
             .LoadAsync(ct);
         _db.Quotes.RemoveRange(chain);
         await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     private async Task<List<Quote>> ChainAsync(long quoteId, CancellationToken ct)

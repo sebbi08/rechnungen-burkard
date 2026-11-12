@@ -42,6 +42,7 @@ public static class EdmModelBuilder
         b.Action("DeclineQuote").ReturnsFromEntitySet<Quote>("Quotes");
         b.Action("ReopenQuote").ReturnsFromEntitySet<Quote>("Quotes");
         b.Action("DeleteQuote");
+        b.Action("ConvertQuote").ReturnsFromEntitySet<Invoice>("Invoices");
         return b.GetEdmModel();
     }
 }

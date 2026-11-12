@@ -8,11 +8,17 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class QuoteActionsController : ODataController
 {
     private readonly QuoteService _service;
+    private readonly InvoiceService _invoices;
     private readonly ILogger<QuoteActionsController> _logger;
 
-    public QuoteActionsController(QuoteService service, ILogger<QuoteActionsController> logger)
+    public QuoteActionsController(
+        QuoteService service,
+        InvoiceService invoices,
+        ILogger<QuoteActionsController> logger
+    )
     {
         _service = service;
+        _invoices = invoices;
         _logger = logger;
     }
 
@@ -112,6 +118,20 @@ public class QuoteActionsController : ODataController
             {
                 await _service.DeleteAsync(id, HttpContext.RequestAborted);
                 return NoContent();
+            }
+        );
+
+    /// <summary>Answers with the new invoice, as CreateInvoice does: its Id is
+    /// its RootId, the key of its detail page.</summary>
+    [HttpPost("ConvertQuote")]
+    public Task<IActionResult> ConvertQuote([FromBody] QuoteIdRequest? request) =>
+        RunAsync(
+            request,
+            "ConvertQuote",
+            async id =>
+            {
+                var invoice = await _invoices.CreateFromQuoteAsync(id, HttpContext.RequestAborted);
+                return Created($"/odata/Invoices({invoice.Id})", invoice);
             }
         );
 
