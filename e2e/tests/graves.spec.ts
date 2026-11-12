@@ -655,6 +655,29 @@ async function deleteOnItsPage(page: Page): Promise<void> {
   });
 }
 
+// The overview offers the same delete as the grave's page, with the same
+// question; the question stays a readable width despite its length.
+test("the overview deletes a grave after asking", async ({ page }) => {
+  const marker = `GO-${unique()}`;
+  await seedGrave(page, marker, [`Anna ${marker}`]);
+
+  await page.goto("/graves");
+  await searchColumn(page, "Grabnummer", marker);
+  const row = page.locator("tbody tr").filter({ hasText: marker });
+  await expect(row).toHaveCount(1);
+
+  // under the generation lock: the server refuses a delete while a run is going
+  await withGenerationLock(async () => {
+    await row.getByRole("button", { name: `Grab löschen: ${marker}` }).click();
+    const question = confirmation(page);
+    await expect(question).toContainText("Inaktive Gräber");
+    const box = (await question.boundingBox())!;
+    expect(box.width).toBeLessThanOrEqual(32 * 16 + 2);
+    await question.getByRole("button", { name: "Ja" }).click();
+    await expect(page.locator("tbody")).not.toContainText(marker);
+  });
+});
+
 test("deleting a grave asks first and explains what follows", async ({ page }) => {
   const marker = `GL-${unique()}`;
   // from 2044: no generation reaches it, so it stays open and restorable
@@ -1398,8 +1421,9 @@ test("the overview fits its card on a laptop and on a wide screen", async ({ pag
 
     // and every row's actions are inside the card
     for (const row of await rows.all()) {
-      const actions = row.locator("td").last().getByRole("button");
-      expect(await actions.count()).toBe(2);
+      // edit and delete; details only on a wide screen (the number links there too)
+      const actions = row.locator("td").last().getByRole("button").filter({ visible: true });
+      expect(await actions.count()).toBe(width < 1536 ? 2 : 3);
       for (const action of await actions.all()) {
         const box = (await action.boundingBox())!;
         const name = `${width}px ${await action.getAttribute("aria-label")}`;

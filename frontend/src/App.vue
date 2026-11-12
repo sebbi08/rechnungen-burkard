@@ -25,7 +25,9 @@ if (primevue.config.locale) {
     position="top-right"
     :breakpoints="{ '640px': { width: 'calc(100vw - 2rem)', right: '1rem' } }"
   />
-  <ConfirmDialog />
+  <!-- without a limit a long question (deleting a grave) stretched it across
+       the window; short ones stay as narrow as their text -->
+  <ConfirmDialog :style="{ maxWidth: 'min(32rem, calc(100vw - 2rem))' }" />
   <MessageDialog />
   <BlockingProgress />
 </template>

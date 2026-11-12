@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDeleteGrave } from "@/composables/useDeleteGrave";
 import { useQuery } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -22,6 +23,8 @@ import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 import { matchesWords } from "@/lib/searchWords";
 
 const { t } = useI18n();
+// the same confirmation and refresh as on the grave's page
+const { removeGrave, deleting } = useDeleteGrave();
 const router = useRouter();
 
 const filters = useColumnFilters({
@@ -283,6 +286,17 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 rounded
                 :aria-label="`${t('edit')}: ${data.GraveNumber}`"
                 @click="openEditor(data.Id)"
+              />
+              <Button
+                v-tooltip.top="t('deleteGrave')"
+                class="hidden sm:inline-flex"
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                rounded
+                :aria-label="`${t('deleteGrave')}: ${data.GraveNumber}`"
+                :disabled="deleting"
+                @click="removeGrave(data.Id)"
               />
             </div>
           </template>

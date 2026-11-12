@@ -3,6 +3,7 @@ import { withGenerationLock } from "../generation-lock";
 import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
+  confirmation,
   drawer,
   fillDate,
   filterColumn,
@@ -244,4 +245,21 @@ test("the list asks without a semicolon and keeps the recipients in link order",
 
   const popover = await openPopover(page, row.getByRole("button", { name: "2 Empfänger" }));
   await expect(popover.getByRole("listitem")).toHaveText([`Zeta ${ts}`, `Alpha ${ts}`]);
+});
+
+test("a cooperative grave can be deleted from the list", async ({ page }) => {
+  const marker = `GD-${unique()}`;
+  await seedCooperative(page, marker, { startDate: "2044-01", endDate: null });
+
+  await page.goto("/cooperative-graves");
+  await searchColumn(page, "Grabnummer", marker);
+  const row = page.locator("tbody tr").filter({ hasText: marker });
+  await expect(row).toHaveCount(1);
+
+  // under the generation lock: the server refuses a delete while a run is going
+  await withGenerationLock(async () => {
+    await row.getByRole("button", { name: `Grab löschen: ${marker}` }).click();
+    await confirmation(page).getByRole("button", { name: "Ja" }).click();
+    await expect(page.locator("tbody")).not.toContainText(marker);
+  });
 });

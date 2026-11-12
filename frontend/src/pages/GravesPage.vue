@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDeleteGrave } from "@/composables/useDeleteGrave";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import Button from "primevue/button";
 import Card from "primevue/card";
@@ -41,6 +42,8 @@ import { lastPageStart, PAGE_SIZE, PAGINATOR_TEMPLATE } from "@/lib/paging";
 import { matchesWords } from "@/lib/searchWords";
 
 const { t } = useI18n();
+// the same confirmation and refresh as on the grave's page
+const { removeGrave, deleting } = useDeleteGrave();
 const translate: Translate = (key, list) => (list ? t(key, list) : t(key));
 const router = useRouter();
 const { showError } = useErrorToast();
@@ -539,10 +542,11 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
         <Column class="w-0 whitespace-nowrap">
           <template #body="{ data }">
             <div class="flex justify-end">
-              <!-- the grave number already links here; on a phone that is enough -->
+              <!-- the grave number already links here; until the widest screens that
+                   is enough, and it leaves the room for the delete button -->
               <Button
                 v-tooltip.top="t('actionDetails')"
-                class="hidden sm:inline-flex"
+                class="hidden 2xl:inline-flex"
                 icon="pi pi-eye"
                 text
                 rounded
@@ -556,6 +560,17 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
                 rounded
                 :aria-label="`${t('edit')}: ${data.GraveNumber}`"
                 @click="openEditor(data.Id)"
+              />
+              <Button
+                v-tooltip.top="t('deleteGrave')"
+                class="hidden sm:inline-flex"
+                icon="pi pi-trash"
+                severity="danger"
+                text
+                rounded
+                :aria-label="`${t('deleteGrave')}: ${data.GraveNumber}`"
+                :disabled="deleting"
+                @click="removeGrave(data.Id)"
               />
             </div>
           </template>

@@ -9,7 +9,7 @@ import ProgressSpinner from "primevue/progressspinner";
 import Tag from "primevue/tag";
 import { computed, nextTick, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { deleteGrave, type GraveDetails, restoreGrave } from "@/api/endpoints";
+import { type GraveDetails, restoreGrave } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadGraveDetail } from "@/api/queries";
 import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
@@ -20,7 +20,7 @@ import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
 import { listLocation } from "@/composables/useColumnFilters";
 import { type PreviewInput, useGraveBillingPreview } from "@/composables/useGraveBillingPreview";
-import { useConfirmAsync } from "@/composables/useConfirmAsync";
+import { useDeleteGrave } from "@/composables/useDeleteGrave";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { useGraveInvoiceEdit } from "@/composables/useGraveInvoiceEdit";
 import {
@@ -65,7 +65,6 @@ const deleted = computed(() => grave.value?.DeletedAt != null);
 // "2026-11-11T09:30:00" is UTC without a "Z": only its day is shown, never a time
 const deletedOn = computed(() => formatDeletedDate(grave.value?.DeletedAt));
 
-const ask = useConfirmAsync();
 const { showError } = useErrorToast();
 const queryClient = useQueryClient();
 const changing = ref(false);
@@ -82,10 +81,9 @@ async function change(action: () => Promise<void>): Promise<void> {
     changing.value = false;
   }
 }
+const { removeGrave: deleteAfterAsking, deleting } = useDeleteGrave();
 async function removeGrave(): Promise<void> {
-  if (await ask(t("confirmDeleteGrave"))) {
-    await change(() => deleteGrave(props.graveId));
-  }
+  await deleteAfterAsking(props.graveId);
 }
 async function restore(): Promise<void> {
   await change(() => restoreGrave(props.graveId));
@@ -214,7 +212,7 @@ const {
           icon="pi pi-trash"
           severity="danger"
           outlined
-          :loading="changing"
+          :loading="deleting"
           @click="removeGrave"
         />
         <Button :label="t('editGrave')" icon="pi pi-pencil" @click="openEditor" />
