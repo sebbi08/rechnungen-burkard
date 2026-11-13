@@ -1,7 +1,7 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page, type Route, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
-import { dialog, fillNumber, waitForOverlayOpen } from "../vue";
+import { dialog, fillNumber, searchColumn, waitForOverlayOpen } from "../vue";
 
 /** An all-year item at 10,10 € with a grave at the default, one at its own
  *  150,00 and one at its own 95,00 shared by two recipients. */
@@ -36,6 +36,8 @@ async function seedItem(page: Page) {
 
 async function openItem(page: Page, number: string) {
   await page.goto("/items");
+  // the list pages by 10 and parallel tests keep adding items: search for this one
+  await searchColumn(page, "Nummer", number);
   await page
     .getByRole("row")
     .filter({ hasText: number })
@@ -178,4 +180,58 @@ test("discarding the increase saves the item as before", async ({ page }) => {
   expect(await ownPrices(page, itemId)).toEqual({ default: 10.1, own: [95, 150] });
   const response = await page.request.get(`/odata/InvoiceItems(${itemId})`);
   expect((await response.json()).Description).toBe("Neue Beschreibung");
+});
+
+test("a default typed before the increase is not shown once the increase leaves it out", async ({
+  page,
+}) => {
+  const { number } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  const defaultField = itemDialog.locator("#itemDefaultPrice");
+  await fillNumber(defaultField, "12");
+  await expect(defaultField).toHaveValue("12,00 €");
+
+  const popover = await raise(page, itemDialog, "5");
+  await popover.getByRole("checkbox", { name: "Standardpreis 10,10 €" }).uncheck();
+  await apply(popover);
+
+  // a save stores the stored default, so the field shows that
+  await expect(defaultField).toBeDisabled();
+  await expect(defaultField).toHaveValue("10,10 €");
+
+  await itemDialog.getByRole("button", { name: "Erhöhung verwerfen" }).click();
+  await expect(defaultField).toBeEnabled();
+  await expect(defaultField).toHaveValue("12,00 €");
+});
+
+test("a refused save because the corrections changed is recovered by reopening the increase", async ({
+  page,
+}) => {
+  const { number, itemId } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  const popover = await raise(page, itemDialog, "5");
+  await apply(popover);
+
+  const handler = (route: Route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ error: { code: "CorrectionsChanged", message: "x" } }),
+    });
+  await page.route("**/odata/ApplyItemPriceIncrease", handler);
+  await itemDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(
+    page.getByText("Die Rundungsanpassungen haben sich inzwischen geändert."),
+  ).toBeVisible();
+  await expect(itemDialog).toBeVisible();
+  await page.unroute("**/odata/ApplyItemPriceIncrease", handler);
+
+  await itemDialog.getByRole("button", { name: "Preise erhöhen" }).click();
+  await waitForOverlayOpen(page);
+  const reopened = dialog(page, "Preise erhöhen");
+  await apply(reopened);
+  await itemDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(itemDialog).toHaveCount(0);
+
+  expect(await ownPrices(page, itemId)).toEqual({ default: 10.61, own: [99.75, 157.5] });
 });

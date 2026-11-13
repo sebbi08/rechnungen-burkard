@@ -31,7 +31,8 @@ const props = defineProps<{
 const visible = defineModel<boolean>("visible", { required: true });
 const emit = defineEmits<{ apply: [pending: PendingIncrease] }>();
 
-const { t } = useI18n();
+const i18n = useI18n();
+const { t } = i18n;
 
 const MAX_PROBLEMS = 3;
 
@@ -42,10 +43,25 @@ watch(
   visible,
   (open) => {
     if (open) {
-      // a copy: the pending increase stays as it was until "Übernehmen"
-      const source = props.initial?.rows ?? increaseRows(props.graves);
-      rows.value = source.map((row) => ({ ...row, graveIds: [...row.graveIds] }));
+      // Always built from the graves as they are now: a pending increase may
+      // have been prepared on rows that have since moved. It carries over what
+      // the user chose for the rows that still exist; the pending increase
+      // itself stays as it was until "Übernehmen".
       percent.value = props.initial?.percent ?? null;
+      rows.value = increaseRows(props.graves).map((row) => {
+        const before = props.initial?.rows.find(
+          (candidate) =>
+            candidate.isDefault === row.isDefault &&
+            candidate.oldPrice === row.oldPrice &&
+            candidate.priceIncludesVat === row.priceIncludesVat,
+        );
+        if (before) {
+          return { ...row, ticked: before.ticked, newPrice: before.newPrice };
+        }
+        return props.initial
+          ? { ...row, newPrice: raiseByPercent(row.oldPrice, percent.value ?? 0) }
+          : row;
+      });
     }
   },
   { immediate: true },
@@ -72,7 +88,7 @@ const input = computed<IncreaseInput | null>(() => {
     ? null
     : { itemId: props.itemId, rows: changed.map((row) => ({ ...row })) };
 });
-const { preview, answered, pending, failed, key } = useItemPriceIncreasePreview(input);
+const { preview, answered, pending, failed, failureCode, key } = useItemPriceIncreasePreview(input);
 
 // the answer belongs to the input it was asked for: anything else is stale
 const fresh = computed(
@@ -97,6 +113,12 @@ const anyProblems = computed(() => (preview.value?.Rows ?? []).some((r) => r.Pro
 const corrections = computed(() => (fresh.value ? (preview.value?.Corrections ?? []) : []));
 const canApply = computed(
   () => rows.value.some(rowChanged) && fresh.value && !anyProblems.value && !pending.value,
+);
+
+const failedText = computed(() =>
+  failureCode.value != null && i18n.te(`error${failureCode.value}`)
+    ? t(`error${failureCode.value}`)
+    : t("billingPreviewUnavailable"),
 );
 
 function problemText(problem: PriceIncreaseProblem): string {
@@ -218,7 +240,7 @@ function apply(): void {
         :aria-label="t('billingPreviewChecking')"
       />
       <Message v-if="failed" severity="warn" size="small">
-        {{ t("billingPreviewUnavailable") }}
+        {{ failedText }}
       </Message>
       <Message v-if="corrections.length > 0" severity="warn" size="small">
         <details>

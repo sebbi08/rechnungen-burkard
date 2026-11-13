@@ -472,6 +472,7 @@
   "priceIncreaseCorrections": "Rundungsanpassung bei {0} Gräbern",
   "priceIncreaseApply": "Übernehmen",
   "priceIncreaseDiscard": "Erhöhung verwerfen",
+  "errorPriceIncreaseCorrectionsChanged": "Die Rundungsanpassungen haben sich inzwischen geändert. Bitte „Preise erhöhen“ erneut öffnen.",
   "errorPricesChanged": "Die Preise haben sich inzwischen geändert. Bitte „Preise erhöhen“ erneut öffnen.",
   "errorPricesDoNotDivide2": "Bei Grab „{0}“ lässt sich die Rechnung „{1}“ nicht gleichmäßig auf die Empfänger aufteilen."
 }

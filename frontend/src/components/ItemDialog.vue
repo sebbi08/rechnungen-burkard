@@ -14,7 +14,7 @@ import ItemPriceIncreaseDialog from "./ItemPriceIncreaseDialog.vue";
 import { RouterLink } from "vue-router";
 import { applyItemPriceIncrease, getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
 import type { InvoiceItem } from "@/api/generated";
-import { ApiError } from "@/api/http";
+import { ApiError, toApiError } from "@/api/http";
 import { odata } from "@/api/odata";
 import { useVatRatesQuery } from "@/api/queries";
 import { useErrorToast } from "@/composables/useErrorToast";
@@ -83,9 +83,12 @@ const pendingDefault = computed(() => {
   const row = pending.value?.rows.find((candidate) => candidate.isDefault && rowChanged(candidate));
   return row?.newPrice ?? null;
 });
-// the field shows the increased default and is read-only while it is pending
+// While an increase is pending the field is read-only and shows what a save
+// will store: the increased default, or else the stored one. A typed value stays
+// in the form and comes back when the increase is discarded.
 const defaultPrice = computed({
-  get: () => pendingDefault.value ?? form.DefaultPrice,
+  get: () =>
+    pending.value ? (pendingDefault.value ?? props.item?.DefaultPrice ?? null) : form.DefaultPrice,
   set: (value: number | null) => {
     form.DefaultPrice = value;
   },
@@ -157,7 +160,17 @@ async function save(): Promise<void> {
     visible.value = false;
     toast.add({ severity: "success", summary: t("saved"), life: 3000 });
   } catch (error) {
-    showError(error);
+    if (patched && pending.value && toApiError(error).code === "CorrectionsChanged") {
+      // not the grave editor's text: here the increase has to be prepared again
+      toast.add({
+        severity: "error",
+        summary: t("errorTitle"),
+        detail: t("errorPriceIncreaseCorrectionsChanged"),
+        life: 8000,
+      });
+    } else {
+      showError(error);
+    }
     if (patched) {
       // the item's own fields are saved: show them in the list
       await queryClient.invalidateQueries();
