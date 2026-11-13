@@ -1,6 +1,6 @@
 <Project>
   <!--
-    The package versions are ranges (QuestPDF 2025.*, EF Core 10.*), and a range
+    The package versions are ranges (QuestPDF 2025.*, EF Core 11.*), and a range
     resolves to whatever is newest at restore time. So two builds of one commit
     could ship different packages (a different QuestPDF lays out a different
     PDF), and CI could test other binaries than the image ships. Each project's

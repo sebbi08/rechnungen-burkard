@@ -11,11 +11,19 @@ public class VatInclusivePriceTests
         Assert.Equal(50.42m, VatInclusivePrice.NetOf(50.42m, 19m, false));
     }
 
+    // Decimal literals rather than InlineData: an attribute can only hold a
+    // double, and since .NET 11 a double converts to decimal with all its
+    // binary digits, so 100.84 arrives as 100.84000000000000341060513165.
+    public static readonly TheoryData<decimal, decimal, decimal> FlaggedPrices = new()
+    {
+        { 120.00m, 19m, 100.84m },
+        { 100.00m, 19m, 84.03m },
+        { 107.00m, 7m, 100.00m },
+        { 119.00m, 7m, 111.21m },
+    };
+
     [Theory]
-    [InlineData(120.00, 19, 100.84)]
-    [InlineData(100.00, 19, 84.03)]
-    [InlineData(107.00, 7, 100.00)]
-    [InlineData(119.00, 7, 111.21)]
+    [MemberData(nameof(FlaggedPrices))]
     public void A_flagged_price_gives_up_its_vat_at_two_decimals(
         decimal gross,
         decimal rate,
@@ -67,16 +75,21 @@ public class VatInclusivePriceTests
     // The round trip the revision dialogs depend on: the dialog shows
     // round(net × (1 + rate/100), 2) and sends it back, and the same net must
     // come out — otherwise every save subtracts the VAT again.
+    public static readonly TheoryData<decimal, decimal> DisplayedGrosses = new()
+    {
+        { 0.01m, 19m },
+        { 1.00m, 19m },
+        { 33.33m, 19m },
+        { 120.00m, 19m },
+        { 999.99m, 19m },
+        { 0.01m, 7m },
+        { 33.33m, 7m },
+        { 119.00m, 7m },
+        { 999.99m, 7m },
+    };
+
     [Theory]
-    [InlineData(0.01, 19)]
-    [InlineData(1.00, 19)]
-    [InlineData(33.33, 19)]
-    [InlineData(120.00, 19)]
-    [InlineData(999.99, 19)]
-    [InlineData(0.01, 7)]
-    [InlineData(33.33, 7)]
-    [InlineData(119.00, 7)]
-    [InlineData(999.99, 7)]
+    [MemberData(nameof(DisplayedGrosses))]
     public void The_displayed_gross_converts_back_to_the_same_net(decimal gross, decimal rate)
     {
         var net = VatInclusivePrice.NetOf(gross, rate, true);

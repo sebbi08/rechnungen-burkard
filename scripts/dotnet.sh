@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run dotnet inside the official .NET 10 SDK container (host has no SDK).
+# Run dotnet inside the official .NET 11 SDK container (host has no SDK).
 # Usage: scripts/dotnet.sh <dotnet args...>   (working dir: backend/)
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -12,4 +12,4 @@ exec docker run --rm \
   -v "${REPO_ROOT}/backend:/src" \
   -v invoicing-nuget:/nuget \
   -w /src \
-  mcr.microsoft.com/dotnet/sdk:10.0 dotnet "$@"
+  mcr.microsoft.com/dotnet/sdk:11.0 dotnet "$@"

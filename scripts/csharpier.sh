@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run CSharpier over backend/ inside the .NET 10 SDK container (host has no SDK).
+# Run CSharpier over backend/ inside the .NET 11 SDK container (host has no SDK).
 # Usage: scripts/csharpier.sh format .     # rewrite
 #        scripts/csharpier.sh check .      # fail if anything is unformatted
 #
@@ -19,5 +19,5 @@ exec docker run --rm \
   -v "${REPO_ROOT}/backend:/src" \
   -v invoicing-nuget:/nuget \
   -w /src \
-  mcr.microsoft.com/dotnet/sdk:10.0 \
+  mcr.microsoft.com/dotnet/sdk:11.0 \
   sh -c 'dotnet tool restore >/dev/null && exec dotnet csharpier "$@"' -- "$@"
