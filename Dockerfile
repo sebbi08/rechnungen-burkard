@@ -15,7 +15,7 @@ ARG PRIMEUI_LICENSE
 ENV VITE_PRIMEUI_LICENSE=${PRIMEUI_LICENSE}
 RUN npm run build
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS backend
 ARG VERSION=0.0.0
 WORKDIR /src
 # The packages first, from the project files and their lock files alone, so the
@@ -31,7 +31,7 @@ COPY backend/ ./
 RUN dotnet publish src/Invoicing.Api/Invoicing.Api.csproj -c Release -o /out --no-restore \
   -p:Version=${VERSION}
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 WORKDIR /app
 COPY --from=backend /out ./
 # The build carries THIRD-PARTY-LICENSES.md for the dependencies it bundles,
