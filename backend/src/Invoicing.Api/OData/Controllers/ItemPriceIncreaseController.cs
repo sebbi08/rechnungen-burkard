@@ -34,7 +34,45 @@ public class ItemPriceIncreaseController : ODataController
         }
         catch (ValidationException ex)
         {
-            return BadRequest(new { error = new { code = ex.Code, message = ex.Message } });
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = ex.Code,
+                        message = ex.Message,
+                        args = ex.Args,
+                    },
+                }
+            );
+        }
+    }
+
+    [HttpPost("ApplyItemPriceIncrease")]
+    public async Task<IActionResult> Apply([FromBody] ItemPriceIncreaseRequest? request)
+    {
+        try
+        {
+            await _service.ApplyAsync(request, HttpContext.RequestAborted);
+            return NoContent();
+        }
+        catch (ItemNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(
+                new
+                {
+                    error = new
+                    {
+                        code = ex.Code,
+                        message = ex.Message,
+                        args = ex.Args,
+                    },
+                }
+            );
         }
     }
 }

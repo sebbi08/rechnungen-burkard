@@ -1,5 +1,6 @@
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
+using Burkard.Invoicing.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services;
@@ -106,8 +107,11 @@ public sealed class ItemPriceIncreaseService
         );
     }
 
-    public async Task<PriceIncreasePreview> PreviewAsync(
+    /// <summary>The request's rows and the item, once the request is known to be
+    /// well formed and the rows still describe the item's prices.</summary>
+    private async Task<(List<PriceIncreaseRowInput> Rows, InvoiceItem Item)> PrepareAsync(
         ItemPriceIncreaseRequest? request,
+        bool track,
         CancellationToken ct
     )
     {
@@ -135,10 +139,9 @@ public sealed class ItemPriceIncreaseService
             );
         }
 
+        var items = track ? _db.InvoiceItems : _db.InvoiceItems.AsNoTracking();
         var item =
-            await _db
-                .InvoiceItems.AsNoTracking()
-                .FirstOrDefaultAsync(i => i.Id == request.ItemId, ct)
+            await items.FirstOrDefaultAsync(i => i.Id == request.ItemId, ct)
             ?? throw new ItemNotFoundException();
 
         foreach (var row in rows)
@@ -155,25 +158,45 @@ public sealed class ItemPriceIncreaseService
             }
         }
 
-        var graves = await _db
-            .Graves.AsNoTracking()
-            .Where(g => g.DeletedAt == null && g.Items.Any(l => l.ItemId == item.Id))
+        return (rows, item);
+    }
+
+    /// <summary>A grave the increase raises: the row each raised link belongs to
+    /// (by link id), and its evaluation at the new prices, or null when no
+    /// evaluation applies.</summary>
+    private sealed record GravePlan(
+        Grave Grave,
+        Dictionary<long, int> RaisedRows,
+        GraveBillingEvaluation? Evaluation
+    );
+
+    /// <summary>Resolves every link of the item to its row, substitutes the new
+    /// prices and evaluates each affected grave as a whole, as a save of it with
+    /// those prices would. Preview and apply both stand on this.</summary>
+    private async Task<List<GravePlan>> PlanAsync(
+        List<PriceIncreaseRowInput> rows,
+        InvoiceItem item,
+        bool track,
+        CancellationToken ct
+    )
+    {
+        var query = _db
+            .Graves.Where(g => g.DeletedAt == null && g.Items.Any(l => l.ItemId == item.Id))
             .Include(g => g.Items)
                 .ThenInclude(l => l.Item)
             .Include(g => g.Recipients)
             .OrderBy(g => g.Id)
-            .ToListAsync(ct);
+            .AsQueryable();
+        var graves = await (track ? query : query.AsNoTracking()).ToListAsync(ct);
 
-        var problems = rows.Select(_ => new List<PriceIncreaseProblem>()).ToList();
-        var corrections = new List<PriceIncreaseCorrection>();
+        var plans = new List<GravePlan>();
         var current = HalfYearBilling.HalfYearOf(_clock.GetLocalNow());
 
         foreach (var grave in graves)
         {
-            var links = grave.Items.OrderBy(l => l.Id).ToList();
             var raisedRows = new Dictionary<long, int>();
             var billable = new List<BillableLink>();
-            foreach (var link in links)
+            foreach (var link in grave.Items.OrderBy(l => l.Id))
             {
                 var rowIndex =
                     link.ItemId == item.Id
@@ -198,22 +221,43 @@ public sealed class ItemPriceIncreaseService
 
             // a cooperative grave is never split, and one without recipients
             // has nothing to divide by: neither is evaluated or corrected
-            if (grave.IsCooperative || grave.Recipients.Count == 0)
+            var evaluation =
+                grave.IsCooperative || grave.Recipients.Count == 0
+                    ? null
+                    : GraveBillingCheck.Evaluate(
+                        billable,
+                        grave.StartDate,
+                        grave.EndDate,
+                        grave.Recipients.Count,
+                        current
+                    );
+            plans.Add(new GravePlan(grave, raisedRows, evaluation));
+        }
+
+        return plans;
+    }
+
+    public async Task<PriceIncreasePreview> PreviewAsync(
+        ItemPriceIncreaseRequest? request,
+        CancellationToken ct
+    )
+    {
+        var (rows, item) = await PrepareAsync(request, track: false, ct);
+        var plans = await PlanAsync(rows, item, track: false, ct);
+
+        var problems = rows.Select(_ => new List<PriceIncreaseProblem>()).ToList();
+        var corrections = new List<PriceIncreaseCorrection>();
+        foreach (var plan in plans)
+        {
+            if (plan.Evaluation is not { } evaluation)
             {
                 continue;
             }
 
-            var evaluation = GraveBillingCheck.Evaluate(
-                billable,
-                grave.StartDate,
-                grave.EndDate,
-                grave.Recipients.Count,
-                current
-            );
-
+            var grave = plan.Grave;
             if (ProblemOf(grave.Id, grave.GraveNumber, evaluation) is { } problem)
             {
-                foreach (var rowIndex in raisedRows.Values.Distinct())
+                foreach (var rowIndex in plan.RaisedRows.Values.Distinct())
                 {
                     problems[rowIndex].Add(problem);
                 }
@@ -248,12 +292,120 @@ public sealed class ItemPriceIncreaseService
         );
     }
 
+    /// <summary>Raises the prices and replaces the affected graves' corrections in
+    /// one transaction. Refuses unless the request still matches what is stored
+    /// and the corrections are the ones the user confirmed.</summary>
+    public async Task ApplyAsync(ItemPriceIncreaseRequest? request, CancellationToken ct)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var (rows, item) = await PrepareAsync(request, track: true, ct);
+        var plans = await PlanAsync(rows, item, track: true, ct);
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (rows[i].GraveIds is not { } expected)
+            {
+                throw new ValidationException("InvalidRequest", "A row must list its graves.");
+            }
+
+            var found = plans
+                .Where(p => p.RaisedRows.Values.Contains(i))
+                .Select(p => p.Grave.Id)
+                .ToHashSet();
+            if (!found.SetEquals(expected))
+            {
+                throw new ValidationException(
+                    "PricesChanged",
+                    "The prices changed since the increase was prepared."
+                );
+            }
+        }
+
+        foreach (var plan in plans.OrderBy(p => p.Grave.GraveNumber, StringComparer.Ordinal))
+        {
+            if (
+                plan.Evaluation is { } evaluation
+                && ProblemOf(plan.Grave.Id, plan.Grave.GraveNumber, evaluation) is { } problem
+            )
+            {
+                throw new PriceIncreaseDoesNotDivideException(problem.GraveNumber, problem.Invoice);
+            }
+        }
+
+        var confirmed = (request!.Corrections ?? [])
+            .GroupBy(c => c.GraveId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                    g.Select(c => new CorrectionKey(
+                            Enum.TryParse<BillingExampleKind>(c.Kind, out var kind)
+                            && Enum.IsDefined(kind)
+                                ? kind
+                                : (BillingExampleKind)(-1),
+                            c.Year,
+                            c.Half,
+                            c.VatRate,
+                            c.ItemId,
+                            c.CorrectedPrice
+                        ))
+                        .ToList()
+            );
+        var affected = plans.Select(p => p.Grave.Id).ToHashSet();
+        if (
+            confirmed.Keys.Any(id => !affected.Contains(id))
+            || plans.Any(p =>
+                !GraveBillingCheck.SameCorrections(
+                    p.Evaluation?.CorrectionKeys ?? [],
+                    confirmed.GetValueOrDefault(p.Grave.Id) ?? []
+                )
+            )
+        )
+        {
+            throw new ValidationException(
+                "CorrectionsChanged",
+                "The rounding corrections differ from the ones confirmed."
+            );
+        }
+
+        if (rows.FirstOrDefault(r => r.IsDefault) is { } defaultRow)
+        {
+            item.DefaultPrice = defaultRow.NewPrice;
+        }
+
+        _db.GraveBillingCorrections.RemoveRange(
+            await _db
+                .GraveBillingCorrections.Where(c => affected.Contains(c.GraveId))
+                .ToListAsync(ct)
+        );
+        foreach (var plan in plans)
+        {
+            foreach (var link in plan.Grave.Items.Where(l => plan.RaisedRows.ContainsKey(l.Id)))
+            {
+                // a link without its own price keeps billing the default
+                if (link.UnitPrice is not null)
+                {
+                    link.UnitPrice = rows[plan.RaisedRows[link.Id]].NewPrice;
+                }
+            }
+
+            if (plan.Evaluation is { } evaluation)
+            {
+                _db.GraveBillingCorrections.AddRange(
+                    GraveCorrections.Build(plan.Grave.Id, evaluation)
+                );
+            }
+        }
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+    }
+
     /// <summary>The ticked row a link of the item belongs to, or -1. The default
     /// row holds the links billing the default, compared by number only; an own
     /// row holds the links at exactly its price and gross flag.</summary>
     private static int RowOf(
         List<PriceIncreaseRowInput> rows,
-        Domain.Entities.InvoiceItem item,
+        InvoiceItem item,
         decimal? unitPrice,
         bool gross
     )
