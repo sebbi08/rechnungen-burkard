@@ -12,7 +12,7 @@ import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import ItemPriceIncreaseDialog from "./ItemPriceIncreaseDialog.vue";
 import { RouterLink } from "vue-router";
-import { getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
+import { applyItemPriceIncrease, getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
 import type { InvoiceItem } from "@/api/generated";
 import { ApiError } from "@/api/http";
 import { odata } from "@/api/odata";
@@ -138,19 +138,30 @@ async function save(): Promise<void> {
     Description: form.Description.trim(),
     VatRate: form.VatRate,
     Quarter: toBillingQuarter(form.Quarter),
-    DefaultPrice: form.DefaultPrice,
+    // a pending increase reaches the default only through the apply call
+    DefaultPrice: pending.value && props.item ? props.item.DefaultPrice : form.DefaultPrice,
   };
+  let patched = false;
   try {
     if (props.item) {
       await odata.InvoiceItems(props.item.Id).patch(payload).execute();
+      patched = true;
+      if (pending.value) {
+        await applyItemPriceIncrease(props.item.Id, pending.value.rows, pending.value.corrections);
+      }
     } else {
       await odata.InvoiceItems().create(payload).execute();
     }
+    pending.value = null;
     await queryClient.invalidateQueries();
     visible.value = false;
     toast.add({ severity: "success", summary: t("saved"), life: 3000 });
   } catch (error) {
     showError(error);
+    if (patched) {
+      // the item's own fields are saved: show them in the list
+      await queryClient.invalidateQueries();
+    }
   } finally {
     saving.value = false;
   }

@@ -31,7 +31,7 @@ async function seedItem(page: Page) {
       recipientIds: index === 2 ? [recipients[1], recipients[2]] : [recipients[0]],
     });
   }
-  return { number };
+  return { number, itemId: item.Id as number };
 }
 
 async function openItem(page: Page, number: string) {
@@ -108,4 +108,74 @@ test("price increase: proposes, checks and keeps a pending increase in the item 
   await expect(reopened.locator("#itemDefaultPrice")).toHaveValue("10,10 €");
   await expect(reopened.locator("s")).toHaveCount(0);
   await expect(reopened).toContainText("Eigener Preis 95,00 €");
+});
+
+async function raise(page: Page, itemDialog: ReturnType<typeof dialog>, percent: string) {
+  await itemDialog.getByRole("button", { name: "Preise erhöhen" }).click();
+  await waitForOverlayOpen(page);
+  const popover = dialog(page, "Preise erhöhen");
+  await fillNumber(popover.getByRole("spinbutton", { name: "Erhöhung in %" }), percent);
+  return popover;
+}
+
+async function apply(popover: ReturnType<typeof dialog>) {
+  const button = popover.getByRole("button", { name: "Übernehmen" });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(popover).toHaveCount(0);
+}
+
+async function ownPrices(page: Page, itemId: number): Promise<{ default: number; own: number[] }> {
+  const response = await page.request.get(`/odata/ItemGraves?itemId=${itemId}`);
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  const own = (body.Groups as { IsDefault: boolean; UnitPrice: number }[])
+    .filter((group) => !group.IsDefault)
+    .map((group) => group.UnitPrice)
+    .sort((a, b) => a - b);
+  return { default: body.DefaultPrice, own };
+}
+
+test("saving the item applies the increase to every ticked price", async ({ page }) => {
+  const { number, itemId } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  const popover = await raise(page, itemDialog, "5");
+  await popover.getByRole("checkbox", { name: "Eigener Preis 150,00 €" }).uncheck();
+  await fillNumber(popover.getByRole("spinbutton", { name: "Neu Eigener Preis 95,00 €" }), "100");
+  await apply(popover);
+
+  await itemDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(itemDialog).toHaveCount(0);
+
+  expect(await ownPrices(page, itemId)).toEqual({ default: 10.61, own: [100, 150] });
+});
+
+test("a raised price that needs a rounding correction is stored with it", async ({ page }) => {
+  const { number, itemId } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  const popover = await raise(page, itemDialog, "5");
+  await expect(popover).toContainText("Rundungsanpassung bei 1 Gräbern");
+  await apply(popover);
+
+  await itemDialog.getByRole("button", { name: "Speichern" }).click();
+  // an unconfirmed correction would be refused and keep the dialog open
+  await expect(itemDialog).toHaveCount(0);
+
+  expect((await ownPrices(page, itemId)).own).toEqual([99.75, 157.5]);
+});
+
+test("discarding the increase saves the item as before", async ({ page }) => {
+  const { number, itemId } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  const popover = await raise(page, itemDialog, "5");
+  await apply(popover);
+  await itemDialog.getByRole("button", { name: "Erhöhung verwerfen" }).click();
+  await itemDialog.locator("#itemDescription").fill("Neue Beschreibung");
+
+  await itemDialog.getByRole("button", { name: "Speichern" }).click();
+  await expect(itemDialog).toHaveCount(0);
+
+  expect(await ownPrices(page, itemId)).toEqual({ default: 10.1, own: [95, 150] });
+  const response = await page.request.get(`/odata/InvoiceItems(${itemId})`);
+  expect((await response.json()).Description).toBe("Neue Beschreibung");
 });
