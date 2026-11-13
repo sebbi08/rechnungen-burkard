@@ -394,6 +394,8 @@ public class WorkListTests
     [InlineData("/odata/PlantingList?year=2027")]
     [InlineData("/odata/PlantingList?year=2027&quarter=5")]
     [InlineData("/odata/PlantingList?year=2027&quarter=Fall")]
+    [InlineData("/odata/PlantingList?year=2027&quarter=Spring,Summer")]
+    [InlineData("/odata/PlantingList?year=2027&quarter=Spring,1")]
     [InlineData("/odata/PlantingList?quarter=Spring")]
     public async Task Bad_parameters_are_refused(string url)
     {

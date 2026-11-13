@@ -103,13 +103,15 @@ public class WorkListController : ODataController
         };
 
     private static BillingQuarter ParseQuarter(string? value) =>
-        // a name only: Enum.TryParse also takes "1", and "5" parses without being defined
-        value is { Length: > 0 }
-        && char.IsLetter(value[0])
-        && Enum.TryParse<BillingQuarter>(value, ignoreCase: true, out var quarter)
-        && Enum.IsDefined(quarter)
-            ? quarter
-            : throw Invalid(
+        // a name only: Enum.TryParse would also take "1" and combine "Spring,Summer"
+        value?.ToLowerInvariant() switch
+        {
+            "spring" => BillingQuarter.Spring,
+            "summer" => BillingQuarter.Summer,
+            "autumn" => BillingQuarter.Autumn,
+            "winter" => BillingQuarter.Winter,
+            _ => throw Invalid(
                 "The parameter 'quarter' must be one of Spring, Summer, Autumn, Winter."
-            );
+            ),
+        };
 }
