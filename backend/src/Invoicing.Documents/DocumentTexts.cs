@@ -1,4 +1,5 @@
 using System.Globalization;
+using Burkard.Invoicing.Domain.Entities;
 
 namespace Burkard.Invoicing.Documents;
 
@@ -139,4 +140,76 @@ public static class DocumentTexts
             netTotal.ToString("N2", Culture),
             percent.ToString("0.##", Culture)
         );
+
+    /// <summary>A quarter's German name: "Frühling", "Sommer", "Herbst", "Winter".</summary>
+    public static string QuarterName(BillingQuarter quarter) =>
+        quarter switch
+        {
+            BillingQuarter.Spring => "Frühling",
+            BillingQuarter.Summer => "Sommer",
+            BillingQuarter.Autumn => "Herbst",
+            BillingQuarter.Winter => "Winter",
+            _ => throw new ArgumentOutOfRangeException(nameof(quarter), quarter, null),
+        };
+
+    /// <summary>A quarter's name as a file name spells it, without umlauts:
+    /// "Fruehling".</summary>
+    public static string QuarterFileWord(BillingQuarter quarter) =>
+        QuarterName(quarter).Replace("ü", "ue", StringComparison.Ordinal);
+
+    public static string CareListTitle(int year) => string.Format(Culture, "Pflegeliste {0}", year);
+
+    public static string PlantingListTitle(BillingQuarter quarter, int year) =>
+        string.Format(Culture, "Pflanzliste {0} {1}", QuarterName(quarter), year);
+
+    /// <summary>"27 dGr.a": the field number and the position's short form,
+    /// whichever of the two exists, as the grave invoice composes them but
+    /// without its "FELD-GRAB-NR:" label.</summary>
+    public static string GravePositionText(string? fieldNumber, GravePosition? position) =>
+        string.Join(
+            " ",
+            new[] { fieldNumber, PositionShortForm(position?.ToString()) }.Where(s =>
+                !string.IsNullOrWhiteSpace(s)
+            )
+        );
+
+    /// <summary>"04/2015", or "–" for none (a grave without an end).</summary>
+    public static string Month(DateOnly? month) =>
+        // the slash quoted: unquoted it stands for the culture's date separator, "." in German
+        month?.ToString("MM'/'yyyy", Culture) ?? Dash;
+
+    /// <summary>"48,15 €", or "–" for a service without a price.</summary>
+    public static string Amount(decimal? amount) =>
+        amount is { } value ? $"{value.ToString("N2", Culture)} {Currency}" : Dash;
+
+    public const string Dash = "–";
+
+    public const string WorkListColumnNumber = "Nr.";
+    public const string WorkListColumnSite = "Grabstätte";
+    public const string WorkListColumnPosition = "Pos.";
+    public const string WorkListColumnStart = "Beginn";
+    public const string WorkListColumnEnd = "Ende";
+    public const string WorkListColumnContract = "Vertrag";
+    public const string WorkListColumnService = "Leistung";
+    public const string WorkListColumnAmount = "Betrag";
+    public const string WorkListColumnHalfYearAmount = "Betrag je Halbjahr";
+
+    /// <summary>"Stand: 13.11.2026": the day a list was made.</summary>
+    public static string WorkListMadeOn(DateOnly day) =>
+        string.Format(Culture, "Stand: {0:dd.MM.yyyy}", day);
+
+    /// <summary>"2 × 1001 Jahrespflege (Frühling)", the quarter only where
+    /// one is given.</summary>
+    public static string WorkListService(
+        int count,
+        string? itemNumber,
+        string description,
+        BillingQuarter? quarter
+    ) =>
+        string.Join(
+            " ",
+            new[] { $"{count} ×", itemNumber, description }.Where(s =>
+                !string.IsNullOrWhiteSpace(s)
+            )
+        ) + (quarter is { } q ? $" ({QuarterName(q)})" : "");
 }
