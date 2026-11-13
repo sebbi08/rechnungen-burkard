@@ -80,6 +80,11 @@ item management section, then selecting it by number when composing an invoice.
    **Then** the system requires the price to be entered before saving the invoice.
 3. **Given** an item has a default price, **When** it is selected on an invoice,
    **Then** the default price is pre-filled and can still be overridden.
+4. **Given** the item "Jährliche Grabpflege" has a default price and graves billing
+   it at several own prices, **When** the user raises its prices by 5 %, unticks
+   one row, overwrites one proposed end price and saves, **Then** the default and
+   the graves' own prices of the ticked rows bill the new prices, the unticked
+   row is unchanged, and the rounding corrections the new prices need are stored.
 
 ---
 
@@ -527,6 +532,9 @@ revising it, and checking the numbers, the stored versions and the printout.
   entered? The system must not save the invoice until a price is provided.
 - What happens when a grave has no recipients? Invoice generation must be blocked
   with a clear message.
+- What happens when a price increase gives a multi-recipient grave a price no
+  rounding correction can split? The row is marked, naming the grave, and
+  applying the increase is blocked until another end price is entered.
 - What happens when an invoice is generated twice for the same grave and
   half-year? The second attempt must be prevented.
 - How are rounding differences handled when a grave's per-rate subtotal does not
@@ -624,7 +632,19 @@ revising it, and checking the numbers, the stored versions and the printout.
   on. A grave that was billing the old default MUST keep it, written onto the
   link as its own price; a link price equal to the default counts as billing the
   default. The item section MUST show which graves bill an item, grouped by the
-  price they bill.
+  price they bill. A default raised through a price increase (FR-009c) moves the
+  graves billing the default along with it.
+- **FR-009c**: Users MUST be able to raise an item's prices by a percentage from
+  the item dialog. The default price and each distinct own price graves bill for
+  the item are listed as one row each, with the number of graves on it, and each
+  row can be ticked or left out. A ticked row's new price is proposed as the old
+  price raised by the percentage, rounded to two decimals, and MUST be
+  overwritable with any amount of at least 0,01 with at most two decimals. A live
+  check against the server MUST list the rounding corrections (FR-021a) the new
+  prices need and mark every row that no correction can fix, naming the grave;
+  applying MUST stay blocked while a row is marked. Nothing MUST be written
+  before the dialog is saved, and on save the increase MUST be applied in full or
+  refused in full, together with the corrections.
 - **FR-010**: Users MUST be able to select invoice items by their number when
   composing invoices.
 - **FR-010a**: Where an item is picked, users MUST be able to search invoice

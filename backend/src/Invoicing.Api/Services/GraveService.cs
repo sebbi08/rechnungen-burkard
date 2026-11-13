@@ -222,23 +222,11 @@ public sealed class GraveService
             );
         }
 
-        foreach (var invoice in evaluation?.Invoices ?? [])
+        if (evaluation is not null)
         {
-            foreach (var correction in invoice.Corrections)
+            foreach (var correction in GraveCorrections.Build(grave.Id, evaluation))
             {
-                grave.Corrections.Add(
-                    new GraveBillingCorrection
-                    {
-                        GraveId = grave.Id,
-                        Kind = invoice.Example.Kind,
-                        Year = invoice.Example.Period.Year,
-                        Half = invoice.Example.Period.Half,
-                        VatRate = correction.VatRate,
-                        ItemId = correction.ItemId,
-                        EnteredPrice = correction.EnteredPrice,
-                        CorrectedPrice = correction.CorrectedPrice,
-                    }
-                );
+                grave.Corrections.Add(correction);
             }
         }
 

@@ -49,6 +49,7 @@ builder.Services.AddScoped<QuoteService>();
 builder.Services.AddScoped<GraveInvoiceGenerator>();
 builder.Services.AddScoped<GraveInvoiceRevisionService>();
 builder.Services.AddScoped<GraveService>();
+builder.Services.AddScoped<ItemPriceIncreaseService>();
 builder.Services.AddScoped<GraveCorrectionCheck>();
 builder.Services.AddScoped<RecipientNumberService>();
 builder.Services.AddScoped<ImportValidator>();
