@@ -290,6 +290,23 @@ public class WorkListTests
     }
 
     [Fact]
+    public async Task The_price_on_the_grave_wins_over_the_item_default()
+    {
+        using var host = new ApiTestHost();
+        Seed(
+            host,
+            "G-1",
+            M(2020, 1),
+            null,
+            services: new Svc(null, Count: 2, UnitPrice: 20.00m, DefaultPrice: 10.00m, Vat: 19m)
+        );
+
+        var data = await CareAsync(host, 2027, CareListServices.Care);
+
+        Assert.Equal(47.60m, data!.Cemeteries[0].Graves[0].Lines.Single().Amount);
+    }
+
+    [Fact]
     public async Task A_service_without_any_price_has_no_amount()
     {
         using var host = new ApiTestHost();
