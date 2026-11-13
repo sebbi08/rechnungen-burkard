@@ -556,6 +556,34 @@ public class ItemPriceIncreaseTests
     }
 
     [Fact]
+    public async Task Apply_replaces_a_grave_s_existing_correction_with_the_new_one()
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var itemId = await ItemAsync(client, "U-1", 120.00m);
+        var g = await SaveGraveAsync(client, "G-R", [new Link(itemId, 99.99m)], recipients: 2);
+        var old = await CorrectionsOfAsync(host, g);
+        Assert.NotEmpty(old);
+        var oldIds = old.Select(c => c.Id).ToHashSet();
+        var confirmed = await ConfirmedAsync(client, itemId, OwnRow(99.99m, 100.01m));
+        Assert.NotEmpty(confirmed);
+
+        var response = await ApplyAsync(
+            client,
+            itemId,
+            [OwnRowOf(99.99m, 100.01m, [g])],
+            confirmed
+        );
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var stored = await CorrectionsOfAsync(host, g);
+        Assert.Equal(confirmed.Count, stored.Count);
+        Assert.DoesNotContain(stored, c => oldIds.Contains(c.Id));
+        Assert.All(stored, c => Assert.NotEqual(old[0].CorrectedPrice, c.CorrectedPrice));
+        Assert.All(stored, c => Assert.Equal(100.02m, c.CorrectedPrice));
+    }
+
+    [Fact]
     public async Task Apply_removes_corrections_no_longer_needed()
     {
         using var host = new ApiTestHost();
