@@ -27,9 +27,10 @@ internal sealed class WorkListDocument : IDocument
     private const float AmountWidth = 18;
 
     // the same at 8 pt, in a column half as wide
-    private const float TwoColumnPositionWidth = 17;
+    private const float TwoColumnNumberWidth = 11;
+    private const float TwoColumnPositionWidth = 15;
     private const float TwoColumnMonthWidth = 13;
-    private const float TwoColumnContractWidth = 12;
+    private const float TwoColumnContractWidth = 11.5f;
 
     // the services variant's indent and its amount column, which also holds
     // the heading "Betrag je Halbjahr"
@@ -173,7 +174,7 @@ internal sealed class WorkListDocument : IDocument
                     {
                         table.ColumnsDefinition(c =>
                         {
-                            c.ConstantColumn(NumberWidth, Unit.Millimetre);
+                            c.ConstantColumn(TwoColumnNumberWidth, Unit.Millimetre);
                             c.RelativeColumn();
                             c.ConstantColumn(TwoColumnPositionWidth, Unit.Millimetre);
                             c.ConstantColumn(TwoColumnMonthWidth, Unit.Millimetre);
@@ -333,10 +334,16 @@ internal sealed class WorkListDocument : IDocument
             .AlignRight()
             .Text(DocumentTexts.WorkListColumnAmount)
             .Bold();
+        // the contract cells below are padded on the left
+        table
+            .Cell()
+            .Element(HeadingCell)
+            .PaddingLeft(CellGapMillimetre, Unit.Millimetre)
+            .Text(DocumentTexts.WorkListColumnContract)
+            .Bold();
         foreach (
             var heading in new[]
             {
-                DocumentTexts.WorkListColumnContract,
                 DocumentTexts.WorkListColumnStart,
                 DocumentTexts.WorkListColumnEnd,
             }

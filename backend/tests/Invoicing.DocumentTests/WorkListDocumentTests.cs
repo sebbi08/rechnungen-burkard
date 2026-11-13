@@ -252,7 +252,10 @@ public class WorkListDocumentTests
 
         var first = Word(page, "A-12").BoundingBox.Left;
         var last = Word(page, "A-14").BoundingBox.Left;
-        var headings = page.GetWords().Where(w => w.Text == "Grabstätte").ToList();
+        var headings = page.GetWords()
+            .Where(w => w.Text == "Grabstätte")
+            .OrderBy(w => w.BoundingBox.Left)
+            .ToList();
 
         Assert.Equal(1, document.NumberOfPages);
         // each column has its own heading
