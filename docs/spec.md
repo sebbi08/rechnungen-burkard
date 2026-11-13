@@ -1329,21 +1329,27 @@ it holds.
   including VAT, with two decimals. The unit price is the grave's own price or,
   without one, the item's default price; a price entered as gross is taken as
   entered, and a net price is turned into a gross with the item's VAT rate,
-  rounded to the cent. Rounding corrections and partial half-years MUST NOT be
+  rounded to the cent. The price is the one entered on the grave: per half-year
+  for a care service, not doubled to a yearly amount, and per occurrence for a
+  seasonal service. Rounding corrections and partial half-years MUST NOT be
   applied. A service without any price MUST print a dash instead of an amount.
 - **FR-105**: The care list MUST print, per grave, its number, site name,
   position, start month, end month and, on a cooperative grave, its contract
   number. The graves-only variant MUST use two columns, the left filling before
   the right; the other variants MUST use one column with an indented line per
   service, whose amount is headed as per half-year, and the all-services variant
-  MUST name the quarter of an extra service.
+  MUST name the quarter of an extra service. A grave with no service to list
+  MUST still get its detail line. A service line consists of count, item number,
+  description, the quarter (on the all-services variant only) and amount.
 - **FR-106**: The planting list MUST print one line per extra service of the
   quarter, with its count, description and amount. The grave's details, start
   and end month and contract number MUST stand on its first line only.
 - **FR-107**: Both lists MUST print start and end month as `MM/yyyy`, an open end
   as a dash, and the month in bold when it lies in the list's period: the year
-  on the care list, the quarter on the planting list. The position MUST be
-  composed as on the grave invoice, leaving out a part that is missing.
+  on the care list, the quarter on the planting list. The grave position MUST
+  be the field number followed by the position's short form (`27 dGr.a`; a kind
+  without an abbreviation is spelled out), without the label "FELD-GRAB-NR" that
+  the grave invoice (FR-037b) puts before it, leaving out a part that is missing.
   Cemeteries MUST be sorted by name in German order ignoring case, graves by
   grave number with digit runs compared as numbers and then by start, so a
   handed-over grave's old term comes first. Every page MUST carry the list's
