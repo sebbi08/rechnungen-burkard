@@ -1,0 +1,96 @@
+import { expect, type Page, test } from "@playwright/test";
+import { createRow, ensureRow, seedGrave } from "../seed";
+import { unique } from "../unique";
+import { dialog, fillNumber, waitForOverlayOpen } from "../vue";
+
+/** An all-year item at 10,10 € with a grave at the default, one at its own
+ *  150,00 and one at its own 95,00 shared by two recipients. */
+async function seedItem(page: Page) {
+  const run = unique();
+  const number = `ERH-${run}`;
+  await ensureRow(page, "/odata/VatRates", { Rate: 19 });
+  const item = await createRow(page, "/odata/InvoiceItems", {
+    Number: number,
+    Description: `Erhöhung ${run}`,
+    VatRate: 19,
+    DefaultPrice: 10.1,
+  });
+  const recipients: number[] = [];
+  for (let index = 1; index <= 3; index += 1) {
+    const recipient = await createRow(page, "/odata/Recipients", {
+      Name: `Erhöhung ${index} ${run}`,
+      Address: "Musterweg 1",
+    });
+    recipients.push(recipient.Id as number);
+  }
+  const prices = [null, 150, 95];
+  for (const [index, unitPrice] of prices.entries()) {
+    await seedGrave(page, {
+      graveNumber: `ERH-G${index}-${run}`,
+      items: [{ itemId: item.Id, count: 1, unitPrice }],
+      recipientIds: index === 2 ? [recipients[1], recipients[2]] : [recipients[0]],
+    });
+  }
+  return { number };
+}
+
+async function openItem(page: Page, number: string) {
+  await page.goto("/items");
+  await page
+    .getByRole("row")
+    .filter({ hasText: number })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForOverlayOpen(page);
+  return dialog(page, "Leistung bearbeiten");
+}
+
+test("price increase: proposes, checks and keeps a pending increase in the item dialog", async ({
+  page,
+}) => {
+  const { number } = await seedItem(page);
+  const itemDialog = await openItem(page, number);
+  await itemDialog.getByRole("button", { name: "Preise erhöhen" }).click();
+  await waitForOverlayOpen(page);
+
+  const popover = dialog(page, "Preise erhöhen");
+  const price = (label: string) => popover.getByRole("spinbutton", { name: `Neu ${label}` });
+  await fillNumber(popover.getByRole("spinbutton", { name: "Erhöhung in %" }), "5");
+
+  await expect(price("Standardpreis 10,10 €")).toHaveValue("10,61 €");
+  await expect(price("Eigener Preis 95,00 €")).toHaveValue("99,75 €");
+  await expect(price("Eigener Preis 150,00 €")).toHaveValue("157,50 €");
+  // 99,75 over two recipients is odd in cents, so it is corrected to 99,76
+  await expect(popover).toContainText("Rundungsanpassung bei 1 Gräbern");
+
+  await fillNumber(price("Eigener Preis 95,00 €"), "100");
+  await expect(price("Eigener Preis 95,00 €")).toHaveValue("100,00 €");
+  await expect(popover).not.toContainText("Rundungsanpassung");
+
+  // a new percentage proposes every price again and drops the manual edit
+  await fillNumber(popover.getByRole("spinbutton", { name: "Erhöhung in %" }), "10");
+  await expect(price("Eigener Preis 95,00 €")).toHaveValue("104,50 €");
+  await expect(price("Standardpreis 10,10 €")).toHaveValue("11,11 €");
+
+  await popover.getByRole("checkbox", { name: "Eigener Preis 150,00 €" }).uncheck();
+  const apply = popover.getByRole("button", { name: "Übernehmen" });
+  await expect(apply).toBeEnabled();
+  await apply.click();
+  await expect(popover).toHaveCount(0);
+
+  await expect(itemDialog.locator("s").filter({ hasText: "10,10 €" })).toBeVisible();
+  await expect(itemDialog.locator("s").filter({ hasText: "95,00 €" })).toBeVisible();
+  await expect(itemDialog).toContainText("104,50 €");
+  await expect(itemDialog.locator("s").filter({ hasText: "150,00 €" })).toHaveCount(0);
+  const defaultField = itemDialog.locator("#itemDefaultPrice");
+  await expect(defaultField).toHaveValue("11,11 €");
+  await expect(defaultField).toBeDisabled();
+
+  // nothing was saved
+  await itemDialog.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(itemDialog).toHaveCount(0);
+  const reopened = await openItem(page, number);
+  await expect(reopened.locator("#itemDefaultPrice")).toHaveValue("10,10 €");
+  await expect(reopened.locator("s")).toHaveCount(0);
+  await expect(reopened).toContainText("Eigener Preis 95,00 €");
+});

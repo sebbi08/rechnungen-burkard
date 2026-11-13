@@ -460,5 +460,18 @@
   "filterAll": "Alle",
   "filterSearchColumn": "{0} durchsuchen",
   "filterSelectColumn": "{0} filtern",
-  "filterRemove": "Filter {0} entfernen"
+  "filterRemove": "Filter {0} entfernen",
+  "priceIncrease": "Preise erhöhen",
+  "priceIncreasePercent": "Erhöhung in %",
+  "priceIncreaseRounded": "Neue Preise werden auf zwei Stellen gerundet.",
+  "priceIncreaseOld": "Bisher",
+  "priceIncreaseNew": "Neu",
+  "priceIncreaseGraves": "{0} Gräber",
+  "priceIncreaseProblem": "Geht bei Grab {0} ({1}) nicht auf. Bitte anderen Preis eingeben.",
+  "priceIncreaseMoreProblems": "und {0} weitere",
+  "priceIncreaseCorrections": "Rundungsanpassung bei {0} Gräbern",
+  "priceIncreaseApply": "Übernehmen",
+  "priceIncreaseDiscard": "Erhöhung verwerfen",
+  "errorPricesChanged": "Die Preise haben sich inzwischen geändert. Bitte „Preise erhöhen“ erneut öffnen.",
+  "errorPricesDoNotDivide2": "Bei Grab „{0}“ lässt sich die Rechnung „{1}“ nicht gleichmäßig auf die Empfänger aufteilen."
 }

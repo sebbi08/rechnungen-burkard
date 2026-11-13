@@ -4,6 +4,7 @@
  * controllers.
  */
 import type { GravePositionName } from "@/lib/gravePosition";
+import type { IncreaseRow } from "@/lib/priceIncrease";
 import type { QuarterName } from "@/lib/quarter";
 import { type InvoiceLine, type Job, JobStatus, type QuoteLine } from "./generated";
 import { ApiError, getBlob, getJson, isTransient, postBlob, postJson, request } from "./http";
@@ -178,6 +179,78 @@ export interface ItemGraves {
 
 export function getItemGraves(itemId: number): Promise<ItemGraves> {
   return getJson<ItemGraves>(`/odata/ItemGraves?itemId=${itemId}`);
+}
+
+export interface PriceIncreaseProblem {
+  GraveId: number;
+  GraveNumber: string;
+  Invoice: string;
+  VatRate: number;
+}
+
+export interface PriceIncreaseCorrection {
+  GraveId: number;
+  GraveNumber: string;
+  Kind: string;
+  Year: number | null;
+  Half: number;
+  Invoice: string;
+  VatRate: number;
+  ItemId: number;
+  ItemNumber: string;
+  EnteredPrice: number;
+  CorrectedPrice: number;
+}
+
+/** `Rows[i]` belongs to the i-th row sent. */
+export interface PriceIncreasePreview {
+  Rows: { Problems: PriceIncreaseProblem[] }[];
+  Corrections: PriceIncreaseCorrection[];
+}
+
+/** Only the ticked rows whose price changes go to the server. */
+function increaseBody(itemId: number, rows: IncreaseRow[]) {
+  return {
+    ItemId: itemId,
+    Rows: rows
+      .filter((row) => row.ticked && row.newPrice !== row.oldPrice)
+      .map((row) => ({
+        IsDefault: row.isDefault,
+        OldPrice: row.oldPrice,
+        PriceIncludesVat: row.priceIncludesVat,
+        NewPrice: row.newPrice,
+        GraveIds: row.graveIds,
+      })),
+  };
+}
+
+export function previewItemPriceIncrease(
+  itemId: number,
+  rows: IncreaseRow[],
+): Promise<PriceIncreasePreview> {
+  return postJson<PriceIncreasePreview>(
+    "/odata/PreviewItemPriceIncrease",
+    increaseBody(itemId, rows),
+  );
+}
+
+export async function applyItemPriceIncrease(
+  itemId: number,
+  rows: IncreaseRow[],
+  corrections: PriceIncreaseCorrection[],
+): Promise<void> {
+  await postJson("/odata/ApplyItemPriceIncrease", {
+    ...increaseBody(itemId, rows),
+    Corrections: corrections.map((correction) => ({
+      GraveId: correction.GraveId,
+      Kind: correction.Kind,
+      Year: correction.Year,
+      Half: correction.Half,
+      VatRate: correction.VatRate,
+      ItemId: correction.ItemId,
+      CorrectedPrice: correction.CorrectedPrice,
+    })),
+  });
 }
 
 // ---- graves ---------------------------------------------------------------

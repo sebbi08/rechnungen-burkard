@@ -10,6 +10,7 @@ import Tag from "primevue/tag";
 import { useToast } from "primevue/usetoast";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import ItemPriceIncreaseDialog from "./ItemPriceIncreaseDialog.vue";
 import { RouterLink } from "vue-router";
 import { getItemGraves, type ItemGraveGroup } from "@/api/endpoints";
 import type { InvoiceItem } from "@/api/generated";
@@ -19,6 +20,7 @@ import { useVatRatesQuery } from "@/api/queries";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { formatAmount, formatVatRate } from "@/lib/format";
+import { type PendingIncrease, increaseRows, rowChanged } from "@/lib/priceIncrease";
 import {
   QUARTERS,
   type QuarterName,
@@ -66,9 +68,42 @@ watch(visible, (open) => {
       // empty means "no default price"; 0 is a real price
       DefaultPrice: props.item?.DefaultPrice ?? null,
     });
+    pending.value = null;
     void vatRates.refetch();
   }
 });
+
+// an increase the user confirmed in "Preise erhöhen", not saved yet
+const pending = ref<PendingIncrease | null>(null);
+const increaseVisible = ref(false);
+const canIncrease = computed(
+  () => graves.data.value != null && increaseRows(graves.data.value).length > 0,
+);
+const pendingDefault = computed(() => {
+  const row = pending.value?.rows.find((candidate) => candidate.isDefault && rowChanged(candidate));
+  return row?.newPrice ?? null;
+});
+// the field shows the increased default and is read-only while it is pending
+const defaultPrice = computed({
+  get: () => pendingDefault.value ?? form.DefaultPrice,
+  set: (value: number | null) => {
+    form.DefaultPrice = value;
+  },
+});
+
+/** The new price a group is going to get, if the pending increase changes it. */
+function newPriceOf(group: ItemGraveGroup): number | null {
+  const row = pending.value?.rows.find(
+    (candidate) =>
+      rowChanged(candidate) &&
+      (group.IsDefault
+        ? candidate.isDefault
+        : !candidate.isDefault &&
+          candidate.oldPrice === group.UnitPrice &&
+          candidate.priceIncludesVat === group.PriceIncludesVat),
+  );
+  return row?.newPrice ?? null;
+}
 
 const itemId = computed(() => props.item?.Id ?? null);
 const graves = useQuery({
@@ -165,18 +200,39 @@ async function save(): Promise<void> {
       <div class="flex flex-col gap-2">
         <label for="itemDefaultPrice" class="font-medium">{{ t("itemDefaultPrice") }}</label>
         <InputNumber
-          v-model="form.DefaultPrice"
+          v-model="defaultPrice"
           v-decimal-point
           input-id="itemDefaultPrice"
           locale="de-DE"
           :min-fraction-digits="2"
           :max-fraction-digits="2"
           suffix=" €"
+          :disabled="pendingDefault != null"
         />
       </div>
 
       <section v-if="item" class="flex flex-col gap-2">
-        <h3 class="m-0 text-base font-semibold">{{ t("itemGravesTitle") }}</h3>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="m-0 text-base font-semibold">{{ t("itemGravesTitle") }}</h3>
+          <div v-if="canIncrease" class="flex items-center gap-1">
+            <Button
+              v-if="pending"
+              type="button"
+              :label="t('priceIncreaseDiscard')"
+              size="small"
+              text
+              @click="pending = null"
+            />
+            <Button
+              type="button"
+              :label="t('priceIncrease')"
+              icon="pi pi-arrow-up-right"
+              size="small"
+              outlined
+              @click="increaseVisible = true"
+            />
+          </div>
+        </div>
         <!-- linked, yet nothing listed: only deleted graves still link the item -->
         <Message
           v-if="graves.data.value?.Linked && graves.data.value.Groups.length === 0"
@@ -197,7 +253,10 @@ async function save(): Promise<void> {
           :key="index"
           class="flex flex-col gap-1"
         >
-          <span class="text-sm font-medium">{{ groupLabel(group) }}</span>
+          <span v-if="newPriceOf(group) != null" class="text-sm font-medium">
+            <s>{{ groupLabel(group) }}</s> → {{ formatAmount(newPriceOf(group)) }}
+          </span>
+          <span v-else class="text-sm font-medium">{{ groupLabel(group) }}</span>
           <div class="flex flex-wrap gap-x-3 gap-y-1">
             <span
               v-for="grave in group.Graves"
@@ -221,6 +280,14 @@ async function save(): Promise<void> {
         </div>
       </section>
     </form>
+    <ItemPriceIncreaseDialog
+      v-if="item && graves.data.value"
+      v-model:visible="increaseVisible"
+      :item-id="item.Id"
+      :graves="graves.data.value"
+      :initial="pending"
+      @apply="pending = $event"
+    />
     <template #footer>
       <Button :label="t('cancel')" severity="secondary" text @click="visible = false" />
       <Button
