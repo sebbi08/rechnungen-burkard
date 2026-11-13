@@ -52,6 +52,9 @@ watch(
 );
 
 function onPercent(value: number | null): void {
+  if (value === percent.value) {
+    return;
+  }
   percent.value = value;
   // every price is proposed again, which drops a manual edit
   for (const row of rows.value) {

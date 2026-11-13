@@ -164,6 +164,7 @@ async function save(): Promise<void> {
     :header="item ? t('editItem') : t('createItem')"
     :style="{ width: '30rem' }"
     :breakpoints="{ '640px': '100vw' }"
+    :close-on-escape="!increaseVisible"
   >
     <form id="itemForm" class="flex flex-col gap-4" @submit.prevent="save">
       <div class="flex flex-col gap-2">
@@ -207,7 +208,7 @@ async function save(): Promise<void> {
           :min-fraction-digits="2"
           :max-fraction-digits="2"
           suffix=" €"
-          :disabled="pendingDefault != null"
+          :disabled="pending != null"
         />
       </div>
 

@@ -54,6 +54,14 @@ test("price increase: proposes, checks and keeps a pending increase in the item 
   await waitForOverlayOpen(page);
 
   const popover = dialog(page, "Preise erhöhen");
+
+  // Escape closes the popover only, not the item dialog beneath it
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await expect(itemDialog).toBeVisible();
+  await itemDialog.getByRole("button", { name: "Preise erhöhen" }).click();
+  await waitForOverlayOpen(page);
+
   const price = (label: string) => popover.getByRole("spinbutton", { name: `Neu ${label}` });
   await fillNumber(popover.getByRole("spinbutton", { name: "Erhöhung in %" }), "5");
 
@@ -65,7 +73,14 @@ test("price increase: proposes, checks and keeps a pending increase in the item 
 
   await fillNumber(price("Eigener Preis 95,00 €"), "100");
   await expect(price("Eigener Preis 95,00 €")).toHaveValue("100,00 €");
+  // the server's answer for 100,00 has come in once "Übernehmen" is enabled
+  await expect(popover.getByRole("button", { name: "Übernehmen" })).toBeEnabled();
   await expect(popover).not.toContainText("Rundungsanpassung");
+
+  // leaving the percent field unchanged keeps the manual edit
+  await popover.getByRole("spinbutton", { name: "Erhöhung in %" }).click();
+  await price("Eigener Preis 150,00 €").click();
+  await expect(price("Eigener Preis 95,00 €")).toHaveValue("100,00 €");
 
   // a new percentage proposes every price again and drops the manual edit
   await fillNumber(popover.getByRole("spinbutton", { name: "Erhöhung in %" }), "10");
