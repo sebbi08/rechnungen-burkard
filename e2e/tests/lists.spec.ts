@@ -80,6 +80,48 @@ test("the planting list downloads as a PDF", async ({ page }) => {
   expect(content.subarray(0, 4).toString()).toBe("%PDF");
 });
 
+test("the chosen variant and quarter go to the server", async ({ page }) => {
+  // not the current quarter, so the default would be a different request
+  const other = QUARTERS[(QUARTERS.indexOf(QUARTER) + 1) % 4];
+  const careId = await seedItem(page, `L3-${RUN}`);
+  const itemId = await seedItem(page, `L3-${RUN}-seasonal`, other.api);
+  const recipientId = await seedRecipient(page, `Auswahl Beispiel ${RUN}`);
+  await seedGrave(page, {
+    graveNumber: `L3-${RUN}`,
+    startDate: `${YEAR}-01`,
+    endDate: `${YEAR}-12`,
+    items: [{ itemId: careId }, { itemId }],
+    recipientIds: [recipientId],
+  });
+
+  await page.goto("/lists");
+  await page
+    .getByRole("group", { name: "Umfang" })
+    .getByRole("button", { name: "Mit allen Leistungen" })
+    .click();
+  const care = page.waitForRequest(
+    (r) => r.url().includes("/odata/CareList") && r.url().includes("services=all"),
+  );
+  const careDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Pflegeliste als PDF herunterladen" }).click();
+  await care;
+  expect((await careDownload).suggestedFilename()).toBe(`Pflegeliste-${YEAR}.pdf`);
+
+  await page
+    .getByRole("group", { name: "Quartal" })
+    .getByRole("button", { name: other.label })
+    .click();
+  const planting = page.waitForRequest(
+    (r) => r.url().includes("/odata/PlantingList") && r.url().includes(`quarter=${other.api}`),
+  );
+  const plantingDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Pflanzliste als PDF herunterladen" }).click();
+  await planting;
+  expect((await plantingDownload).suggestedFilename()).toBe(
+    `Pflanzliste-${YEAR}-${other.file}.pdf`,
+  );
+});
+
 test("a list with nothing on it says so", async ({ page }) => {
   await page.goto("/lists");
 
