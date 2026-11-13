@@ -29,7 +29,7 @@ public class WorkListController : ODataController
             var data = await _service.CareListAsync(y, variant);
             if (data is null)
             {
-                throw new NoGravesOnListException(y.ToString());
+                return Refuse(new NoGravesOnListException(y.ToString()));
             }
 
             return Pdf(data, $"Pflegeliste-{y}.pdf");
@@ -53,7 +53,9 @@ public class WorkListController : ODataController
             var data = await _service.PlantingListAsync(y, q);
             if (data is null)
             {
-                throw new NoGravesOnListException(y.ToString(), DocumentTexts.QuarterName(q));
+                return Refuse(
+                    new NoGravesOnListException(y.ToString(), DocumentTexts.QuarterName(q))
+                );
             }
 
             return Pdf(data, $"Pflanzliste-{y}-{DocumentTexts.QuarterFileWord(q)}.pdf");
