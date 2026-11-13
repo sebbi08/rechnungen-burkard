@@ -524,6 +524,41 @@ revising it, and checking the numbers, the stored versions and the printout.
 7. **Given** a converted or declined quote, **When** the user tries to convert
    it, **Then** the system refuses and no invoice number is used.
 
+### User Story 17 - Print work lists (Priority: P3)
+
+The gardeners work from paper. Once a year they need a care list of every grave
+that is looked after in that year, and every quarter a planting list of the
+graves that get a seasonal service in it. The owner prints both from the
+application, one set of pages per cemetery, so the sheets can be handed out as
+they are.
+
+**Why this priority**: The lists change nothing in the data; they are read-only
+views of what the graves already hold, and today they are put together by hand.
+
+**Independent Test**: Can be fully tested by saving graves with all-year and
+seasonal services, downloading each list and checking which graves and services
+it holds.
+
+**Acceptance Scenarios**:
+
+1. **Given** graves running in a year, **When** the user downloads the care list
+   for that year, **Then** it holds every grave with at least one month of its
+   term in the year, cooperative graves included and deleted ones left out, in
+   one of three variants: graves only, graves with their care services, or
+   graves with their care services and the seasonal services of the quarters
+   they run in.
+2. **Given** graves with seasonal services, **When** the user downloads the
+   planting list for a quarter, **Then** it holds every grave that has a service
+   of that quarter and a month of its term in it, with one line per such service
+   and its amount.
+3. **Given** graves in more than one cemetery, **When** a list is downloaded,
+   **Then** each cemetery starts on a page of its own, its pages are numbered
+   among themselves, and cemeteries and graves are in a fixed order.
+4. **Given** a grave that starts or ends within the list's period, **When** the
+   list is printed, **Then** that month is printed in bold.
+5. **Given** no grave is on the requested list, **When** the user asks for it,
+   **Then** the system refuses with a message instead of producing a PDF.
+
 ---
 
 ### Edge Cases
@@ -587,6 +622,18 @@ revising it, and checking the numbers, the stored versions and the printout.
 - What happens when an archive names a cemetery the settings do not have? The
   row is reported and nothing is imported; the cemetery has to be added in the
   settings first.
+- What happens when a grave on a work list has no position? Its position column
+  shows the field number alone, or stays empty if that is missing too.
+- What happens when a service on a work list has no price, on the grave or on the
+  item? Its amount is printed as a dash instead of a number.
+- What happens when a grave starts or ends inside the list's period? It is on the
+  list, and the month of its start or end is printed in bold.
+- What happens when a grave is handed over inside the period, the old grave
+  ending and a new one starting under the same number? Both are on the list, the
+  old one first, each with its own bold month.
+- What happens with a cooperative grave without services? It is on the care list
+  with its contract number, and on the planting list only if it carries a
+  service of the quarter.
 
 ## Requirements _(mandatory)_
 
@@ -1260,6 +1307,58 @@ revising it, and checking the numbers, the stored versions and the printout.
   and blank lines MUST be kept as no text, and the spaces and blank lines
   around a text MUST be dropped. Invoices and quotes created before these
   fields existed MUST print as before.
+
+**Work lists**
+
+- **FR-102**: The system MUST offer a care list for a year and a planting list
+  for a quarter of a year. The care list MUST hold every grave whose term has at
+  least one month in the year, cooperative graves included. The planting list
+  MUST hold every grave that has at least one service of the quarter and whose
+  term has at least one month in the quarter, the rule invoicing uses; a
+  cooperative grave is on it if it carries such a service. Deleted graves MUST
+  be on neither. A cemetery without a grave on the list MUST get no page, and a
+  list without any grave MUST NOT be produced: the request is refused with the
+  code `NoGravesOnList`.
+- **FR-103**: A care service is an item without a quarter; an extra service is an
+  item with a quarter. The care list MUST come in three variants: graves only;
+  graves with their care services; graves with their care services and those
+  extra services whose quarter has at least one month of the grave's term in the
+  year. The planting list MUST show the grave's items of its quarter. Services
+  MUST stand in the order they were linked to the grave.
+- **FR-104**: The amount of a service MUST be its count times the unit price
+  including VAT, with two decimals. The unit price is the grave's own price or,
+  without one, the item's default price; a price entered as gross is taken as
+  entered, and a net price is turned into a gross with the item's VAT rate,
+  rounded to the cent. Rounding corrections and partial half-years MUST NOT be
+  applied. A service without any price MUST print a dash instead of an amount.
+- **FR-105**: The care list MUST print, per grave, its number, site name,
+  position, start month, end month and, on a cooperative grave, its contract
+  number. The graves-only variant MUST use two columns, the left filling before
+  the right; the other variants MUST use one column with an indented line per
+  service, whose amount is headed as per half-year, and the all-services variant
+  MUST name the quarter of an extra service.
+- **FR-106**: The planting list MUST print one line per extra service of the
+  quarter, with its count, description and amount. The grave's details, start
+  and end month and contract number MUST stand on its first line only.
+- **FR-107**: Both lists MUST print start and end month as `MM/yyyy`, an open end
+  as a dash, and the month in bold when it lies in the list's period: the year
+  on the care list, the quarter on the planting list. The position MUST be
+  composed as on the grave invoice, leaving out a part that is missing.
+  Cemeteries MUST be sorted by name in German order ignoring case, graves by
+  grave number with digit runs compared as numbers and then by start, so a
+  handed-over grave's old term comes first. Every page MUST carry the list's
+  title, the cemetery, the date it was made and its page number counted per
+  cemetery. Pages MUST be A4 portrait without letterhead, logo or fold marks.
+- **FR-108**: The application MUST offer a page "Listen" with a card for each
+  list: year and variant for the care list, year and quarter for the planting
+  list, each with a button that downloads the PDF and shows it is busy while the
+  PDF is made. The API MUST serve the lists as `application/pdf` attachments
+  named `Pflegeliste-2027.pdf` and `Pflanzliste-2027-Fruehling.pdf`, from
+  `GET odata/CareList?year=&services=none|care|all` and
+  `GET odata/PlantingList?year=&quarter=`. A year outside 2000 to 2100, or a
+  missing or unknown variant or quarter, MUST be refused with the code
+  `ValidationFailed`; a list without graves MUST be refused with
+  `NoGravesOnList`, and the page MUST show the server's message as an error.
 
 ### Key Entities _(include if feature involves data)_
 
