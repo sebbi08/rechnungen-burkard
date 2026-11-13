@@ -62,8 +62,8 @@ default price:
 - Groups without any price ("ohne Preis") are not listed, since there is nothing
   to raise.
 
-A grave can link the same item more than once. Every link in a ticked row is
-raised, and the grave counts once per row.
+A grave cannot link the same item twice (`SaveGrave` refuses it with
+`GraveItemLinkExists`), so each grave sits in exactly one row.
 
 Rows are ordered as the dialog orders its groups (default first, then by price,
 net before gross).
@@ -262,11 +262,11 @@ code.
    since its gross flag says how the default is read for that grave. When raised
    it gets the new number and keeps its flag. No separate "Eigener Preis inkl.
    MwSt." row is made for such links.
-2. **A grave may be split across rows.** Corrections are always computed over
-   all of a grave's links with the new prices of the ticked rows and the old
-   prices elsewhere, so a partly raised grave is checked as it will be billed.
-   `GraveIds` is compared per row as an exact set. A grave in two rows is listed
-   in both, and a red row names every grave that fails in it.
+2. **A raised grave is checked as a whole.** Corrections are always computed
+   over all of a grave's links, including those of other items at their
+   unchanged prices, so a raised grave is checked as it will be billed.
+   `GraveIds` is compared per row as an exact set. A grave sits in one row only
+   (see 3.1), and a red row names every grave that fails in it.
 3. **Corrections are replaced exactly as `SaveGrave` would store them** for a
    grave with its new prices. A grave `SaveGrave` would not evaluate (no
    recipients, or cooperative) keeps no corrections. A one-recipient grave
