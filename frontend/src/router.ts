@@ -89,6 +89,11 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: "importExportTitle" },
     component: () => import("@/pages/ImportExportPage.vue"),
   },
+  {
+    path: "/lists",
+    meta: { titleKey: "menuLists" },
+    component: () => import("@/pages/ListsPage.vue"),
+  },
   // pages: add new routes above this line
   { path: "/:pathMatch(.*)*", redirect: "/invoices" },
 ];

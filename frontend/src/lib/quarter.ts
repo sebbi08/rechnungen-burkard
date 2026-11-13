@@ -20,3 +20,8 @@ export function toQuarterName(value: string | null | undefined): QuarterName | n
 export function toBillingQuarter(name: QuarterName | null): BillingQuarter | null {
   return name == null ? null : (name as string as BillingQuarter);
 }
+
+/** The calendar quarter of a date: January to March is Spring. */
+export function quarterOf(date: Date): QuarterName {
+  return QUARTERS[Math.floor(date.getMonth() / 3)];
+}

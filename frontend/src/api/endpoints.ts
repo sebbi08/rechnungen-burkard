@@ -746,15 +746,41 @@ export interface StagedBackup {
   summary: BackupSummary;
 }
 
-export async function downloadBackup(): Promise<{ blob: Blob; fileName: string }> {
-  const response = await request("/odata/DownloadBackup");
+/** The file a download response suggests through Content-Disposition, or the fallback. */
+async function readDownload(
+  response: Response,
+  fallbackName: string,
+): Promise<{ blob: Blob; fileName: string }> {
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const name = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
   const plain = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
   return {
     blob: await response.blob(),
-    fileName: name ? decodeURIComponent(name) : (plain ?? "sicherung.zip"),
+    fileName: name ? decodeURIComponent(name) : (plain ?? fallbackName),
   };
+}
+
+export async function downloadBackup(): Promise<{ blob: Blob; fileName: string }> {
+  return readDownload(await request("/odata/DownloadBackup"), "sicherung.zip");
+}
+
+/** Which services the care list shows under each grave. */
+export type CareListServices = "none" | "care" | "all";
+
+export async function downloadCareList(
+  year: number,
+  services: CareListServices,
+): Promise<{ blob: Blob; fileName: string }> {
+  const query = new URLSearchParams({ year: String(year), services });
+  return readDownload(await request(`/odata/CareList?${query}`), `Pflegeliste-${year}.pdf`);
+}
+
+export async function downloadPlantingList(
+  year: number,
+  quarter: QuarterName,
+): Promise<{ blob: Blob; fileName: string }> {
+  const query = new URLSearchParams({ year: String(year), quarter });
+  return readDownload(await request(`/odata/PlantingList?${query}`), `Pflanzliste-${year}.pdf`);
 }
 
 /** Stages the backup on the server and checks it; nothing is replaced yet. */
