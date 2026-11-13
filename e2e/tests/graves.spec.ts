@@ -1606,6 +1606,9 @@ test("a grave lies in a cemetery, which the overview shows and searches", async 
   await addRecipient(page, editor, recipientName);
   await saveEditor(editor);
 
+  // the list pages by ten in grave-number order, and other tests' graves sort
+  // before this one
+  await searchColumn(page, "Grabnummer", graveNumber);
   const row = page.getByRole("row").filter({ hasText: graveNumber });
   await expect(row.getByRole("cell", { name: cemetery, exact: true })).toBeVisible();
 
@@ -1848,6 +1851,8 @@ test.describe("the half-year today falls in", () => {
     await seedGrave(page, marker, [`Liste ${marker}`]);
 
     await page.goto("/graves");
+    // the list pages by ten, and other tests' graves sort before this one
+    await searchColumn(page, "Grabnummer", marker);
     const row = page.getByRole("row").filter({ hasText: marker });
     await expect(row).toBeVisible();
 
@@ -1862,6 +1867,7 @@ test.describe("the half-year today falls in", () => {
 
     // and so does the grave's number
     await page.goto("/graves");
+    await searchColumn(page, "Grabnummer", marker);
     await page.getByRole("link", { name: marker, exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: marker })).toBeVisible();
 
@@ -1891,6 +1897,7 @@ test.describe("the half-year today falls in", () => {
     await seedGrave(page, marker, [`Ansage ${marker}`]);
 
     await page.goto("/graves");
+    await searchColumn(page, "Grabnummer", marker);
     const status = page.getByRole("row").filter({ hasText: marker }).locator(".p-tag").first();
     await expect(status).toHaveText("offen");
 

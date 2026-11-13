@@ -159,6 +159,7 @@ test("items: create an item without default price (Story 2)", async ({ page }) =
   await itemDialog.getByRole("button", { name: "Speichern" }).click();
   await expect(itemDialog).toHaveCount(0);
 
+  await searchColumn(page, "Nummer", number);
   const row = page.getByRole("row").filter({ hasText: number });
   await expect(row).toContainText("Grabpflege");
   await expect(row).toContainText("7 %");
@@ -265,6 +266,7 @@ test("items: edit an existing item via the row dialog (Story 2)", async ({ page 
   });
 
   await page.goto("/items");
+  await searchColumn(page, "Nummer", number);
   const row = page.getByRole("row").filter({ hasText: number });
   await row.getByRole("button", { name: "Bearbeiten" }).click();
   await waitForOverlayOpen(page);
@@ -307,6 +309,7 @@ test("items: the edit dialog lists the graves billing the item under their price
   });
 
   await page.goto("/items");
+  await searchColumn(page, "Nummer", number);
   await page
     .getByRole("row")
     .filter({ hasText: number })
@@ -344,6 +347,7 @@ test("items: the quarter is chosen in the dialog and fixed while a grave bills t
   await createDialog.getByRole("button", { name: "Speichern" }).click();
   await expect(createDialog).toHaveCount(0);
 
+  await searchColumn(page, "Nummer", number);
   const row = page.getByRole("row").filter({ hasText: number });
   await row.getByRole("button", { name: "Bearbeiten" }).click();
   await waitForOverlayOpen(page);
@@ -383,6 +387,7 @@ test("items: the quarter is chosen in the dialog and fixed while a grave bills t
   });
 
   await page.reload();
+  await searchColumn(page, "Nummer", `${number}-used`);
   await page
     .getByRole("row")
     .filter({ hasText: `${number}-used` })
@@ -623,6 +628,7 @@ test("recipients: an e-mail address is optional and checked", async ({ page }) =
   await createDialog.getByLabel("E-Mail").fill(` ${email} `);
   await createDialog.getByRole("button", { name: "Speichern" }).click();
   await expect(createDialog).toHaveCount(0);
+  await searchColumn(page, "Name", name);
   const row = page.getByRole("row").filter({ hasText: name });
   await expect(row).toContainText(email);
 
@@ -651,6 +657,8 @@ test("recipients: edit an existing recipient via the row dialog (Story 3)", asyn
   await createRow(page, "/odata/Recipients", { Name: `Danach ${ts}`, Address: "Neue Gasse 1" });
 
   await page.goto("/recipients");
+  // the search keeps the renamed recipient in the list as well
+  await searchColumn(page, "Name", ts);
   await page
     .getByRole("row")
     .filter({ hasText: name })
@@ -741,6 +749,7 @@ test("items: the edit dialog marks cooperative graves", async ({ page }) => {
   });
 
   await page.goto("/items");
+  await searchColumn(page, "Nummer", number);
   await page
     .getByRole("row")
     .filter({ hasText: number })

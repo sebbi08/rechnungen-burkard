@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { createRow } from "../seed";
 import { withGenerationLock } from "../generation-lock";
 import { unique } from "../unique";
-import { confirmation, toasts } from "../vue";
+import { confirmation, searchColumn, toasts } from "../vue";
 
 // None of these confirms a restore: it would replace the data of every other
 // test running in parallel. The restore itself is covered by the backend's
@@ -88,5 +88,6 @@ test("cancelling the confirmation changes nothing", async ({ page }) => {
 
   expect(await page.evaluate(() => (window as any).__noReload)).toBe(true);
   await page.goto("/recipients");
+  await searchColumn(page, "Name", name);
   await expect(page.getByRole("row").filter({ hasText: name })).toBeVisible();
 });
