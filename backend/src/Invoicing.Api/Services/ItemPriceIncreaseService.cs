@@ -67,6 +67,17 @@ public sealed record PriceIncreasePreview(
     IReadOnlyList<PriceIncreaseCorrection> Corrections
 );
 
+/// <summary>A price increase a grave's rounding cannot absorb: the first grave
+/// that fails and the invoice that does not divide.</summary>
+public sealed class PriceIncreaseDoesNotDivideException : ValidationException
+{
+    public PriceIncreaseDoesNotDivideException(string graveNumber, string invoiceLabel)
+        : base("PricesDoNotDivide", "A raised price does not divide among the recipients.")
+    {
+        Args = [graveNumber, invoiceLabel];
+    }
+}
+
 public sealed class ItemNotFoundException : Exception
 {
     public ItemNotFoundException()

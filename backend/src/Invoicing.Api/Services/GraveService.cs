@@ -762,6 +762,4 @@ public sealed class GraveNumberInUseException : ValidationException
             ? [number, GraveTerm.FormatMonth(start), GraveTerm.FormatMonth(last)]
             : [number, GraveTerm.FormatMonth(start)];
     }
-
-    public IReadOnlyList<string> Args { get; }
 }
