@@ -775,12 +775,23 @@ export async function downloadCareList(
   return readDownload(await request(`/odata/CareList?${query}`), `Pflegeliste-${year}.pdf`);
 }
 
+/** The quarter's word in a file name, as the server spells it. */
+const QUARTER_FILE_WORDS: Record<QuarterName, string> = {
+  Spring: "Fruehling",
+  Summer: "Sommer",
+  Autumn: "Herbst",
+  Winter: "Winter",
+};
+
 export async function downloadPlantingList(
   year: number,
   quarter: QuarterName,
 ): Promise<{ blob: Blob; fileName: string }> {
   const query = new URLSearchParams({ year: String(year), quarter });
-  return readDownload(await request(`/odata/PlantingList?${query}`), `Pflanzliste-${year}.pdf`);
+  return readDownload(
+    await request(`/odata/PlantingList?${query}`),
+    `Pflanzliste-${year}-${QUARTER_FILE_WORDS[quarter]}.pdf`,
+  );
 }
 
 /** Stages the backup on the server and checks it; nothing is replaced yet. */

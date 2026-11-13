@@ -23,6 +23,9 @@ const careYear = ref<Date | null>(new Date(today.getFullYear(), 0, 1));
 const plantingYear = ref<Date | null>(new Date(today.getFullYear(), 0, 1));
 const services = ref<CareListServices>("none");
 const quarter = ref<QuarterName>(quarterOf(today));
+// on a phone the buttons share the row and wrap their labels, instead of
+// pushing the page sideways
+const selectButtonPt = { pcToggleButton: { root: { class: "flex-1 whitespace-normal" } } };
 const careBusy = ref(false);
 const plantingBusy = ref(false);
 
@@ -106,6 +109,8 @@ async function downloadPlanting(): Promise<void> {
             option-value="value"
             :allow-empty="false"
             :aria-label="t('listScope')"
+            :pt="selectButtonPt"
+            class="w-full sm:w-auto"
           />
           <Button
             :label="t('downloadPdf')"
@@ -143,6 +148,8 @@ async function downloadPlanting(): Promise<void> {
             option-value="value"
             :allow-empty="false"
             :aria-label="t('listQuarter')"
+            :pt="selectButtonPt"
+            class="w-full sm:w-auto"
           />
           <Button
             :label="t('downloadPdf')"
