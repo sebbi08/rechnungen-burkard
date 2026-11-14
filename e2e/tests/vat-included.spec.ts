@@ -113,6 +113,9 @@ test("the grave editor offers no VAT-included checkbox", async ({ page }) => {
   await waitForOverlayOpen(page);
   const editor = drawer(page);
   await expect(editor.getByLabel("Grabnummer")).toBeVisible();
+  // a new grave starts without a row, and the checkbox is drawn per row
+  await editor.getByRole("button", { name: "Zeile hinzufügen" }).click();
+  await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toBeVisible();
   await expect(editor.getByRole("checkbox", { name: "inkl. MwSt." })).toHaveCount(0);
   await expect(editor).not.toContainText("inkl. MwSt.");
 });
