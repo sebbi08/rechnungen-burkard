@@ -103,3 +103,43 @@ export function lineNet(count: number, unitPrice: number): number {
 export function roundCents(amount: number): number {
   return lineNet(1, amount);
 }
+
+/** A line as the document prints it. */
+export interface PrintedLine {
+  UnitPrice: number;
+  GrossUnitPrice: number | null;
+  PriceIncludesVat: boolean;
+  VatRate: number;
+}
+
+/** VAT and net inside a gross line total, the way the backend splits it:
+ *  VAT is the share of the gross, rounded a half cent away from zero, and the
+ *  net is what is left, so the two always add up to the gross. */
+export function splitGross(lineGross: number, vatRate: number): { net: number; vat: number } {
+  const vat = roundCents((lineGross * vatRate) / (100 + vatRate));
+  return { net: roundCents(lineGross - vat), vat };
+}
+
+/** The unit price the PDF prints. A line entered VAT-included has its gross
+ *  stored and printed as entered; an older flagged line has only a net, which
+ *  is shown grossed up; a net line prints its net. */
+export function printedUnitPrice(line: PrintedLine): number {
+  if (line.GrossUnitPrice != null) {
+    return line.GrossUnitPrice;
+  }
+  return line.PriceIncludesVat ? grossFromNet(line.UnitPrice, line.VatRate) : line.UnitPrice;
+}
+
+/** The line total the PDF prints: count × gross for a gross-led line, net plus
+ *  VAT for an older flagged one (each rounded on its own, as the backend does),
+ *  the net for a net line. */
+export function printedLineTotal(line: PrintedLine & { Count: number }): number {
+  if (line.GrossUnitPrice != null) {
+    return lineNet(line.Count, line.GrossUnitPrice);
+  }
+  const net = lineNet(line.Count, line.UnitPrice);
+  if (!line.PriceIncludesVat) {
+    return net;
+  }
+  return roundCents(net + roundCents((net * line.VatRate) / 100));
+}

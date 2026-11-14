@@ -94,6 +94,15 @@ export interface QuoteLine {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `GrossUnitPrice` |
+   * | Type | `Edm.Decimal` |
+   */
+  GrossUnitPrice: number | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `Comment` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
@@ -127,4 +136,4 @@ export interface EditableQuoteLine
       | "Comment"
       | "LineNumber"
     >,
-    Partial<Pick<QuoteLine, "Id" | "ItemId">> {}
+    Partial<Pick<QuoteLine, "Id" | "ItemId" | "GrossUnitPrice">> {}

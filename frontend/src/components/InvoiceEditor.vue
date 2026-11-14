@@ -107,13 +107,16 @@ watch(visible, async (open) => {
         newLine({
           itemId: line.ItemId,
           count: line.Count,
-          // the line stores a net; one entered VAT-included is edited as its
-          // gross, converted with the item's current rate (what the backend uses)
-          unitPrice: priceFieldValue(
-            line.UnitPrice,
-            line.PriceIncludesVat,
-            (line.ItemId != null ? rates.get(line.ItemId) : undefined) ?? line.VatRate,
-          ),
+          // a line entered VAT-included stores its gross: edit exactly that. An
+          // older flagged line has only a net, so it is shown grossed up with
+          // the item's current rate (what the backend converts with)
+          unitPrice:
+            line.GrossUnitPrice ??
+            priceFieldValue(
+              line.UnitPrice,
+              line.PriceIncludesVat,
+              (line.ItemId != null ? rates.get(line.ItemId) : undefined) ?? line.VatRate,
+            ),
           priceIncludesVat: line.PriceIncludesVat,
           comment: line.Comment,
         }),
@@ -139,7 +142,7 @@ async function save(): Promise<void> {
   }
   let inputs: InvoiceLineInput[];
   try {
-    inputs = toLineInputs(lines.value, { withComments: true });
+    inputs = toLineInputs(lines.value, { ordinary: true });
   } catch (error) {
     showError(error);
     return;
@@ -212,7 +215,7 @@ async function save(): Promise<void> {
       </div>
       <div class="flex flex-col gap-2">
         <span class="font-medium">{{ t("menuItems") }}</span>
-        <LineEditor v-model="lines" with-comments />
+        <LineEditor v-model="lines" ordinary />
       </div>
     </form>
     <template #footer>

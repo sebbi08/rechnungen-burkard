@@ -19,6 +19,7 @@ export class QInvoiceLine extends QueryObject {
   public readonly GraveUnitPrice = new QNumberPath(this.withPrefix("GraveUnitPrice"));
   public readonly VatRate = new QNumberPath(this.withPrefix("VatRate"));
   public readonly PriceIncludesVat = new QBooleanPath(this.withPrefix("PriceIncludesVat"));
+  public readonly GrossUnitPrice = new QNumberPath(this.withPrefix("GrossUnitPrice"));
   public readonly Comment = new QStringPath(this.withPrefix("Comment"));
   public readonly LineNumber = new QNumberPath(this.withPrefix("LineNumber"));
 }

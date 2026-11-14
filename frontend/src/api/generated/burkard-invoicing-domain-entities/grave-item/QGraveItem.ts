@@ -1,7 +1,6 @@
 import {
   QueryObject,
   QNumberPath,
-  QBooleanPath,
   QEntityPath,
   QBinding,
   QId,
@@ -16,7 +15,6 @@ export class QGraveItem extends QueryObject {
   public readonly ItemId = new QNumberPath(this.withPrefix("ItemId"));
   public readonly Count = new QNumberPath(this.withPrefix("Count"));
   public readonly UnitPrice = new QNumberPath(this.withPrefix("UnitPrice"));
-  public readonly PriceIncludesVat = new QBooleanPath(this.withPrefix("PriceIncludesVat"));
   public readonly Item = new QEntityPath(
     this.withPrefix("Item"),
     () => QInvoiceItem,

@@ -103,6 +103,15 @@ export interface InvoiceLine {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
+   * | Name | `GrossUnitPrice` |
+   * | Type | `Edm.Decimal` |
+   */
+  GrossUnitPrice: number | null;
+  /**
+   *
+   * OData Attributes:
+   * |Attribute Name | Attribute Value |
+   * | --- | ---|
    * | Name | `Comment` |
    * | Type | `Edm.String` |
    * | Nullable | `false` |
@@ -136,4 +145,4 @@ export interface EditableInvoiceLine
       | "Comment"
       | "LineNumber"
     >,
-    Partial<Pick<InvoiceLine, "Id" | "ItemId" | "GraveUnitPrice">> {}
+    Partial<Pick<InvoiceLine, "Id" | "ItemId" | "GraveUnitPrice" | "GrossUnitPrice">> {}

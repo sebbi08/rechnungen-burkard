@@ -60,16 +60,6 @@ export interface GraveItem {
    * OData Attributes:
    * |Attribute Name | Attribute Value |
    * | --- | ---|
-   * | Name | `PriceIncludesVat` |
-   * | Type | `Edm.Boolean` |
-   * | Nullable | `false` |
-   */
-  PriceIncludesVat: boolean;
-  /**
-   *
-   * OData Attributes:
-   * |Attribute Name | Attribute Value |
-   * | --- | ---|
    * | Name | `Item` |
    * | Type | `Burkard.Invoicing.Domain.Entities.InvoiceItem` |
    * | Nullable | `false` |
@@ -81,7 +71,7 @@ export type GraveItemId = number | { Id: number };
 
 export interface EditableGraveItem
   extends
-    Pick<GraveItem, "GraveId" | "ItemId" | "Count" | "PriceIncludesVat">,
+    Pick<GraveItem, "GraveId" | "ItemId" | "Count">,
     Partial<Pick<GraveItem, "Id" | "UnitPrice">> {
   /**
    * Create "Item" along with this entity (deep insert), or update it along with it (deep update).

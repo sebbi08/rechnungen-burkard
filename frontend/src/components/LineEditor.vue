@@ -10,13 +10,14 @@ import { useItemsQuery } from "@/api/queries";
 import { formatAmount, formatVatRate } from "@/lib/format";
 import { vDecimalPoint } from "@/directives/decimalPoint";
 import { type DraftLine, newLine } from "@/lib/lines";
-import { lineNet, roundCents } from "@/lib/money";
+import { lineNet, roundCents, splitGross } from "@/lib/money";
 import { quarterLabelKey } from "@/lib/quarter";
 import ItemPicker from "./ItemPicker.vue";
 
 const lines = defineModel<DraftLine[]>({ required: true });
-/** Ordinary invoices and quotes print a note under a line; a grave does not. */
-const props = defineProps<{ withComments?: boolean }>();
+/** Ordinary invoices and quotes print a note under a line and can price it
+ *  VAT-included; a grave does neither. */
+const props = defineProps<{ ordinary?: boolean }>();
 
 const { t } = useI18n();
 const items = useItemsQuery(ref(""));
@@ -60,10 +61,20 @@ function removeLine(key: number): void {
   lines.value = lines.value.filter((line) => line.key !== key);
 }
 
+/** The row grid, with the 8rem VAT-included column only where it is shown. A
+ *  literal class string each, so Tailwind finds both. */
+const columns = computed(() =>
+  props.ordinary
+    ? "md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem]"
+    : "md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_2.5rem]",
+);
+
 /** An estimate while typing; the invoice's own totals come from the backend.
- *  Rounded line by line as an invoice is -- a VAT-included price back to its
- *  net per unit, each line's net and VAT to the cent -- so it matches the
- *  saved invoice in the usual case rather than drifting by a cent or two. */
+ *  Rounded line by line as an invoice is, so it matches the saved invoice
+ *  rather than drifting by a cent or two. A VAT-included line is gross-led: the
+ *  line's gross is count × the price as typed, its VAT is the share of that
+ *  gross at the rate, and the net is the rest -- the price is never converted
+ *  to a net per unit first. A net line is its net plus VAT on top. */
 const totals = computed(() => {
   let net = 0;
   let vat = 0;
@@ -73,12 +84,15 @@ const totals = computed(() => {
     if (rate == null || price == null || line.count == null) {
       continue;
     }
-    const unitNet = line.priceIncludesVat
-      ? roundCents(roundCents(price) / (1 + rate / 100))
-      : price;
-    const lineNetValue = lineNet(line.count, unitNet);
-    net += lineNetValue;
-    vat += roundCents((lineNetValue * rate) / 100);
+    if (props.ordinary && line.priceIncludesVat) {
+      const split = splitGross(lineNet(line.count, price), rate);
+      net += split.net;
+      vat += split.vat;
+    } else {
+      const lineNetValue = lineNet(line.count, price);
+      net += lineNetValue;
+      vat += roundCents((lineNetValue * rate) / 100);
+    }
   }
   return { net: roundCents(net), gross: roundCents(net + vat) };
 });
@@ -87,20 +101,22 @@ const totals = computed(() => {
 <template>
   <div class="flex flex-col gap-3">
     <div
-      class="hidden gap-3 px-1 text-sm font-medium text-muted-color md:grid md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem]"
+      class="hidden gap-3 px-1 text-sm font-medium text-muted-color md:grid"
+      :class="columns"
       aria-hidden="true"
     >
       <span>{{ t("itemNumber") }}</span>
       <span>{{ t("itemCount") }}</span>
       <span>{{ t("itemPrice") }}</span>
-      <span>{{ t("priceIncludesVatShort") }}</span>
+      <span v-if="props.ordinary">{{ t("priceIncludesVatShort") }}</span>
       <span />
     </div>
 
     <div
       v-for="(line, index) in lines"
       :key="line.key"
-      class="grid grid-cols-2 gap-3 rounded-lg border border-surface p-3 md:grid-cols-[minmax(14rem,1fr)_6rem_10rem_8rem_2.5rem] md:items-start md:border-0 md:p-1"
+      class="grid grid-cols-2 gap-3 rounded-lg border border-surface p-3 md:items-start md:border-0 md:p-1"
+      :class="columns"
     >
       <div class="col-span-2 flex min-w-0 flex-col gap-1 md:col-span-1">
         <ItemPicker
@@ -146,7 +162,10 @@ const totals = computed(() => {
           fluid
         />
       </div>
-      <label class="flex items-center gap-2 self-end pb-2 md:self-auto md:pt-2 md:pb-0">
+      <label
+        v-if="props.ordinary"
+        class="flex items-center gap-2 self-end pb-2 md:self-auto md:pt-2 md:pb-0"
+      >
         <Checkbox v-model="line.priceIncludesVat" binary />
         <span class="text-sm md:sr-only">{{ t("priceIncludesVatShort") }}</span>
       </label>
@@ -162,7 +181,7 @@ const totals = computed(() => {
       />
       <!-- under the item, as the document prints it under the description -->
       <Textarea
-        v-if="props.withComments"
+        v-if="props.ordinary"
         v-model="line.comment"
         rows="1"
         auto-resize

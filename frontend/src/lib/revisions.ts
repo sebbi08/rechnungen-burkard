@@ -1,14 +1,17 @@
 import type { Invoice, InvoiceLine, Quote, QuoteLine } from "@/api/generated";
-import { grossPerLine, lineNet } from "./money";
+import { grossPerLine, lineNet, splitGross } from "./money";
 
 export interface RevisionLineView {
   ItemNumber: string;
   Description: string;
   Count: number;
   UnitPrice: number;
+  /** What a line entered VAT-included was stored at; null on every other. */
+  GrossUnitPrice: number | null;
   VatRate: number;
   PriceIncludesVat: boolean;
-  /** Count × UnitPrice as printed, rounded to the cent. */
+  /** The line's net, rounded to the cent: count × UnitPrice, or on a gross-led
+   *  line what is left of count × GrossUnitPrice after its VAT. */
   LineTotal: number;
   /** This line's part of what is actually charged, gross (grossPerLine). */
   GrossTotal: number;
@@ -51,9 +54,13 @@ function buildView(
       Description: line.Description,
       Count: line.Count,
       UnitPrice: line.UnitPrice,
+      GrossUnitPrice: line.GrossUnitPrice ?? null,
       VatRate: line.VatRate,
       PriceIncludesVat: line.PriceIncludesVat,
-      LineTotal: lineNet(line.Count, line.UnitPrice),
+      LineTotal:
+        line.GrossUnitPrice != null
+          ? splitGross(lineNet(line.Count, line.GrossUnitPrice), line.VatRate).net
+          : lineNet(line.Count, line.UnitPrice),
       GrossTotal: 0,
     }));
   const shares = grossPerLine(

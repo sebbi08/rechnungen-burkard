@@ -7,6 +7,7 @@ import { type DocumentKindName, quotePdfUrl } from "@/api/endpoints";
 import { useErrorToast } from "@/composables/useErrorToast";
 import { openDocument } from "@/lib/download";
 import { formatAmount, formatVatRate } from "@/lib/format";
+import { printedUnitPrice } from "@/lib/money";
 import type { RevisionView } from "@/lib/revisions";
 
 const props = defineProps<{ revision: RevisionView; kind: "invoice" | "quote" }>();
@@ -71,7 +72,7 @@ function openQuote(): void {
         header-class="hidden sm:table-cell col-num"
         body-class="hidden sm:table-cell text-right tabular-nums whitespace-nowrap"
       >
-        <template #body="{ data }">{{ formatAmount(data.UnitPrice) }}</template>
+        <template #body="{ data }">{{ formatAmount(printedUnitPrice(data)) }}</template>
       </Column>
       <Column
         :header="t('netAmount')"
