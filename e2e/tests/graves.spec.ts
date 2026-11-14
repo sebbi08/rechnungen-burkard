@@ -510,7 +510,6 @@ interface SeedGraveItem {
   description?: string;
   vatRate?: number;
   price?: number;
-  priceIncludesVat?: boolean;
   count?: number;
 }
 
@@ -539,7 +538,6 @@ async function seedGrave(
     lines.push({
       itemId: item.Id,
       count: spec.count ?? 1,
-      priceIncludesVat: spec.priceIncludesVat ?? false,
     });
   }
   const recipientIds: number[] = [];
@@ -1090,50 +1088,7 @@ test("a grave with three recipients bills every one of them the identical share 
   await expect(graveInvoiceRows(page).filter({ hasText: "81,03 €" })).toHaveCount(3);
 });
 
-test("a grave splits a VAT-included price without taking its VAT out twice", async ({ page }) => {
-  const marker = `GV-${unique()}`;
-  const names = [`Vera ${marker}`, `Walter ${marker}`];
-  const { graveId } = await seedGrave(
-    page,
-    marker,
-    names,
-    [{ vatRate: 7, price: 117.02, priceIncludesVat: true }],
-    term(2036, 2),
-  );
-  await generateFor(page, 2036, 2);
-
-  await page.goto(`/graves/${graveId}`);
-  // the grave's own item list shows the gross and says so in its own column
-  const careRow = card(page, "Leistungen").locator("tbody tr").filter({ hasText: "Grabpflege" });
-  await expect(careRow).toContainText("Ja");
-  // 117,02 gross at 7 % is a net of 109,36, whose 10 936 cents divide evenly by
-  // two. The page shows the price exactly as it was typed.
-  await expect(careRow).toContainText("117,02 €");
-
-  // 54,68 net and 58,51 gross each — 117,02 together, the price that was entered
-  await expect(graveInvoiceRows(page).filter({ hasText: "58,51 €" })).toHaveCount(2);
-
-  await graveInvoiceRows(page)
-    .filter({ hasText: names[0] })
-    .getByRole("button", { name: "Bearbeiten" })
-    .click();
-  await waitForOverlayOpen(page);
-
-  // the editor opens on the grave's gross — not on the 109,36 net it stores,
-  // and not on either recipient's share
-  const editor = drawer(page);
-  await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("117,02");
-  await expect(editor.getByRole("checkbox", { name: "inkl. MwSt." })).toBeChecked();
-
-  // saved back untouched, every share stays where it was
-  await saveEditor(editor);
-  await expect(graveInvoiceRows(page).filter({ hasText: "R1" })).toHaveCount(2);
-  await expect(graveInvoiceRows(page).filter({ hasText: "58,51 €" })).toHaveCount(2);
-});
-
-test("the grave's item table shows the price as entered, its rate and the flag", async ({
-  page,
-}) => {
+test("the grave's item table shows the price as entered and its rate", async ({ page }) => {
   const marker = `GK-${unique()}`;
   const { graveId } = await seedGrave(
     page,
@@ -1150,8 +1105,9 @@ test("the grave's item table shows the price as entered, its rate and the flag",
   // belong to the invoices listed beneath it.
   await expect(row).toContainText("100,00 €");
   await expect(row).toContainText("19 %");
-  // the flag reads as a word, since a screen reader announces these cell by cell
-  await expect(row).toContainText("Nein");
+  // no VAT-included column: a grave's prices are always net
+  await expect(card(page, "Leistungen")).not.toContainText("USt inkl.");
+  await expect(card(page, "Leistungen")).not.toContainText("inkl. MwSt.");
   await expect(row).not.toContainText("200,00 €");
   await expect(row).not.toContainText("238,00 €");
 });

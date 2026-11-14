@@ -12,10 +12,12 @@ const RUN = unique();
 const RECIPIENTS_HEADER = "RecipientNumber,Name,Address\r\n";
 const ITEMS_HEADER = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
 const GRAVES_HEADER = "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate\r\n";
+// the mapping header of archives prepared while grave prices could be flagged
+// VAT-included: the importer still reads it, and the flag column must stay empty
 const MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
 // the template's headers, with the optional last columns the ones above leave out
 const FULL_RECIPIENTS_HEADER = "RecipientNumber,Name,Address,Email\r\n";
-const FULL_MAPPING_HEADER = "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
+const FULL_MAPPING_HEADER = "Type,GraveNumber,Reference,Count,UnitPrice\r\n";
 
 function archive(files: Record<string, string>): Buffer {
   const zip = new AdmZip();
@@ -222,8 +224,8 @@ test("an archive with e-mail addresses, grave prices and an old position imports
       `${graveNumber},27,Grabstätte Alt,${SEED_CEMETERY},LawnUrnOutside,2026-01,2040-12\r\n`,
     "mapping.csv":
       FULL_MAPPING_HEADER +
-      `Item,${graveNumber},IMP-I-${suffix},1,,"80,50"\r\n` +
-      `Recipient,${graveNumber},IMP-R-${suffix},,,\r\n`,
+      `Item,${graveNumber},IMP-I-${suffix},1,"80,50"\r\n` +
+      `Recipient,${graveNumber},IMP-R-${suffix},,\r\n`,
   });
 
   await page.goto("/import-export");

@@ -88,12 +88,11 @@ export async function ensureCemetery(page: Page, name = SEED_CEMETERY): Promise<
 
 /** One item line of a grave `seedGrave` saves. A `unitPrice` left out (or null)
  *  bills the item's default price, as the dialog does when the pre-filled price
- *  is left alone; `priceIncludesVat` says the price is a gross one. */
+ *  is left alone. */
 export interface SeedGraveLine {
   itemId: number;
   count?: number;
   unitPrice?: number | null;
-  priceIncludesVat?: boolean;
 }
 
 export interface SeedGraveInput {
@@ -141,7 +140,6 @@ export async function seedGrave(page: Page, grave: SeedGraveInput): Promise<numb
       itemId: line.itemId,
       count: line.count ?? 1,
       unitPrice: line.unitPrice ?? null,
-      priceIncludesVat: line.priceIncludesVat ?? false,
     })),
     recipientIds: grave.recipientIds,
     isCooperative: grave.isCooperative ?? false,
