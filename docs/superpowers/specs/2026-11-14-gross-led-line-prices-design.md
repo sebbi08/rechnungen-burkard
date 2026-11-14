@@ -2,7 +2,7 @@
 
 **Created**: 2026-11-14
 
-**Status**: Awaiting approval
+**Status**: Approved
 
 **Input**: Issue 73. On an ordinary invoice, a line priced 75,00 € including
 19 % VAT prints as 75,01 €, unit price and total. A price entered as a gross
