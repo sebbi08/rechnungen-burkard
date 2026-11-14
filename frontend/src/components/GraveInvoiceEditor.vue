@@ -33,12 +33,7 @@ const { run } = useBlocking();
 const queryClient = useQueryClient();
 const lines = ref<DraftLine[]>([]);
 const discard = useDiscardGuard(visible, () =>
-  lines.value.map(({ itemId, count, unitPrice, priceIncludesVat }) => ({
-    itemId,
-    count,
-    unitPrice,
-    priceIncludesVat,
-  })),
+  lines.value.map(({ itemId, count, unitPrice }) => ({ itemId, count, unitPrice })),
 );
 
 watch(visible, (open) => {

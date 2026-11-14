@@ -156,7 +156,6 @@ const previewInput = computed<PreviewInput | null>(() => {
       itemId: link.Item.Id,
       count: link.Count,
       unitPrice: link.UnitPrice,
-      priceIncludesVat: link.PriceIncludesVat,
     })),
     keys: current.Items.map((_, index) => index),
   };
@@ -315,13 +314,6 @@ const {
             body-class="hidden md:table-cell text-right"
           >
             <template #body="{ data }">{{ formatVatRate(data.VatRate) }} %</template>
-          </Column>
-          <Column
-            :header="t('priceIncludesVatColumn')"
-            header-class="hidden md:table-cell"
-            body-class="hidden md:table-cell"
-          >
-            <template #body="{ data }">{{ data.PriceIncludesVat ? t("yes") : t("no") }}</template>
           </Column>
         </DataTable>
       </template>

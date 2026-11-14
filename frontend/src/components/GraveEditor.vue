@@ -98,12 +98,7 @@ const saving = ref(false);
 // is added.
 const discard = useDiscardGuard(visible, () => ({
   form,
-  lines: lines.value.map(({ itemId, count, unitPrice, priceIncludesVat }) => ({
-    itemId,
-    count,
-    unitPrice,
-    priceIncludesVat,
-  })),
+  lines: lines.value.map(({ itemId, count, unitPrice }) => ({ itemId, count, unitPrice })),
   recipients: recipients.value.map((recipient) => recipient.id),
 }));
 // Which opening a load belongs to. An answer that arrives after the drawer was
@@ -124,13 +119,12 @@ function fill(grave: GraveDetails): void {
     ContractNumber: grave.ContractNumber ?? "",
   });
   storedPosition.value = grave.Position;
-  // a link price is shown as stored -- already the gross on a VAT-included line
+  // a link price is shown as stored: a grave's prices are always net
   lines.value = grave.Items.map((link) =>
     newLine({
       itemId: link.Item.Id,
       count: link.Count,
       unitPrice: link.UnitPrice,
-      priceIncludesVat: link.PriceIncludesVat,
     }),
   );
   recipients.value = grave.Recipients.map((link) => ({

@@ -5,7 +5,6 @@ import { formatAmount, type Translate } from "./format";
 export interface IncreaseRow {
   isDefault: boolean;
   oldPrice: number;
-  priceIncludesVat: boolean;
   graveIds: number[];
   graveCount: number;
   ticked: boolean;
@@ -24,7 +23,7 @@ export function rowLabel(row: IncreaseRow, t: Translate): string {
   const price = t(row.isDefault ? "itemPriceDefault" : "itemPriceOwn", [
     formatAmount(row.oldPrice),
   ]);
-  return row.priceIncludesVat ? `${price} (${t("priceIncludesVatShort")})` : price;
+  return price;
 }
 
 /** Whether a ticked row's price is actually going to change. */
@@ -42,7 +41,7 @@ export function raiseByPercent(price: number, percent: number): number {
 }
 
 /** The rows of an item's graves: the default price first (merging net and
- *  gross groups, even with no grave), then one per own price. */
+ *  groups, even with no grave), then one per own price. */
 export function increaseRows(graves: ItemGraves): IncreaseRow[] {
   const rows: IncreaseRow[] = [];
   if (graves.DefaultPrice != null) {
@@ -55,7 +54,6 @@ export function increaseRows(graves: ItemGraves): IncreaseRow[] {
     rows.push({
       isDefault: true,
       oldPrice: graves.DefaultPrice,
-      priceIncludesVat: false,
       graveIds: [...ids],
       graveCount: ids.size,
       ticked: true,
@@ -70,7 +68,6 @@ export function increaseRows(graves: ItemGraves): IncreaseRow[] {
     rows.push({
       isDefault: false,
       oldPrice: group.UnitPrice,
-      priceIncludesVat: group.PriceIncludesVat,
       graveIds: ids,
       graveCount: ids.length,
       ticked: true,

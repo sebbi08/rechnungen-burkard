@@ -1,4 +1,4 @@
-import type { BillingPreviewInvoice, GraveBillingProblem, InvoiceLineInput } from "@/api/endpoints";
+import type { BillingPreviewInvoice, GraveBillingProblem, GraveLineInput } from "@/api/endpoints";
 import { formatAmount, formatVatRate, type Translate } from "./format";
 import { halfYearText } from "./halfYear";
 import type { DraftLine } from "./lines";
@@ -52,8 +52,8 @@ function isWholeCents(value: number): boolean {
 export function previewLines(
   lines: DraftLine[],
   defaultPrice: (itemId: number) => number | null,
-): { inputs: InvoiceLineInput[]; keys: number[] } {
-  const inputs: InvoiceLineInput[] = [];
+): { inputs: GraveLineInput[]; keys: number[] } {
+  const inputs: GraveLineInput[] = [];
   const keys: number[] = [];
   for (const line of lines) {
     if (line.itemId == null || line.count == null) {
@@ -70,7 +70,6 @@ export function previewLines(
       itemId: line.itemId,
       count: line.count,
       unitPrice: line.unitPrice,
-      priceIncludesVat: line.priceIncludesVat,
     });
     keys.push(line.key);
   }

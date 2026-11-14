@@ -2,7 +2,6 @@ import type { QFilterExpression, QStringPath } from "@odata2ts/odata-query-objec
 import { keepPreviousData, type QueryClient, useQuery } from "@tanstack/vue-query";
 import type { Ref } from "vue";
 import { currentHalfYear } from "@/lib/halfYear";
-import { priceFieldValue } from "@/lib/money";
 import { PAGE_SIZE } from "@/lib/paging";
 import { fetchGraveDetails, fetchGraveInvoiceGroup, type GraveDetails } from "./endpoints";
 import type { Invoice, InvoiceItem, QRecipient, Quote } from "./generated";
@@ -288,7 +287,6 @@ export interface GraveLineView {
   Count: number;
   Price: number;
   VatRate: number;
-  PriceIncludesVat: boolean;
 }
 
 export interface GraveDetailView {
@@ -340,9 +338,8 @@ export async function loadGraveDetail(graveId: number): Promise<GraveDetailView>
         Number: line.ItemNumber,
         Description: line.Description,
         Count: line.Count,
-        Price: priceFieldValue(line.UnitPrice, line.PriceIncludesVat, line.VatRate),
+        Price: line.UnitPrice,
         VatRate: line.VatRate,
-        PriceIncludesVat: line.PriceIncludesVat,
       }))
     : grave.Items.map((link) => ({
         Number: link.Item.Number,
@@ -350,7 +347,6 @@ export async function loadGraveDetail(graveId: number): Promise<GraveDetailView>
         Count: link.Count,
         Price: link.UnitPrice ?? link.Item.DefaultPrice ?? 0,
         VatRate: link.Item.VatRate,
-        PriceIncludesVat: link.PriceIncludesVat,
       }));
 
   return { grave, currentInvoiced, lines, invoices };

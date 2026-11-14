@@ -1,11 +1,8 @@
-import { useQueryClient } from "@tanstack/vue-query";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { fetchGraveInvoiceGroup } from "@/api/endpoints";
-import { loadItemVatRates } from "@/api/queries";
 import { halfYearText } from "@/lib/halfYear";
 import { type DraftLine, newLine } from "@/lib/lines";
-import { priceFieldValue } from "@/lib/money";
 import { useErrorToast } from "./useErrorToast";
 import { showMessage } from "./useMessage";
 
@@ -23,16 +20,12 @@ export interface GraveInvoiceDraft {
 export function useGraveInvoiceEdit() {
   const { t } = useI18n();
   const { showError } = useErrorToast();
-  const queryClient = useQueryClient();
   const visible = ref(false);
   const draft = ref<GraveInvoiceDraft | null>(null);
 
   async function open(invoiceId: number): Promise<void> {
     try {
-      const [group, rates] = await Promise.all([
-        fetchGraveInvoiceGroup(invoiceId),
-        loadItemVatRates(queryClient),
-      ]);
+      const group = await fetchGraveInvoiceGroup(invoiceId);
       const paid = group.Recipients.filter((recipient) => recipient.Paid);
       if (paid.length) {
         showMessage(
@@ -48,19 +41,13 @@ export function useGraveInvoiceEdit() {
           halfYearText(group.PeriodYear, group.PeriodHalf),
           group.Recipients.map((recipient) => recipient.Name).join(", "),
         ]),
-        // Grave-level lines: the full count at the full price. A net price is
-        // not rounded -- an old line keeps three decimals on purpose -- and only
-        // a VAT-included one is converted.
+        // Grave-level lines: the full count at the full price, as stored. A net
+        // price is not rounded -- an old line keeps three decimals on purpose.
         lines: group.Lines.map((line) =>
           newLine({
             itemId: line.ItemId,
             count: line.Count,
-            unitPrice: priceFieldValue(
-              line.UnitPrice,
-              line.PriceIncludesVat,
-              rates.get(line.ItemId) ?? 0,
-            ),
-            priceIncludesVat: line.PriceIncludesVat,
+            unitPrice: line.UnitPrice,
           }),
         ),
       };

@@ -165,7 +165,6 @@ export async function createRecipient(input: {
  *  default standing in for it. */
 export interface ItemGraveGroup {
   UnitPrice: number | null;
-  PriceIncludesVat: boolean;
   IsDefault: boolean;
   Graves: { Id: number; GraveNumber: string; IsCooperative: boolean }[];
 }
@@ -217,7 +216,6 @@ function increaseBody(itemId: number, rows: IncreaseRow[]) {
       .map((row) => ({
         IsDefault: row.isDefault,
         OldPrice: row.oldPrice,
-        PriceIncludesVat: row.priceIncludesVat,
         NewPrice: row.newPrice,
         GraveIds: row.graveIds,
       })),
@@ -430,7 +428,6 @@ export interface GraveItemLink {
   Count: number;
   /** The link's own price, stored as typed; null bills the item's default. */
   UnitPrice: number | null;
-  PriceIncludesVat: boolean;
   Item: {
     Id: number;
     Number: string;
@@ -490,7 +487,6 @@ export interface GraveInvoiceGroupLine {
   Count: number;
   UnitPrice: number;
   VatRate: number;
-  PriceIncludesVat: boolean;
 }
 
 /** The grave, half-year and recipients a grave invoice belongs to, with the
@@ -508,12 +504,15 @@ export function fetchGraveInvoiceGroup(invoiceId: number): Promise<GraveInvoiceG
   return getJson<GraveInvoiceGroup>(`/odata/GraveInvoiceGroup?invoiceId=${invoiceId}`);
 }
 
+/** A grave's line as the billing checks take it: its prices are always net. */
+export type GraveLineInput = Pick<InvoiceLineInput, "itemId" | "count" | "unitPrice">;
+
 export interface GraveBillingProblem {
   VatRate: number;
-  Kind: "NotDivisible" | "DoesNotAddUp";
-  /** What this rate comes to, in the unit its prices were entered in. */
+  Kind: "NotDivisible";
+  /** What this rate comes to. */
   Amount: number;
-  /** The nearest amounts that would work, in that same unit. */
+  /** The nearest amounts that would work. */
   Suggestions: number[];
 }
 
@@ -526,7 +525,7 @@ export interface GraveBillingCheck {
 /** Whether the grave's prices split evenly across its recipients. */
 export function checkGraveBilling(
   recipients: number,
-  lines: InvoiceLineInput[],
+  lines: GraveLineInput[],
 ): Promise<GraveBillingCheck> {
   return postJson<GraveBillingCheck>("/odata/ValidateGraveBilling", {
     Recipients: recipients,
@@ -534,7 +533,6 @@ export function checkGraveBilling(
       ItemId: line.itemId,
       Count: line.count,
       UnitPrice: line.unitPrice,
-      PriceIncludesVat: line.priceIncludesVat,
     })),
   });
 }
@@ -549,9 +547,7 @@ export interface BillingPreviewLine {
   Description: string;
   Count: number;
   VatRate: number;
-  PriceIncludesVat: boolean;
-  /** As billed, corrected; in the unit it was entered in: the gross on a
-   *  VAT-included line. */
+  /** As billed, corrected. */
   Price: number;
   /** What was entered, before a correction. */
   EnteredPrice: number;
@@ -601,7 +597,7 @@ export interface PreviewRequest {
   startMonth: string | null;
   /** "yyyy-MM"; null for a grave without an end */
   endMonth: string | null;
-  lines: InvoiceLineInput[];
+  lines: GraveLineInput[];
 }
 
 /** Every invoice the grave's term will produce, checked like the save checks
@@ -615,7 +611,6 @@ export function previewGraveBilling(input: PreviewRequest): Promise<BillingPrevi
       ItemId: line.itemId,
       Count: line.count,
       UnitPrice: line.unitPrice,
-      PriceIncludesVat: line.priceIncludesVat,
     })),
   });
 }

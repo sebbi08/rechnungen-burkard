@@ -101,9 +101,7 @@ function newPriceOf(group: ItemGraveGroup): number | null {
       rowChanged(candidate) &&
       (group.IsDefault
         ? candidate.isDefault
-        : !candidate.isDefault &&
-          candidate.oldPrice === group.UnitPrice &&
-          candidate.priceIncludesVat === group.PriceIncludesVat),
+        : !candidate.isDefault && candidate.oldPrice === group.UnitPrice),
   );
   return row?.newPrice ?? null;
 }
@@ -120,11 +118,9 @@ const linked = computed(() => graves.data.value?.Linked ?? false);
 const rateLocked = computed(() => linked.value || (itemId.value != null && graves.isPending.value));
 
 function groupLabel(group: ItemGraveGroup): string {
-  const price =
-    group.UnitPrice == null
-      ? t("itemPriceNone")
-      : t(group.IsDefault ? "itemPriceDefault" : "itemPriceOwn", [formatAmount(group.UnitPrice)]);
-  return group.PriceIncludesVat ? `${price} (${t("priceIncludesVatShort")})` : price;
+  return group.UnitPrice == null
+    ? t("itemPriceNone")
+    : t(group.IsDefault ? "itemPriceDefault" : "itemPriceOwn", [formatAmount(group.UnitPrice)]);
 }
 
 const saving = ref(false);

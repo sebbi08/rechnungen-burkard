@@ -283,6 +283,7 @@
   "importProblemContractNumberRequired": "Das Genossenschaftsgrab „{0}“ braucht eine Vertragsnummer.",
   "importProblemCooperativeInvalid": "„{0}“ ist kein gültiger Wert für Genossenschaftsgrab (erwartet true oder false).",
   "importProblemPriceIncludesVatInvalid": "„{0}“ ist kein gültiger Ja/Nein-Wert.",
+  "importProblemGravePriceIncludesVat": "Grabpreise sind immer netto – die Spalte „PriceIncludesVat“ darf nicht „true“ sein.",
   "importProblemDuplicateItemLink": "Das Grab „{0}“ ist bereits in Zeile {2} mit der Leistung „{1}“ verknüpft.",
   "importProblemDuplicateRecipientLink": "Das Grab „{0}“ ist bereits in Zeile {2} mit dem Empfänger „{1}“ verknüpft.",
   "importProblemTypeInvalid": "„{0}“ ist keine Zuordnungsart; erlaubt sind „{1}“ und „{2}“.",

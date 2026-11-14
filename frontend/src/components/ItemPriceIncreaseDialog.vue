@@ -51,9 +51,7 @@ watch(
       rows.value = increaseRows(props.graves).map((row) => {
         const before = props.initial?.rows.find(
           (candidate) =>
-            candidate.isDefault === row.isDefault &&
-            candidate.oldPrice === row.oldPrice &&
-            candidate.priceIncludesVat === row.priceIncludesVat,
+            candidate.isDefault === row.isDefault && candidate.oldPrice === row.oldPrice,
         );
         if (before) {
           return { ...row, ticked: before.ticked, newPrice: before.newPrice };
@@ -103,7 +101,6 @@ function problemsOf(row: IncreaseRow): PriceIncreaseProblem[] {
     (candidate) =>
       candidate.isDefault === row.isDefault &&
       candidate.oldPrice === row.oldPrice &&
-      candidate.priceIncludesVat === row.priceIncludesVat &&
       candidate.newPrice === row.newPrice,
   );
   return preview.value.Rows[index]?.Problems ?? [];
