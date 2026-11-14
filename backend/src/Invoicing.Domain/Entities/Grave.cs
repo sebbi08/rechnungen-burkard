@@ -50,11 +50,6 @@ public sealed class GraveItem
 
     // per-grave price override; null falls back to the item's default price
     public decimal? UnitPrice { get; set; }
-
-    /// <summary>True when this grave's price for the item was entered as a
-    /// gross. Applies to whichever price is billed — the link's own
-    /// <see cref="UnitPrice"/>, or the item's default standing in for it.</summary>
-    public bool PriceIncludesVat { get; set; }
     public InvoiceItem Item { get; set; } = null!;
 }
 

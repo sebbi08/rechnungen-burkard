@@ -98,11 +98,10 @@ public class WorkListRulesTests
     }
 
     [Fact]
-    public void GrossOf_keeps_a_gross_price_and_converts_a_net_one()
+    public void GrossOf_adds_the_vat_to_a_net_price_and_rounds_to_the_cent()
     {
-        Assert.Equal(48.15m, VatInclusivePrice.GrossOf(48.15m, 7m, true));
-        Assert.Equal(48.15m, VatInclusivePrice.GrossOf(45.00m, 7m, false));
-        Assert.Equal(11.90m, VatInclusivePrice.GrossOf(10.00m, 19m, false));
-        Assert.Equal(0.13m, VatInclusivePrice.GrossOf(0.125m, 0m, true));
+        Assert.Equal(48.15m, VatInclusivePrice.GrossOf(45.00m, 7m));
+        Assert.Equal(11.90m, VatInclusivePrice.GrossOf(10.00m, 19m));
+        Assert.Equal(0.13m, VatInclusivePrice.GrossOf(0.125m, 0m));
     }
 }

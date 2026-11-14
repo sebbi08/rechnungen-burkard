@@ -46,13 +46,12 @@ public class GraveBillingValidationTests
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
     }
 
-    private static object Line(long itemId, decimal? price, bool gross = false, int count = 1) =>
+    private static object Line(long itemId, decimal? price, int count = 1) =>
         new
         {
             ItemId = itemId,
             Count = count,
             UnitPrice = price,
-            PriceIncludesVat = gross,
         };
 
     [Fact]
@@ -98,54 +97,6 @@ public class GraveBillingValidationTests
         Assert.True(body.GetProperty("Ok").GetBoolean());
         Assert.Empty(body.GetProperty("Problems").EnumerateArray().ToArray());
         Assert.Equal(56.88m, body.GetProperty("GrossTotal").GetDecimal());
-    }
-
-    [Fact]
-    public async Task A_gross_price_that_cannot_be_billed_exactly_is_reported_as_such()
-    {
-        using var host = new ApiTestHost();
-        var (_, grossItem) = await SeedAsync(host);
-        using var client = host.CreateClient();
-
-        // 100,25 entered as a gross at 19 % over two. Its net of 84,24 divides,
-        // but the two shares collect 100,24 — a cent under what was typed.
-        var body = await ValidateAsync(
-            client,
-            new { Recipients = 2, Lines = new[] { Line(grossItem, 100.25m, gross: true) } }
-        );
-
-        Assert.False(body.GetProperty("Ok").GetBoolean());
-        var problem = Assert.Single(body.GetProperty("Problems").EnumerateArray().ToArray());
-        Assert.Equal("DoesNotAddUp", problem.GetProperty("Kind").GetString());
-        // named and suggested in the unit it was typed in -- gross, not the net
-        // it converts to, so the figures match the field the user edits
-        Assert.Equal(100.25m, problem.GetProperty("Amount").GetDecimal());
-
-        var suggestions = problem
-            .GetProperty("Suggestions")
-            .EnumerateArray()
-            .Select(v => v.GetDecimal())
-            .ToArray();
-        Assert.Equal(2, suggestions.Length);
-        Assert.True(suggestions[0] < 100.25m, "no suggestion below");
-        Assert.True(suggestions[1] > 100.25m, "no suggestion above");
-    }
-
-    [Fact]
-    public async Task A_gross_price_that_comes_out_even_is_accepted()
-    {
-        using var host = new ApiTestHost();
-        var (_, grossItem) = await SeedAsync(host);
-        using var client = host.CreateClient();
-
-        var body = await ValidateAsync(
-            client,
-            new { Recipients = 2, Lines = new[] { Line(grossItem, 100.24m, gross: true) } }
-        );
-
-        Assert.True(body.GetProperty("Ok").GetBoolean());
-        // what was typed is what the two of them collect
-        Assert.Equal(100.24m, body.GetProperty("GrossTotal").GetDecimal());
     }
 
     [Fact]
@@ -225,7 +176,7 @@ public class GraveBillingValidationTests
 
         var response = await client.PostAsJsonAsync(
             "/odata/ValidateGraveBilling",
-            new { Recipients = 2, Lines = new[] { Line(unpriced, null, gross: true) } }
+            new { Recipients = 2, Lines = new[] { Line(unpriced, null) } }
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -300,7 +251,6 @@ public class GraveBillingValidationTests
                             itemId = netItem,
                             count = 1,
                             unitPrice = price,
-                            priceIncludesVat = false,
                         },
                     },
                     recipientIds,

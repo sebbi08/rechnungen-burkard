@@ -598,8 +598,12 @@ public sealed class ImportValidator
             var graveNumber = row[1].Trim();
             var reference = row[2].Trim();
             var rawCount = row[3].Trim();
-            var rawIncludesVat = row[4].Trim();
-            var rawUnitPrice = Cell(row, 5);
+            // an archive prepared with the legacy VAT column has it before
+            // UnitPrice; the template does not
+            var legacy =
+                rows[0].Count > 4 && rows[0][4].Trim() == ImportArchiveLayout.LegacyVatColumn;
+            var rawIncludesVat = legacy ? Cell(row, 4) : "";
+            var rawUnitPrice = Cell(row, legacy ? 5 : 4);
             if (
                 Missing(type, file, line, "Type", problems)
                 | Missing(graveNumber, file, line, "GraveNumber", problems)
@@ -634,7 +638,7 @@ public sealed class ImportValidator
                     continue;
                 }
 
-                if (!TryParseBool(rawIncludesVat, out var priceIncludesVat))
+                if (!TryParseBool(rawIncludesVat, out var legacyIncludesVat))
                 {
                     problems.Add(
                         new ImportProblem(
@@ -644,6 +648,21 @@ public sealed class ImportValidator
                             $"'{rawIncludesVat}' is not a valid yes/no value.",
                             "PriceIncludesVatInvalid",
                             [rawIncludesVat]
+                        )
+                    );
+                    continue;
+                }
+
+                if (legacyIncludesVat)
+                {
+                    problems.Add(
+                        new ImportProblem(
+                            file,
+                            line,
+                            "GravePriceIncludesVat",
+                            "Grave prices are always net; the VAT-included flag cannot be set.",
+                            "GravePriceIncludesVat",
+                            []
                         )
                     );
                     continue;
@@ -683,16 +702,7 @@ public sealed class ImportValidator
                 }
 
                 itemLinks[key] = line;
-                data.ItemLinks.Add(
-                    new ItemLinkRow(
-                        line,
-                        graveNumber,
-                        reference,
-                        count,
-                        priceIncludesVat,
-                        unitPrice
-                    )
-                );
+                data.ItemLinks.Add(new ItemLinkRow(line, graveNumber, reference, count, unitPrice));
             }
             else if (
                 type.Equals(
@@ -701,7 +711,7 @@ public sealed class ImportValidator
                 )
             )
             {
-                // a recipient link has no count, VAT flag or price: a value in
+                // a recipient link has no count or price: a value in
                 // one was meant for an item row, and is not silently dropped
                 var filled = new[]
                 {
@@ -836,8 +846,7 @@ public sealed class ImportValidator
                             Quarter = item.Quarter,
                         },
                         link.Count,
-                        link.UnitPrice,
-                        link.PriceIncludesVat
+                        link.UnitPrice
                     );
                 })
                 .ToList();

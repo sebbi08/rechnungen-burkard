@@ -93,9 +93,7 @@ public sealed class GraveInvoiceGenerator
         }
 
         var links = graveItems
-            .Select(item =>
-                GraveBilling.LinkFor(item.Item, item.Count, item.UnitPrice, item.PriceIncludesVat)
-            )
+            .Select(item => GraveBilling.LinkFor(item.Item, item.Count, item.UnitPrice))
             .ToList();
         if (HalfYearBilling.Lines(links, period).Count == 0)
         {
@@ -185,7 +183,6 @@ public sealed class GraveInvoiceGenerator
                             Count = line.Count,
                             UnitPrice = line.UnitPrice,
                             VatRate = line.VatRate,
-                            PriceIncludesVat = line.PriceIncludesVat,
                             LineNumber = index + 1,
                         }
                 )

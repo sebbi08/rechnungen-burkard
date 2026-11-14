@@ -825,9 +825,8 @@ it holds.
   naming the first failing invoice, the VAT rate and its subtotal. The grave's
   editor MUST show the example invoices, their check and each corrected price
   (marked as adjusted, with the price as entered) while the user types. Every
-  grave MUST have an item billed all year, which carries the correction. Where
-  a rate carries a price entered as a gross, what the recipients collect between
-  them MUST come to exactly that gross, and the save MUST be refused otherwise.
+  grave MUST have an item billed all year, which carries the correction. Grave
+  prices are always net; no grave price is entered as a gross.
   The start block of a term MUST be checked and corrected whenever its
   half-year can still be generated — the current half-year and up to two back,
   or a later one. Only the start of a term in an older half-year is left out,
@@ -993,8 +992,8 @@ it holds.
   columns, plus an eighth marking a cooperative grave (FR-020) and a ninth with
   its contract number:
   `GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative,ContractNumber`.
-  `Cooperative` is read like the mapping's VAT-included flag (`true`/`false`,
-  `ja`/`nein`, `1`/`0`; empty is false); a value that is none of these is a
+  `Cooperative` is read as a yes/no value (`true`/`false`, `ja`/`nein`,
+  `1`/`0`; empty is false); a value that is none of these is a
   problem naming the row and the value. `ContractNumber` is required for a
   cooperative grave (a row without one is a problem naming the grave) and
   ignored for any other. Either or both of the last two columns may be left out
@@ -1005,11 +1004,15 @@ it holds.
   problem naming the row and the value. The import MUST NOT create cemeteries.
   An archive whose graves CSV lacks the `Cemetery` column is refused.
 - **FR-053**: The mapping CSV MUST link each grave to its invoicing items (item
-  identifier with count, VAT-included flag and an optional unit price for this
-  grave) and to its recipients (recipient number, the other three columns
-  empty), covering both link types. A link's unit price is billed instead of the
-  item's price, exactly as one set in the grave editor; a file without the
-  `UnitPrice` column (header included) bills every item at its own price.
+  identifier with count and an optional net unit price for this grave) and to its
+  recipients (recipient number, the other two columns empty), covering both link
+  types: `Type,GraveNumber,Reference,Count,UnitPrice`. A link's unit price is
+  billed instead of the item's price, exactly as one set in the grave editor; a
+  file without the `UnitPrice` column (header included) bills every item at its
+  own price. Grave prices are always net, so the template has no VAT-included
+  flag. An archive prepared while there was one still imports: it carries a
+  `PriceIncludesVat` column between `Count` and `UnitPrice`, whose false or
+  empty value is ignored and whose true value is a problem naming the row.
 - **FR-054**: The system MUST validate an archive before importing any data.
 - **FR-055**: Validation MUST check that all four CSV files are present.
 - **FR-056**: Validation MUST check that each CSV file has a correct header row.
@@ -1327,9 +1330,9 @@ it holds.
   MUST stand in the order they were linked to the grave.
 - **FR-104**: The amount of a service MUST be its count times the unit price
   including VAT, with two decimals. The unit price is the grave's own price or,
-  without one, the item's default price; a price entered as gross is taken as
-  entered, and a net price is turned into a gross with the item's VAT rate,
-  rounded to the cent. The price is the one entered on the grave: per half-year
+  without one, the item's default price; both are net, and the net price is
+  turned into a gross with the item's VAT rate, rounded to the cent. The price
+  is the one entered on the grave: per half-year
   for a care service, not doubled to a yearly amount, and per occurrence for a
   seasonal service. Rounding corrections and partial half-years MUST NOT be
   applied. A service without any price MUST print a dash instead of an amount.

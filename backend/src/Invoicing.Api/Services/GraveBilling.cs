@@ -20,12 +20,7 @@ public static class GraveBilling
     /// <summary>A link as the half-year rule sees it: the link's own price, or
     /// the item's default standing in for it, rounded to the cent like
     /// <see cref="LineFor"/>.</summary>
-    public static BillableLink LinkFor(
-        InvoiceItem item,
-        int count,
-        decimal? unitPrice,
-        bool priceIncludesVat
-    ) =>
+    public static BillableLink LinkFor(InvoiceItem item, int count, decimal? unitPrice) =>
         new(
             item.Id,
             item.Number,
@@ -33,8 +28,7 @@ public static class GraveBilling
             item.VatRate,
             item.Quarter,
             count,
-            decimal.Round(unitPrice ?? item.DefaultPrice ?? 0m, 2, MidpointRounding.AwayFromZero),
-            priceIncludesVat
+            decimal.Round(unitPrice ?? item.DefaultPrice ?? 0m, 2, MidpointRounding.AwayFromZero)
         );
 
     /// <summary>Every grave's item links as the half-year rule sees them, in
@@ -55,7 +49,6 @@ public static class GraveBilling
                 l.Item,
                 l.Count,
                 l.UnitPrice,
-                l.PriceIncludesVat,
             })
             .ToListAsync(ct);
         return rows.GroupBy(l => l.GraveId)
@@ -63,8 +56,7 @@ public static class GraveBilling
                 g => g.Key,
                 g =>
                     (IReadOnlyList<BillableLink>)
-                        g.Select(l => LinkFor(l.Item, l.Count, l.UnitPrice, l.PriceIncludesVat))
-                            .ToList()
+                        g.Select(l => LinkFor(l.Item, l.Count, l.UnitPrice)).ToList()
             );
     }
 
@@ -90,32 +82,15 @@ public static class GraveBilling
 
     /// <summary>The billed line for one item link. The link's own price wins;
     /// without one the item's default is billed.</summary>
-    public static GraveLine LineFor(
-        InvoiceItem item,
-        int count,
-        decimal? unitPrice,
-        bool priceIncludesVat
-    )
-    {
-        var entered = decimal.Round(
-            unitPrice ?? item.DefaultPrice ?? 0m,
-            2,
-            MidpointRounding.AwayFromZero
-        );
-
-        return new GraveLine(
+    public static GraveLine LineFor(InvoiceItem item, int count, decimal? unitPrice) =>
+        new(
             item.Id,
             item.Number,
             item.Description,
             count,
-            VatInclusivePrice.NetOf(entered, item.VatRate, priceIncludesVat),
-            item.VatRate,
-            priceIncludesVat,
-            // a price entered as a gross is a promise about what the customer
-            // pays, and the split has to come to exactly that
-            priceIncludesVat ? entered : null
+            decimal.Round(unitPrice ?? item.DefaultPrice ?? 0m, 2, MidpointRounding.AwayFromZero),
+            item.VatRate
         );
-    }
 
     /// <summary>What a generation of this half-year has still to do: the graves
     /// due in it that have no invoices for it yet, in the order a run invoices

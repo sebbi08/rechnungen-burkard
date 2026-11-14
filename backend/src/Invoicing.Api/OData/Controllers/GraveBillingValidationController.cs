@@ -57,9 +57,7 @@ public class GraveBillingValidationController : ODataController
         }
 
         var lines = request
-            .Lines.Select(l =>
-                GraveBilling.LineFor(items![l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
-            )
+            .Lines.Select(l => GraveBilling.LineFor(items![l.ItemId], l.Count, l.UnitPrice))
             .ToList();
         var problems = GraveShare.Problems(lines, request.Recipients);
 
@@ -90,7 +88,6 @@ public class GraveBillingValidationController : ODataController
                         line.Description,
                         line.Count,
                         line.VatRate,
-                        line.PriceIncludesVat,
                         line.UnitPrice,
                         NetTotal = decimal.Round(
                             line.Count * line.UnitPrice,
@@ -236,9 +233,7 @@ public class GraveBillingValidationController : ODataController
         }
 
         var links = request
-            .Lines.Select(l =>
-                GraveBilling.LinkFor(items![l.ItemId], l.Count, l.UnitPrice, l.PriceIncludesVat)
-            )
+            .Lines.Select(l => GraveBilling.LinkFor(items![l.ItemId], l.Count, l.UnitPrice))
             .ToList();
         var evaluation = GraveBillingCheck.Evaluate(
             links,
@@ -305,7 +300,6 @@ public class GraveBillingValidationController : ODataController
                                     b.Line.Description,
                                     b.Line.Count,
                                     b.Line.VatRate,
-                                    b.Line.PriceIncludesVat,
                                     b.Price,
                                     EnteredPrice = invoice
                                         .Corrections.FirstOrDefault(c => c.LinkIndex == b.LinkIndex)
@@ -359,6 +353,5 @@ public class GraveBillingValidationController : ODataController
         /// <summary>The grave's own price for the item; null falls back to the
         /// item's default, as billing does.</summary>
         public decimal? UnitPrice { get; set; }
-        public bool PriceIncludesVat { get; set; }
     }
 }

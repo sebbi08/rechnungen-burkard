@@ -18,16 +18,15 @@ public class GraveBillingCorrectionTests
         long id,
         decimal price,
         int count = 1,
-        decimal rate = 19m,
-        bool gross = false
-    ) => new(id, $"{id}", $"Leistung {id}", rate, null, count, price, gross);
+        decimal rate = 19m
+    ) => new(id, $"{id}", $"Leistung {id}", rate, null, count, price);
 
     private static BillableLink Seasonal(
         long id,
         BillingQuarter quarter,
         decimal price,
         decimal rate = 19m
-    ) => new(id, $"{id}", $"Leistung {id}", rate, quarter, 1, price, false);
+    ) => new(id, $"{id}", $"Leistung {id}", rate, quarter, 1, price);
 
     [Fact]
     public void A_block_that_divides_needs_no_correction()
@@ -107,27 +106,6 @@ public class GraveBillingCorrectionTests
         var full = evaluation.Invoices[0];
         Assert.Equal(new[] { 7m, 19m }, full.Corrections.Select(c => c.VatRate).OrderBy(r => r));
         Assert.True(full.Ok);
-    }
-
-    [Fact]
-    public void A_gross_line_is_raised_as_a_gross()
-    {
-        // 100,25 gross at 19 % over 2 does not add up (100,24 collected)
-        var evaluation = GraveBillingCheck.Evaluate(
-            [AllYear(1, 100.25m, gross: true)],
-            null,
-            null,
-            2,
-            EarlierHalf
-        );
-
-        var correction = Assert.Single(evaluation.Invoices[0].Corrections);
-        Assert.True(correction.CorrectedPrice > 100.25m);
-        Assert.True(correction.CorrectedPrice - 100.25m <= 1.00m);
-        var line = evaluation.Invoices[0].Lines[0].Line;
-        Assert.Equal(correction.CorrectedPrice, line.EnteredGross);
-        Assert.Equal(VatInclusivePrice.NetOf(correction.CorrectedPrice, 19m, true), line.UnitPrice);
-        Assert.True(GraveShare.IsEven([line], 2));
     }
 
     [Fact]

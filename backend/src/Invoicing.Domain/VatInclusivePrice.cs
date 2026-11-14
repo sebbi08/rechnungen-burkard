@@ -25,12 +25,8 @@ public static class VatInclusivePrice
         return decimal.Round(gross / (1m + vatRate / 100m), 2, MidpointRounding.AwayFromZero);
     }
 
-    /// <summary>What the customer pays for one unit: a gross price rounded to
-    /// the cent, or a net price plus VAT rounded like the invoice's gross column.</summary>
-    public static decimal GrossOf(decimal price, decimal vatRate, bool priceIncludesVat) =>
-        decimal.Round(
-            priceIncludesVat ? price : price * (1m + vatRate / 100m),
-            2,
-            MidpointRounding.AwayFromZero
-        );
+    /// <summary>What the customer pays for one unit of a net price: the net plus
+    /// VAT, rounded like the invoice's gross column.</summary>
+    public static decimal GrossOf(decimal price, decimal vatRate) =>
+        decimal.Round(price * (1m + vatRate / 100m), 2, MidpointRounding.AwayFromZero);
 }

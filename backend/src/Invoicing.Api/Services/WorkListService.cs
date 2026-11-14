@@ -152,8 +152,7 @@ public sealed class WorkListService(AppDbContext db, IClock clock)
         decimal? amount = price is { } p
             ? VatInclusivePrice.GrossOf(
                 decimal.Round(p, 2, MidpointRounding.AwayFromZero),
-                item.VatRate,
-                link.PriceIncludesVat
+                item.VatRate
             ) * link.Count
             : null;
         return new WorkListLine(link.Count, item.Number, item.Description, item.Quarter, amount);

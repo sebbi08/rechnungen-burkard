@@ -43,17 +43,23 @@ public static class ImportArchiveLayout
     };
 
     /// <summary>Both link types live in one file, told apart by the Type column:
-    /// "Item" rows carry a count, a VAT-included flag and optionally the grave's
-    /// own unit price, "Recipient" rows leave all three empty.</summary>
+    /// "Item" rows carry a count and optionally the grave's own net unit price,
+    /// "Recipient" rows leave both empty.</summary>
     public static readonly string[] MappingHeader =
     {
         "Type",
         "GraveNumber",
         "Reference",
         "Count",
-        "PriceIncludesVat",
         "UnitPrice",
     };
+
+    /// <summary>The column grave prices used to be flagged VAT-included in. It
+    /// is gone from the template, but archives prepared while it existed (the
+    /// converter wrote it, always false) carry it between Count and UnitPrice,
+    /// and still import: a false or empty value is ignored, a true one is
+    /// refused, because grave prices are always net.</summary>
+    public const string LegacyVatColumn = "PriceIncludesVat";
 
     public const string ItemLinkType = "Item";
     public const string RecipientLinkType = "Recipient";
@@ -92,6 +98,14 @@ public static class ImportArchiveLayout
         for (var left = 1; left <= OptionalTrailingColumns[file]; left++)
         {
             yield return header[..^left];
+        }
+
+        if (file.Equals(MappingFile, StringComparison.OrdinalIgnoreCase))
+        {
+            // the headers with the legacy column, with and without UnitPrice
+            string[] legacy = [.. header[..4], LegacyVatColumn, header[4]];
+            yield return legacy;
+            yield return legacy[..^1];
         }
     }
 

@@ -99,6 +99,14 @@ public sealed class InvoiceLine
     /// revision dialog can show the gross again and take it back unchanged.</summary>
     public bool PriceIncludesVat { get; set; }
 
+    /// <summary>The gross per unit as entered, two decimals, set exactly when
+    /// the line was entered VAT-included. The calculation works from this rather
+    /// than from <see cref="UnitPrice"/>, so the line's gross is what the user
+    /// typed instead of whatever a rounded net converts back to. Null on net
+    /// lines, on grave-invoice lines, and on lines that existed before the
+    /// column did.</summary>
+    public decimal? GrossUnitPrice { get; set; }
+
     /// <summary>A note the document prints under the line's description, as
     /// entered with the line; empty when none was, and always on grave
     /// invoices.</summary>

@@ -970,7 +970,6 @@ public class SaveGraveTests
                     itemId,
                     count = 1,
                     unitPrice = (decimal?)price,
-                    priceIncludesVat = false,
                 },
             },
             recipientIds,
@@ -1208,7 +1207,6 @@ public class SaveGraveTests
                     itemId,
                     count = 1,
                     unitPrice = (decimal?)price,
-                    priceIncludesVat = false,
                 },
             },
             recipientIds,
@@ -1284,9 +1282,9 @@ public class SaveGraveTests
         Assert.Equal("CorrectionsChanged", await ErrorCodeAsync(response));
     }
 
-    // 100,25 gross at 19 % needs a correction even for one recipient, which the
-    // editor previews; without a recipient the save has nothing to evaluate and
-    // must say so instead of calling the corrections changed
+    // a price that needs a correction, which the editor previews; without a
+    // recipient the save has nothing to evaluate and must say so instead of
+    // calling the corrections changed
     [Fact]
     public async Task A_new_grave_without_recipients_is_refused_for_that_not_for_its_corrections()
     {
@@ -1314,7 +1312,6 @@ public class SaveGraveTests
                             itemId = item,
                             count = 1,
                             unitPrice = (decimal?)100.25m,
-                            priceIncludesVat = true,
                         },
                     },
                     recipientIds = Array.Empty<long>(),

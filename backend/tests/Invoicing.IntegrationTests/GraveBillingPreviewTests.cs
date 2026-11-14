@@ -47,7 +47,6 @@ public class GraveBillingPreviewTests
             ItemId = itemId,
             Count = 1,
             UnitPrice = price,
-            PriceIncludesVat = false,
         };
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, object body) =>

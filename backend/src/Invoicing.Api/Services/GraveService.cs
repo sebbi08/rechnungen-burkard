@@ -10,7 +10,6 @@ public sealed class GraveItemInput
     public long ItemId { get; set; }
     public int Count { get; set; }
     public decimal? UnitPrice { get; set; }
-    public bool PriceIncludesVat { get; set; }
 }
 
 /// <summary>One correction the editor showed and the user confirmed. The kind
@@ -210,7 +209,6 @@ public sealed class GraveService
                     ItemId = input.ItemId,
                     Count = input.Count,
                     UnitPrice = input.UnitPrice,
-                    PriceIncludesVat = input.PriceIncludesVat,
                 }
             );
         }
@@ -341,7 +339,6 @@ public sealed class GraveService
                         ItemId = i.ItemId,
                         Count = i.Count,
                         UnitPrice = i.UnitPrice,
-                        PriceIncludesVat = i.PriceIncludesVat,
                     })
                     .ToList(),
                 predecessor.Recipients.Select(r => r.RecipientId).ToList(),
@@ -680,12 +677,7 @@ public sealed class GraveService
         {
             var links = items
                 .Select(input =>
-                    GraveBilling.LinkFor(
-                        invoiceItems[input.ItemId],
-                        input.Count,
-                        input.UnitPrice,
-                        input.PriceIncludesVat
-                    )
+                    GraveBilling.LinkFor(invoiceItems[input.ItemId], input.Count, input.UnitPrice)
                 )
                 .ToList();
 

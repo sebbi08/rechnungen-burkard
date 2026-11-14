@@ -207,31 +207,6 @@ public class GraveTermGenerationTests
         Assert.Empty(result.GetProperty("SkippedGraves").EnumerateArray());
     }
 
-    [Fact]
-    public async Task Generation_bills_a_prorated_gross_line_as_a_gross()
-    {
-        using var host = new ApiTestHost();
-        using var client = host.CreateClient();
-        var graveId = await SeedAsync(host, new DateOnly(2026, 5, 1), null, ("Pflege", null, 119m));
-        using (var scope = host.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            foreach (var link in db.GraveItems.Where(l => l.GraveId == graveId))
-            {
-                link.PriceIncludesVat = true;
-            }
-
-            await db.SaveChangesAsync();
-        }
-
-        await GenerateAsync(client, 2026, 1);
-
-        var line = Assert.Single(await LinesAsync(host, graveId, 2026, 1));
-        Assert.Equal("Pflege, anteilig 05–06/2026 (2 von 6 Monaten)", line.Description);
-        Assert.True(line.PriceIncludesVat);
-        Assert.Equal(VatInclusivePrice.NetOf(39.67m, 19m, true), line.UnitPrice);
-    }
-
     private static async Task<long[]> StatusIdsAsync(HttpClient client, int year, int half)
     {
         using var json = await ODataJson.ReadAsync(

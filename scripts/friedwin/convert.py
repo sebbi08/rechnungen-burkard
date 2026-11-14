@@ -1050,17 +1050,17 @@ def main():
     mapping_rows = []
     for number, (customer, items, _) in plans.items():
         if customer:
-            mapping_rows.append(["Recipient", number, customer, "", "", ""])
+            mapping_rows.append(["Recipient", number, customer, "", ""])
         if number in care_only:
             price = care_only[number]
             if CARE_ITEM not in default_price:
                 raise SystemExit(f"item {CARE_ITEM} is in no billed grave's items, a grave without invoices needs it")
             own = "" if default_price[CARE_ITEM] == price else money(price)
-            mapping_rows.append(["Item", number, CARE_ITEM, "1", "false", own])
+            mapping_rows.append(["Item", number, CARE_ITEM, "1", own])
         for i in items:
             n = item_number(i)
             own = "" if default_price[n] == i.price else money(i.price)
-            mapping_rows.append(["Item", number, n, str(i.count), "false", own])
+            mapping_rows.append(["Item", number, n, str(i.count), own])
 
     files = {
         "recipients.csv": csv_text(["RecipientNumber", "Name", "Address", "Email"], recipient_rows),
@@ -1071,7 +1071,7 @@ def main():
             grave_rows,
         ),
         "mapping.csv": csv_text(
-            ["Type", "GraveNumber", "Reference", "Count", "PriceIncludesVat", "UnitPrice"], mapping_rows
+            ["Type", "GraveNumber", "Reference", "Count", "UnitPrice"], mapping_rows
         ),
     }
     with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as z:

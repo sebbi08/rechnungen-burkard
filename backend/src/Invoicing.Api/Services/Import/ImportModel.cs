@@ -62,7 +62,6 @@ public sealed record ItemLinkRow(
     string GraveNumber,
     string ItemNumber,
     int Count,
-    bool PriceIncludesVat,
     decimal? UnitPrice
 );
 

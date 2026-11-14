@@ -14,7 +14,7 @@ public class GraveBillingCheckTests
     private static readonly (int Year, int Half) EarlierHalf = (2025, 2);
 
     private static BillableLink Care(decimal price) =>
-        new(1, "100", "Grabpflege", 19m, null, 1, price, false);
+        new(1, "100", "Grabpflege", 19m, null, 1, price);
 
     [Fact]
     public void A_grave_whose_every_invoice_divides_is_ok()
@@ -44,16 +44,7 @@ public class GraveBillingCheckTests
     [Fact]
     public void An_invoice_with_nothing_to_bill_is_ok()
     {
-        var spring = new BillableLink(
-            2,
-            "200",
-            "Frühling",
-            19m,
-            BillingQuarter.Spring,
-            1,
-            40.01m,
-            false
-        );
+        var spring = new BillableLink(2, "200", "Frühling", 19m, BillingQuarter.Spring, 1, 40.01m);
 
         // start in May: H1 2026 bills nothing, the full H1 bills 40,01 (odd) and
         // is corrected

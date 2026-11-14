@@ -27,7 +27,14 @@ public class ImportTests
     private const string ItemsHeader = "ItemNumber,Description,VatRate,Price,Quarter\r\n";
     private const string GravesHeader =
         "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate\r\n";
-    private const string MappingHeader = "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
+    private const string MappingHeader = "Type,GraveNumber,Reference,Count,UnitPrice\r\n";
+
+    // the mapping headers of archives prepared while grave prices could be
+    // flagged VAT-included: the flag between Count and UnitPrice
+    private const string LegacyMappingHeader =
+        "Type,GraveNumber,Reference,Count,PriceIncludesVat\r\n";
+    private const string LegacyFullMappingHeader =
+        "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
 
     // the full headers, as the template has them
     private const string FullGravesHeader =
@@ -37,8 +44,7 @@ public class ImportTests
     private const string EightColumnGravesHeader =
         "GraveNumber,FieldNumber,SiteName,Cemetery,Position,StartDate,EndDate,Cooperative\r\n";
     private const string FullRecipientsHeader = "RecipientNumber,Name,Address,Email\r\n";
-    private const string FullMappingHeader =
-        "Type,GraveNumber,Reference,Count,PriceIncludesVat,UnitPrice\r\n";
+    private const string FullMappingHeader = "Type,GraveNumber,Reference,Count,UnitPrice\r\n";
 
     private static async Task ConfigureVatAsync(ApiTestHost host, params decimal[] rates)
     {
@@ -90,7 +96,7 @@ public class ImportTests
 
     /// <summary>A consistent archive: two recipients, three items (one of them
     /// without a price, which no grave links), one grave with both link kinds.
-    /// The gross-priced 107.00 is 100.00 net at 7 %, so the grave divides.</summary>
+    /// The 107.00 item is a net price like any other and divides by two.</summary>
     private static byte[] ValidArchive() =>
         Zip(
             (
@@ -115,7 +121,7 @@ public class ImportTests
                 "mapping.csv",
                 MappingHeader
                     + "Item,IMP-1,9001,2,\r\n"
-                    + "Item,IMP-1,9002,1,true\r\n"
+                    + "Item,IMP-1,9002,1,\r\n"
                     + "Recipient,IMP-1,E-1000,,\r\n"
                     + "Recipient,IMP-1,E-1001,,\r\n"
             )
@@ -296,32 +302,67 @@ public class ImportTests
         Assert.All(grave.Items, link => Assert.Null(link.UnitPrice));
     }
 
-    [Fact]
-    public async Task An_item_link_carries_its_vat_included_flag()
+    /// <summary>An archive with one grave, one item and one recipient whose
+    /// mapping carries the legacy VAT column, with the given value on the
+    /// item row.</summary>
+    private static byte[] LegacyVatColumnArchive(string vatCell) =>
+        Zip(
+            ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Weg 1\r\n"),
+            ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,\r\n"),
+            (
+                "graves.csv",
+                GravesHeader
+                    + "IMP-1,27,Grabstätte Import,Bergfriedhof,DoubleOutside,2026-01-01,2040-12-31\r\n"
+            ),
+            (
+                "mapping.csv",
+                LegacyFullMappingHeader
+                    + $"Item,IMP-1,9001,2,{vatCell},95.00\r\n"
+                    + "Recipient,IMP-1,E-1000,,,\r\n"
+            )
+        );
+
+    [Theory]
+    [InlineData("false")]
+    [InlineData("")]
+    public async Task A_mapping_with_the_legacy_vat_column_set_false_imports(string vatCell)
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 7m);
         using var client = host.CreateClient();
 
-        var response = await client.PostAsync("/odata/ImportArchive", Upload(ValidArchive()));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(LegacyVatColumnArchive(vatCell))
+        );
 
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.False(
-            await db
-                .GraveItems.Include(l => l.Item)
-                .Where(l => l.Item.Number == "9001")
-                .Select(l => l.PriceIncludesVat)
-                .SingleAsync()
+        var link = await db.GraveItems.SingleAsync();
+        Assert.Equal(2, link.Count);
+        Assert.Equal(95.00m, link.UnitPrice);
+    }
+
+    [Fact]
+    public async Task A_mapping_with_the_legacy_vat_column_set_true_is_refused()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(LegacyVatColumnArchive("true"))
         );
-        Assert.True(
-            await db
-                .GraveItems.Include(l => l.Item)
-                .Where(l => l.Item.Number == "9002")
-                .Select(l => l.PriceIncludesVat)
-                .SingleAsync()
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problems = await ProblemsAsync(response);
+        Assert.Contains(
+            problems,
+            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "GravePriceIncludesVat"
         );
+        await AssertNothingImportedAsync(host);
     }
 
     [Fact]
@@ -335,7 +376,7 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", MappingHeader + "Item,IMP-1,9001,1,vielleicht\r\n")
+            ("mapping.csv", LegacyMappingHeader + "Item,IMP-1,9001,1,vielleicht\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -347,13 +388,11 @@ public class ImportTests
         );
     }
 
-    /// <summary>An archive built before this feature has a mapping.csv with the
-    /// old four-column header, missing PriceIncludesVat. Regenerating the
-    /// archive from the current template is the accepted cost of the new
-    /// column, so the old header must be rejected rather than silently read as
-    /// if every item link were not VAT-included.</summary>
+    /// <summary>The template's header, the one without UnitPrice and the two
+    /// with the legacy VAT column are accepted; any other column set is not
+    /// guessed at.</summary>
     [Fact]
-    public async Task A_mapping_header_without_the_vat_included_column_is_rejected()
+    public async Task A_mapping_header_with_an_unknown_column_is_rejected()
     {
         using var host = new ApiTestHost();
         await ConfigureVatAsync(host, 7m);
@@ -363,7 +402,7 @@ public class ImportTests
             ("recipients.csv", RecipientsHeader),
             ("items.csv", ItemsHeader),
             ("graves.csv", GravesHeader),
-            ("mapping.csv", "Type,GraveNumber,Reference,Count\r\n")
+            ("mapping.csv", "Type,GraveNumber,Reference,Count,Discount\r\n")
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -1380,7 +1419,7 @@ public class ImportTests
                     + string.Concat(
                         Enumerable
                             .Range(0, recipients)
-                            .Select(i => $"Recipient,IMP-1,E-100{i},,,\r\n")
+                            .Select(i => $"Recipient,IMP-1,E-100{i},,\r\n")
                     )
             )
         );
@@ -1769,7 +1808,7 @@ public class ImportTests
 
         var archive = ArchiveWithItemLink(
             "9001,Grabpflege,7,120.00,\r\n9002,Gießen,7,30.00,\r\n",
-            "Item,IMP-1,9001,1,,\"80,50\"\r\nItem,IMP-1,9002,1,,\r\n"
+            "Item,IMP-1,9001,1,\"80,50\"\r\nItem,IMP-1,9002,1,\r\n"
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
@@ -1790,7 +1829,7 @@ public class ImportTests
         await ConfigureVatAsync(host, 7m);
         using var client = host.CreateClient();
 
-        var priced = ArchiveWithItemLink("9001,Grabpflege,7,,\r\n", "Item,IMP-1,9001,1,,95.00\r\n");
+        var priced = ArchiveWithItemLink("9001,Grabpflege,7,,\r\n", "Item,IMP-1,9001,1,95.00\r\n");
         var response = await client.PostAsync("/odata/ImportArchive", Upload(priced));
         Assert.True(response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync());
         using (var scope = host.Services.CreateScope())
@@ -1815,10 +1854,10 @@ public class ImportTests
             (
                 "mapping.csv",
                 FullMappingHeader
-                    + "Item,IMP-1,9001,1,,95.00\r\n"
-                    + "Item,IMP-2,9001,1,,\r\n"
-                    + "Recipient,IMP-1,E-1000,,,\r\n"
-                    + "Recipient,IMP-2,E-1000,,,\r\n"
+                    + "Item,IMP-1,9001,1,95.00\r\n"
+                    + "Item,IMP-2,9001,1,\r\n"
+                    + "Recipient,IMP-1,E-1000,,\r\n"
+                    + "Recipient,IMP-2,E-1000,,\r\n"
             )
         );
         var refused = await otherClient.PostAsync("/odata/ImportArchive", Upload(archive));
@@ -1843,7 +1882,7 @@ public class ImportTests
 
         var archive = ArchiveWithItemLink(
             "9001,Grabpflege,7,120.00,\r\n",
-            $"Item,IMP-1,9001,1,,{raw}\r\n"
+            $"Item,IMP-1,9001,1,{raw}\r\n"
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -1854,12 +1893,13 @@ public class ImportTests
     }
 
     [Theory]
-    [InlineData("Recipient,IMP-1,E-1000,,,10.00", "UnitPrice")]
-    [InlineData("Recipient,IMP-1,E-1000,1,,", "Count")]
-    [InlineData("Recipient,IMP-1,E-1000,,true,", "PriceIncludesVat")]
+    [InlineData("Recipient,IMP-1,E-1000,,10.00", "UnitPrice", false)]
+    [InlineData("Recipient,IMP-1,E-1000,1,", "Count", false)]
+    [InlineData("Recipient,IMP-1,E-1000,,true,", "PriceIncludesVat", true)]
     public async Task A_recipient_link_with_an_item_links_value_is_reported(
         string row,
-        string column
+        string column,
+        bool legacyHeader
     )
     {
         using var host = new ApiTestHost();
@@ -1873,7 +1913,12 @@ public class ImportTests
                 "graves.csv",
                 GravesHeader + "IMP-1,27,Grabstätte,Bergfriedhof,DoubleOutside,2026-01,\r\n"
             ),
-            ("mapping.csv", FullMappingHeader + "Item,IMP-1,9001,1,,\r\n" + row + "\r\n")
+            (
+                "mapping.csv",
+                legacyHeader
+                    ? LegacyFullMappingHeader + "Item,IMP-1,9001,1,,\r\n" + row + "\r\n"
+                    : FullMappingHeader + "Item,IMP-1,9001,1,\r\n" + row + "\r\n"
+            )
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
@@ -1900,7 +1945,7 @@ public class ImportTests
 
         var raised = ArchiveWithItemLink(
             "9001,Grabpflege,19,120.00,\r\n",
-            "Item,IMP-1,9001,1,,120.01\r\n",
+            "Item,IMP-1,9001,1,120.01\r\n",
             recipients: 2
         );
         var response = await client.PostAsync("/odata/ImportArchive", Upload(raised));
@@ -1934,7 +1979,7 @@ public class ImportTests
         using var otherClient = other.CreateClient();
         var even = ArchiveWithItemLink(
             "9001,Grabpflege,19,120.01,\r\n",
-            "Item,IMP-1,9001,1,,120.00\r\n",
+            "Item,IMP-1,9001,1,120.00\r\n",
             recipients: 2
         );
         var evenResponse = await otherClient.PostAsync("/odata/ImportArchive", Upload(even));

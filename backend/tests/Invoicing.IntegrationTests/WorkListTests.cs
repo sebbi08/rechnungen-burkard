@@ -23,8 +23,7 @@ public class WorkListTests
         int Count = 1,
         decimal? UnitPrice = null,
         decimal? DefaultPrice = null,
-        decimal Vat = 7m,
-        bool Gross = false
+        decimal Vat = 7m
     );
 
     private static long _next;
@@ -67,7 +66,6 @@ public class WorkListTests
                 {
                     Count = s.Count,
                     UnitPrice = s.UnitPrice,
-                    PriceIncludesVat = s.Gross,
                     Item = new InvoiceItem
                     {
                         Number = $"L-{n}",
@@ -265,7 +263,7 @@ public class WorkListTests
     }
 
     [Fact]
-    public async Task Amounts_are_count_times_gross()
+    public async Task Amounts_are_count_times_net_plus_vat()
     {
         using var host = new ApiTestHost();
         Seed(
@@ -276,7 +274,7 @@ public class WorkListTests
             services:
             [
                 new Svc(null, Count: 2, UnitPrice: 45.00m, Vat: 7m),
-                new Svc(null, UnitPrice: 48.15m, Vat: 7m, Gross: true),
+                new Svc(null, UnitPrice: 45.00m, Vat: 7m),
                 new Svc(null, DefaultPrice: 10.00m, Vat: 19m),
             ]
         );

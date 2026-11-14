@@ -184,7 +184,6 @@ public sealed class GraveInvoiceRevisionService
                                 Count = line.Count,
                                 UnitPrice = line.UnitPrice,
                                 VatRate = line.VatRate,
-                                PriceIncludesVat = line.PriceIncludesVat,
                                 LineNumber = index + 1,
                             }
                     )
@@ -290,12 +289,10 @@ public sealed class GraveInvoiceRevisionService
                     item.Number,
                     earlier?.Description ?? item.Description,
                     input.Count,
-                    // the dialog sends the grave's price as it shows it, which
-                    // for a VAT-included line is the gross; a line is billed net
-                    VatInclusivePrice.NetOf(unitPrice, item.VatRate, input.PriceIncludesVat),
-                    item.VatRate,
-                    input.PriceIncludesVat,
-                    input.PriceIncludesVat ? unitPrice : null
+                    // grave prices are net; the input's PriceIncludesVat is
+                    // ignored, as its Comment is
+                    unitPrice,
+                    item.VatRate
                 )
             );
         }

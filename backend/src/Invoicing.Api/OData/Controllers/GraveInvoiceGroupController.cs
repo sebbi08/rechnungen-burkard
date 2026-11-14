@@ -125,7 +125,6 @@ public class GraveInvoiceGroupController : ODataController
                     l.Count,
                     l.UnitPrice,
                     l.VatRate,
-                    l.PriceIncludesVat,
                 }),
         };
 

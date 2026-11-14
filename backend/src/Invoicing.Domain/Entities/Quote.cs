@@ -69,6 +69,11 @@ public sealed class QuoteLine
     public decimal VatRate { get; set; }
     public bool PriceIncludesVat { get; set; }
 
+    /// <summary>The gross per unit as entered, as on
+    /// <see cref="InvoiceLine.GrossUnitPrice"/>; null on net lines and on lines
+    /// that existed before the column did.</summary>
+    public decimal? GrossUnitPrice { get; set; }
+
     /// <summary>The note under the line, as on <see cref="InvoiceLine.Comment"/>.</summary>
     public string Comment { get; set; } = "";
     public int LineNumber { get; set; }

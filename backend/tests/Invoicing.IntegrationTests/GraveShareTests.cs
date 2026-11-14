@@ -13,19 +13,7 @@ namespace Burkard.Invoicing.IntegrationTests;
 public class GraveShareTests
 {
     private static GraveLine Net(int count, decimal unitPrice, decimal vatRate) =>
-        new(1, "1001", "Grabpflege", count, unitPrice, vatRate, false);
-
-    private static GraveLine Gross(int count, decimal enteredGross, decimal vatRate) =>
-        new(
-            1,
-            "1001",
-            "Grabpflege",
-            count,
-            VatInclusivePrice.NetOf(enteredGross, vatRate, true),
-            vatRate,
-            true,
-            enteredGross
-        );
+        new(1, "1001", "Grabpflege", count, unitPrice, vatRate);
 
     [Fact]
     public void A_subtotal_that_divides_is_accepted()
@@ -63,53 +51,6 @@ public class GraveShareTests
         var problem = Assert.Single(GraveShare.Problems(lines, 3));
         Assert.Equal(19m, problem.VatRate);
         Assert.Equal(9770, problem.Amount);
-    }
-
-    [Fact]
-    public void A_gross_price_that_cannot_be_billed_exactly_is_reported()
-    {
-        // The reported case. 100,25 entered as a gross at 19 % is a net of
-        // 84,24, whose 8 424 cents divide evenly by two — but each recipient's
-        // VAT rounds 8,0028 down to 8,00, so the two of them collect 100,24
-        // against the 100,25 that was typed. The old rule raised the price to
-        // cover that; this one refuses the grave and says so.
-        var problem = Assert.Single(GraveShare.Problems(new[] { Gross(1, 100.25m, 19m) }, 2));
-
-        Assert.Equal(GraveShareProblemKind.DoesNotAddUp, problem.Kind);
-        // spoken about in the unit it was entered in: the gross that was typed,
-        // not the net it converts to
-        Assert.Equal(10025, problem.Amount);
-
-        // and the suggestions are grosses too, one below and one above. Moving
-        // the net subtotal by whole cents -- which is what the search used to do
-        // -- looks in the wrong place entirely: a cent on a gross moves the net
-        // by about 1/(1 + rate) of one, so it found nothing and the message came
-        // out with no figures at all.
-        Assert.Equal(2, problem.Suggestions.Count);
-        Assert.True(problem.Suggestions[0] < 10025, "no suggestion below");
-        Assert.True(problem.Suggestions[1] > 10025, "no suggestion above");
-        Assert.All(
-            problem.Suggestions,
-            value => Assert.Empty(GraveShare.Problems(new[] { Gross(1, value / 100m, 19m) }, 2))
-        );
-    }
-
-    [Fact]
-    public void A_gross_price_that_comes_out_even_is_accepted()
-    {
-        // 100,24 at 19 % is the same net of 84,24, and two shares of 50,12
-        // collect exactly that
-        Assert.Empty(GraveShare.Problems(new[] { Gross(1, 100.24m, 19m) }, 2));
-    }
-
-    [Fact]
-    public void A_net_price_is_not_held_to_a_gross_it_never_promised()
-    {
-        // 84,24 net at 19 % over two: the shares collect 100,24 while net plus
-        // VAT on the whole grave would be 100,25. A net price says what the net
-        // is; the gross is derived, and what the recipients collect is simply
-        // what the grave is worth. Only a price entered as a gross is a promise.
-        Assert.Empty(GraveShare.Problems(new[] { Net(1, 84.24m, 19m) }, 2));
     }
 
     [Fact]
@@ -176,27 +117,6 @@ public class GraveShareTests
                     GraveShare.CollectedCents(new[] { line }, recipients),
                     recipients * (cents / recipients + Vat(cents / recipients, rate))
                 );
-            }
-        }
-    }
-
-    [Theory]
-    [InlineData(7)]
-    [InlineData(19)]
-    public void A_gross_price_that_passes_is_billed_to_the_cent(decimal rate)
-    {
-        for (var recipients = 1; recipients <= 7; recipients++)
-        {
-            for (var cents = 1; cents <= 3000; cents++)
-            {
-                var line = Gross(1, cents / 100m, rate);
-                if (GraveShare.Problems(new[] { line }, recipients).Count > 0)
-                {
-                    continue;
-                }
-
-                // what was typed is what the recipients collect between them
-                Assert.Equal(cents, GraveShare.CollectedCents(new[] { line }, recipients));
             }
         }
     }

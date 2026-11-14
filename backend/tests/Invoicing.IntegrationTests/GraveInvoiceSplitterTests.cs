@@ -20,8 +20,7 @@ public class GraveInvoiceSplitterTests
         decimal unitPrice,
         decimal vatRate,
         int lineNumber,
-        string itemNumber = "1001",
-        bool priceIncludesVat = false
+        string itemNumber = "1001"
     ) =>
         new()
         {
@@ -31,7 +30,6 @@ public class GraveInvoiceSplitterTests
             Count = count,
             UnitPrice = unitPrice,
             VatRate = vatRate,
-            PriceIncludesVat = priceIncludesVat,
             LineNumber = lineNumber,
         };
 
@@ -90,20 +88,5 @@ public class GraveInvoiceSplitterTests
         Assert.Throws<ArgumentException>(() =>
             GraveInvoiceSplitter.Combine(Array.Empty<IReadOnlyList<InvoiceLine>>())
         );
-    }
-
-    [Fact]
-    public void Combine_remembers_how_the_grave_price_was_entered()
-    {
-        var perRecipient = new[]
-        {
-            (IReadOnlyList<InvoiceLine>)
-                new List<InvoiceLine> { RecipientLine(1, 50.42m, 19m, 1, priceIncludesVat: true) },
-            new List<InvoiceLine> { RecipientLine(1, 50.42m, 19m, 1, priceIncludesVat: true) },
-        };
-
-        var combined = Assert.Single(GraveInvoiceSplitter.Combine(perRecipient));
-
-        Assert.True(combined.PriceIncludesVat);
     }
 }

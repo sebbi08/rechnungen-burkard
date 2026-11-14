@@ -65,7 +65,7 @@ public class ItemPriceIncreaseTests
         return ids.ToArray();
     }
 
-    private sealed record Link(long ItemId, decimal? UnitPrice, bool Gross = false);
+    private sealed record Link(long ItemId, decimal? UnitPrice);
 
     /// <summary>Saves a grave the way the dialog does: the corrections its
     /// prices need are the ones the preview names, as the editor confirms them.</summary>
@@ -97,7 +97,6 @@ public class ItemPriceIncreaseTests
                             itemId = l.ItemId,
                             count = 1,
                             unitPrice = l.UnitPrice,
-                            priceIncludesVat = l.Gross,
                         }),
                     }
                 )
@@ -145,7 +144,6 @@ public class ItemPriceIncreaseTests
                         itemId = l.ItemId,
                         count = 1,
                         unitPrice = l.UnitPrice,
-                        priceIncludesVat = l.Gross,
                     }),
                     recipientIds,
                     corrections,
@@ -157,12 +155,11 @@ public class ItemPriceIncreaseTests
         return result.RootElement.GetProperty("Id").GetInt64();
     }
 
-    private static object OwnRow(decimal oldPrice, decimal newPrice, bool gross = false) =>
+    private static object OwnRow(decimal oldPrice, decimal newPrice) =>
         new
         {
             IsDefault = false,
             OldPrice = oldPrice,
-            PriceIncludesVat = gross,
             NewPrice = newPrice,
         };
 
@@ -349,7 +346,6 @@ public class ItemPriceIncreaseTests
                 {
                     IsDefault = true,
                     OldPrice = 120.00m,
-                    PriceIncludesVat = false,
                     NewPrice = 126.00m,
                 }
             ),
@@ -399,22 +395,15 @@ public class ItemPriceIncreaseTests
         {
             IsDefault = true,
             OldPrice = oldPrice,
-            PriceIncludesVat = false,
             NewPrice = newPrice,
             GraveIds = graveIds,
         };
 
-    private static object OwnRowOf(
-        decimal oldPrice,
-        decimal newPrice,
-        long[] graveIds,
-        bool gross = false
-    ) =>
+    private static object OwnRowOf(decimal oldPrice, decimal newPrice, long[] graveIds) =>
         new
         {
             IsDefault = false,
             OldPrice = oldPrice,
-            PriceIncludesVat = gross,
             NewPrice = newPrice,
             GraveIds = graveIds,
         };
@@ -501,12 +490,7 @@ public class ItemPriceIncreaseTests
         using var client = host.CreateClient();
         var itemId = await ItemAsync(client, "U-1", 120.00m);
         var a = await SaveGraveAsync(client, "G-A", [new Link(itemId, null)], recipients: 1);
-        var d = await SaveGraveAsync(
-            client,
-            "G-D",
-            [new Link(itemId, 120.00m, true)],
-            recipients: 1
-        );
+        var d = await SaveGraveAsync(client, "G-D", [new Link(itemId, 120.00m)], recipients: 1);
         var b = await SaveGraveAsync(client, "G-B", [new Link(itemId, 95.00m)], recipients: 1);
         var c = await SaveGraveAsync(client, "G-C", [new Link(itemId, 150.00m)], recipients: 1);
 
@@ -520,10 +504,8 @@ public class ItemPriceIncreaseTests
         Assert.Equal(126.00m, await DefaultOfAsync(host, itemId));
         // a link without its own price stays without one and bills the new default
         Assert.Null((await LinkOfAsync(host, a)).UnitPrice);
-        // an own price equal to the old default is raised, and keeps its gross flag
-        var raised = await LinkOfAsync(host, d);
-        Assert.Equal(126.00m, raised.UnitPrice);
-        Assert.True(raised.PriceIncludesVat);
+        // an own price equal to the old default is raised
+        Assert.Equal(126.00m, (await LinkOfAsync(host, d)).UnitPrice);
         Assert.Equal(99.75m, (await LinkOfAsync(host, b)).UnitPrice);
         Assert.Equal(150.00m, (await LinkOfAsync(host, c)).UnitPrice);
     }

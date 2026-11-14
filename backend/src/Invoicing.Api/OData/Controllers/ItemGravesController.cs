@@ -8,9 +8,8 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 /// <summary>Which graves bill an item, and at what price, for the item dialog.
 ///
 /// Grouped by the price a grave is actually billed — its own link price, or the
-/// item's default standing in for it — together with whether that price was
-/// entered as a gross. A link whose own price equals the default counts as
-/// billing the default: the grave dialog copies the default into the field, so
+/// item's default standing in for it. A link whose own price equals the default
+/// counts as billing the default: the grave dialog copies the default into the field, so
 /// most links carry it that way. Default groups come first, so the reader sees
 /// what a changed default would have applied to.</summary>
 [Route("odata")]
@@ -36,7 +35,6 @@ public class ItemGravesController : ODataController
             select new
             {
                 link.UnitPrice,
-                link.PriceIncludesVat,
                 grave.Id,
                 grave.GraveNumber,
                 grave.IsCooperative,
@@ -48,12 +46,11 @@ public class ItemGravesController : ODataController
         // locks count every link, so Linked does too
         var groups = links
             .Where(l => !l.IsDeleted)
-            .GroupBy(l => (Price: l.UnitPrice ?? item.DefaultPrice, l.PriceIncludesVat))
+            .GroupBy(l => l.UnitPrice ?? item.DefaultPrice)
             .Select(g => new
             {
-                UnitPrice = g.Key.Price,
-                g.Key.PriceIncludesVat,
-                IsDefault = g.Key.Price == item.DefaultPrice,
+                UnitPrice = g.Key,
+                IsDefault = g.Key == item.DefaultPrice,
                 Graves = g.OrderBy(l => l.GraveNumber, StringComparer.OrdinalIgnoreCase)
                     .Select(l => new
                     {
@@ -65,7 +62,6 @@ public class ItemGravesController : ODataController
             })
             .OrderByDescending(g => g.IsDefault)
             .ThenBy(g => g.UnitPrice)
-            .ThenBy(g => g.PriceIncludesVat)
             .ToList();
 
         return new JsonResult(

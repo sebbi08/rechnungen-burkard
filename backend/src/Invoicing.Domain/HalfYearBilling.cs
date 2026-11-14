@@ -5,7 +5,7 @@ namespace Burkard.Invoicing.Domain;
 
 /// <summary>One of a grave's item links as the half-year rule sees it: the
 /// item's facts, the grave's count, and the price billed for a full half-year
-/// in the unit it was entered in — the gross when <paramref name="PriceIncludesVat"/>.</summary>
+/// (net).</summary>
 public sealed record BillableLink(
     long ItemId,
     string ItemNumber,
@@ -13,8 +13,7 @@ public sealed record BillableLink(
     decimal VatRate,
     BillingQuarter? Quarter,
     int Count,
-    decimal EnteredPrice,
-    bool PriceIncludesVat
+    decimal EnteredPrice
 );
 
 /// <summary>The months of one half-year an invoice covers, both ends inclusive,
@@ -261,10 +260,8 @@ public static class HalfYearBilling
                 link.ItemNumber,
                 description,
                 link.Count,
-                VatInclusivePrice.NetOf(price, link.VatRate, link.PriceIncludesVat),
-                link.VatRate,
-                link.PriceIncludesVat,
-                link.PriceIncludesVat ? price : null
+                price,
+                link.VatRate
             )
         );
 

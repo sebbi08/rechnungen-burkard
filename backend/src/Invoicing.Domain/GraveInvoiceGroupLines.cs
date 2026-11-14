@@ -55,8 +55,7 @@ public static class GraveInvoiceGroupLines
                     l.Description,
                     l.Count,
                     l.UnitPrice,
-                    l.VatRate,
-                    l.PriceIncludesVat
+                    l.VatRate
                 ))
                 .ToList();
         }
@@ -70,8 +69,7 @@ public static class GraveInvoiceGroupLines
                     l.Description,
                     l.Count,
                     l.GraveUnitPrice!.Value,
-                    l.VatRate,
-                    l.PriceIncludesVat
+                    l.VatRate
                 ))
                 .ToList();
         }

@@ -82,23 +82,27 @@ three together, as one would apply a single migration. They are released and
 applied now, so they stay as they are: rewriting them would break databases
 that recorded them. Every release since has introduced at most one migration.
 
-## D-005: v3.5.0 ships two migrations
+## D-005: v3.5.0 ships three migrations
 
 **Principle**: IV — SQLite Persistence with Versioned Migrations ("each version
 MUST introduce at most one migration").
 
-**Deviation**: The release after v3.4.0 brings two migrations:
-`20261112174329_SeparateEndingTexts` (four ending texts, issue 66) and
+**Deviation**: The release after v3.4.0 brings three migrations:
+`20261112174329_SeparateEndingTexts` (four ending texts, issue 66),
 `20261112212917_DocumentComments` (free text above the lines and line
-comments, issues 63 and 65).
+comments, issues 63 and 65) and `20261114084602_GrossLinePrices` (the gross a
+line was entered as, and no VAT-included grave prices, issue 73).
 
 **Why**: The first was already on `main`, and applied to the development
-database, when the second was written. Folding the new columns into it would
-have changed a migration that a database had already recorded, which EF Core
-does not notice: that database would never get the new columns. The owner
-chose a second migration over releasing in between.
+database, when the second was written, and the second likewise when the third
+was. Folding new columns into a migration that a database had already recorded
+would have changed it without EF Core noticing: that database would never get
+them. The owner chose a further migration each time over releasing in between.
 
-**Containment**: Both only add columns with defaults, plus one data copy in the
-first, and they apply in one go on upgrade like a single migration would. If a
-release is cut between the two, this deviation no longer applies and is to be
-removed.
+**Containment**: The first two only add columns with defaults, plus one data
+copy in the first. The third adds two nullable columns and drops one, after a
+data conversion that touches no row in the owner's data (no grave link has the
+flag set); it exists so a database that does have one bills what it billed
+before. All three apply in one go on upgrade like a single migration would. If
+a release is cut between any of them, this deviation no longer applies and is
+to be removed.

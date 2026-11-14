@@ -6,13 +6,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Burkard.Invoicing.Api.Services;
 
 /// <summary>One ticked row of a price increase: the default price, or one own
-/// price the graves bill the item at. <see cref="PriceIncludesVat"/> only tells
-/// own rows apart; the default row ignores it.</summary>
+/// price the graves bill the item at.</summary>
 public sealed class PriceIncreaseRowInput
 {
     public bool IsDefault { get; set; }
     public decimal OldPrice { get; set; }
-    public bool PriceIncludesVat { get; set; }
     public decimal NewPrice { get; set; }
 
     /// <summary>The graves the popover showed in the row (apply only).</summary>
@@ -134,9 +132,7 @@ public sealed class ItemPriceIncreaseService
             );
         }
 
-        var keys = rows.Select(r =>
-            r.IsDefault ? (true, 0m, false) : (false, r.OldPrice, r.PriceIncludesVat)
-        );
+        var keys = rows.Select(r => r.IsDefault ? (true, 0m) : (false, r.OldPrice));
         if (keys.Distinct().Count() != rows.Count)
         {
             throw new ValidationException("InvalidRequest", "A price is listed twice.");
@@ -209,10 +205,7 @@ public sealed class ItemPriceIncreaseService
             var billable = new List<BillableLink>();
             foreach (var link in grave.Items.OrderBy(l => l.Id))
             {
-                var rowIndex =
-                    link.ItemId == item.Id
-                        ? RowOf(rows, item, link.UnitPrice, link.PriceIncludesVat)
-                        : -1;
+                var rowIndex = link.ItemId == item.Id ? RowOf(rows, item, link.UnitPrice) : -1;
                 var unitPrice = link.UnitPrice;
                 if (rowIndex >= 0)
                 {
@@ -220,9 +213,7 @@ public sealed class ItemPriceIncreaseService
                     unitPrice = rows[rowIndex].NewPrice;
                 }
 
-                billable.Add(
-                    GraveBilling.LinkFor(link.Item, link.Count, unitPrice, link.PriceIncludesVat)
-                );
+                billable.Add(GraveBilling.LinkFor(link.Item, link.Count, unitPrice));
             }
 
             if (raisedRows.Count == 0)
@@ -413,23 +404,14 @@ public sealed class ItemPriceIncreaseService
 
     /// <summary>The ticked row a link of the item belongs to, or -1. The default
     /// row holds the links billing the default, compared by number only; an own
-    /// row holds the links at exactly its price and gross flag.</summary>
-    private static int RowOf(
-        List<PriceIncreaseRowInput> rows,
-        InvoiceItem item,
-        decimal? unitPrice,
-        bool gross
-    )
+    /// row holds the links at exactly its price.</summary>
+    private static int RowOf(List<PriceIncreaseRowInput> rows, InvoiceItem item, decimal? unitPrice)
     {
         var billsDefault = unitPrice is null || unitPrice == item.DefaultPrice;
         for (var i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
-            if (
-                row.IsDefault
-                    ? billsDefault
-                    : !billsDefault && unitPrice == row.OldPrice && gross == row.PriceIncludesVat
-            )
+            if (row.IsDefault ? billsDefault : !billsDefault && unitPrice == row.OldPrice)
             {
                 return i;
             }

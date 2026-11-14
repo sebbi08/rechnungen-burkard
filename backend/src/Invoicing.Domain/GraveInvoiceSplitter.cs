@@ -13,16 +13,7 @@ public sealed record GraveLine(
     string Description,
     int Count,
     decimal UnitPrice,
-    decimal VatRate,
-    bool PriceIncludesVat,
-    /// <summary>The gross this line was entered as, per unit, when it was
-    /// entered as one. <see cref="GraveShare"/> bills at least this rather than
-    /// at least the gross of the rounded net — otherwise the cent
-    /// <see cref="VatInclusivePrice.NetOf"/> may already have added to cover it
-    /// would be charged for a second time. Null for a net-priced line, and for
-    /// one reconstructed from an old invoice, which no longer records what was
-    /// typed.</summary>
-    decimal? EnteredGross = null
+    decimal VatRate
 );
 
 /// <summary>Recovers a grave's lines from its recipients' invoices. Nothing
@@ -83,8 +74,7 @@ public static class GraveInvoiceSplitter
                         3,
                         MidpointRounding.AwayFromZero
                     ),
-                    template.VatRate,
-                    template.PriceIncludesVat
+                    template.VatRate
                 )
             );
         }

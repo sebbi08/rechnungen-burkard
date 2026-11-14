@@ -16,11 +16,11 @@ public class HalfYearBillingTests
     // a current half-year before every term these tests start: nothing is left out
     private static readonly (int Year, int Half) EarlierHalf = (2025, 2);
 
-    private static BillableLink Care(decimal price = 60m, bool gross = false) =>
-        new(1, "100", "Grabpflege", 19m, null, 1, price, gross);
+    private static BillableLink Care(decimal price = 60m) =>
+        new(1, "100", "Grabpflege", 19m, null, 1, price);
 
     private static BillableLink Seasonal(BillingQuarter quarter, decimal price = 40m) =>
-        new(2, "210", $"Bepflanzung {quarter}", 19m, quarter, 1, price, false);
+        new(2, "210", $"Bepflanzung {quarter}", 19m, quarter, 1, price);
 
     [Fact]
     public void PeriodIn_cuts_the_first_half_year_at_the_start()
@@ -100,21 +100,6 @@ public class HalfYearBillingTests
             HalfYearBilling.Lines(new[] { Care(50m) }, new BillingPeriod(2026, 1, 2, 6))
         );
         Assert.Equal(41.67m, line.UnitPrice);
-    }
-
-    [Fact]
-    public void A_gross_price_is_prorated_as_a_gross()
-    {
-        var billed = Assert.Single(
-            HalfYearBilling.Bill(
-                new[] { Care(119m, gross: true) },
-                new BillingPeriod(2026, 1, 4, 6)
-            )
-        );
-
-        Assert.Equal(59.50m, billed.Price);
-        Assert.Equal(59.50m, billed.Line.EnteredGross);
-        Assert.Equal(VatInclusivePrice.NetOf(59.50m, 19m, true), billed.Line.UnitPrice);
     }
 
     [Theory]

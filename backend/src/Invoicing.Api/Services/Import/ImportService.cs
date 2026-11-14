@@ -117,7 +117,6 @@ public sealed class ImportService
                     ItemId = items[link.ItemNumber].Id,
                     Count = link.Count,
                     UnitPrice = link.UnitPrice,
-                    PriceIncludesVat = link.PriceIncludesVat,
                 }
             );
         }
@@ -154,14 +153,7 @@ public sealed class ImportService
                 .ItemLinks.Where(l =>
                     string.Equals(l.GraveNumber, number, StringComparison.OrdinalIgnoreCase)
                 )
-                .Select(l =>
-                    GraveBilling.LinkFor(
-                        items[l.ItemNumber],
-                        l.Count,
-                        l.UnitPrice,
-                        l.PriceIncludesVat
-                    )
-                )
+                .Select(l => GraveBilling.LinkFor(items[l.ItemNumber], l.Count, l.UnitPrice))
                 .ToList();
             if (count == 0 || links.Count == 0)
             {

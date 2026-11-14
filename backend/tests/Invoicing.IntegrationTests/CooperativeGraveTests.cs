@@ -1102,7 +1102,6 @@ public class CooperativeGraveTests
                                 itemId = item,
                                 count = 1,
                                 unitPrice = (decimal?)60.00m,
-                                priceIncludesVat = false,
                             },
                         },
                         recipientIds = recipients,

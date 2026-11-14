@@ -41,8 +41,7 @@ public class ItemGravesTests
         HttpClient client,
         long itemId,
         string graveNumber,
-        decimal? unitPrice,
-        bool gross = false
+        decimal? unitPrice
     )
     {
         var recipientId = await CreateAsync(
@@ -70,7 +69,6 @@ public class ItemGravesTests
                             itemId,
                             count = 1,
                             unitPrice,
-                            priceIncludesVat = gross,
                         },
                     },
                     recipientIds = new[] { recipientId },
@@ -91,7 +89,6 @@ public class ItemGravesTests
         // dialog is concerned: it copies the default into the field
         await LinkAsync(client, itemId, "G-2", 100.00m);
         await LinkAsync(client, itemId, "G-3", 95.00m);
-        await LinkAsync(client, itemId, "G-5", 100.00m, gross: true);
         await LinkAsync(client, itemId, "G-1", null);
 
         var response = await client.GetAsync($"/odata/ItemGraves?itemId={itemId}");
@@ -106,7 +103,6 @@ public class ItemGravesTests
             .Select(g =>
                 (
                     Price: g.GetProperty("UnitPrice").GetDecimal(),
-                    Gross: g.GetProperty("PriceIncludesVat").GetBoolean(),
                     IsDefault: g.GetProperty("IsDefault").GetBoolean(),
                     Graves: g.GetProperty("Graves")
                         .EnumerateArray()
@@ -120,22 +116,17 @@ public class ItemGravesTests
             groups,
             g =>
             {
-                Assert.Equal((100.00m, false, true), (g.Price, g.Gross, g.IsDefault));
+                Assert.Equal((100.00m, true), (g.Price, g.IsDefault));
                 Assert.Equal(new[] { "G-1", "G-2" }, g.Graves);
             },
             g =>
             {
-                Assert.Equal((100.00m, true, true), (g.Price, g.Gross, g.IsDefault));
-                Assert.Equal(new[] { "G-5" }, g.Graves);
-            },
-            g =>
-            {
-                Assert.Equal((95.00m, false, false), (g.Price, g.Gross, g.IsDefault));
+                Assert.Equal((95.00m, false), (g.Price, g.IsDefault));
                 Assert.Equal(new[] { "G-3" }, g.Graves);
             },
             g =>
             {
-                Assert.Equal((130.00m, false, false), (g.Price, g.Gross, g.IsDefault));
+                Assert.Equal((130.00m, false), (g.Price, g.IsDefault));
                 Assert.Equal(new[] { "G-4" }, g.Graves);
             }
         );
