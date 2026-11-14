@@ -1800,7 +1800,7 @@ test.describe("the half-year today falls in", () => {
     await expect(row.getByRole("button", { name: "Kopie herunterladen" })).toBeVisible();
   });
 
-  test("the grave list colours its status and offers the invoice mass download", async ({
+  test("the grave list colours its status and offers the invoice mass download and print", async ({
     page,
   }) => {
     const marker = `GL-${unique()}`;
@@ -1846,6 +1846,30 @@ test.describe("the half-year today falls in", () => {
     await page.getByRole("button", { name: "Rechnungen (ZIP)" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("rechnungen.zip");
+
+    // printing opens the same invoices as one PDF in a new tab; what the tab
+    // renders is up to the browser — a headless one has no PDF viewer — so the
+    // assertions are on the address it loads and what the server answers there
+    const tabPromise = page.context().waitForEvent("page");
+    const printRequest = page
+      .context()
+      .waitForEvent(
+        "request",
+        (request) =>
+          request.url().includes("/odata/GraveInvoicesPdf") && request.frame().page() !== page,
+      );
+    await page.getByRole("button", { name: "Drucken" }).click();
+    const tab = await tabPromise;
+    const printUrl = (await printRequest).url();
+    await tab.close();
+    expect(printUrl).toContain(`year=${CURRENT_YEAR}`);
+    expect(printUrl).toContain(`half=${CURRENT_HALF}`);
+    const printed = await page.request.get(printUrl);
+    expect(printed.headers()["content-type"]).toBe("application/pdf");
+    const disposition = printed.headers()["content-disposition"] ?? "";
+    expect(disposition).toContain("inline");
+    expect(disposition).toContain(`Grabrechnungen-${CURRENT_YEAR}-${CURRENT_HALF}.pdf`);
+    expect((await printed.body()).subarray(0, 4).toString()).toBe("%PDF");
   });
 
   test("the half-year status announces its meaning, not a validation error", async ({ page }) => {

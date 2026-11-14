@@ -13,6 +13,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 import {
   bulkDownload,
+  graveInvoicesPdfUrl,
   fetchGraveStatus,
   generateGraveInvoices,
   type GraveDetails,
@@ -35,7 +36,7 @@ import { useErrorToast } from "@/composables/useErrorToast";
 import { useGraveMarkPaid } from "@/composables/useGraveMarkPaid";
 import { showMessage } from "@/composables/useMessage";
 import { usePageReport } from "@/composables/usePageReport";
-import { downloadBlob } from "@/lib/download";
+import { downloadBlob, openPdf } from "@/lib/download";
 import { forgetJob, rememberedJob, rememberJob } from "@/lib/followedJob";
 import { formatMonth, type Translate } from "@/lib/format";
 import { generationSummary } from "@/lib/generation";
@@ -263,6 +264,27 @@ async function downloadZip(): Promise<void> {
   }
 }
 
+const printing = ref(false);
+async function printAll(): Promise<void> {
+  // as for the ZIP: say so, rather than open a tab only to be refused
+  if (status.data.value && !status.data.value.some((row) => row.InvoiceCount > 0)) {
+    showMessage(
+      t("bulkGraveInvoices"),
+      t("bulkNothingToPrint", [halfYearText(period.value[0], period.value[1])]),
+      "info",
+    );
+    return;
+  }
+  printing.value = true;
+  try {
+    await openPdf(graveInvoicesPdfUrl(period.value[0], period.value[1]));
+  } catch (error) {
+    showError(error);
+  } finally {
+    printing.value = false;
+  }
+}
+
 const generateOpen = ref(false);
 async function generate(year: number, half: number): Promise<void> {
   generateOpen.value = false;
@@ -346,6 +368,14 @@ async function openSuccessor(grave: GraveDetails, month: Date): Promise<void> {
         outlined
         :loading="zipping"
         @click="downloadZip"
+      />
+      <Button
+        :label="t('printGraveInvoices')"
+        icon="pi pi-print"
+        severity="secondary"
+        outlined
+        :loading="printing"
+        @click="printAll"
       />
       <Button
         :label="t('generateInvoices')"

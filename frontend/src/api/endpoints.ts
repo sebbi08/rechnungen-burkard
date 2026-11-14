@@ -762,6 +762,11 @@ export async function downloadBackup(): Promise<{ blob: Blob; fileName: string }
 /** Which services the care list shows under each grave. */
 export type CareListServices = "none" | "care" | "all";
 
+/** Where a half-year's grave invoices are served as one PDF, for printing from a tab. */
+export function graveInvoicesPdfUrl(year: number, half: number): string {
+  return `/odata/GraveInvoicesPdf?${new URLSearchParams({ year: String(year), half: String(half) })}`;
+}
+
 /** Where the care list of a year is served, for display in a tab. */
 export function careListUrl(year: number, services: CareListServices): string {
   return `/odata/CareList?${new URLSearchParams({ year: String(year), services })}`;
