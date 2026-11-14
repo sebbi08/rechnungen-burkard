@@ -593,6 +593,12 @@ it holds.
 - What happens when the recipient invoices of a grave and half-year no longer
   carry the same lines? The edit is refused with a clear message instead of
   picking one of them.
+- What happens to an invoice issued before lines became gross-led, with a line
+  entered VAT-included? It keeps its figures, in its stored PDF and in every
+  list, since the line has no stored gross and is calculated as it was. A
+  revision of it takes the gross its dialog showed (the gross its PDF printed per
+  unit), so with a count above one its total can differ by a cent from the
+  original's.
 - What happens when the stamp word is empty? Saving the configuration must be
   rejected.
 - What happens when the stamp word is very long? The stamp must still fit on the
@@ -943,13 +949,23 @@ it holds.
   out, "27 Rasengrab außen"). A line whose values are missing MUST be left out.
 - **FR-037c**: The line table MUST have the columns item number, description,
   count, unit price, total and VAT rate ("19 %"). A line whose price includes VAT
-  MUST read "7 % Incl." and print the gross unit price and gross total.
+  MUST read "7 % Incl." and print the gross unit price and gross total: the
+  gross as it was entered, and count times that gross.
 - **FR-037d**: The ending text MUST follow the lines. At the foot of the last page
   a VAT block MUST show, per VAT rate, the net and the VAT, followed by the net
   amount, the VAT and the gross amount. The block MUST NOT be split across pages.
 - **FR-037e**: On a grave invoice with several recipients the VAT block MUST bill
   the recipient's share, and one line above it MUST give the net sum of the whole
   grave and the recipient's percentage; the lines themselves stay in full.
+- **FR-037f**: A line of an ordinary invoice or a quote that was entered VAT-included
+  MUST be gross-led: the entered gross per unit is stored with the line and bills
+  exactly. With the count and the VAT rate in per cent, the line's gross is
+  `lineGross = count × GrossUnitPrice`, its VAT is
+  `lineVat = round(lineGross × rate / (100 + rate), 2)` rounded half away from
+  zero, and its net is `lineNet = lineGross − lineVat`. The VAT block, the
+  totals the lists show and the PDF MUST all follow from these figures, so a line
+  priced 75,00 € at 19 % bills 75,00 € with 11,97 € VAT, never 75,01 €. A line
+  entered net is calculated as before.
 - **FR-038**: The copy document MUST carry the configured stamp word diagonally
   across the page.
 - **FR-039**: The stamp MUST appear on every page of a multi-page copy.
@@ -1216,7 +1232,8 @@ it holds.
   A quote MUST NOT take or reserve an invoice number.
 - **FR-094**: A quote version MUST store what it prints — the recipient's name,
   address and number, the lines with item number, description, count, net price,
-  VAT rate and VAT-included flag, and the ending text — so a later change to a
+  VAT rate, VAT-included flag and, on a line entered VAT-included, the entered
+  gross price (FR-037f), and the ending text — so a later change to a
   recipient, an item or the settings never alters it.
 - **FR-095**: Editing a quote MUST create a new version with the revision marker
   of invoices (`A2026-0001-R1`, FR-035), continuing the revision numbers of the
@@ -1245,7 +1262,8 @@ it holds.
   date, the current invoice ending text (FR-002) and stamp word, both documents (FR-037), and
   the recipient's values as they are now. Its lines MUST be the
   latest version's lines as quoted — the same items, item numbers,
-  descriptions, counts, net prices, VAT rates, VAT-included flags and comments
+  descriptions, counts, net prices, VAT rates, VAT-included flags, entered gross
+  prices (FR-037f) and comments
   (FR-101e) — even where an item has changed since, and its free text above the
   lines MUST be the latest version's (FR-101d). In the same transaction every version of the
   quote MUST become converted, so a quote is converted at most once, also when

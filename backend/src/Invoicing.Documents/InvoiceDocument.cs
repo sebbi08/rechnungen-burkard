@@ -272,19 +272,23 @@ internal sealed class InvoiceDocument : IDocument
 
         foreach (var line in _data.Lines)
         {
-            // A VAT-included line prints the gross it was entered as. A grave
-            // refuses a gross that does not survive the conversion to net, so
-            // there the unit price comes back unchanged; an ordinary invoice
-            // does not, and 3 x 10,00 at 19 % can bill 29,99. The line total
-            // therefore prints what is billed, the net plus its own VAT, so
-            // the line agrees with the VAT block.
-            var unitPrice = line.PriceIncludesVat
-                ? decimal.Round(
-                    line.UnitPrice * (1m + line.VatRate / 100m),
-                    2,
-                    MidpointRounding.AwayFromZero
-                )
-                : line.UnitPrice;
+            // A VAT-included line prints the gross it was entered as. A line
+            // that stored it prints it as it is, and its total, the net plus its
+            // own VAT, is count x that gross. A line from before that stored only
+            // a net, so its gross is worked out from it, and 3 x 10,00 at 19 %
+            // could bill 29,99; its total prints what was billed, the net plus
+            // its own VAT, so the line agrees with the VAT block.
+            var unitPrice =
+                line.GrossUnitPrice
+                ?? (
+                    line.PriceIncludesVat
+                        ? decimal.Round(
+                            line.UnitPrice * (1m + line.VatRate / 100m),
+                            2,
+                            MidpointRounding.AwayFromZero
+                        )
+                        : line.UnitPrice
+                );
             var total = line.PriceIncludesVat ? line.LineTotal + line.VatAmount : line.LineTotal;
             var rate = DocumentTexts.VatRate(line.VatRate);
 

@@ -128,6 +128,38 @@ public class QuoteConversionTests
     }
 
     [Fact]
+    public async Task Conversion_carries_the_gross()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var lines = new[]
+        {
+            new
+            {
+                itemId,
+                count = 1,
+                unitPrice = (decimal?)75.00m,
+                priceIncludesVat = true,
+            },
+        };
+        var (quoteId, _) = await CreatedAsync(await CreateQuoteAsync(client, recipientId, lines));
+
+        var (invoiceId, _) = await ConvertedAsync(await ConvertAsync(client, quoteId));
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var line = await db.InvoiceLines.SingleAsync(l => l.InvoiceId == invoiceId);
+            Assert.Equal(75.00m, line.GrossUnitPrice);
+        }
+        var response = await client.GetAsync($"/odata/Invoices?$filter=Id eq {invoiceId}");
+        using var json = await ODataJson.ReadAsync(response);
+        var row = json.RootElement.GetProperty("value").EnumerateArray().Single();
+        Assert.Equal(75.00m, row.GetProperty("GrossTotal").GetDecimal());
+    }
+
+    [Fact]
     public async Task Converting_keeps_the_quoted_prices()
     {
         using var host = new ApiTestHost();

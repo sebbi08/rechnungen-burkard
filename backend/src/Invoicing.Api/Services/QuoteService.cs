@@ -291,6 +291,7 @@ public sealed class QuoteService
                 UnitPrice = l.UnitPrice,
                 VatRate = l.VatRate,
                 PriceIncludesVat = l.PriceIncludesVat,
+                GrossUnitPrice = l.GrossUnitPrice,
                 Comment = l.Comment,
                 LineNumber = l.LineNumber,
             })

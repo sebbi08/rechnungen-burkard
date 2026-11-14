@@ -16,6 +16,7 @@ public sealed class DocumentDataBuilder
                 l.UnitPrice,
                 l.VatRate,
                 l.PriceIncludesVat,
+                l.GrossUnitPrice,
                 l.Comment
             ))
         );
@@ -95,6 +96,7 @@ public sealed class DocumentDataBuilder
                 l.UnitPrice,
                 l.VatRate,
                 l.PriceIncludesVat,
+                l.GrossUnitPrice,
                 l.Comment
             ))
         );
@@ -128,12 +130,15 @@ public sealed class DocumentDataBuilder
         decimal UnitPrice,
         decimal VatRate,
         bool PriceIncludesVat,
+        decimal? GrossUnitPrice,
         string Comment
     );
 
     /// <summary>The printed lines, the VAT block and the totals in cents: each
     /// line rounded to the cent, its VAT rounded from that, and the block summed
-    /// from the rounded lines.</summary>
+    /// from the rounded lines. A line with an entered gross is the exception: its
+    /// gross is count x gross, its VAT is taken out of that, and its net is what
+    /// remains.</summary>
     private static (
         InvoiceDocumentData.LineData[] Lines,
         InvoiceDocumentData.VatSummary[] Summaries,
@@ -145,15 +150,34 @@ public sealed class DocumentDataBuilder
             .OrderBy(l => l.LineNumber)
             .Select(l =>
             {
-                var lineTotalCents = Math.Round(
-                    l.Count * l.UnitPrice * 100m,
-                    0,
-                    MidpointRounding.AwayFromZero
-                );
-                var lineTotal = lineTotalCents / 100m;
-                var vatAmount =
-                    Math.Round(lineTotalCents * l.VatRate / 100m, 0, MidpointRounding.AwayFromZero)
-                    / 100m;
+                decimal lineTotalCents;
+                decimal vatCents;
+                if (l.GrossUnitPrice is { } gross)
+                {
+                    // an entered gross: the line bills exactly count x gross and
+                    // the VAT is taken out of that, rather than put on a net
+                    // that was rounded to the cent
+                    var grossCents = l.Count * gross * 100m;
+                    vatCents = Math.Round(
+                        grossCents * l.VatRate / (100m + l.VatRate),
+                        0,
+                        MidpointRounding.AwayFromZero
+                    );
+                    lineTotalCents = grossCents - vatCents;
+                }
+                else
+                {
+                    lineTotalCents = Math.Round(
+                        l.Count * l.UnitPrice * 100m,
+                        0,
+                        MidpointRounding.AwayFromZero
+                    );
+                    vatCents = Math.Round(
+                        lineTotalCents * l.VatRate / 100m,
+                        0,
+                        MidpointRounding.AwayFromZero
+                    );
+                }
                 return new InvoiceDocumentData.LineData(
                     l.LineNumber,
                     l.ItemNumber,
@@ -161,10 +185,11 @@ public sealed class DocumentDataBuilder
                     l.Count,
                     l.UnitPrice,
                     l.VatRate,
-                    lineTotal,
-                    vatAmount,
+                    lineTotalCents / 100m,
+                    vatCents / 100m,
                     l.PriceIncludesVat,
-                    l.Comment
+                    l.Comment,
+                    l.GrossUnitPrice
                 );
             })
             .ToArray();

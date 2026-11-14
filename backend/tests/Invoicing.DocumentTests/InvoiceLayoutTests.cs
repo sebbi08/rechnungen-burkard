@@ -265,6 +265,42 @@ public class InvoiceLayoutTests
     }
 
     [Fact]
+    public void A_gross_led_line_prints_the_entered_gross()
+    {
+        // 75,00 at 19 % is 63,03 net and 11,97 VAT; the net alone, grossed up
+        // again, would print 75,01
+        var data = GraveData();
+        data.Share = null;
+        data.Lines = new[]
+        {
+            new InvoiceDocumentData.LineData(
+                1,
+                "9001",
+                "Pflege",
+                1,
+                63.03m,
+                19m,
+                63.03m,
+                11.97m,
+                PriceIncludesVat: true,
+                GrossUnitPrice: 75.00m
+            ),
+        };
+        data.VatSummaries = new[]
+        {
+            new InvoiceDocumentData.VatSummary(19m, 63.03m, 11.97m, 75.00m),
+        };
+        data.NetTotal = 63.03m;
+        data.TotalVat = 11.97m;
+        data.GrossTotal = 75.00m;
+
+        var text = Text(data);
+
+        Assert.Contains("75,00", text);
+        Assert.DoesNotContain("75,01", text);
+    }
+
+    [Fact]
     public void A_vat_included_line_total_agrees_with_the_vat_block()
     {
         // 3 x 10,00 gross at 19 % is 8,40 net each, 25,20 net, 4,79 VAT, 29,99

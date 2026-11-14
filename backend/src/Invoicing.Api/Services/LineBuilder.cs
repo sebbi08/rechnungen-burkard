@@ -7,7 +7,7 @@ namespace Burkard.Invoicing.Api.Services;
 
 /// <summary>Turns the lines a user entered into snapshotted, validated lines:
 /// each item's number, description and VAT rate as they are now, the price
-/// entered or else the item's default, converted to net where it was entered
+/// entered or else the item's default, kept as the gross where it was entered
 /// VAT-included. Invoices and quotes take their input through the same rules, so
 /// a quote accepts exactly what an invoice would.</summary>
 public sealed class LineBuilder
@@ -74,12 +74,15 @@ public sealed class LineBuilder
                     Description = item.Description,
                     Count = input.Count,
                     // a line priced VAT-included is entered as the gross the
-                    // customer pays; the line itself is always net
+                    // customer pays, and that gross is what is stored and billed.
+                    // UnitPrice then only holds the per-unit net for readers that
+                    // want one; the calculation does not use it
                     UnitPrice = VatInclusivePrice.NetOf(
                         unitPrice.Value,
                         item.VatRate,
                         input.PriceIncludesVat
                     ),
+                    GrossUnitPrice = input.PriceIncludesVat ? unitPrice.Value : null,
                     VatRate = item.VatRate,
                     PriceIncludesVat = input.PriceIncludesVat,
                     Comment = CleanText(input.Comment),

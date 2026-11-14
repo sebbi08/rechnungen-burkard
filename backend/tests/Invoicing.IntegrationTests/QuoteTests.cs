@@ -92,6 +92,38 @@ public class QuoteTests
     }
 
     [Fact]
+    public async Task A_ticked_quote_line_stores_its_gross()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedAsync(host);
+        using var client = host.CreateClient();
+        var lines = new[]
+        {
+            new
+            {
+                itemId,
+                count = 1,
+                unitPrice = (decimal?)75.00m,
+                priceIncludesVat = true,
+            },
+        };
+
+        var (id, _) = await CreatedAsync(await CreateQuoteAsync(client, recipientId, lines));
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var line = await db.QuoteLines.SingleAsync(l => l.QuoteId == id);
+            Assert.Equal(75.00m, line.GrossUnitPrice);
+            Assert.True(line.PriceIncludesVat);
+        }
+        var response = await client.GetAsync($"/odata/Quotes?$filter=Id eq {id}");
+        using var json = await ODataJson.ReadAsync(response);
+        var row = json.RootElement.GetProperty("value").EnumerateArray().Single();
+        Assert.Equal(75.00m, row.GetProperty("GrossTotal").GetDecimal());
+    }
+
+    [Fact]
     public async Task Creating_a_quote_snapshots_and_renders_one_pdf()
     {
         using var host = new ApiTestHost();

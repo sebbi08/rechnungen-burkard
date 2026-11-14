@@ -62,7 +62,11 @@ public sealed class InvoiceDocumentData
         // the price was entered gross; UnitPrice is still the net
         bool PriceIncludesVat = false,
         // printed under the description, in that column; empty prints nothing
-        string Comment = ""
+        string Comment = "",
+        // the gross per unit as entered, on a line that was entered VAT-included
+        // since lines became gross-led; null on every other line, and then the
+        // unit price is worked out from UnitPrice as before
+        decimal? GrossUnitPrice = null
     );
 
     public sealed record VatSummary(
