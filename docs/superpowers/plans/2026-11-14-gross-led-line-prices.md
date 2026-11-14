@@ -99,12 +99,12 @@
 **Interfaces:**
 
 - Consumes: `GrossUnitPrice` on invoice and quote lines (Task 2).
-- Produces: `LineEditor` prop `ordinary?: boolean` replacing `withComments` (shows the comment field **and** the VAT-included checkbox column); `toLineInputs(lines, { ordinary })` sends `comment` and `priceIncludesVat` only when `ordinary`, else `priceIncludesVat: false`; `money.ts` exports `printedUnitPrice(line: { UnitPrice: number; GrossUnitPrice: number | null; PriceIncludesVat: boolean; VatRate: number }): number` and `printedLineTotal(sameLine & { Count: number }): number` — what the PDF prints (gross-led: gross and count × gross; old flagged: `grossFromNet(UnitPrice, VatRate)` and net + VAT of `lineNet`; net: `UnitPrice` and `lineNet`).
+- Produces: `LineEditor` prop `ordinary?: boolean` replacing `withComments` (shows the comment field **and** the VAT-included checkbox column); `toLineInputs(lines, { ordinary })` sends `comment` and `priceIncludesVat` only when `ordinary`, else `priceIncludesVat: false`; `money.ts` exports `printedUnitPrice(line: { UnitPrice: number; GrossUnitPrice: number | null; PriceIncludesVat: boolean; VatRate: number }): number` — the unit price the PDF prints (gross-led: the gross; old flagged: `grossFromNet(UnitPrice, VatRate)`; net: `UnitPrice`) — and `splitGross(lineGross, rate)`, the split of a gross-led line into VAT and net. The revision panel's line rows carry a net and a gross column: a gross-led line's net is `splitGross(count × gross).net` and its gross is count × gross; the other lines' gross comes from `grossPerLine`.
 
 - [ ] **Step 1:** Opening a version in `InvoiceEditor`: a line's price field shows `line.GrossUnitPrice` when set, else today's `priceFieldValue(...)`.
 - [ ] **Step 2:** `LineEditor`'s running totals: a ticked line contributes `lineGross = count × price` (via `lineNet(count, price)`), `vat = roundCents(lineGross × rate / (100 + rate))`, `net = lineGross − vat`; an unticked line as today. Update the doc comment.
 - [ ] **Step 3:** Rename `withComments` → `ordinary` in `LineEditor` and `toLineInputs`; `InvoiceEditor` passes it (invoices and quotes). The checkbox column header and cell render only with `ordinary`; the grid template drops the 8rem column without it.
-- [ ] **Step 4:** `revisions.ts`/`RevisionPanel.vue`: `RevisionLineView` carries `GrossUnitPrice`; the panel shows `printedUnitPrice` and `printedLineTotal`.
+- [ ] **Step 4:** `revisions.ts`/`RevisionPanel.vue`: `RevisionLineView` carries `GrossUnitPrice`; the panel shows `printedUnitPrice`, the per-line net, and a gross column that is count × gross for a gross-led line (`grossPerLine` runs over the remaining lines only).
 - [ ] **Step 5: Run** `npm run typecheck && npm run lint && npm run build` in `frontend/` — clean.
 - [ ] **Step 6: Commit** `feat(frontend): edit and show a VAT-included line in its stored gross`.
 

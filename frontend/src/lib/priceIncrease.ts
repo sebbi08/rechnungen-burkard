@@ -20,10 +20,7 @@ export interface PendingIncrease {
 
 /** A row's name as the dialog's grave section names a group. */
 export function rowLabel(row: IncreaseRow, t: Translate): string {
-  const price = t(row.isDefault ? "itemPriceDefault" : "itemPriceOwn", [
-    formatAmount(row.oldPrice),
-  ]);
-  return price;
+  return t(row.isDefault ? "itemPriceDefault" : "itemPriceOwn", [formatAmount(row.oldPrice)]);
 }
 
 /** Whether a ticked row's price is actually going to change. */
@@ -40,8 +37,8 @@ export function raiseByPercent(price: number, percent: number): number {
   return Math.floor((raised + 5000) / 10000) / 100;
 }
 
-/** The rows of an item's graves: the default price first (merging net and
- *  groups, even with no grave), then one per own price. */
+/** The rows of an item's graves: the default price first (merging every
+ *  group at the default, even with no grave), then one per own price. */
 export function increaseRows(graves: ItemGraves): IncreaseRow[] {
   const rows: IncreaseRow[] = [];
   if (graves.DefaultPrice != null) {

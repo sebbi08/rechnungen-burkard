@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { createRow, ensureRow } from "../seed";
 import { unique } from "../unique";
-import { drawer, pickItem, pickRecipient, saveEditor, waitForOverlayOpen } from "../vue";
+import {
+  drawer,
+  pickItem,
+  pickRecipient,
+  saveEditor,
+  searchColumn,
+  waitForOverlayOpen,
+} from "../vue";
 
 // Unique per worker, and each test seeds under names of its own: every test
 // shares the one stack and writes into it at the same time as the others.
@@ -69,7 +76,12 @@ test("a ticked line reopens on its gross and re-saves unchanged", async ({ page 
   });
 
   await page.goto(`/invoices/${created.RootId ?? created.Id}`);
-  await expect(page.getByText("75,00 €").first()).toBeVisible();
+  // the revision panel's line: net, and a gross cell reading what was entered
+  // rather than the net with its VAT put on again (75,01)
+  const line = page.locator(".p-accordionpanel").first().locator("tbody tr").first();
+  await expect(line.getByRole("cell", { name: "63,03 €", exact: true })).toBeVisible();
+  await expect(line.getByRole("cell", { name: "75,00 €", exact: true })).toHaveCount(2);
+  await expect(page.locator(".p-accordionpanel").first()).not.toContainText("75,01");
 
   // the editor opens on the gross with the box still ticked, not on the stored net
   await page.getByRole("button", { name: "Bearbeiten" }).click();
@@ -83,6 +95,16 @@ test("a ticked line reopens on its gross and re-saves unchanged", async ({ page 
   await expect(page.locator(".p-accordionheader").first()).toContainText("Revision 1");
   const latest = page.locator(".p-accordionpanel").first();
   await expect(latest.locator("dl")).toContainText("Gesamt75,00 €");
+
+  // the list finds the invoice by the total it prints, not by net plus VAT
+  await page.goto("/invoices");
+  const answered = (key: string) => (url: string) =>
+    url.includes("/odata/Invoices") && url.includes(`${key}=`);
+  await searchColumn(page, "Empfänger", `Brutto zwei ${RUN}`, answered("recipient"));
+  await searchColumn(page, "Betrag", "75,01", answered("total"));
+  await expect(page.getByRole("row").filter({ hasText: `Brutto zwei ${RUN}` })).toHaveCount(0);
+  await searchColumn(page, "Betrag", "75,00", answered("total"));
+  await expect(page.getByRole("row").filter({ hasText: `Brutto zwei ${RUN}` })).toHaveCount(1);
 });
 
 test("a ticked line bills its count times the entered gross", async ({ page }) => {
