@@ -305,7 +305,10 @@ public class ImportTests
     /// <summary>An archive with one grave, one item and one recipient whose
     /// mapping carries the legacy VAT column, with the given value on the
     /// item row.</summary>
-    private static byte[] LegacyVatColumnArchive(string vatCell) =>
+    private static byte[] LegacyVatColumnArchive(
+        string vatCell,
+        string header = LegacyFullMappingHeader
+    ) =>
         Zip(
             ("recipients.csv", RecipientsHeader + "E-1000,Anna Beispiel,Weg 1\r\n"),
             ("items.csv", ItemsHeader + "9001,Grabpflege,7,120.00,\r\n"),
@@ -316,11 +319,33 @@ public class ImportTests
             ),
             (
                 "mapping.csv",
-                LegacyFullMappingHeader
-                    + $"Item,IMP-1,9001,2,{vatCell},95.00\r\n"
-                    + "Recipient,IMP-1,E-1000,,,\r\n"
+                header + $"Item,IMP-1,9001,2,{vatCell},95.00\r\n" + "Recipient,IMP-1,E-1000,,,\r\n"
             )
         );
+
+    [Fact]
+    public async Task The_legacy_vat_column_is_found_whatever_the_case_of_its_header()
+    {
+        using var host = new ApiTestHost();
+        await ConfigureVatAsync(host, 7m);
+        using var client = host.CreateClient();
+
+        var response = await client.PostAsync(
+            "/odata/ImportArchive",
+            Upload(
+                LegacyVatColumnArchive(
+                    "false",
+                    "Type,GraveNumber,Reference,Count,priceincludesvat,UnitPrice\r\n"
+                )
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var link = await db.GraveItems.SingleAsync();
+        Assert.Equal(95.00m, link.UnitPrice);
+    }
 
     [Theory]
     [InlineData("false")]

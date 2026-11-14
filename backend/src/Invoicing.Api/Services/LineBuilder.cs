@@ -82,7 +82,9 @@ public sealed class LineBuilder
                         item.VatRate,
                         input.PriceIncludesVat
                     ),
-                    GrossUnitPrice = input.PriceIncludesVat ? unitPrice.Value : null,
+                    GrossUnitPrice = input.PriceIncludesVat
+                        ? decimal.Round(unitPrice.Value, 2, MidpointRounding.AwayFromZero)
+                        : null,
                     VatRate = item.VatRate,
                     PriceIncludesVat = input.PriceIncludesVat,
                     Comment = CleanText(input.Comment),

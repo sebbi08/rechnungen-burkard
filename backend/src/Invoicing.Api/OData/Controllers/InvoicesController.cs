@@ -72,6 +72,7 @@ public class InvoicesController : ODataController
                             l.Count,
                             l.UnitPrice,
                             l.VatRate,
+                            l.GrossUnitPrice,
                         })
                         .ToList(),
                 })
@@ -95,7 +96,7 @@ public class InvoicesController : ODataController
                         // reach a user through here, so there is no share
                         // to take.
                         InvoiceSearch.GrossTotal(
-                            c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
+                            c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate, l.GrossUnitPrice))
                         )
                     );
                     return InvoiceSearch.Matches(row, filter);

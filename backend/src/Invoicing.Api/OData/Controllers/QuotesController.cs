@@ -57,6 +57,7 @@ public class QuotesController : ODataController
                             l.Count,
                             l.UnitPrice,
                             l.VatRate,
+                            l.GrossUnitPrice,
                         })
                         .ToList(),
                 })
@@ -72,7 +73,9 @@ public class QuotesController : ODataController
                             c.RecipientAddress,
                             c.GeneratedAt,
                             InvoiceSearch.GrossTotal(
-                                c.Lines.Select(l => (l.Count, l.UnitPrice, l.VatRate))
+                                c.Lines.Select(l =>
+                                    (l.Count, l.UnitPrice, l.VatRate, l.GrossUnitPrice)
+                                )
                             )
                         ),
                         filter

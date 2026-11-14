@@ -47,24 +47,21 @@ public static class InvoiceSearch
     /// DocumentDataBuilder rounds it, so the number the user reads on the
     /// document is the number they can search for.</summary>
     public static decimal GrossTotal(
-        IEnumerable<(int Count, decimal UnitPrice, decimal VatRate)> lines
+        IEnumerable<(int Count, decimal UnitPrice, decimal VatRate, decimal? GrossUnitPrice)> lines
     )
     {
         decimal netCents = 0;
         decimal vatCents = 0;
         foreach (var line in lines)
         {
-            var lineCents = Math.Round(
-                line.Count * line.UnitPrice * 100m,
-                0,
-                MidpointRounding.AwayFromZero
+            var (net, vat) = LineAmounts.Cents(
+                line.Count,
+                line.UnitPrice,
+                line.VatRate,
+                line.GrossUnitPrice
             );
-            netCents += lineCents;
-            vatCents += Math.Round(
-                lineCents * line.VatRate / 100m,
-                0,
-                MidpointRounding.AwayFromZero
-            );
+            netCents += net;
+            vatCents += vat;
         }
 
         return (netCents + vatCents) / 100m;

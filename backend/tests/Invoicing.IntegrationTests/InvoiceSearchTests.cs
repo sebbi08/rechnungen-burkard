@@ -15,7 +15,7 @@ public class InvoiceSearchTests
     [Fact]
     public void Gross_total_rounds_each_line_the_way_the_document_does()
     {
-        var total = InvoiceSearch.GrossTotal(new[] { (2, 100m, 7m) });
+        var total = InvoiceSearch.GrossTotal(new[] { (2, 100m, 7m, (decimal?)null) });
         Assert.Equal(214.00m, total);
     }
 
@@ -258,6 +258,106 @@ public class InvoiceSearchTests
             new[] { "2026-0001" },
             await NumbersAsync(host, "recipient=O'Brien%20%26%20s%C3%B6hne")
         );
+    }
+
+    private static async Task<(long ItemId, long RecipientId)> SeedGrossItemAsync(ApiTestHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.VatRates.Add(new VatRate { Rate = 19m });
+        var item = new InvoiceItem
+        {
+            Number = "4003",
+            Description = "Grabpflege",
+            VatRate = 19m,
+            DefaultPrice = 75m,
+        };
+        var recipient = new Recipient
+        {
+            Number = "E-0004",
+            Name = "Familie Brutto",
+            Address = "Weg 4",
+        };
+        db.InvoiceItems.Add(item);
+        db.Recipients.Add(recipient);
+        await db.SaveChangesAsync();
+        return (item.Id, recipient.Id);
+    }
+
+    private static async Task<int> CountAsync(HttpClient client, string set, string total)
+    {
+        var response = await client.GetAsync($"/odata/{set}?total={Uri.EscapeDataString(total)}");
+        response.EnsureSuccessStatusCode();
+        using var json = await ODataJson.ReadAsync(response);
+        return json.RootElement.GetProperty("value").GetArrayLength();
+    }
+
+    [Fact]
+    public async Task A_gross_led_invoice_is_found_by_the_total_it_prints()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedGrossItemAsync(host);
+        using var client = host.CreateClient();
+        var created = await client.PostAsync(
+            "/odata/CreateInvoice",
+            ODataJson.Body(
+                new
+                {
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)75m,
+                            priceIncludesVat = true,
+                        },
+                    },
+                }
+            )
+        );
+        created.EnsureSuccessStatusCode();
+
+        Assert.Equal(1, await CountAsync(client, "Invoices", "75,00"));
+        Assert.Equal(0, await CountAsync(client, "Invoices", "75,01"));
+    }
+
+    [Fact]
+    public async Task A_gross_led_quote_is_found_by_the_total_it_prints()
+    {
+        using var host = new ApiTestHost();
+        var (itemId, recipientId) = await SeedGrossItemAsync(host);
+        using var client = host.CreateClient();
+        var created = await client.PostAsync(
+            "/odata/CreateQuote",
+            ODataJson.Body(
+                new
+                {
+                    recipientId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 1,
+                            unitPrice = (decimal?)75m,
+                            priceIncludesVat = true,
+                        },
+                    },
+                }
+            )
+        );
+        created.EnsureSuccessStatusCode();
+
+        Assert.Equal(1, await CountAsync(client, "Quotes", "75,00"));
+        Assert.Equal(0, await CountAsync(client, "Quotes", "75,01"));
+    }
+
+    [Fact]
+    public void Gross_total_of_a_gross_led_line_is_the_entered_gross()
+    {
+        Assert.Equal(75.00m, InvoiceSearch.GrossTotal(new[] { (1, 63.03m, 19m, (decimal?)75m) }));
     }
 
     [Theory]

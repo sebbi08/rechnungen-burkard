@@ -94,9 +94,10 @@ public sealed class InvoiceLine
     public decimal VatRate { get; set; }
 
     /// <summary>True when this line's price was entered as a gross — the amount
-    /// the customer pays, VAT included. <see cref="UnitPrice"/> is still the net
-    /// it was converted to; this records how that net was arrived at, so a
-    /// revision dialog can show the gross again and take it back unchanged.</summary>
+    /// the customer pays, VAT included — and so prints "Incl.". A new line
+    /// carries that gross in <see cref="GrossUnitPrice"/>; only a line from
+    /// before that column existed has just the net, from which the gross is
+    /// recovered.</summary>
     public bool PriceIncludesVat { get; set; }
 
     /// <summary>The gross per unit as entered, two decimals, set exactly when

@@ -150,34 +150,12 @@ public sealed class DocumentDataBuilder
             .OrderBy(l => l.LineNumber)
             .Select(l =>
             {
-                decimal lineTotalCents;
-                decimal vatCents;
-                if (l.GrossUnitPrice is { } gross)
-                {
-                    // an entered gross: the line bills exactly count x gross and
-                    // the VAT is taken out of that, rather than put on a net
-                    // that was rounded to the cent
-                    var grossCents = l.Count * gross * 100m;
-                    vatCents = Math.Round(
-                        grossCents * l.VatRate / (100m + l.VatRate),
-                        0,
-                        MidpointRounding.AwayFromZero
-                    );
-                    lineTotalCents = grossCents - vatCents;
-                }
-                else
-                {
-                    lineTotalCents = Math.Round(
-                        l.Count * l.UnitPrice * 100m,
-                        0,
-                        MidpointRounding.AwayFromZero
-                    );
-                    vatCents = Math.Round(
-                        lineTotalCents * l.VatRate / 100m,
-                        0,
-                        MidpointRounding.AwayFromZero
-                    );
-                }
+                var (lineTotalCents, vatCents) = LineAmounts.Cents(
+                    l.Count,
+                    l.UnitPrice,
+                    l.VatRate,
+                    l.GrossUnitPrice
+                );
                 return new InvoiceDocumentData.LineData(
                     l.LineNumber,
                     l.ItemNumber,

@@ -601,7 +601,12 @@ public sealed class ImportValidator
             // an archive prepared with the legacy VAT column has it before
             // UnitPrice; the template does not
             var legacy =
-                rows[0].Count > 4 && rows[0][4].Trim() == ImportArchiveLayout.LegacyVatColumn;
+                rows[0].Count > 4
+                && string.Equals(
+                    rows[0][4].Trim(),
+                    ImportArchiveLayout.LegacyVatColumn,
+                    StringComparison.OrdinalIgnoreCase
+                );
             var rawIncludesVat = legacy ? Cell(row, 4) : "";
             var rawUnitPrice = Cell(row, legacy ? 5 : 4);
             if (
