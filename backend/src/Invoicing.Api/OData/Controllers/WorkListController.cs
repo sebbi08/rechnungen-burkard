@@ -68,7 +68,9 @@ public class WorkListController : ODataController
 
     private IActionResult Pdf(WorkListData data, string fileName)
     {
-        var disposition = new ContentDispositionHeaderValue("attachment");
+        // inline, so the browser shows the list in the tab the UI opens for it;
+        // the file name still travels along for a save from the viewer
+        var disposition = new ContentDispositionHeaderValue("inline");
         disposition.SetHttpFileName(fileName);
         Response.Headers.ContentDisposition = disposition.ToString();
         return File(WorkListDocuments.Generate(data), "application/pdf");

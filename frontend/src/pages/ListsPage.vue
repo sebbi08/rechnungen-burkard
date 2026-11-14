@@ -5,10 +5,10 @@ import DatePicker from "primevue/datepicker";
 import SelectButton from "primevue/selectbutton";
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { type CareListServices, downloadCareList, downloadPlantingList } from "@/api/endpoints";
+import { type CareListServices, careListUrl, plantingListUrl } from "@/api/endpoints";
 import PageHeader from "@/components/PageHeader.vue";
 import { useErrorToast } from "@/composables/useErrorToast";
-import { downloadBlob } from "@/lib/download";
+import { openPdf } from "@/lib/download";
 import { QUARTERS, type QuarterName, quarterLabelKey, quarterOf } from "@/lib/quarter";
 
 const { t } = useI18n();
@@ -53,11 +53,10 @@ function restoreYears(): void {
   plantingYear.value ??= new Date(today.getFullYear(), 0, 1);
 }
 
-async function downloadCare(): Promise<void> {
+async function openCare(): Promise<void> {
   careBusy.value = true;
   try {
-    const { blob, fileName } = await downloadCareList(yearOf(careYear.value), services.value);
-    downloadBlob(blob, fileName);
+    await openPdf(careListUrl(yearOf(careYear.value), services.value));
   } catch (error) {
     showError(error);
   } finally {
@@ -65,14 +64,10 @@ async function downloadCare(): Promise<void> {
   }
 }
 
-async function downloadPlanting(): Promise<void> {
+async function openPlanting(): Promise<void> {
   plantingBusy.value = true;
   try {
-    const { blob, fileName } = await downloadPlantingList(
-      yearOf(plantingYear.value),
-      quarter.value,
-    );
-    downloadBlob(blob, fileName);
+    await openPdf(plantingListUrl(yearOf(plantingYear.value), quarter.value));
   } catch (error) {
     showError(error);
   } finally {
@@ -113,12 +108,12 @@ async function downloadPlanting(): Promise<void> {
             class="w-full sm:w-auto"
           />
           <Button
-            :label="t('downloadPdf')"
-            :aria-label="t('careListDownload')"
-            icon="pi pi-download"
+            :label="t('openPdf')"
+            :aria-label="t('careListOpen')"
+            icon="pi pi-file-pdf"
             outlined
             :loading="careBusy"
-            @click="downloadCare"
+            @click="openCare"
           />
         </div>
       </template>
@@ -152,12 +147,12 @@ async function downloadPlanting(): Promise<void> {
             class="w-full sm:w-auto"
           />
           <Button
-            :label="t('downloadPdf')"
-            :aria-label="t('plantingListDownload')"
-            icon="pi pi-download"
+            :label="t('openPdf')"
+            :aria-label="t('plantingListOpen')"
+            icon="pi pi-file-pdf"
             outlined
             :loading="plantingBusy"
-            @click="downloadPlanting"
+            @click="openPlanting"
           />
         </div>
       </template>

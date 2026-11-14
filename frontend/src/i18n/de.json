@@ -488,9 +488,9 @@
   "plantingListYear": "Jahr der Pflanzliste",
   "listScope": "Umfang",
   "listQuarter": "Quartal",
-  "careListDownload": "Pflegeliste als PDF herunterladen",
-  "plantingListDownload": "Pflanzliste als PDF herunterladen",
-  "downloadPdf": "PDF herunterladen",
+  "careListOpen": "Pflegeliste als PDF öffnen",
+  "plantingListOpen": "Pflanzliste als PDF öffnen",
+  "openPdf": "PDF öffnen",
   "errorNoGravesOnList1": "Für {0} gibt es keine Gräber.",
   "errorNoGravesOnList2": "Für {1} {0} gibt es keine Gräber mit Zusatzleistungen."
 }

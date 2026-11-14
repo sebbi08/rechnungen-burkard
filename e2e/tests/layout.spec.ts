@@ -802,12 +802,8 @@ test("import/export: the page fits the viewport", async ({ page }) => {
 test("lists: both cards fit the viewport", async ({ page }) => {
   await page.goto("/lists");
 
-  await expect(
-    page.getByRole("button", { name: "Pflegeliste als PDF herunterladen" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Pflanzliste als PDF herunterladen" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pflegeliste als PDF öffnen" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pflanzliste als PDF öffnen" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Mit allen Leistungen" })).toBeVisible();
   await expectNoSidewaysScrolling(page);
 });

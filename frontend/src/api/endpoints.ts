@@ -762,31 +762,14 @@ export async function downloadBackup(): Promise<{ blob: Blob; fileName: string }
 /** Which services the care list shows under each grave. */
 export type CareListServices = "none" | "care" | "all";
 
-export async function downloadCareList(
-  year: number,
-  services: CareListServices,
-): Promise<{ blob: Blob; fileName: string }> {
-  const query = new URLSearchParams({ year: String(year), services });
-  return readDownload(await request(`/odata/CareList?${query}`), `Pflegeliste-${year}.pdf`);
+/** Where the care list of a year is served, for display in a tab. */
+export function careListUrl(year: number, services: CareListServices): string {
+  return `/odata/CareList?${new URLSearchParams({ year: String(year), services })}`;
 }
 
-/** The quarter's word in a file name, as the server spells it. */
-const QUARTER_FILE_WORDS: Record<QuarterName, string> = {
-  Spring: "Fruehling",
-  Summer: "Sommer",
-  Autumn: "Herbst",
-  Winter: "Winter",
-};
-
-export async function downloadPlantingList(
-  year: number,
-  quarter: QuarterName,
-): Promise<{ blob: Blob; fileName: string }> {
-  const query = new URLSearchParams({ year: String(year), quarter });
-  return readDownload(
-    await request(`/odata/PlantingList?${query}`),
-    `Pflanzliste-${year}-${QUARTER_FILE_WORDS[quarter]}.pdf`,
-  );
+/** Where the planting list of a quarter is served, for display in a tab. */
+export function plantingListUrl(year: number, quarter: QuarterName): string {
+  return `/odata/PlantingList?${new URLSearchParams({ year: String(year), quarter })}`;
 }
 
 /** Stages the backup on the server and checks it; nothing is replaced yet. */

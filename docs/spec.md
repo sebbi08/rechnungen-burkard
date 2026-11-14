@@ -541,17 +541,17 @@ it holds.
 
 **Acceptance Scenarios**:
 
-1. **Given** graves running in a year, **When** the user downloads the care list
+1. **Given** graves running in a year, **When** the user opens the care list
    for that year, **Then** it holds every grave with at least one month of its
    term in the year, cooperative graves included and deleted ones left out, in
    one of three variants: graves only, graves with their care services, or
    graves with their care services and the seasonal services of the quarters
    they run in.
-2. **Given** graves with seasonal services, **When** the user downloads the
+2. **Given** graves with seasonal services, **When** the user opens the
    planting list for a quarter, **Then** it holds every grave that has a service
    of that quarter and a month of its term in it, with one line per such service
    and its amount.
-3. **Given** graves in more than one cemetery, **When** a list is downloaded,
+3. **Given** graves in more than one cemetery, **When** a list is opened,
    **Then** each cemetery starts on a page of its own, its pages are numbered
    among themselves, and cemeteries and graves are in a fixed order.
 4. **Given** a grave that starts or ends within the list's period, **When** the
@@ -1378,9 +1378,10 @@ it holds.
   cemetery. Pages MUST be A4 portrait without letterhead, logo or fold marks.
 - **FR-108**: The application MUST offer a page "Listen" with a card for each
   list: year and variant for the care list, year and quarter for the planting
-  list, each with a button that downloads the PDF and shows it is busy while the
-  PDF is made. The API MUST serve the lists as `application/pdf` attachments
-  named `Pflegeliste-2027.pdf` and `Pflanzliste-2027-Fruehling.pdf`, from
+  list, each with a button that opens the PDF in a new browser tab and shows it
+  is busy while the PDF is made; a refused list MUST NOT leave a tab open. The
+  API MUST serve the lists as inline `application/pdf` named
+  `Pflegeliste-2027.pdf` and `Pflanzliste-2027-Fruehling.pdf`, from
   `GET odata/CareList?year=&services=none|care|all` and
   `GET odata/PlantingList?year=&quarter=`. A year outside 2000 to 2100, or a
   missing or unknown variant or quarter, MUST be refused with the code

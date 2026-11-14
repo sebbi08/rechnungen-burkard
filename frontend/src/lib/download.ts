@@ -1,5 +1,5 @@
 import { type DocumentKindName, documentUrl, fetchDocuments } from "@/api/endpoints";
-import { ApiError } from "@/api/http";
+import { ApiError, request } from "@/api/http";
 
 export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
@@ -29,6 +29,26 @@ export async function openDocument(invoiceId: number, kind: DocumentKindName): P
     } else {
       // a browser that refused the empty tab may still allow a real URL
       window.open(documentUrl(match.Id), "_blank");
+    }
+  } catch (error) {
+    tab?.close();
+    throw error;
+  }
+}
+
+/** Opens a PDF the server makes on request in a new tab. The tab is opened
+ *  before the await, as in openDocument. The request first runs here, so a
+ *  refusal shows as the server's message instead of a tab of JSON; the tab
+ *  then loads the same address, which makes the PDF a second time but keeps
+ *  the server's file name for a save from the viewer. */
+export async function openPdf(url: string): Promise<void> {
+  const tab = window.open("", "_blank");
+  try {
+    await request(url);
+    if (tab) {
+      tab.location.href = url;
+    } else {
+      window.open(url, "_blank");
     }
   } catch (error) {
     tab?.close();

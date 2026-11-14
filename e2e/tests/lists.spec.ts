@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { createRow, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
@@ -37,7 +36,35 @@ async function seedItem(page: Page, number: string, quarter?: string): Promise<n
   return item.Id;
 }
 
-test("the care list downloads as a PDF", async ({ page }) => {
+/** Clicks a list's button and answers the address its new tab loads. What the
+ *  tab renders is up to the browser — a headless one has no PDF viewer — so
+ *  the assertions are on the address and on what the server answers there. */
+async function openList(page: Page, button: string, path: string): Promise<string> {
+  const tabPromise = page.context().waitForEvent("page");
+  const listRequest = page
+    .context()
+    .waitForEvent(
+      "request",
+      (request) => request.url().includes(path) && request.frame().page() !== page,
+    );
+  await page.getByRole("button", { name: button }).click();
+  const tab = await tabPromise;
+  const url = (await listRequest).url();
+  await tab.close();
+  return url;
+}
+
+/** The list at that address is a PDF, served for display under that name. */
+async function expectPdfForDisplay(page: Page, url: string, fileName: string): Promise<void> {
+  const response = await page.request.get(url);
+  expect(response.headers()["content-type"]).toBe("application/pdf");
+  const disposition = response.headers()["content-disposition"] ?? "";
+  expect(disposition).toContain("inline");
+  expect(disposition).toContain(fileName);
+  expect((await response.body()).subarray(0, 4).toString()).toBe("%PDF");
+}
+
+test("the care list opens as a PDF in a new tab", async ({ page }) => {
   const itemId = await seedItem(page, `L1-${RUN}`);
   const recipientId = await seedRecipient(page, `Pflege Beispiel ${RUN}`);
   await seedGrave(page, {
@@ -49,16 +76,12 @@ test("the care list downloads as a PDF", async ({ page }) => {
   });
 
   await page.goto("/lists");
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Pflegeliste als PDF herunterladen" }).click();
-  const file = await download;
+  const url = await openList(page, "Pflegeliste als PDF öffnen", "/odata/CareList");
 
-  expect(file.suggestedFilename()).toBe(`Pflegeliste-${YEAR}.pdf`);
-  const content = await readFile(await file.path());
-  expect(content.subarray(0, 4).toString()).toBe("%PDF");
+  await expectPdfForDisplay(page, url, `Pflegeliste-${YEAR}.pdf`);
 });
 
-test("the planting list downloads as a PDF", async ({ page }) => {
+test("the planting list opens as a PDF in a new tab", async ({ page }) => {
   const careId = await seedItem(page, `L2-${RUN}`);
   const itemId = await seedItem(page, `L2-${RUN}-seasonal`, QUARTER.api);
   const recipientId = await seedRecipient(page, `Pflanz Beispiel ${RUN}`);
@@ -71,13 +94,9 @@ test("the planting list downloads as a PDF", async ({ page }) => {
   });
 
   await page.goto("/lists");
-  const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Pflanzliste als PDF herunterladen" }).click();
-  const file = await download;
+  const url = await openList(page, "Pflanzliste als PDF öffnen", "/odata/PlantingList");
 
-  expect(file.suggestedFilename()).toBe(`Pflanzliste-${YEAR}-${QUARTER.file}.pdf`);
-  const content = await readFile(await file.path());
-  expect(content.subarray(0, 4).toString()).toBe("%PDF");
+  await expectPdfForDisplay(page, url, `Pflanzliste-${YEAR}-${QUARTER.file}.pdf`);
 });
 
 test("the chosen variant and quarter go to the server", async ({ page }) => {
@@ -99,27 +118,17 @@ test("the chosen variant and quarter go to the server", async ({ page }) => {
     .getByRole("group", { name: "Umfang" })
     .getByRole("button", { name: "Mit allen Leistungen" })
     .click();
-  const care = page.waitForRequest(
-    (r) => r.url().includes("/odata/CareList") && r.url().includes("services=all"),
-  );
-  const careDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Pflegeliste als PDF herunterladen" }).click();
-  await care;
-  expect((await careDownload).suggestedFilename()).toBe(`Pflegeliste-${YEAR}.pdf`);
+  const careUrl = await openList(page, "Pflegeliste als PDF öffnen", "/odata/CareList");
+  expect(careUrl).toContain("services=all");
+  await expectPdfForDisplay(page, careUrl, `Pflegeliste-${YEAR}.pdf`);
 
   await page
     .getByRole("group", { name: "Quartal" })
     .getByRole("button", { name: other.label })
     .click();
-  const planting = page.waitForRequest(
-    (r) => r.url().includes("/odata/PlantingList") && r.url().includes(`quarter=${other.api}`),
-  );
-  const plantingDownload = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Pflanzliste als PDF herunterladen" }).click();
-  await planting;
-  expect((await plantingDownload).suggestedFilename()).toBe(
-    `Pflanzliste-${YEAR}-${other.file}.pdf`,
-  );
+  const plantingUrl = await openList(page, "Pflanzliste als PDF öffnen", "/odata/PlantingList");
+  expect(plantingUrl).toContain(`quarter=${other.api}`);
+  await expectPdfForDisplay(page, plantingUrl, `Pflanzliste-${YEAR}-${other.file}.pdf`);
 });
 
 test("a list with nothing on it says so", async ({ page }) => {
@@ -127,15 +136,17 @@ test("a list with nothing on it says so", async ({ page }) => {
 
   // 2000, not a year far out: graves without an end run on every later year
   await fillYear(page, page.locator("#careListYear"), "2000");
-  await page.getByRole("button", { name: "Pflegeliste als PDF herunterladen" }).click();
+  await page.getByRole("button", { name: "Pflegeliste als PDF öffnen" }).click();
   await expect(toasts(page).filter({ hasText: "Für 2000 gibt es keine Gräber." })).toBeVisible();
+  // the tab opened for the list is closed again rather than left showing the refusal
+  await expect.poll(() => page.context().pages().length).toBe(1);
 
   await fillYear(page, page.locator("#plantingListYear"), "2000");
   await page
     .getByRole("group", { name: "Quartal" })
     .getByRole("button", { name: "Frühling" })
     .click();
-  await page.getByRole("button", { name: "Pflanzliste als PDF herunterladen" }).click();
+  await page.getByRole("button", { name: "Pflanzliste als PDF öffnen" }).click();
   await expect(
     toasts(page).filter({
       hasText: "Für Frühling 2000 gibt es keine Gräber mit Zusatzleistungen.",

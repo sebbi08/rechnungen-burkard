@@ -372,7 +372,7 @@ public class WorkListTests
     }
 
     [Fact]
-    public async Task The_lists_download_as_pdf_with_their_names()
+    public async Task The_lists_are_served_as_pdf_for_display_with_their_names()
     {
         using var host = new ApiTestHost();
         Seed(host, "G-1", M(2020, 1), null, services: new Svc(BillingQuarter.Spring));
@@ -394,7 +394,7 @@ public class WorkListTests
             var bytes = await response.Content.ReadAsByteArrayAsync();
             Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
             var disposition = response.Content.Headers.ContentDisposition;
-            Assert.Equal("attachment", disposition?.DispositionType);
+            Assert.Equal("inline", disposition?.DispositionType);
             Assert.Equal(name, disposition?.FileNameStar ?? disposition?.FileName?.Trim('"'));
         }
     }
