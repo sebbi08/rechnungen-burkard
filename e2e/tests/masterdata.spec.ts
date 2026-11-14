@@ -708,9 +708,8 @@ test("graves: search by number narrows the list and empty search shows nothing (
   await page.setViewportSize({ width: 1536, height: 720 });
   await page.goto("/graves");
   const table = page.getByRole("table");
-  // graves still open for the selected half-year are listed first, so a
-  // freshly created one is in the table right away
-  await expect(table).toContainText(graveNumber);
+  // no look at the unfiltered list first: it is sorted by status and number,
+  // and other tests' open graves can push this one off the first page
 
   await searchColumn(page, "Grabnummer", graveNumber);
   // the unique number matches exactly this run's grave, nothing else
