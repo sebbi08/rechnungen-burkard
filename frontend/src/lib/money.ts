@@ -113,11 +113,20 @@ export interface PrintedLine {
 }
 
 /** VAT and net inside a gross line total, the way the backend splits it:
- *  VAT is the share of the gross, rounded a half cent away from zero, and the
- *  net is what is left, so the two always add up to the gross. */
+ *  VAT is the share of the gross, rounded once, a half cent away from zero, and
+ *  the net is what is left, so the two always add up to the gross.
+ *
+ *  Worked in integers -- the gross in whole cents, the rate in thousandths of a
+ *  percent -- and rounded a single time. Going through `roundCents` rounded to
+ *  four decimals first and then to cents, which turned a VAT of 0,114957 into
+ *  0,12 where the backend's decimal says 0,11. */
 export function splitGross(lineGross: number, vatRate: number): { net: number; vat: number } {
-  const vat = roundCents((lineGross * vatRate) / (100 + vatRate));
-  return { net: roundCents(lineGross - vat), vat };
+  const grossCents = Math.round(lineGross * 100);
+  const rate = Math.round(vatRate * 1000);
+  const divisor = 100000 + rate;
+  const vatCents =
+    Math.sign(grossCents) * Math.floor((2 * Math.abs(grossCents) * rate + divisor) / (2 * divisor));
+  return { net: (grossCents - vatCents) / 100, vat: vatCents / 100 };
 }
 
 /** The unit price the PDF prints. A line entered VAT-included has its gross
@@ -128,18 +137,4 @@ export function printedUnitPrice(line: PrintedLine): number {
     return line.GrossUnitPrice;
   }
   return line.PriceIncludesVat ? grossFromNet(line.UnitPrice, line.VatRate) : line.UnitPrice;
-}
-
-/** The line total the PDF prints: count × gross for a gross-led line, net plus
- *  VAT for an older flagged one (each rounded on its own, as the backend does),
- *  the net for a net line. */
-export function printedLineTotal(line: PrintedLine & { Count: number }): number {
-  if (line.GrossUnitPrice != null) {
-    return lineNet(line.Count, line.GrossUnitPrice);
-  }
-  const net = lineNet(line.Count, line.UnitPrice);
-  if (!line.PriceIncludesVat) {
-    return net;
-  }
-  return roundCents(net + roundCents((net * line.VatRate) / 100));
 }
