@@ -13,7 +13,8 @@ export interface RevisionLineView {
   /** The line's net, rounded to the cent: count × UnitPrice, or on a gross-led
    *  line what is left of count × GrossUnitPrice after its VAT. */
   LineTotal: number;
-  /** This line's part of what is actually charged, gross (grossPerLine). */
+  /** This line's part of what is actually charged, gross: count × GrossUnitPrice
+   *  on a gross-led line, otherwise its share by grossPerLine. */
   GrossTotal: number;
 }
 
@@ -63,12 +64,20 @@ function buildView(
           : lineNet(line.Count, line.UnitPrice),
       GrossTotal: 0,
     }));
+  // a gross-led line is charged exactly count × gross; the remaining lines
+  // share out what their rates are billed at (grossPerLine)
+  const rest = lines.filter((line) => line.GrossUnitPrice == null);
   const shares = grossPerLine(
-    lines.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
+    rest.map((line) => ({ NetTotal: line.LineTotal, VatRate: line.VatRate })),
     recipientCount,
   );
-  lines.forEach((line, index) => {
+  rest.forEach((line, index) => {
     line.GrossTotal = shares[index];
+  });
+  lines.forEach((line) => {
+    if (line.GrossUnitPrice != null) {
+      line.GrossTotal = lineNet(line.Count, line.GrossUnitPrice);
+    }
   });
   return {
     Id: row.Id,
