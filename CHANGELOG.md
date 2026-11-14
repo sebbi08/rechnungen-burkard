@@ -5,6 +5,39 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.5.0 — 2026-11-14
+
+### Features
+- **lists**: open the care and planting lists in a new tab (badbc4f)
+- **frontend**: edit and show a VAT-included line in its stored gross (2f48a92)
+- **frontend**: a page to download the care and planting lists (26b1b07)
+- **api**: download the care and planting lists (dad7e49)
+- **documents**: render the care and planting lists (ffb3277)
+- **domain**: periods, grave-number order and gross amounts for the work lists (ed855bb)
+- **frontend**: save an item price increase with the item dialog (7bbf845)
+- **frontend**: propose and check an item price increase in the item dialog (c8b773f)
+- **api**: apply an item price increase and its corrections in one transaction (9130c01)
+- **api**: preview an item price increase with the corrections it needs (e5702fd)
+- free text above the lines and a comment per line on invoices and quotes (dfaf51f)
+- separate ending texts for invoices, quotes and each grave half-year (8b2def1)
+
+### Fixes
+- **frontend**: show a gross-led line's gross as entered in the revision panel (3dbdf4d)
+- **invoices**: find a gross-led invoice by the total it prints (eb36548)
+- **frontend**: split a gross into VAT and net with one rounding (317da65)
+- **invoices**: bill a VAT-included price at exactly the entered gross (ee58a1a)
+- **frontend**: name the quarter in the planting list file and wrap its selectors (d3e1ba5)
+- **documents**: widen the site column and align the Vertrag heading (bbde0fb)
+- **api**: accept only a quarter's name in the planting list route (3137db0)
+- **frontend**: recover from a stale price increase and show the default a save stores (9c8c1ca)
+- **frontend**: keep the item dialog open on Escape and manual prices on blur (ccfeaf5)
+- **api**: let GraveNumberInUseException use the shared validation Args (a0d44b9)
+
+### Other changes
+- **frontend**: drop the VAT-included checkbox from graves (5fad528)
+- **graves**: drop VAT-included grave prices (e1c9733)
+- **api**: refuse an empty list directly instead of throwing (2b035a9)
+
 ## v3.4.0 — 2026-11-12
 
 ### Features
