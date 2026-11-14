@@ -5,6 +5,12 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.6.0 — 2026-11-14
+
+### Features
+- **frontend**: print a half-year's grave invoices from the grave page (846b942)
+- **api**: print a half-year's grave invoices as one PDF (90f49b6)
+
 ## v3.5.0 — 2026-11-14
 
 ### Features
