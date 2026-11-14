@@ -13,14 +13,16 @@ public static class PdfJoiner
         "invoicing-pdf-join"
     );
 
-    public static byte[] Join(IReadOnlyList<byte[]> pdfs)
+    /// <param name="workRoot">Where the per-join directory goes; the default
+    /// unless a caller (a test) needs a root no one else writes to.</param>
+    public static byte[] Join(IReadOnlyList<byte[]> pdfs, string? workRoot = null)
     {
         if (pdfs.Count == 0)
         {
             throw new ArgumentException("There is nothing to join.", nameof(pdfs));
         }
 
-        var directory = Path.Combine(WorkRoot, Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(workRoot ?? WorkRoot, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
         {

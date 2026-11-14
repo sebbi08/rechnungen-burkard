@@ -12,11 +12,6 @@ namespace Burkard.Invoicing.DocumentTests;
 /// invoices in one go: every page as it is, in the order given.</summary>
 public class PdfJoinerTests
 {
-    private static readonly string WorkRoot = Path.Combine(
-        Path.GetTempPath(),
-        "invoicing-pdf-join"
-    );
-
     /// <summary>A PDF with one page per text, each page showing its text.</summary>
     private static byte[] Pdf(params string[] pageTexts)
     {
@@ -38,9 +33,6 @@ public class PdfJoinerTests
         return document.GetPages().Select(page => page.Text.Trim()).ToArray();
     }
 
-    private static int WorkDirectories() =>
-        Directory.Exists(WorkRoot) ? Directory.GetDirectories(WorkRoot).Length : 0;
-
     [Fact]
     public void Join_keeps_every_page_in_order()
     {
@@ -60,13 +52,24 @@ public class PdfJoinerTests
     [Fact]
     public void Join_leaves_no_temp_files()
     {
-        var before = WorkDirectories();
+        // a root of its own: other test assemblies join in the shared one at
+        // the same time, and their directories would be counted here
+        var root = Path.Combine(Path.GetTempPath(), $"pdf-join-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            PdfJoiner.Join([Pdf("A1"), Pdf("B1")], root);
+            Assert.Empty(Directory.GetFileSystemEntries(root));
 
-        PdfJoiner.Join([Pdf("A1"), Pdf("B1")]);
-        Assert.Equal(before, WorkDirectories());
-
-        Assert.ThrowsAny<Exception>(() => PdfJoiner.Join([Pdf("A1"), "no pdf"u8.ToArray()]));
-        Assert.Equal(before, WorkDirectories());
+            Assert.ThrowsAny<Exception>(() =>
+                PdfJoiner.Join([Pdf("A1"), "no pdf"u8.ToArray()], root)
+            );
+            Assert.Empty(Directory.GetFileSystemEntries(root));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
