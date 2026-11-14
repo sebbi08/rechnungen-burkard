@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using Burkard.Invoicing.Api.Persistence;
-using Burkard.Invoicing.Domain.Entities;
+using Burkard.Invoicing.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.EntityFrameworkCore;
@@ -64,23 +64,9 @@ public class BulkDownloadController : ODataController
             );
         }
 
-        // a superseded revision's documents were replaced; a bulk download must
-        // not put them next to the revision that replaced them
-        var query = _db.Documents.Where(d =>
-            d.Kind == DocumentKind.Normal
-            && d.Invoice != null
-            && d.Invoice.IsLatestRevision
-            // a deleted grave's invoices are no longer listed, so they are not
-            // downloaded either
-            && (
-                d.Invoice.GraveId == null
-                || !_db.Graves.Any(g => g.Id == d.Invoice.GraveId && g.DeletedAt != null)
-            )
-            && d.Invoice.PeriodYear == year
-            && d.Invoice.PeriodHalf == request.Half
-        );
-
-        var documents = await query.OrderBy(d => d.FileName).ToListAsync();
+        var documents = await GraveInvoiceDocuments
+            .OfHalfYear(_db, year, request.Half.Value)
+            .ToListAsync();
 
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))

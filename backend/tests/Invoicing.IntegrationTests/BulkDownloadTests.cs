@@ -16,10 +16,19 @@ namespace Burkard.Invoicing.IntegrationTests;
 /// time, never in bulk.</summary>
 public class BulkDownloadTests
 {
-    /// <summary>A grave invoiced for H1 and H2 2026, and an invoice that
-    /// belongs to no grave.</summary>
-    private static async Task SeedAsync(ApiTestHost host, HttpClient client)
+    /// <summary>Graves (by default one, "B-1") invoiced for H1 and H2 2026,
+    /// and an invoice that belongs to no grave.</summary>
+    internal static async Task SeedAsync(
+        ApiTestHost host,
+        HttpClient client,
+        params string[] graveNumbers
+    )
     {
+        if (graveNumbers.Length == 0)
+        {
+            graveNumbers = ["B-1"];
+        }
+
         long itemId,
             recipientId;
         using (var scope = host.Services.CreateScope())
@@ -45,33 +54,36 @@ public class BulkDownloadTests
             (itemId, recipientId) = (item.Id, recipient.Id);
         }
 
-        var saved = await client.PostAsync(
-            "/odata/SaveGrave",
-            ODataJson.Body(
-                new
-                {
-                    graveId = (long?)null,
-                    graveNumber = "B-1",
-                    fieldNumber = "1",
-                    siteName = "Grabstätte",
-                    cemeteryId = TestCemetery.Id,
-                    position = "SingleInside",
-                    startDate = "2026-01",
-                    endDate = "2040-12",
-                    items = new[]
+        foreach (var graveNumber in graveNumbers)
+        {
+            var saved = await client.PostAsync(
+                "/odata/SaveGrave",
+                ODataJson.Body(
+                    new
                     {
-                        new
+                        graveId = (long?)null,
+                        graveNumber,
+                        fieldNumber = "1",
+                        siteName = "Grabstätte",
+                        cemeteryId = TestCemetery.Id,
+                        position = "SingleInside",
+                        startDate = "2026-01",
+                        endDate = "2040-12",
+                        items = new[]
                         {
-                            itemId,
-                            count = 1,
-                            unitPrice = (decimal?)null,
+                            new
+                            {
+                                itemId,
+                                count = 1,
+                                unitPrice = (decimal?)null,
+                            },
                         },
-                    },
-                    recipientIds = new[] { recipientId },
-                }
-            )
-        );
-        saved.EnsureSuccessStatusCode();
+                        recipientIds = new[] { recipientId },
+                    }
+                )
+            );
+            saved.EnsureSuccessStatusCode();
+        }
         await GraveGenerationHelper.RunAsync(client, 2026, 1);
         await GraveGenerationHelper.RunAsync(client, 2026, 2);
 

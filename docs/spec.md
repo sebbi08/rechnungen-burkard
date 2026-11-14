@@ -315,6 +315,10 @@ bulk-downloading its normal invoices.
 3. **Given** a half-year is selected on the grave overview, **When** the user
    triggers the bulk download, **Then** the normal documents of that half-year's
    grave invoices are downloaded, with no copies included.
+4. **Given** a half-year is selected on the grave overview, **When** the user
+   prints its invoices, **Then** one PDF of that half-year's normal grave
+   documents, the same as the bulk download's and in its order, opens in a new
+   browser tab.
 
 ---
 
@@ -985,6 +989,13 @@ it holds.
 - **FR-045**: Users MUST be able to bulk-download the normal documents of the
   grave invoices of a selected half-year, leaving out the invoices of deleted
   graves (FR-018e).
+- **FR-045a**: Users MUST be able to print the documents of FR-045 from the
+  grave overview as one PDF that opens in a new browser tab: the stored
+  documents unchanged, one after the other in the bulk download's order, with no
+  blank pages between them. The API MUST serve it as inline `application/pdf`
+  named `Grabrechnungen-2027-1.pdf` from `GET odata/GraveInvoicesPdf?year=&half=`.
+  A missing or invalid year or half MUST be refused with the code
+  `InvalidHalfYear`, a half-year without documents with `NoGraveInvoices`.
 - **FR-046**: Bulk download of normal invoices MUST NOT include copies.
 - **FR-047**: A copy MUST be downloadable individually wherever an invoice is
   listed or shown; copies MUST NOT be downloadable in bulk.
