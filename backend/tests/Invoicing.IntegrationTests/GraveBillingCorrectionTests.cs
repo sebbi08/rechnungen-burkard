@@ -88,9 +88,8 @@ public class GraveBillingCorrectionTests
         var evaluation = GraveBillingCheck.Evaluate(links, null, null, 2, EarlierHalf);
 
         Assert.True(evaluation.Ok);
-        var key = Assert.Single(
-            evaluation.CorrectionKeys,
-            k => k.Kind == BillingExampleKind.FullFirstHalf
+        var key = Assert.Single(evaluation.CorrectionKeys, k =>
+            k.Kind == BillingExampleKind.FullFirstHalf
         );
         Assert.Equal(2, key.ItemId);
         Assert.Equal(10.02m, key.CorrectedPrice);

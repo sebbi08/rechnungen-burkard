@@ -146,14 +146,11 @@ public class GraveShareGenerationTests
         var first = invoices[0]
             .Lines.OrderBy(l => l.LineNumber)
             .Select(l => (l.Count, l.UnitPrice, l.VatRate));
-        Assert.All(
-            invoices.Skip(1),
-            i =>
-                Assert.Equal(
-                    first,
-                    i.Lines.OrderBy(l => l.LineNumber)
-                        .Select(l => (l.Count, l.UnitPrice, l.VatRate))
-                )
+        Assert.All(invoices.Skip(1), i =>
+            Assert.Equal(
+                first,
+                i.Lines.OrderBy(l => l.LineNumber).Select(l => (l.Count, l.UnitPrice, l.VatRate))
+            )
         );
     }
 

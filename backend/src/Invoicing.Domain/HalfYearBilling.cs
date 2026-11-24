@@ -203,8 +203,7 @@ public static class HalfYearBilling
     /// prorated line's description and stored with it.</summary>
     public static string ProrationNote(BillingPeriod period)
     {
-        var year =
-            period.Year
+        var year = period.Year
             ?? throw new ArgumentException("A prorated period needs its year.", nameof(period));
         var months =
             period.Months == 1

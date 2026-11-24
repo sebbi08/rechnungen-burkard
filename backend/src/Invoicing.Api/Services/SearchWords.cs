@@ -17,12 +17,8 @@ public static class SearchWords
     /// values (null values hold nothing) — true for a term without words. The
     /// words need not share a value.</summary>
     public static bool InAny(string? term, params string?[] values) =>
-        All(
-            term ?? "",
-            word =>
-                values.Any(v =>
-                    v is not null && v.Contains(word, StringComparison.OrdinalIgnoreCase)
-                )
+        All(term ?? "", word =>
+            values.Any(v => v is not null && v.Contains(word, StringComparison.OrdinalIgnoreCase))
         );
 
     private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");

@@ -89,8 +89,7 @@ public sealed class QuoteService
         CancellationToken ct
     )
     {
-        var edited =
-            await _db.Quotes.SingleOrDefaultAsync(q => q.Id == quoteId, ct)
+        var edited = await _db.Quotes.SingleOrDefaultAsync(q => q.Id == quoteId, ct)
             ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
         RequireOpen(edited);
 
@@ -215,11 +214,10 @@ public sealed class QuoteService
 
     private async Task<List<Quote>> ChainAsync(long quoteId, CancellationToken ct)
     {
-        var rootId =
-            await _db
-                .Quotes.Where(q => q.Id == quoteId)
-                .Select(q => (long?)q.RootId)
-                .SingleOrDefaultAsync(ct)
+        var rootId = await _db
+            .Quotes.Where(q => q.Id == quoteId)
+            .Select(q => (long?)q.RootId)
+            .SingleOrDefaultAsync(ct)
             ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
         return await _db
             .Quotes.Where(q => q.RootId == rootId)

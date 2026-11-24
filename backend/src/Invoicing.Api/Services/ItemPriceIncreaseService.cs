@@ -147,8 +147,7 @@ public sealed class ItemPriceIncreaseService
         }
 
         var items = track ? _db.InvoiceItems : _db.InvoiceItems.AsNoTracking();
-        var item =
-            await items.FirstOrDefaultAsync(i => i.Id == request.ItemId, ct)
+        var item = await items.FirstOrDefaultAsync(i => i.Id == request.ItemId, ct)
             ?? throw new ItemNotFoundException();
 
         foreach (var row in rows)

@@ -185,14 +185,11 @@ public class GraveGenerationTests
         Assert.Equal(214.00m, g2Invoices.Sum(i => builder.Build(i).Share!.GrossTotal));
 
         Assert.Equal(2, await db.GraveInvoiceRuns.CountAsync(r => r.Year == 2026 && r.Half == 1));
-        Assert.All(
-            invoices,
-            i =>
-            {
-                Assert.Equal(2, i.Documents.Count);
-                Assert.All(i.Documents, d => Assert.NotEmpty(d.Content));
-            }
-        );
+        Assert.All(invoices, i =>
+        {
+            Assert.Equal(2, i.Documents.Count);
+            Assert.All(i.Documents, d => Assert.NotEmpty(d.Content));
+        });
     }
 
     [Fact]

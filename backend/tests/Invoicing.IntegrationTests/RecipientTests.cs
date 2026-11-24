@@ -76,9 +76,8 @@ public class RecipientTests : IClassFixture<ApiTestHost>
                 )
         );
 
-        Assert.All(
-            responses,
-            response => Assert.Equal(HttpStatusCode.Created, response.StatusCode)
+        Assert.All(responses, response =>
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode)
         );
 
         var list = await client.GetAsync(

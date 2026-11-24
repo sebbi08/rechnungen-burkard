@@ -252,12 +252,11 @@ public sealed class GraveService
             );
         }
 
-        var predecessor =
-            await _db
-                .Graves.AsNoTracking()
-                .Include(g => g.Items)
-                .Include(g => g.Recipients)
-                .SingleOrDefaultAsync(g => g.Id == predecessorId, ct)
+        var predecessor = await _db
+            .Graves.AsNoTracking()
+            .Include(g => g.Items)
+            .Include(g => g.Recipients)
+            .SingleOrDefaultAsync(g => g.Id == predecessorId, ct)
             ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
 
         if (predecessor.DeletedAt is not null)
@@ -457,12 +456,11 @@ public sealed class GraveService
 
     private async Task<Grave> LoadForReplaceAsync(long graveId, CancellationToken ct)
     {
-        var grave =
-            await _db
-                .Graves.Include(g => g.Items)
-                .Include(g => g.Recipients)
-                .Include(g => g.Corrections)
-                .SingleOrDefaultAsync(g => g.Id == graveId, ct)
+        var grave = await _db
+            .Graves.Include(g => g.Items)
+            .Include(g => g.Recipients)
+            .Include(g => g.Corrections)
+            .SingleOrDefaultAsync(g => g.Id == graveId, ct)
             ?? throw new ValidationException("GraveNotFound", "The grave does not exist.");
 
         // the dialog always sends the complete set of links, so replace wholesale
@@ -560,7 +558,16 @@ public sealed class GraveService
                     g.EndDate,
                 })
                 .ToListAsync(ct)
-        ).Select(g => handover is not null && g.Id == handover.Predecessor.Id ? g with { EndDate = handover.EndDate } : g).ToList();
+        )
+            .Select(g =>
+                handover is not null && g.Id == handover.Predecessor.Id
+                    ? g with
+                    {
+                        EndDate = handover.EndDate,
+                    }
+                    : g
+            )
+            .ToList();
         var clash = others.FirstOrDefault(g =>
             string.Equals(g.GraveNumber.Trim(), number, StringComparison.OrdinalIgnoreCase)
             && GraveTerm.Overlap(g.StartDate, g.EndDate, fields.StartDate, fields.EndDate)

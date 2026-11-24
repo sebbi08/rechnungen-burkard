@@ -35,8 +35,8 @@ builder
             .AddRouteComponents("odata", EdmModelBuilder.Build());
     });
 
-var connectionString =
-    builder.Configuration.GetConnectionString("Invoicing") ?? "Data Source=invoicing.db";
+var connectionString = builder.Configuration.GetConnectionString("Invoicing")
+    ?? "Data Source=invoicing.db";
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
@@ -132,30 +132,26 @@ if (!string.IsNullOrEmpty(app.Environment.WebRootPath))
 // The container's health check asks this, so it reads the database rather
 // than only proving the process answers; and it says which release runs, which
 // is otherwise nowhere to be read.
-var version =
-    typeof(Program)
-        .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-        ?.InformationalVersion.Split('+')[0]
+var version = typeof(Program)
+    .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+    ?.InformationalVersion.Split('+')[0]
     ?? "0.0.0";
-app.MapGet(
-    "/healthz",
-    async (AppDbContext db, CancellationToken ct) =>
+app.MapGet("/healthz", async (AppDbContext db, CancellationToken ct) =>
+{
+    try
     {
-        try
-        {
-            await db.GlobalSettings.AnyAsync(ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return Results.Json(
-                new { status = "unavailable", version },
-                statusCode: StatusCodes.Status503ServiceUnavailable
-            );
-        }
-
-        return Results.Ok(new { status = "ok", version });
+        await db.GlobalSettings.AnyAsync(ct);
     }
-);
+    catch (Exception ex) when (ex is not OperationCanceledException)
+    {
+        return Results.Json(
+            new { status = "unavailable", version },
+            statusCode: StatusCodes.Status503ServiceUnavailable
+        );
+    }
+
+    return Results.Ok(new { status = "ok", version });
+});
 app.MapControllers();
 
 app.Run();

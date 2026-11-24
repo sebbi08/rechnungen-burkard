@@ -27,8 +27,10 @@ public sealed class InvoiceNumberService
     )
     {
         var year = _clock.GetLocalNow().Year;
-        var maxSequence =
-            await _db.Invoices.Where(i => i.Year == year).MaxAsync(i => (int?)i.Sequence, ct) ?? 0;
+        var maxSequence = await _db
+            .Invoices.Where(i => i.Year == year)
+            .MaxAsync(i => (int?)i.Sequence, ct)
+            ?? 0;
         var sequence = maxSequence + 1;
         return (InvoiceNumberFormatter.ForOriginal(year, sequence), year, sequence);
     }

@@ -226,16 +226,13 @@ public class InvoiceTotalsTests
         // both the normal document and the copy are present, each with exactly
         // the fields the $select asked for and none of the PDF bytes
         Assert.Equal(2, documents.Count);
-        Assert.All(
-            documents,
-            document =>
-            {
-                Assert.True(document.TryGetProperty("Id", out _));
-                Assert.True(document.TryGetProperty("FileName", out _));
-                Assert.True(document.TryGetProperty("Kind", out _));
-                Assert.False(document.TryGetProperty("Content", out _));
-            }
-        );
+        Assert.All(documents, document =>
+        {
+            Assert.True(document.TryGetProperty("Id", out _));
+            Assert.True(document.TryGetProperty("FileName", out _));
+            Assert.True(document.TryGetProperty("Kind", out _));
+            Assert.False(document.TryGetProperty("Content", out _));
+        });
         var kinds = documents
             .Select(d => d.GetProperty("Kind").GetString())
             .OrderBy(k => k)

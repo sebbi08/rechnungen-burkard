@@ -47,8 +47,7 @@ public sealed class InvoiceService
         CancellationToken ct
     )
     {
-        var recipient =
-            await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
+        var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
         var lines = await _lines.BuildAsync(lineInputs, ct);
@@ -89,11 +88,10 @@ public sealed class InvoiceService
         // invoice behind and so uses no number.
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
-        var rootId =
-            await _db
-                .Quotes.Where(q => q.Id == quoteId)
-                .Select(q => (long?)q.RootId)
-                .SingleOrDefaultAsync(ct)
+        var rootId = await _db
+            .Quotes.Where(q => q.Id == quoteId)
+            .Select(q => (long?)q.RootId)
+            .SingleOrDefaultAsync(ct)
             ?? throw new ValidationException("QuoteNotFound", "The quote does not exist.");
         var chain = await _db.Quotes.Where(q => q.RootId == rootId).ToListAsync(ct);
         var latest = chain.Single(q => q.IsLatestRevision);
@@ -102,8 +100,7 @@ public sealed class InvoiceService
             throw new ValidationException("QuoteNotOpen", "The quote is not open.");
         }
 
-        var recipient =
-            await _db.Recipients.FindAsync(new object[] { latest.RecipientId }, ct)
+        var recipient = await _db.Recipients.FindAsync(new object[] { latest.RecipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
         RequireAddress(recipient);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
@@ -148,8 +145,7 @@ public sealed class InvoiceService
         CancellationToken ct
     )
     {
-        var edited =
-            await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
+        var edited = await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
         // A grave invoice is one recipient's share of one grave bill: revising it
@@ -176,8 +172,7 @@ public sealed class InvoiceService
             );
         }
 
-        var recipient =
-            await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
+        var recipient = await _db.Recipients.FindAsync(new object[] { recipientId }, ct)
             ?? throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
 
         var lines = await _lines.BuildAsync(lineInputs, ct);
@@ -188,10 +183,9 @@ public sealed class InvoiceService
         // edited: editing an older revision (or the same one twice) must still
         // produce the next free number instead of colliding on (Year, Sequence,
         // RevisionNumber).
-        var lastRevision =
-            await _db
-                .Invoices.Where(i => i.RootId == edited.RootId)
-                .MaxAsync(i => (int?)i.RevisionNumber, ct)
+        var lastRevision = await _db
+            .Invoices.Where(i => i.RootId == edited.RootId)
+            .MaxAsync(i => (int?)i.RevisionNumber, ct)
             ?? edited.RevisionNumber;
         var revisionNumber = lastRevision + 1;
 
@@ -255,8 +249,7 @@ public sealed class InvoiceService
     /// move a recorded payment day.</summary>
     public async Task<Invoice> SetPaidAsync(long invoiceId, bool paid, CancellationToken ct)
     {
-        var invoice =
-            await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
+        var invoice = await _db.Invoices.SingleOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
         // Lists show latest revisions only. A superseded row can only be reached

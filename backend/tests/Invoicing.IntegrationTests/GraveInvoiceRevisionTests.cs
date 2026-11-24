@@ -405,15 +405,12 @@ public class GraveInvoiceRevisionTests
             .ToListAsync();
         Assert.Equal(2, revisions.Count);
         Assert.All(revisions, r => Assert.Equal(2, r.RecipientCount));
-        Assert.All(
-            revisions,
-            r =>
-            {
-                var line = Assert.Single(r.Lines);
-                Assert.Equal(3, line.Count);
-                Assert.Equal(100m, line.UnitPrice);
-            }
-        );
+        Assert.All(revisions, r =>
+        {
+            var line = Assert.Single(r.Lines);
+            Assert.Equal(3, line.Count);
+            Assert.Equal(100m, line.UnitPrice);
+        });
 
         // the superseded, pre-change invoices are untouched: same lines, still
         // RecipientCount null, and they still build the exact totals — and the
@@ -426,34 +423,26 @@ public class GraveInvoiceRevisionTests
         Assert.Equal(2, superseded.Count);
         Assert.All(superseded, i => Assert.False(i.IsLatestRevision));
         Assert.All(superseded, i => Assert.Null(i.RecipientCount));
-        Assert.All(
-            superseded,
-            i =>
-            {
-                var line = Assert.Single(i.Lines);
-                Assert.Equal(2, line.Count);
-                Assert.Equal(50m, line.UnitPrice);
-                Assert.Equal(100m, line.GraveUnitPrice);
-            }
-        );
+        Assert.All(superseded, i =>
+        {
+            var line = Assert.Single(i.Lines);
+            Assert.Equal(2, line.Count);
+            Assert.Equal(50m, line.UnitPrice);
+            Assert.Equal(100m, line.GraveUnitPrice);
+        });
 
         var builderAfter = new DocumentDataBuilder();
-        Assert.All(
-            superseded,
-            i => Assert.Equal(originalNetTotals[i.Id], builderAfter.Build(i).NetTotal)
+        Assert.All(superseded, i =>
+            Assert.Equal(originalNetTotals[i.Id], builderAfter.Build(i).NetTotal)
         );
-        Assert.All(
-            superseded,
-            i =>
-            {
-                var before = originalDocumentContent[i.Id];
-                Assert.Equal(2, i.Documents.Count);
-                Assert.All(
-                    i.Documents,
-                    document => Assert.Equal(before[document.Kind], document.Content)
-                );
-            }
-        );
+        Assert.All(superseded, i =>
+        {
+            var before = originalDocumentContent[i.Id];
+            Assert.Equal(2, i.Documents.Count);
+            Assert.All(i.Documents, document =>
+                Assert.Equal(before[document.Kind], document.Content)
+            );
+        });
     }
 
     [Fact]
@@ -497,23 +486,19 @@ public class GraveInvoiceRevisionTests
         Assert.Equal(2, revisions.Count);
         Assert.All(revisions, r => Assert.True(r.IsLatestRevision));
         Assert.All(revisions, r => Assert.EndsWith("-R1", r.InvoiceNumber));
-        Assert.All(
-            invoices.Where(i => i.RevisionNumber == 0),
-            o => Assert.False(o.IsLatestRevision)
+        Assert.All(invoices.Where(i => i.RevisionNumber == 0), o =>
+            Assert.False(o.IsLatestRevision)
         );
 
         // each revision carries the grave's new line in full, identically, and
         // is marked as billing a share of it rather than the whole
-        Assert.All(
-            revisions,
-            r =>
-            {
-                var line = Assert.Single(r.Lines);
-                Assert.Equal(3, line.Count);
-                Assert.Equal(200m, line.UnitPrice);
-                Assert.Equal(2, r.RecipientCount);
-            }
-        );
+        Assert.All(revisions, r =>
+        {
+            var line = Assert.Single(r.Lines);
+            Assert.Equal(3, line.Count);
+            Assert.Equal(200m, line.UnitPrice);
+            Assert.Equal(2, r.RecipientCount);
+        });
 
         // both recipients keep their own invoice and get both documents again
         Assert.Equal(

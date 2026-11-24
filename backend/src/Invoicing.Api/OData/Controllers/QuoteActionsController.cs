@@ -97,45 +97,33 @@ public class QuoteActionsController : ODataController
 
     [HttpPost("DeclineQuote")]
     public Task<IActionResult> DeclineQuote([FromBody] QuoteIdRequest? request) =>
-        RunAsync(
-            request,
-            "DeclineQuote",
-            async id => Ok(await _service.DeclineAsync(id, HttpContext.RequestAborted))
+        RunAsync(request, "DeclineQuote", async id =>
+            Ok(await _service.DeclineAsync(id, HttpContext.RequestAborted))
         );
 
     [HttpPost("ReopenQuote")]
     public Task<IActionResult> ReopenQuote([FromBody] QuoteIdRequest? request) =>
-        RunAsync(
-            request,
-            "ReopenQuote",
-            async id => Ok(await _service.ReopenAsync(id, HttpContext.RequestAborted))
+        RunAsync(request, "ReopenQuote", async id =>
+            Ok(await _service.ReopenAsync(id, HttpContext.RequestAborted))
         );
 
     [HttpPost("DeleteQuote")]
     public Task<IActionResult> DeleteQuote([FromBody] QuoteIdRequest? request) =>
-        RunAsync(
-            request,
-            "DeleteQuote",
-            async id =>
-            {
-                await _service.DeleteAsync(id, HttpContext.RequestAborted);
-                return NoContent();
-            }
-        );
+        RunAsync(request, "DeleteQuote", async id =>
+        {
+            await _service.DeleteAsync(id, HttpContext.RequestAborted);
+            return NoContent();
+        });
 
     /// <summary>Answers with the new invoice, as CreateInvoice does: its Id is
     /// its RootId, the key of its detail page.</summary>
     [HttpPost("ConvertQuote")]
     public Task<IActionResult> ConvertQuote([FromBody] QuoteIdRequest? request) =>
-        RunAsync(
-            request,
-            "ConvertQuote",
-            async id =>
-            {
-                var invoice = await _invoices.CreateFromQuoteAsync(id, HttpContext.RequestAborted);
-                return Created($"/odata/Invoices({invoice.Id})", invoice);
-            }
-        );
+        RunAsync(request, "ConvertQuote", async id =>
+        {
+            var invoice = await _invoices.CreateFromQuoteAsync(id, HttpContext.RequestAborted);
+            return Created($"/odata/Invoices({invoice.Id})", invoice);
+        });
 
     private async Task<IActionResult> RunAsync(
         QuoteIdRequest? request,
