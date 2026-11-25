@@ -212,8 +212,7 @@ internal static class Letterhead
     private static Image Load(string file)
     {
         var name = $"Burkard.Invoicing.Documents.Assets.{file}";
-        using var stream =
-            Assembly.GetExecutingAssembly().GetManifestResourceStream(name)
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(name)
             ?? throw new InvalidOperationException($"Embedded resource '{name}' is missing.");
 
         return Image.FromStream(stream);

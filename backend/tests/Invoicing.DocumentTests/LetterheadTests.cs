@@ -87,16 +87,13 @@ public class LetterheadTests
         var pages = document.GetPages().ToList();
 
         Assert.True(pages.Count > 1, $"expected a multi-page invoice, got {pages.Count} page(s)");
-        Assert.All(
-            pages,
-            page =>
-            {
-                var images = page.GetImages().ToList();
-                Assert.Equal(2, images.Count);
-                Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
-                Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
-            }
-        );
+        Assert.All(pages, page =>
+        {
+            var images = page.GetImages().ToList();
+            Assert.Equal(2, images.Count);
+            Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
+            Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
+        });
 
         // the share's VAT block itself only has to appear once, wherever it lands
         Assert.Contains("33,33", string.Join("\n", pages.Select(p => p.Text)));
@@ -137,16 +134,13 @@ public class LetterheadTests
         var pages = document.GetPages().ToList();
 
         Assert.True(pages.Count > 1, $"expected a multi-page invoice, got {pages.Count} page(s)");
-        Assert.All(
-            pages,
-            page =>
-            {
-                var images = page.GetImages().ToList();
-                Assert.Equal(2, images.Count);
-                Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
-                Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
-            }
-        );
+        Assert.All(pages, page =>
+        {
+            var images = page.GetImages().ToList();
+            Assert.Equal(2, images.Count);
+            Assert.Contains(images, i => i.BoundingBox.Bottom > HeaderBandBottom);
+            Assert.Contains(images, i => i.BoundingBox.Top < FooterBandTop);
+        });
     }
 
     [Theory]
@@ -275,17 +269,14 @@ public class LetterheadTests
 
         Assert.True(pages.Count > 1, $"expected a multi-page invoice, got {pages.Count} page(s)");
         Assert.Contains("Familie Mahr", pages[0].Text);
-        Assert.All(
-            pages.Skip(1),
-            page =>
-            {
-                Assert.DoesNotContain("Familie Mahr", page.Text);
-                Assert.DoesNotContain("Musterstadt", page.Text);
-                Assert.DoesNotContain("NUMMER:", page.Text);
-                Assert.Contains("2026-0042", page.Text);
-                Assert.Contains("Seite", page.Text);
-            }
-        );
+        Assert.All(pages.Skip(1), page =>
+        {
+            Assert.DoesNotContain("Familie Mahr", page.Text);
+            Assert.DoesNotContain("Musterstadt", page.Text);
+            Assert.DoesNotContain("NUMMER:", page.Text);
+            Assert.Contains("2026-0042", page.Text);
+            Assert.Contains("Seite", page.Text);
+        });
     }
 
     // The sheet folds at 105 mm and 210 mm, leaving panels of 105, 105 and 87 mm.
@@ -325,20 +316,17 @@ public class LetterheadTests
             .ToList();
 
         Assert.NotEmpty(inWindow);
-        Assert.All(
-            inWindow,
-            letter =>
-            {
-                Assert.True(
-                    letter.BoundingBox.Left >= WindowLeft + WindowClearance,
-                    $"'{letter.Value}' sits on the window's left edge"
-                );
-                Assert.True(
-                    letter.BoundingBox.Top <= WindowTop - WindowClearance,
-                    $"'{letter.Value}' sits on the window's top edge"
-                );
-            }
-        );
+        Assert.All(inWindow, letter =>
+        {
+            Assert.True(
+                letter.BoundingBox.Left >= WindowLeft + WindowClearance,
+                $"'{letter.Value}' sits on the window's left edge"
+            );
+            Assert.True(
+                letter.BoundingBox.Top <= WindowTop - WindowClearance,
+                $"'{letter.Value}' sits on the window's top edge"
+            );
+        });
     }
 
     [Fact]
@@ -348,16 +336,13 @@ public class LetterheadTests
 
         using var document = PdfDocument.Open(pdf);
 
-        Assert.All(
-            document.GetPages(),
-            page =>
-            {
-                var marks = FoldMarkPositions(page);
-                Assert.Equal(2, marks.Count);
-                Assert.Equal(FirstFold, marks[0], 1d);
-                Assert.Equal(SecondFold, marks[1], 1d);
-            }
-        );
+        Assert.All(document.GetPages(), page =>
+        {
+            var marks = FoldMarkPositions(page);
+            Assert.Equal(2, marks.Count);
+            Assert.Equal(FirstFold, marks[0], 1d);
+            Assert.Equal(SecondFold, marks[1], 1d);
+        });
     }
 
     // The panel above the first crease has to be the tallest of the three. A shorter
@@ -385,13 +370,11 @@ public class LetterheadTests
 
         using var document = PdfDocument.Open(pdf);
 
-        Assert.All(
-            FoldMarkPositions(document.GetPage(1)),
-            millimetre =>
-                Assert.False(
-                    millimetre is > 45 and < 90,
-                    $"a crease at {millimetre:0.#} mm runs through the address window"
-                )
+        Assert.All(FoldMarkPositions(document.GetPage(1)), millimetre =>
+            Assert.False(
+                millimetre is > 45 and < 90,
+                $"a crease at {millimetre:0.#} mm runs through the address window"
+            )
         );
     }
 
@@ -417,14 +400,11 @@ public class LetterheadTests
             .ToList();
 
         Assert.All(pdfs, pdf => Assert.Equal(pdfs[0], pdf));
-        Assert.All(
-            pdfs,
-            pdf =>
-            {
-                using var document = PdfDocument.Open(pdf);
-                Assert.All(document.GetPages(), page => Assert.Equal(2, page.GetImages().Count()));
-            }
-        );
+        Assert.All(pdfs, pdf =>
+        {
+            using var document = PdfDocument.Open(pdf);
+            Assert.All(document.GetPages(), page => Assert.Equal(2, page.GetImages().Count()));
+        });
     }
 
     // Setting the letterhead as text and embedding only the artwork is the whole point

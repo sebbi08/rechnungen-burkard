@@ -33,8 +33,9 @@ public sealed class GraveInvoiceRevisionService
         CancellationToken ct
     )
     {
-        var edited =
-            await _db.Invoices.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invoiceId, ct)
+        var edited = await _db
+            .Invoices.AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == invoiceId, ct)
             ?? throw new ValidationException("InvoiceNotFound", "The invoice does not exist.");
 
         if (edited.GraveId is null || edited.PeriodYear is null || edited.PeriodHalf is null)
@@ -124,8 +125,7 @@ public sealed class GraveInvoiceRevisionService
         for (var r = 0; r < siblings.Count; r++)
         {
             var sibling = siblings[r];
-            var recipient =
-                await _db.Recipients.FindAsync(new object[] { sibling.RecipientId }, ct)
+            var recipient = await _db.Recipients.FindAsync(new object[] { sibling.RecipientId }, ct)
                 ?? throw new ValidationException(
                     "RecipientNotFound",
                     "The recipient does not exist."
@@ -139,10 +139,9 @@ public sealed class GraveInvoiceRevisionService
             }
 
             // the number continues the whole chain, not just the row that was edited
-            var lastRevision =
-                await _db
-                    .Invoices.Where(i => i.RootId == sibling.RootId)
-                    .MaxAsync(i => (int?)i.RevisionNumber, ct)
+            var lastRevision = await _db
+                .Invoices.Where(i => i.RootId == sibling.RootId)
+                .MaxAsync(i => (int?)i.RevisionNumber, ct)
                 ?? sibling.RevisionNumber;
             var revisionNumber = lastRevision + 1;
             var baseNumber = InvoiceNumberFormatter.StripRevision(sibling.InvoiceNumber);
@@ -247,8 +246,7 @@ public sealed class GraveInvoiceRevisionService
                 throw new ValidationException("InvalidCount", "The count must be positive.");
             }
 
-            var unitPrice =
-                input.UnitPrice
+            var unitPrice = input.UnitPrice
                 ?? item.DefaultPrice
                 ?? throw new ValidationException(
                     "PriceRequired",

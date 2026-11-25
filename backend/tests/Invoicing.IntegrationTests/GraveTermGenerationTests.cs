@@ -278,13 +278,11 @@ public class GraveTermGenerationTests
             await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1")
         );
 
-        Assert.DoesNotContain(
-            before.RootElement.GetProperty("value").EnumerateArray(),
-            g => g.GetProperty("Id").GetInt64() == graveId
+        Assert.DoesNotContain(before.RootElement.GetProperty("value").EnumerateArray(), g =>
+            g.GetProperty("Id").GetInt64() == graveId
         );
-        Assert.Contains(
-            during.RootElement.GetProperty("value").EnumerateArray(),
-            g => g.GetProperty("Id").GetInt64() == graveId
+        Assert.Contains(during.RootElement.GetProperty("value").EnumerateArray(), g =>
+            g.GetProperty("Id").GetInt64() == graveId
         );
     }
 
@@ -386,14 +384,11 @@ public class GraveTermGenerationTests
 
         var lines = await LinesAsync(host, graveId, 2026, 1);
         Assert.Equal(3, lines.Length);
-        Assert.All(
-            lines,
-            l =>
-            {
-                Assert.Equal(40.02m, l.UnitPrice);
-                Assert.StartsWith("Pflege, anteilig 03–06/2026", l.Description);
-            }
-        );
+        Assert.All(lines, l =>
+        {
+            Assert.Equal(40.02m, l.UnitPrice);
+            Assert.StartsWith("Pflege, anteilig 03–06/2026", l.Description);
+        });
     }
 
     [Fact]
@@ -599,17 +594,14 @@ public class GraveTermGenerationTests
         await GenerateAsync(client, 2027, 2);
         await GenerateAsync(client, 2028, 2);
 
-        Assert.All(
-            await LinesAsync(host, graveId, 2026, 1),
-            l => Assert.Equal(distinct[0], l.UnitPrice)
+        Assert.All(await LinesAsync(host, graveId, 2026, 1), l =>
+            Assert.Equal(distinct[0], l.UnitPrice)
         );
-        Assert.All(
-            await LinesAsync(host, graveId, 2027, 2),
-            l => Assert.Equal(distinct[1], l.UnitPrice)
+        Assert.All(await LinesAsync(host, graveId, 2027, 2), l =>
+            Assert.Equal(distinct[1], l.UnitPrice)
         );
-        Assert.All(
-            await LinesAsync(host, graveId, 2028, 2),
-            l => Assert.Equal(distinct[2], l.UnitPrice)
+        Assert.All(await LinesAsync(host, graveId, 2028, 2), l =>
+            Assert.Equal(distinct[2], l.UnitPrice)
         );
     }
 }

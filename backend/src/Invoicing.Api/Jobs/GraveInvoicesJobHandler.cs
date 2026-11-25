@@ -22,8 +22,7 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
 
     public async Task ExecuteAsync(Job job, IProgressWriter progress, CancellationToken ct)
     {
-        var payload =
-            JsonSerializer.Deserialize<GraveInvoicesPayload>(job.PayloadJson ?? "{}")
+        var payload = JsonSerializer.Deserialize<GraveInvoicesPayload>(job.PayloadJson ?? "{}")
             ?? throw new InvalidOperationException("missing payload");
 
         using var scope = _scopeFactory.CreateScope();

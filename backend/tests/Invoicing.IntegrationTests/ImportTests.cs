@@ -383,9 +383,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "GravePriceIncludesVat"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 2 && p.Code == "GravePriceIncludesVat"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -407,9 +406,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceIncludesVatInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceIncludesVatInvalid"
         );
     }
 
@@ -433,9 +431,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -477,9 +474,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "recipients.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "recipients.csv" && p.Row == 1 && p.Code == "HeaderInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -505,17 +501,14 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
+        Assert.Contains(problems, p =>
+            p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateInvalid"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "DateInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "graves.csv" && p.Row == 2 && p.Code == "DateInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -543,13 +536,11 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
+        Assert.Contains(problems, p =>
+            p.File == "recipients.csv" && p.Row == 2 && p.Code == "FieldRequired"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
         );
     }
 
@@ -606,17 +597,14 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 2 && p.Code == "ItemNotDefined"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "RecipientNotDefined"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 3 && p.Code == "RecipientNotDefined"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 4 && p.Code == "GraveNotDefined"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 4 && p.Code == "GraveNotDefined"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -646,21 +634,17 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "recipients.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        Assert.Contains(problems, p =>
+            p.File == "recipients.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "items.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        Assert.Contains(problems, p =>
+            p.File == "items.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "graves.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
+        Assert.Contains(problems, p =>
+            p.File == "graves.csv" && p.Row == 3 && p.Code == "DuplicateNumber"
         );
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 3 && p.Code == "DuplicateLink"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 3 && p.Code == "DuplicateLink"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -708,9 +692,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateNotConfigured"
+        Assert.Contains(problems, p =>
+            p.File == "items.csv" && p.Row == 2 && p.Code == "VatRateNotConfigured"
         );
     }
 
@@ -877,9 +860,8 @@ public class ImportTests
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "QuarterInvalid"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "items.csv" && p.Row == 2 && p.Code == "QuarterInvalid"
         );
     }
 
@@ -902,9 +884,8 @@ public class ImportTests
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "AllYearItemRequired"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "graves.csv" && p.Row == 2 && p.Code == "AllYearItemRequired"
         );
     }
 
@@ -933,9 +914,8 @@ public class ImportTests
         var response = await client.PostAsync("/odata/ImportArchive", Upload(archive));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
         );
     }
 
@@ -967,9 +947,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceRequired"
+        Assert.Contains(problems, p =>
+            p.File == "mapping.csv" && p.Row == 2 && p.Code == "PriceRequired"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -1001,9 +980,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -1181,9 +1159,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
+        Assert.Contains(problems, p =>
+            p.File == "items.csv" && p.Row == 2 && p.Code == "PriceInvalid"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -1596,9 +1573,8 @@ public class ImportTests
         using (other)
         {
             Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
-            Assert.Contains(
-                await ProblemsAsync(refused),
-                p => p.File == "graves.csv" && p.Row == 2 && p.Code == "ContractNumberRequired"
+            Assert.Contains(await ProblemsAsync(refused), p =>
+                p.File == "graves.csv" && p.Row == 2 && p.Code == "ContractNumberRequired"
             );
         }
     }
@@ -1668,9 +1644,8 @@ public class ImportTests
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "mapping.csv" && p.Code == "PriceRequired"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "mapping.csv" && p.Code == "PriceRequired"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -1690,9 +1665,8 @@ public class ImportTests
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "graves.csv" && p.Code == "AllYearItemRequired"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "graves.csv" && p.Code == "AllYearItemRequired"
         );
         await AssertNothingImportedAsync(host);
     }
@@ -1735,9 +1709,8 @@ public class ImportTests
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains(
-            await ProblemsAsync(response),
-            p => p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
+        Assert.Contains(await ProblemsAsync(response), p =>
+            p.File == "graves.csv" && p.Row == 2 && p.Code == "TooManyRecipients"
         );
     }
 
@@ -1818,9 +1791,8 @@ public class ImportTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var problems = await ProblemsAsync(response);
-        Assert.Contains(
-            problems,
-            p => p.File == "recipients.csv" && p.Row == 2 && p.Code == "ColumnCount"
+        Assert.Contains(problems, p =>
+            p.File == "recipients.csv" && p.Row == 2 && p.Code == "ColumnCount"
         );
     }
 

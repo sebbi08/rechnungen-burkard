@@ -278,8 +278,7 @@ internal sealed class InvoiceDocument : IDocument
             // a net, so its gross is worked out from it, and 3 x 10,00 at 19 %
             // could bill 29,99; its total prints what was billed, the net plus
             // its own VAT, so the line agrees with the VAT block.
-            var unitPrice =
-                line.GrossUnitPrice
+            var unitPrice = line.GrossUnitPrice
                 ?? (
                     line.PriceIncludesVat
                         ? decimal.Round(

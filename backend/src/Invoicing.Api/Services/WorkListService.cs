@@ -47,26 +47,16 @@ public sealed class WorkListService(AppDbContext db, IClock clock)
             services == CareListServices.None
                 ? WorkListKind.CareGravesOnly
                 : WorkListKind.CareWithServices;
-        return Build(
-            kind,
-            year,
-            null,
-            range,
-            graves,
-            g =>
-                services switch
-                {
-                    CareListServices.None => [],
-                    CareListServices.Care => g.Items.Where(l => l.Item.Quarter is null),
-                    _ => g.Items.Where(l =>
-                        l.Item.Quarter is not { } q
-                        || WorkListPeriod.Runs(
-                            g.StartDate,
-                            g.EndDate,
-                            WorkListPeriod.Quarter(year, q)
-                        )
-                    ),
-                }
+        return Build(kind, year, null, range, graves, g =>
+            services switch
+            {
+                CareListServices.None => [],
+                CareListServices.Care => g.Items.Where(l => l.Item.Quarter is null),
+                _ => g.Items.Where(l =>
+                    l.Item.Quarter is not { } q
+                    || WorkListPeriod.Runs(g.StartDate, g.EndDate, WorkListPeriod.Quarter(year, q))
+                ),
+            }
         );
     }
 
@@ -78,13 +68,8 @@ public sealed class WorkListService(AppDbContext db, IClock clock)
         var graves = (await RunningAsync(range))
             .Where(g => g.Items.Any(l => l.Item.Quarter == quarter))
             .ToList();
-        return Build(
-            WorkListKind.Planting,
-            year,
-            quarter,
-            range,
-            graves,
-            g => g.Items.Where(l => l.Item.Quarter == quarter)
+        return Build(WorkListKind.Planting, year, quarter, range, graves, g =>
+            g.Items.Where(l => l.Item.Quarter == quarter)
         );
     }
 

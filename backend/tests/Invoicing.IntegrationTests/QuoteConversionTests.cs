@@ -117,14 +117,11 @@ public class QuoteConversionTests
 
         var chain = await db.Quotes.Where(q => q.RootId == originalId).ToListAsync();
         Assert.Equal(2, chain.Count);
-        Assert.All(
-            chain,
-            q =>
-            {
-                Assert.Equal(QuoteState.Converted, q.State);
-                Assert.Equal(invoiceId, q.InvoiceId);
-            }
-        );
+        Assert.All(chain, q =>
+        {
+            Assert.Equal(QuoteState.Converted, q.State);
+            Assert.Equal(invoiceId, q.InvoiceId);
+        });
     }
 
     [Fact]
@@ -456,9 +453,8 @@ public class QuoteConversionTests
         );
 
         Assert.DoesNotContain(responses, r => r.StatusCode >= HttpStatusCode.InternalServerError);
-        var winner = Assert.Single(
-            responses,
-            r => r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.OK
+        var winner = Assert.Single(responses, r =>
+            r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.OK
         );
         var loser = Assert.Single(responses, r => r != winner);
         Assert.Equal(HttpStatusCode.BadRequest, loser.StatusCode);

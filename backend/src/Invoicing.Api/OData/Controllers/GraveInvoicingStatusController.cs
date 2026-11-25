@@ -93,7 +93,9 @@ public class GraveInvoicingStatusController : ODataController
                     },
                 })
                 .ToListAsync()
-        ).GroupBy(gr => gr.GraveId).ToDictionary(g => g.Key, g => g.Select(gr => gr.Recipient).ToList());
+        )
+            .GroupBy(gr => gr.GraveId)
+            .ToDictionary(g => g.Key, g => g.Select(gr => gr.Recipient).ToList());
 
         var links = await GraveBilling.LinksByGraveAsync(_db);
 

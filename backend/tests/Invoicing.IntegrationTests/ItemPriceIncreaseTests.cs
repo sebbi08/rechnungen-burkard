@@ -201,16 +201,13 @@ public class ItemPriceIncreaseTests
         Assert.Equal(0, rows[0].GetProperty("Problems").GetArrayLength());
         var corrections = json.RootElement.GetProperty("Corrections").EnumerateArray().ToList();
         Assert.NotEmpty(corrections);
-        Assert.All(
-            corrections,
-            c =>
-            {
-                Assert.Equal("G-B", c.GetProperty("GraveNumber").GetString());
-                Assert.Equal(itemId, c.GetProperty("ItemId").GetInt64());
-                Assert.Equal(99.75m, c.GetProperty("EnteredPrice").GetDecimal());
-                Assert.Equal(99.76m, c.GetProperty("CorrectedPrice").GetDecimal());
-            }
-        );
+        Assert.All(corrections, c =>
+        {
+            Assert.Equal("G-B", c.GetProperty("GraveNumber").GetString());
+            Assert.Equal(itemId, c.GetProperty("ItemId").GetInt64());
+            Assert.Equal(99.75m, c.GetProperty("EnteredPrice").GetDecimal());
+            Assert.Equal(99.76m, c.GetProperty("CorrectedPrice").GetDecimal());
+        });
     }
 
     [Fact]
@@ -285,9 +282,8 @@ public class ItemPriceIncreaseTests
         // 139,76 divides on its own: checked alone, 99,75 would need a correction
         using var json = await OkAsync(await PreviewAsync(client, itemId, OwnRow(95.00m, 99.75m)));
 
-        Assert.DoesNotContain(
-            json.RootElement.GetProperty("Corrections").EnumerateArray(),
-            c => c.GetProperty("GraveNumber").GetString() == "G-S"
+        Assert.DoesNotContain(json.RootElement.GetProperty("Corrections").EnumerateArray(), c =>
+            c.GetProperty("GraveNumber").GetString() == "G-S"
         );
         Assert.Equal(
             0,
@@ -465,22 +461,16 @@ public class ItemPriceIncreaseTests
         InDbAsync(host, db => db.GraveItems.AsNoTracking().SingleAsync(l => l.GraveId == graveId));
 
     private static Task<decimal?> DefaultOfAsync(ApiTestHost host, long itemId) =>
-        InDbAsync(
-            host,
-            async db =>
-                (await db.InvoiceItems.AsNoTracking().SingleAsync(i => i.Id == itemId)).DefaultPrice
+        InDbAsync(host, async db =>
+            (await db.InvoiceItems.AsNoTracking().SingleAsync(i => i.Id == itemId)).DefaultPrice
         );
 
     private static Task<List<GraveBillingCorrection>> CorrectionsOfAsync(
         ApiTestHost host,
         long graveId
     ) =>
-        InDbAsync(
-            host,
-            db =>
-                db.GraveBillingCorrections.AsNoTracking()
-                    .Where(c => c.GraveId == graveId)
-                    .ToListAsync()
+        InDbAsync(host, db =>
+            db.GraveBillingCorrections.AsNoTracking().Where(c => c.GraveId == graveId).ToListAsync()
         );
 
     [Fact]

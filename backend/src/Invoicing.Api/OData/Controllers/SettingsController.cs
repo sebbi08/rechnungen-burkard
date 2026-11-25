@@ -14,8 +14,7 @@ public class SettingsController : ODataController
 
     public ActionResult<GlobalSettings> Get()
     {
-        var settings =
-            _db.GlobalSettings.FirstOrDefault()
+        var settings = _db.GlobalSettings.FirstOrDefault()
             ?? throw new InvalidOperationException("GlobalSettings not seeded.");
         return Ok(settings);
     }
@@ -39,8 +38,7 @@ public class SettingsController : ODataController
         if (IdReadOnly.Changes(delta))
             return BadRequest(IdReadOnly.Error());
 
-        var settings =
-            _db.GlobalSettings.FirstOrDefault()
+        var settings = _db.GlobalSettings.FirstOrDefault()
             ?? throw new InvalidOperationException("GlobalSettings not seeded.");
 
         if (
