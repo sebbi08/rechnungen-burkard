@@ -451,12 +451,38 @@ public class SaveGraveTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task Save_accepts_a_grave_without_a_position(string? position)
+    {
+        using var host = new ApiTestHost();
+        using var client = host.CreateClient();
+        var (item, _, recipient, _) = await SeedAsync(client);
+
+        var response = await PostGraveAsync(
+            client,
+            "S-006",
+            "2026-01",
+            null,
+            item,
+            recipient,
+            position: position
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var created = await ODataJson.ReadAsync(response);
+        var id = created.RootElement.GetProperty("Id").GetInt64();
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Null((await db.Graves.SingleAsync(g => g.Id == id)).Position);
+    }
+
+    [Theory]
     [InlineData("", "F-1", "Grabstätte", "SingleInside", "2026-01", "GraveNumberRequired")]
     [InlineData("S-005", "", "Grabstätte", "SingleInside", "2026-01", "FieldNumberRequired")]
     [InlineData("S-005", "F-1", " ", "SingleInside", "2026-01", "SiteNameRequired")]
-    [InlineData("S-005", "F-1", "Grabstätte", null, "2026-01", "PositionRequired")]
-    [InlineData("S-005", "F-1", "Grabstätte", "Sideways", "2026-01", "PositionRequired")]
-    [InlineData("S-005", "F-1", "Grabstätte", "3", "2026-01", "PositionRequired")]
+    [InlineData("S-005", "F-1", "Grabstätte", "Sideways", "2026-01", "PositionInvalid")]
+    [InlineData("S-005", "F-1", "Grabstätte", "3", "2026-01", "PositionInvalid")]
     [InlineData("S-005", "F-1", "Grabstätte", "SingleInside", "not-a-date", "InvalidDate")]
     [InlineData("S-005", "F-1", "Grabstätte", "SingleInside", "", "InvalidDate")]
     public async Task Save_rejects_invalid_grave_fields(
@@ -682,7 +708,7 @@ public class SaveGraveTests
         long? graveId = null,
         string fieldNumber = "27",
         string siteName = "Schineller Bäcke",
-        string position = "DoubleOutside"
+        string? position = "DoubleOutside"
     ) =>
         client.PostAsync(
             "/odata/SaveGrave",

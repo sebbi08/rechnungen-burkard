@@ -149,16 +149,34 @@ public class GravesController : ODataController
             return InvalidDate();
         }
 
+        // The position is optional. An unknown name is refused; a known one the
+        // editor does not offer is the save's to judge.
+        GravePosition? position = null;
+        if (!string.IsNullOrWhiteSpace(request.Position))
+        {
+            if (!GraveTerm.TryParsePosition(request.Position, out var parsed))
+            {
+                return BadRequest(
+                    new
+                    {
+                        error = new
+                        {
+                            code = "PositionInvalid",
+                            message = "The grave position is not one of the known names.",
+                        },
+                    }
+                );
+            }
+
+            position = parsed;
+        }
+
         var fields = new GraveFields(
             request.GraveNumber ?? "",
             request.FieldNumber ?? "",
             request.SiteName ?? "",
             request.CemeteryId,
-            // an unknown name is reported as missing; a known one the editor
-            // does not offer is the save's to judge
-            GraveTerm.TryParsePosition(request.Position, out var position)
-                ? position
-                : null,
+            position,
             startDate,
             endDate,
             request.IsCooperative ?? false,

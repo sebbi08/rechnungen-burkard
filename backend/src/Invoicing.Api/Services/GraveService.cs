@@ -508,15 +508,10 @@ public sealed class GraveService
             throw new ValidationException("CemeteryNotFound", "The cemetery does not exist.");
         }
 
-        if (fields.Position is null)
-        {
-            throw new ValidationException("PositionRequired", "The grave position is required.");
-        }
-
-        // The positions beyond the editor's six come from the old program's
-        // data, through the import. A grave keeps the one it has, so it can be
-        // saved unchanged, but none of them is chosen anew.
-        if (!GravePositions.Offered.Contains(fields.Position.Value))
+        // The position is optional. The ones beyond the editor's six come from
+        // the old program's data, through the import. A grave keeps the one it
+        // has, so it can be saved unchanged, but none of them is chosen anew.
+        if (fields.Position is { } chosen && !GravePositions.Offered.Contains(chosen))
         {
             var stored = graveId is { } id
                 ? await _db

@@ -472,6 +472,8 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
             :options="positionOptions"
             option-label="label"
             option-value="value"
+            :placeholder="t('gravePositionPlaceholder')"
+            show-clear
             fluid
           />
         </div>
