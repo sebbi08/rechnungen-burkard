@@ -3,7 +3,9 @@
 # Usage: scripts/dotnet.sh <dotnet args...>   (working dir: backend/)
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-exec docker run --rm \
+# --init: xunit.v3 runs the tests in processes of their own, and dotnet as
+# PID 1 aborts with "Error while reaping child" once they end; tini reaps instead
+exec docker run --rm --init \
   -u "$(id -u):$(id -g)" \
   -e HOME=/tmp/home \
   -e DOTNET_CLI_HOME=/tmp/home \

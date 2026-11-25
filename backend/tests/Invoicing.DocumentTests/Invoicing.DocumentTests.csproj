@@ -4,6 +4,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <!-- xunit.v3 asks every call that takes a CancellationToken to pass the
+         test's own; these tests run in-memory and briefly, nothing to cancel -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
     <RootNamespace>Burkard.Invoicing.DocumentTests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
@@ -12,7 +15,7 @@
     <ProjectReference Include="../../src/Invoicing.Domain/Invoicing.Domain.csproj" />
     <PackageReference Include="PdfPig" Version="0.1.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.*" />
-    <PackageReference Include="xunit" Version="2.*" />
+    <PackageReference Include="xunit.v3" Version="3.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.*" />
   </ItemGroup>
 </Project>
