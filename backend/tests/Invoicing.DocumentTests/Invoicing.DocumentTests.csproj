@@ -15,7 +15,7 @@
     <ProjectReference Include="../../src/Invoicing.Domain/Invoicing.Domain.csproj" />
     <PackageReference Include="PdfPig" Version="0.1.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.*" />
-    <PackageReference Include="xunit.v3" Version="3.*" />
+    <PackageReference Include="xunit.v3" Version="4.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.*" />
   </ItemGroup>
 </Project>
