@@ -5,6 +5,11 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.7.0 — 2026-11-25
+
+### Features
+- **graves**: make the grave position optional (2bcd1f5)
+
 ## v3.6.0 — 2026-11-14
 
 ### Features
