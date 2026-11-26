@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
-import { createRow, ensureRow, seedGrave } from "../seed";
+import { createRow, ensureCemetery, ensureRow, seedGrave } from "../seed";
 import { unique } from "../unique";
 import {
   dialog,
@@ -27,7 +27,7 @@ function auditEntries(page: Page): Locator {
 async function seedSimpleGrave(
   page: Page,
   marker: string,
-): Promise<{ graveId: number; itemNumber: string }> {
+): Promise<{ graveId: number; itemNumber: string; itemId: number; recipientId: number }> {
   await ensureRow(page, "/odata/VatRates", { Rate: 7 });
   const itemNumber = `${marker}-item`;
   const item = await createRow(page, "/odata/InvoiceItems", {
@@ -47,7 +47,7 @@ async function seedSimpleGrave(
     items: [{ itemId: item.Id, count: 1 }],
     recipientIds: [recipient.Id],
   });
-  return { graveId, itemNumber };
+  return { graveId, itemNumber, itemId: item.Id, recipientId: recipient.Id };
 }
 
 test("editing a grave shows the change in its Verlauf", async ({ page }) => {
@@ -146,4 +146,78 @@ test("revising an invoice shows the new recipient in its Verlauf", async ({ page
     `Empfänger: ${anna.Number} ${anna.Name} → ${bernd.Number} ${bernd.Name}`,
   );
   await expect(revised).toContainText(`${invoice.InvoiceNumber} → ${invoice.InvoiceNumber}-R1`);
+});
+
+test("clearing an item's default price reads as no default price", async ({ page }) => {
+  const marker = `AD-${unique()}`;
+  const { graveId, itemNumber, itemId } = await seedSimpleGrave(page, marker);
+
+  // the way the item dialog saves: the whole item, here without a default price
+  const response = await page.request.patch(`/odata/InvoiceItems(${itemId})`, {
+    data: {
+      Number: itemNumber,
+      Description: "Grabpflege",
+      VatRate: 7,
+      Quarter: null,
+      DefaultPrice: null,
+    },
+  });
+  expect(response.ok(), await response.text()).toBe(true);
+
+  // the grave billed the default, so it keeps 100,00 € as its own price
+  await page.goto(`/graves/${graveId}`);
+  await expect(auditEntries(page).first()).toContainText(
+    `Standardpreis von ${itemNumber} Grabpflege geändert (100,00 € → kein Standardpreis); ` +
+      "Grab behält 100,00 € als eigenen Preis",
+  );
+});
+
+test("the Verlauf loads older entries page by page", async ({ page }) => {
+  const marker = `AL-${unique()}`;
+  const { graveId, itemId, recipientId } = await seedSimpleGrave(page, marker);
+
+  // 44 edits and the creation: more than two pages of 20. Each one a save of
+  // the grave as the editor sends it, with the next field number.
+  const edits = 44;
+  const cemeteryId = await ensureCemetery(page);
+  for (let n = 2; n <= edits + 1; n++) {
+    await createRow(page, "/odata/SaveGrave", {
+      graveId,
+      graveNumber: marker,
+      fieldNumber: String(n),
+      siteName: "Schineller Bäcke",
+      cemeteryId,
+      position: "SingleInside",
+      startDate: "2045-01",
+      endDate: "2045-12",
+      items: [{ itemId, count: 1, unitPrice: null }],
+      recipientIds: [recipientId],
+      isCooperative: false,
+      contractNumber: null,
+    });
+  }
+
+  await page.goto(`/graves/${graveId}`);
+  const trail = page.getByTestId("audit-trail");
+  const more = trail.getByRole("button", { name: "Weitere laden" });
+  // newest first: the last edit on top, the first page holding 20
+  await expect(auditEntries(page)).toHaveCount(20);
+  await expect(auditEntries(page).first()).toContainText(`Feldnummer: ${edits} → ${edits + 1}`);
+  await expect(auditEntries(page).filter({ hasText: "Grab angelegt" })).toHaveCount(0);
+
+  // each click adds the next older ones below, and the ones shown stay
+  await more.click();
+  await expect(auditEntries(page)).toHaveCount(40);
+  await expect(auditEntries(page).first()).toContainText(`Feldnummer: ${edits} → ${edits + 1}`);
+  await expect(auditEntries(page).nth(20)).toContainText(
+    `Feldnummer: ${edits - 20} → ${edits - 19}`,
+  );
+
+  // the last page holds the rest, down to the creation, and the button goes
+  await more.click();
+  await expect(auditEntries(page)).toHaveCount(edits + 1);
+  await expect(auditEntries(page).last()).toContainText("Grab angelegt");
+  await expect(auditEntries(page).nth(edits - 1)).toContainText("Feldnummer: 1 → 2");
+  await expect(more).toHaveCount(0);
+  await expect(trail).not.toContainText("nicht geladen werden");
 });

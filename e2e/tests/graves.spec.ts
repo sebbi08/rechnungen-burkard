@@ -376,7 +376,10 @@ test("a recipient can be added to a grave without invoices", async ({ page }) =>
   await saveEditor(editor);
 
   await page.goto(`/graves/${graveId}`);
-  await expect(page.getByText(recipient.Name, { exact: true })).toBeVisible();
+  // named with the number, as the detail page lists recipients
+  await expect(
+    page.getByText(`${recipient.Number} · ${recipient.Name}`, { exact: true }),
+  ).toBeVisible();
 });
 
 test("unticking a cooperative grave asks for a recipient", async ({ page }) => {
@@ -602,6 +605,11 @@ test("a recipient is swapped in the grave editor", async ({ page }) => {
   await expect(graveRecipientRows(page).filter({ hasText: carla.Name })).toHaveCount(1);
   await expect(graveRecipientRows(page).filter({ hasText: bernd })).toHaveCount(1);
   await expect(graveRecipientRows(page).filter({ hasText: anna })).toHaveCount(0);
+  // the page names each recipient with their number and the whole address
+  const carlaRow = graveRecipientRows(page).filter({ hasText: carla.Name });
+  await expect(carlaRow).toContainText(`${carla.Number} · ${carla.Name}`);
+  await expect(carlaRow).toContainText("Lindenweg 5");
+  await expect(carlaRow).toContainText("97080 Würzburg");
 });
 
 /**
@@ -754,6 +762,16 @@ test("a grave invoice's recipient is swapped on revision", async ({ page }) => {
   await expect(memberPicker(names[0])).toContainText(names[0]);
   await expect(memberPicker(names[1])).toContainText(names[1]);
   await pickOption(page, memberPicker(names[0]), carla.Name, { filter: carla.Name });
+  // the member's card turns to the pick: Carla's number, name and whole
+  // address, not the invoiced Anna's
+  const cards = editor.getByTestId("recipient-card");
+  await expect(cards).toHaveCount(2);
+  const carlaCard = cards.filter({ hasText: carla.Name });
+  await expect(carlaCard).toContainText(`${carla.Number} · ${carla.Name}`);
+  await expect(carlaCard).toContainText("Lindenweg 5");
+  await expect(carlaCard).toContainText("97080 Würzburg");
+  await expect(cards.filter({ hasText: names[0] })).toHaveCount(0);
+  await expect(cards.filter({ hasText: names[1] })).toHaveCount(1);
   await saveEditor(editor);
 
   // both invoices moved to R1: Anna's now goes to Carla, Bernd's stays his
