@@ -17,7 +17,7 @@ import { useErrorToast } from "@/composables/useErrorToast";
 import type { GraveInvoiceDraft } from "@/composables/useGraveInvoiceEdit";
 import { showMessage } from "@/composables/useMessage";
 import { billingProblemText } from "@/lib/billing";
-import type { Translate } from "@/lib/format";
+import { formatRecipientLabel, type Translate } from "@/lib/format";
 import { type DraftLine, toLineInputs } from "@/lib/lines";
 import LineEditor from "./LineEditor.vue";
 import RecipientCard from "./RecipientCard.vue";
@@ -125,7 +125,14 @@ async function save(): Promise<void> {
           class="flex flex-col gap-2 rounded-lg border border-surface p-3"
         >
           <RecipientCard :number="member.number" :name="member.name" :address="member.address" />
-          <RecipientPicker v-model="memberRecipients[index]" :exclude="othersOf(index)" />
+          <RecipientPicker
+            v-model="memberRecipients[index]"
+            :input-id="`graveInvoiceMember${index}`"
+            :aria-label="
+              t('graveInvoiceMemberPicker', [formatRecipientLabel(member.number, member.name)])
+            "
+            :exclude="othersOf(index)"
+          />
         </div>
       </section>
       <LineEditor v-model="lines" />

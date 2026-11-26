@@ -95,6 +95,7 @@ public class GravesController : ODataController
                     Recipient = new
                     {
                         r.Recipient.Id,
+                        r.Recipient.Number,
                         r.Recipient.Name,
                         r.Recipient.Address,
                         r.Recipient.Email,

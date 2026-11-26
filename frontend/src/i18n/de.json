@@ -403,6 +403,7 @@
   "pricesAdjustAPrice": "Passen Sie einen Preis dieses Steuersatzes an.",
   "errorPricesDoNotDivide": "Die Preise dieses Grabs lassen sich nicht gleichmäßig auf seine Empfänger aufteilen.",
   "errorPricesDoNotDivide1": "Die Rechnung „{0}“ lässt sich nicht gleichmäßig auf die Empfänger aufteilen.",
+  "graveInvoiceMemberPicker": "Empfänger für {0}",
   "swapRecipient": "Austauschen",
   "errorReplacementNotInGroup": "Dieser Empfänger gehört nicht zu den Rechnungen dieses Grabs und Halbjahrs. Öffnen Sie die Bearbeitung erneut.",
   "graveInvoiceMembers": "Empfänger der Rechnungen",

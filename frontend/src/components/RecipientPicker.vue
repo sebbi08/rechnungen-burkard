@@ -12,6 +12,8 @@ import RecipientQuickCreate from "./RecipientQuickCreate.vue";
 
 const props = defineProps<{
   inputId?: string;
+  /** The field's name where no label stands next to it. */
+  ariaLabel?: string;
   defaultToNewest?: boolean;
   /** Recipients the picker must not offer: the ones the form already holds. */
   exclude?: number[];
@@ -93,6 +95,7 @@ function onCreated(id: number): void {
     <Select
       v-model="model"
       :input-id="inputId"
+      :aria-label="ariaLabel"
       :options="shown"
       option-value="Id"
       option-label="Name"

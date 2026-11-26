@@ -140,6 +140,15 @@ public class GraveTests
             graveJson.RootElement.GetProperty("Items")[0].GetProperty("Count").GetInt32()
         );
 
+        // the editor shows a recipient with its number, so the detail carries it
+        var stored = await client.GetAsync($"/odata/Recipients({recipientId})");
+        using var storedJson = await ODataJson.ReadAsync(stored);
+        var number = storedJson.RootElement.GetProperty("Number").GetString();
+        Assert.False(string.IsNullOrEmpty(number));
+        var linked = graveJson.RootElement.GetProperty("Recipients")[0].GetProperty("Recipient");
+        Assert.Equal(number, linked.GetProperty("Number").GetString());
+        Assert.Equal("Anna Beispiel", linked.GetProperty("Name").GetString());
+
         var status = await client.GetAsync("/odata/GraveInvoicingStatus?year=2026&half=1");
         Assert.Equal(HttpStatusCode.OK, status.StatusCode);
         using var statusJson = await ODataJson.ReadAsync(status);

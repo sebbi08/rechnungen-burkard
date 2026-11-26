@@ -232,9 +232,27 @@ function removeRecipient(id: number): void {
   recipients.value = recipients.value.filter((recipient) => recipient.id !== id);
 }
 
-function startSwapping(id: number): void {
+async function startSwapping(id: number): Promise<void> {
   swappingId.value = id;
   swapPickId.value = null;
+  await nextTick();
+  document.getElementById(`swapRecipient${id}`)?.focus();
+}
+
+/** The card is drawn again where the picker stood; focus goes back to its
+ *  "Austauschen" button, or it would fall to the body and the drawer would no
+ *  longer see an Escape. */
+async function focusSwapButton(id: number): Promise<void> {
+  await nextTick();
+  formEl.value?.querySelector<HTMLElement>(`[data-swap-button="${id}"]`)?.focus();
+}
+
+function cancelSwapping(): void {
+  const id = swappingId.value;
+  stopSwapping();
+  if (id != null) {
+    void focusSwapButton(id);
+  }
 }
 
 function stopSwapping(): void {
@@ -252,6 +270,7 @@ function swapRecipient(picked: Recipient | null): void {
     recipient.id === swapping ? toGraveRecipient(picked) : recipient,
   );
   stopSwapping();
+  void focusSwapButton(picked.Id);
 }
 
 /** Escape in the swap picker puts the card back and leaves the drawer open;
@@ -262,7 +281,7 @@ function onSwapKeydown(event: KeyboardEvent): void {
     return;
   }
   event.stopPropagation();
-  stopSwapping();
+  cancelSwapping();
 }
 
 const items = useItemsQuery(ref(""));
@@ -602,13 +621,14 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
               <RecipientPicker
                 v-model="swapPickId"
                 :input-id="`swapRecipient${recipient.id}`"
+                :aria-label="t('graveInvoiceMemberPicker', [recipient.name])"
                 :exclude="
                   recipients.filter((other) => other.id !== recipient.id).map((other) => other.id)
                 "
                 class="min-w-0 flex-1"
                 @selected="swapRecipient"
               />
-              <Button :label="t('cancel')" severity="secondary" text @click="stopSwapping" />
+              <Button :label="t('cancel')" severity="secondary" text @click="cancelSwapping" />
             </div>
             <template v-else>
               <RecipientCard
@@ -619,6 +639,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
               <div class="flex shrink-0 items-center gap-1">
                 <Button
                   :label="t('swapRecipient')"
+                  :data-swap-button="recipient.id"
                   severity="secondary"
                   text
                   size="small"
