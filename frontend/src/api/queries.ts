@@ -1,5 +1,10 @@
 import type { QFilterExpression, QStringPath } from "@odata2ts/odata-query-objects";
-import { keepPreviousData, type QueryClient, useQuery } from "@tanstack/vue-query";
+import {
+  keepPreviousData,
+  type QueryClient,
+  useInfiniteQuery,
+  useQuery,
+} from "@tanstack/vue-query";
 import type { Ref } from "vue";
 import { currentHalfYear } from "@/lib/halfYear";
 import { PAGE_SIZE } from "@/lib/paging";
@@ -407,16 +412,23 @@ export async function fetchOpenGraveInvoices(graveId: number): Promise<Invoice[]
   });
 }
 
-/** A grave's or an invoice chain's Verlauf, newest first: the first `top`
- *  entries and how many there are in all. No subject, no query. */
+/** Entries per request of a Verlauf: below the controller's MaxTop of 100, which
+ *  every request has to stay within however many pages are loaded. */
+export const AUDIT_PAGE_SIZE = 20;
+
+/** A grave's or an invoice chain's Verlauf, newest first, AUDIT_PAGE_SIZE
+ *  entries a page: each further page asks for the entries after those loaded
+ *  ($skip), never for more at once. Keyed by the subject alone, so another
+ *  subject starts from its first page and never shows this one's entries
+ *  meanwhile. No subject, no query. */
 export function useAuditEntriesQuery(
   subject: Ref<{ graveId: number } | { invoiceRootId: number } | null>,
-  top: Ref<number>,
 ) {
-  return useQuery({
-    queryKey: ["audit", subject, top],
+  return useInfiniteQuery({
+    queryKey: ["audit", subject],
     enabled: () => subject.value != null,
-    queryFn: async () => {
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
       const target = subject.value!;
       const response = await odata
         .AuditEntries()
@@ -427,12 +439,16 @@ export function useAuditEntriesQuery(
               : q.InvoiceRootId.eq(target.invoiceRootId),
           )
             .orderBy(q.OccurredAt.desc(), q.Id.desc())
-            .top(top.value)
+            .skip(pageParam)
+            .top(AUDIT_PAGE_SIZE)
             .count();
         })
         .execute();
       return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
     },
-    placeholderData: keepPreviousData,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((sum, page) => sum + page.rows.length, 0);
+      return last.rows.length > 0 && loaded < last.total ? loaded : undefined;
+    },
   });
 }

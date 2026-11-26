@@ -2,7 +2,7 @@
 import Button from "primevue/button";
 import Card from "primevue/card";
 import Message from "primevue/message";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { RouterLink } from "vue-router";
 import { useAuditEntriesQuery } from "@/api/queries";
@@ -21,8 +21,6 @@ import { formatDateTime } from "@/lib/format";
 const props = defineProps<{ graveId?: number; invoiceRootId?: number }>();
 const { t } = useI18n();
 
-const STEP = 20;
-const top = ref(STEP);
 const subject = computed(() =>
   props.graveId != null
     ? { graveId: props.graveId }
@@ -30,7 +28,16 @@ const subject = computed(() =>
       ? { invoiceRootId: props.invoiceRootId }
       : null,
 );
-const query = useAuditEntriesQuery(subject, top);
+const query = useAuditEntriesQuery(subject);
+
+/** The loaded pages in order. A page fetched after an entry was written may
+ *  repeat the last one of the page before it, so each entry shows once. */
+const rows = computed(() => {
+  const seen = new Set<number>();
+  return (query.data.value?.pages ?? [])
+    .flatMap((page) => page.rows)
+    .filter((entry) => !seen.has(entry.Id) && seen.add(entry.Id));
+});
 
 interface ValuePart {
   text: string;
@@ -88,7 +95,7 @@ function changeLine(change: AuditChange, graveId: number | null): ChangeLine {
 }
 
 const entries = computed(() =>
-  (query.data.value?.rows ?? []).map((entry) => ({
+  rows.value.map((entry) => ({
     id: entry.Id,
     // the API serialises the UTC instant with its offset, but be safe without one
     when: formatDateTime(
@@ -100,14 +107,16 @@ const entries = computed(() =>
     ),
   })),
 );
-const hasMore = computed(() => (query.data.value?.total ?? 0) > entries.value.length);
+const hasMore = computed(() => query.hasNextPage.value);
 </script>
 
 <template>
   <Card data-testid="audit-trail">
     <template #title>{{ t("auditTitle") }}</template>
     <template #content>
-      <Message v-if="query.isError.value" severity="error">{{ t("loadFailed") }}</Message>
+      <Message v-if="query.isError.value && !entries.length" severity="error">
+        {{ t("loadFailed") }}
+      </Message>
       <p v-else-if="query.isSuccess.value && !entries.length" class="m-0 text-muted-color">
         {{ t("auditEmpty") }}
       </p>
@@ -141,14 +150,18 @@ const hasMore = computed(() => (query.data.value?.total ?? 0) > entries.value.le
           </ul>
         </li>
       </ol>
+      <!-- a further page that failed keeps the entries already shown -->
+      <Message v-if="query.isError.value && entries.length" class="mt-4" severity="error">
+        {{ t("loadFailed") }}
+      </Message>
       <Button
         v-if="hasMore"
         class="mt-4"
         :label="t('auditMore')"
         severity="secondary"
         outlined
-        :loading="query.isFetching.value"
-        @click="top += STEP"
+        :loading="query.isFetchingNextPage.value"
+        @click="query.fetchNextPage()"
       />
     </template>
   </Card>
