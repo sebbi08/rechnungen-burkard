@@ -31,6 +31,7 @@ import {
   formatDeletedDate,
   formatInvoiceNumber,
   formatMonth,
+  formatRecipientLabel,
   formatRevisionBadge,
   formatVatRate,
 } from "@/lib/format";
@@ -335,7 +336,10 @@ const {
       <template #title>{{ t("graveRecipients") }}</template>
       <template #content>
         <DataTable :value="recipients" size="small">
-          <Column field="Name" :header="t('recipientName')" />
+          <!-- number and name, as the recipient pickers and cards write them -->
+          <Column :header="t('recipientName')" body-class="[overflow-wrap:anywhere]">
+            <template #body="{ data }">{{ formatRecipientLabel(data.Number, data.Name) }}</template>
+          </Column>
           <Column :header="t('recipientAddress')" body-class="whitespace-pre-line">
             <template #body="{ data }">{{ data.Address }}</template>
           </Column>
