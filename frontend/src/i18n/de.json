@@ -506,6 +506,7 @@
   "auditNone": "–",
   "auditPriceDefault": "Standardpreis",
   "auditPriceOwn": "eigener Preis",
+  "auditNoDefaultPrice": "kein Standardpreis",
   "auditActionGraveCreated": "Grab angelegt",
   "auditActionGraveCreatedFrom": "Grab angelegt als Nachfolger ab {from}",
   "auditActionGraveEdited": "Grab bearbeitet",

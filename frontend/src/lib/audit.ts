@@ -122,11 +122,13 @@ export function auditActionText(
   const from = details.from ? formatMonth(details.from) : "";
   const year = Number(details.year);
   const half = Number(details.half);
+  // a default price set where there was none, or removed, is written empty
+  const noPrice = action === "ItemDefaultPriceChanged" ? t("auditNoDefaultPrice") : "";
   const values = {
     from,
     item: details.item ?? "",
-    old: details.old ? money(details.old) : "",
-    new: details.new ? money(details.new) : "",
+    old: details.old ? money(details.old) : noPrice,
+    new: details.new ? money(details.new) : noPrice,
     halfYear: details.year && details.half ? halfYearText(year, half) : "",
     quote: details.quote ?? "",
   };
