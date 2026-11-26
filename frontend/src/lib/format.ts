@@ -60,9 +60,11 @@ export function formatRevisionBadge(value: number | null | undefined): string {
   return value != null && value > 0 ? `R${value}` : "";
 }
 
-/** The first line of a multi-line address. */
-export function formatAddressLine(value: string | null | undefined): string {
-  return (value ?? "").split("\n")[0].trim();
+/** "E-0042 · Anna Beispiel": a recipient as a form names it, or the name alone
+ *  for one without a number (old data). */
+export function formatRecipientLabel(number: string | null | undefined, name: string): string {
+  const n = (number ?? "").trim();
+  return n === "" ? name : `${n} · ${name}`;
 }
 
 /** "33,33 %", "50 %": a recipient's share as the invoice prints it, with up

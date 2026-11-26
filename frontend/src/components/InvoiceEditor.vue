@@ -17,6 +17,7 @@ import {
   fetchQuoteLines,
   type InvoiceLineInput,
 } from "@/api/endpoints";
+import type { Recipient } from "@/api/generated";
 import { ApiError } from "@/api/http";
 import { loadItemVatRates } from "@/api/queries";
 import { useBlocking } from "@/composables/useBlocking";
@@ -26,6 +27,7 @@ import { useErrorToast } from "@/composables/useErrorToast";
 import { type DraftLine, newLine, toLineInputs } from "@/lib/lines";
 import { priceFieldValue } from "@/lib/money";
 import LineEditor from "./LineEditor.vue";
+import RecipientCard from "./RecipientCard.vue";
 import RecipientPicker from "./RecipientPicker.vue";
 
 const props = withDefaults(
@@ -52,6 +54,7 @@ const { run } = useBlocking();
 const queryClient = useQueryClient();
 
 const recipientId = ref<number | null>(null);
+const pickedRecipient = ref<Recipient | null>(null);
 const introText = ref("");
 const lines = ref<DraftLine[]>([]);
 const loading = ref(false);
@@ -201,6 +204,13 @@ async function save(): Promise<void> {
           v-model="recipientId"
           input-id="invoiceRecipient"
           :default-to-newest="!target"
+          @selected="pickedRecipient = $event"
+        />
+        <RecipientCard
+          v-if="pickedRecipient"
+          :number="pickedRecipient.Number"
+          :name="pickedRecipient.Name"
+          :address="pickedRecipient.Address"
         />
       </div>
       <div class="flex flex-col gap-2">

@@ -6,7 +6,7 @@ import { useI18n } from "vue-i18n";
 import type { Recipient } from "@/api/generated";
 import { RECIPIENT_PICKER_SIZE, useRecipientPickerQuery, useRecipientQuery } from "@/api/queries";
 import { useDebounced } from "@/composables/useDebounced";
-import { formatAddressLine } from "@/lib/format";
+import { formatRecipientLabel } from "@/lib/format";
 import { SERVER_FILTER } from "@/lib/serverFilter";
 import RecipientQuickCreate from "./RecipientQuickCreate.vue";
 
@@ -54,11 +54,14 @@ const more = computed(
   () => (offered.data.value?.total ?? 0) > (offered.data.value?.rows.length ?? 0),
 );
 
-watch(
-  () => options.value.find((option) => option.Id === model.value) ?? null,
-  (recipient) => emit("selected", recipient),
-  { immediate: true },
-);
+const chosen = computed(() => options.value.find((option) => option.Id === model.value) ?? null);
+watch(chosen, (recipient) => emit("selected", recipient), { immediate: true });
+
+// The form resets the model after taking a pick (the grave editor's "Hinzufügen"):
+// the next opening starts on the newest recipients, not on the last search.
+watch(model, (id) => {
+  if (id == null) filter.value = "";
+});
 
 // A fresh draft starts on the newest recipient. Taken from
 // the same list the Select shows, so the default is always one it can display.
@@ -100,7 +103,9 @@ function onCreated(id: number): void {
       class="min-w-0 flex-1 basis-64"
       overlay-class="max-w-[calc(100vw-1rem)]"
       :pt="{ option: ({ context }) => ({ 'aria-label': context?.option.Name }) }"
+      reset-filter-on-hide
       @filter="filter = $event.value"
+      @hide="filter = ''"
     >
       <!-- PrimeVue 5 leaves an option without aria-label when the option slot
            is used, so the address became part of its name; the pt above names
@@ -110,9 +115,15 @@ function onCreated(id: number): void {
            then zoomed the whole page out and slid the editor under it. -->
       <template #option="{ option }">
         <div class="flex min-w-0 flex-col [overflow-wrap:anywhere] whitespace-normal">
-          <span>{{ option.Name }}</span>
-          <small class="text-muted-color">{{ formatAddressLine(option.Address) }}</small>
+          <span>{{ formatRecipientLabel(option.Number, option.Name) }}</span>
+          <small class="whitespace-pre-line text-muted-color">{{ option.Address }}</small>
         </div>
+      </template>
+      <template #value="{ value }">
+        <span v-if="chosen" class="block truncate">
+          {{ formatRecipientLabel(chosen.Number, chosen.Name) }}
+        </span>
+        <span v-else-if="value == null">{{ t("selectRecipient") }}</span>
       </template>
       <template v-if="more" #footer>
         <div class="px-3 py-2 text-sm text-muted-color">

@@ -741,6 +741,9 @@ it holds.
 - **FR-016c**: The recipient list MUST offer a text search per column (FR-068c):
   number, name, address (all its lines) and e-mail. It MUST be answered by the
   server, which pages the list.
+- **FR-016d**: Where a recipient is picked, every option and the chosen value
+  MUST show the recipient's number and name, and the options and the editor MUST
+  show the full address.
 - **FR-017**: Changes to a recipient's name or address MUST only apply to future
   invoices; previously generated invoices MUST keep the values they were issued
   with.
