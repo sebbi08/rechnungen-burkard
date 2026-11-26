@@ -5,6 +5,31 @@ previous tag by `scripts/changelog-entry.sh` and written by the release
 workflow. Housekeeping commits — docs, tests, chores, CI, style, build — are
 left out, so this records what changed for someone using the application.
 
+## v3.8.0 — 2026-11-26
+
+### Features
+- **frontend**: change a grave's recipients and swap one on a grave invoice (10f22c9)
+- **frontend**: show a recipient's number and full address where one is picked (bc0bcaa)
+- **frontend**: show a grave's and an invoice's Verlauf (518d7a3)
+- **api**: guard every request and job against unrecorded changes (ebe4eba)
+- **invoices**: swap a recipient when revising a grave invoice (93417ec)
+- **api**: record invoice changes in the audit log (e8a0a59)
+- **api**: record item price changes on the graves they reach (3789122)
+- **api**: record grave changes in the audit log (5dc7222)
+- **api**: store audit entries behind a guard for undeclared changes (f7ac421)
+- **graves**: let a grave's recipients change after its first invoice (7680885)
+
+### Fixes
+- **frontend**: read a cleared default price as "kein Standardpreis" (32b2d83)
+- **frontend**: show the picked recipient's address on a swapped member's card (329b4a9)
+- **frontend**: name a grave's recipients with their number on its page (a83903c)
+- **frontend**: page the Verlauf by $skip so any number of entries loads (18327df)
+- **backend**: serve a Verlauf entry's time as the UTC instant it is (af62d52)
+- **frontend**: set the Verlauf's changes as "Feld: alt → neu" (05e76bd)
+- **frontend**: read the Verlauf's changes in the case the API writes them (36ab1a9)
+- **frontend**: show a stored recipient's number and keep focus in the recipient swap (1766cf4)
+- **api**: file unattributed entries in the save of the change (48fa607)
+
 ## v3.7.0 — 2026-11-25
 
 ### Features
