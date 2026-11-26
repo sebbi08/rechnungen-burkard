@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -14,9 +15,11 @@ public sealed class ImportService
     private readonly AppDbContext _db;
     private readonly ImportValidator _validator;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
-    public ImportService(AppDbContext db, ImportValidator validator, IClock clock)
+    public ImportService(AppDbContext db, ImportValidator validator, IClock clock, AuditScope audit)
     {
+        _audit = audit;
         _db = db;
         _validator = validator;
         _clock = clock;
@@ -56,6 +59,7 @@ public sealed class ImportService
         }
 
         var data = validation.Data!;
+        using var audit = _audit.Begin(AuditActions.GraveImported);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         var recipients = data.Recipients.ToDictionary(
@@ -104,6 +108,10 @@ public sealed class ImportService
             StringComparer.OrdinalIgnoreCase
         );
         _db.Graves.AddRange(graves.Values);
+        foreach (var grave in graves.Values)
+        {
+            audit.WatchNewGrave(grave);
+        }
 
         // the links need the generated keys, so the parents go in first
         await _db.SaveChangesAsync(ct);
@@ -190,6 +198,7 @@ public sealed class ImportService
         }
 
         await _db.SaveChangesAsync(ct);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
 
         var summary = new ImportSummary(

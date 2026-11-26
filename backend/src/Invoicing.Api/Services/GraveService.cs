@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -40,11 +41,13 @@ public sealed class GraveService
 {
     private readonly AppDbContext _db;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
-    public GraveService(AppDbContext db, IClock clock)
+    public GraveService(AppDbContext db, IClock clock, AuditScope audit)
     {
         _db = db;
         _clock = clock;
+        _audit = audit;
     }
 
     /// <summary>Creates or updates a grave together with its full set of item and
@@ -149,9 +152,27 @@ public sealed class GraveService
             );
         }
 
+        // after every refusal above, so a refused save writes no entry
+        using var audit = _audit.Begin(
+            graveId is null ? AuditActions.GraveCreated : AuditActions.GraveEdited
+        );
+        var from = handover is null
+            ? null
+            : new Dictionary<string, string> { ["from"] = AuditValues.Month(fields.StartDate)! };
+        if (graveId is { } watchedId)
+        {
+            await audit.WatchGravesAsync([watchedId], ct);
+        }
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         if (handover is not null)
         {
+            await audit.WatchGravesAsync(
+                [handover.Predecessor.Id],
+                ct,
+                AuditActions.GraveHandedOver,
+                from
+            );
             // its stored corrections were checked to stay valid for the shorter term
             var predecessor = await _db.Graves.SingleAsync(
                 g => g.Id == handover.Predecessor.Id,
@@ -162,6 +183,11 @@ public sealed class GraveService
         }
 
         var grave = graveId is { } id ? await LoadForReplaceAsync(id, ct) : NewGrave();
+        if (graveId is null)
+        {
+            audit.WatchNewGrave(grave, details: from);
+        }
+
         grave.GraveNumber = fields.GraveNumber.Trim();
         grave.FieldNumber = fields.FieldNumber.Trim();
         grave.SiteName = fields.SiteName.Trim();
@@ -209,6 +235,7 @@ public sealed class GraveService
         }
 
         await _db.SaveChangesAsync(ct);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return grave;
     }
@@ -355,8 +382,14 @@ public sealed class GraveService
             throw GraveDeleted();
         }
 
+        using var audit = _audit.Begin(AuditActions.GraveDeleted);
+        await audit.WatchGravesAsync([graveId], ct);
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         grave.DeletedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
+        audit.Record(new AuditSubject.Grave(graveId), []);
+        await audit.CompleteAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     /// <summary>Brings a deleted grave back, unless an invoice run has finished
@@ -397,8 +430,14 @@ public sealed class GraveService
             throw new GraveNumberInUseException(clash.GraveNumber, clash.StartDate, clash.EndDate);
         }
 
+        using var audit = _audit.Begin(AuditActions.GraveRestored);
+        await audit.WatchGravesAsync([graveId], ct);
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         grave.DeletedAt = null;
         await _db.SaveChangesAsync(ct);
+        audit.Record(new AuditSubject.Grave(graveId), []);
+        await audit.CompleteAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     /// <summary>True when a grave invoice run finished successfully after the
