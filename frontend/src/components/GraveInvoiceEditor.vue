@@ -10,6 +10,7 @@ import {
   createGraveInvoiceRevision,
   type InvoiceLineInput,
 } from "@/api/endpoints";
+import type { Recipient } from "@/api/generated";
 import { useBlocking } from "@/composables/useBlocking";
 import { useDiscardGuard } from "@/composables/useDiscardGuard";
 import { useDrawerFocus } from "@/composables/useDrawerFocus";
@@ -37,6 +38,9 @@ const lines = ref<DraftLine[]>([]);
 // Who each recipient invoice goes to now: the member's own recipient until the
 // picker is used.
 const memberRecipients = ref<(number | null)[]>([]);
+// The recipients the pickers have handed over, by id: a member's card shows the
+// one it now goes to, with its full address, rather than the invoiced one.
+const pickedRecipients = ref<Record<number, Recipient>>({});
 const discard = useDiscardGuard(visible, () => ({
   lines: lines.value.map(({ itemId, count, unitPrice }) => ({ itemId, count, unitPrice })),
   recipients: memberRecipients.value,
@@ -47,11 +51,35 @@ function othersOf(index: number): number[] {
   return memberRecipients.value.filter((id, i): id is number => i !== index && id != null);
 }
 
+/** The picker's recipient, kept by id. A null hand-over is the list
+ *  reloading under the pick, not another pick, so the last one stays. */
+function onPicked(recipient: Recipient | null): void {
+  if (recipient) {
+    pickedRecipients.value[recipient.Id] = recipient;
+  }
+}
+
+type Member = GraveInvoiceDraft["members"][number];
+
+/** What a member's card shows: the recipient its picker holds once that is
+ *  another one, otherwise the invoice's own snapshot. */
+function cardOf(
+  member: Member,
+  index: number,
+): { number: string | null; name: string; address: string } {
+  const id = memberRecipients.value[index];
+  const picked = id != null && id !== member.recipientId ? pickedRecipients.value[id] : undefined;
+  return picked
+    ? { number: picked.Number || null, name: picked.Name, address: picked.Address }
+    : { number: member.number, name: member.name, address: member.address };
+}
+
 watch(visible, (open) => {
   if (open) {
     drawerFocus.remember();
     lines.value = props.draft?.lines ?? [];
     memberRecipients.value = (props.draft?.members ?? []).map((member) => member.recipientId);
+    pickedRecipients.value = {};
     discard.markClean();
   }
 });
@@ -124,9 +152,10 @@ async function save(): Promise<void> {
           :key="member.invoiceId"
           class="flex flex-col gap-2 rounded-lg border border-surface p-3"
         >
-          <RecipientCard :number="member.number" :name="member.name" :address="member.address" />
+          <RecipientCard v-bind="cardOf(member, index)" />
           <RecipientPicker
             v-model="memberRecipients[index]"
+            @selected="onPicked"
             :input-id="`graveInvoiceMember${index}`"
             :aria-label="
               t('graveInvoiceMemberPicker', [formatRecipientLabel(member.number, member.name)])
