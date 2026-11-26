@@ -177,7 +177,7 @@ Grave actions and what they record:
 | Action                                               | Recorded on                                         | Changes                                                                                                                                                                                                |
 | ---------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Grave created (editor)                               | grave                                               | every initial value, items with count and price, recipients                                                                                                                                            |
-| Grave created by hand-over                           | new grave; predecessor                              | new: initial values and "takes over from <number>"; predecessor: its end month old → new                                                                                                               |
+| Grave created by hand-over                           | new grave; predecessor                              | new: initial values, read as "Grab angelegt als Nachfolger ab <month>"; predecessor: "An Nachfolger übergeben ab <month>" and its end month old → new (built so; see below)                            |
 | Grave edited                                         | grave                                               | each changed field; items added/removed, count and own price old → new (incl. "Standardpreis" ↔ own price); recipients added/removed; rounding corrections added/removed/changed                       |
 | Grave deleted / restored                             | grave                                               | —                                                                                                                                                                                                      |
 | Grave imported                                       | grave                                               | initial values, as for created                                                                                                                                                                         |
@@ -314,6 +314,15 @@ Verlauf
   them from a grave — that is Part 1 and in scope) stays as it is: the UI has no
   delete for recipient records, only the bare API, so no rule is added for a
   record that was removed from a grave but is still named on issued invoices.
+- **A hand-over names the month, not the predecessor's number** (deviation from
+  the table as first written, which had "takes over from <number>"). A successor
+  carries the same grave number as the grave it takes over from by definition,
+  so "takes over from G-12" on grave G-12 says nothing; the month the hand-over
+  takes effect is what tells the two apart. The new grave's entry reads "Grab
+  angelegt als Nachfolger ab <month>", the predecessor's "An Nachfolger
+  übergeben ab <month>" with its end month old → new.
+- **A default price set or cleared** is written with an empty old or new value;
+  the Verlauf reads that side as "kein Standardpreis".
 
 ## Left to the builder
 
