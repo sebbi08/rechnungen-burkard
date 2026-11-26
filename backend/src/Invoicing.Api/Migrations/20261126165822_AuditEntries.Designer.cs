@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Burkard.Invoicing.Api.Migrations;
 
 [DbContext(typeof(AppDbContext))]
-[Migration("20261126164912_AuditEntries")]
-partial class _20261126164912_AuditEntries
+[Migration("20261126165822_AuditEntries")]
+partial class AuditEntries
 {
     /// <inheritdoc />
     protected override void BuildTargetModel(ModelBuilder modelBuilder)

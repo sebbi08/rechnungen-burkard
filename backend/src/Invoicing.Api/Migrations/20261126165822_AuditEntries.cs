@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Burkard.Invoicing.Api.Migrations;
 
 /// <inheritdoc />
-public partial class _20261126164912_AuditEntries : Migration
+public partial class AuditEntries : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

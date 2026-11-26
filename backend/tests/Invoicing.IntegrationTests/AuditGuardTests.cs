@@ -344,4 +344,183 @@ public class AuditGuardTests
         Assert.Equal(1, entries[1].InvoiceRootId);
         Assert.Equal("[]", entries[1].ChangesJson);
     }
+
+    // Record mode is what production runs: an undeclared change is kept and
+    // written down as Unattributed rather than refused
+
+    private static ApiTestHost RecordModeHost() =>
+        new()
+        {
+            ConfigureTestServices = s =>
+                s.AddSingleton(typeof(AuditGuardMode), AuditGuardMode.Record),
+        };
+
+    private static Invoice NewInvoice(int sequence) =>
+        new()
+        {
+            Year = 2026,
+            Sequence = sequence,
+            InvoiceNumber = $"R2026-{sequence:D4}",
+            RecipientName = "Anna Beispiel",
+        };
+
+    private static async Task<List<AuditEntry>> EntriesAsync(ApiTestHost host)
+    {
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await db.AuditEntries.OrderBy(e => e.Id).ToListAsync();
+    }
+
+    [Fact]
+    public async Task Record_mode_files_an_added_grave_under_its_generated_id()
+    {
+        using var host = RecordModeHost();
+        long graveId;
+        using (var scope = host.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<AuditScope>().Arm();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var grave = NewGrave();
+            db.Graves.Add(grave);
+            // synchronously, through the follow-up save in SavedChanges
+            db.SaveChanges();
+            graveId = grave.Id;
+        }
+
+        var entry = Assert.Single(await EntriesAsync(host));
+        Assert.Equal(AuditActions.Unattributed, entry.Action);
+        Assert.Equal(graveId, entry.GraveId);
+        Assert.True(graveId > 0);
+    }
+
+    [Fact]
+    public async Task Record_mode_files_an_added_invoice_under_its_root()
+    {
+        using var host = RecordModeHost();
+        long invoiceId;
+        using (var scope = host.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<AuditScope>().Arm();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var invoice = NewInvoice(1);
+            db.Invoices.Add(invoice);
+            // asynchronously, through the follow-up save in SavedChangesAsync
+            await db.SaveChangesAsync();
+            invoiceId = invoice.Id;
+        }
+
+        var entry = Assert.Single(await EntriesAsync(host));
+        Assert.Equal(AuditActions.Unattributed, entry.Action);
+        Assert.Equal(invoiceId, entry.InvoiceRootId);
+        Assert.Null(entry.GraveId);
+    }
+
+    [Fact]
+    public async Task Record_mode_writes_the_entry_of_a_row_on_a_known_grave_in_the_same_save()
+    {
+        using var host = RecordModeHost();
+        var graveId = await SeedGraveAsync(host);
+        long itemId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var item = new InvoiceItem
+            {
+                Number = "1001",
+                Description = "Grabpflege",
+                VatRate = 19m,
+            };
+            db.InvoiceItems.Add(item);
+            await db.SaveChangesAsync();
+            itemId = item.Id;
+        }
+
+        using (var scope = host.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<AuditScope>().Arm();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.GraveItems.Add(
+                new GraveItem
+                {
+                    GraveId = graveId,
+                    ItemId = itemId,
+                    Count = 1,
+                }
+            );
+            // the link and its entry: two rows written by this one save, not
+            // one plus a follow-up outside its transaction
+            Assert.Equal(2, db.SaveChanges());
+        }
+
+        var entry = Assert.Single(await EntriesAsync(host));
+        Assert.Equal(AuditActions.Unattributed, entry.Action);
+        Assert.Equal(graveId, entry.GraveId);
+    }
+
+    [Fact]
+    public async Task Record_mode_files_a_grave_the_open_action_does_not_watch()
+    {
+        using var host = RecordModeHost();
+        var watchedId = await SeedGraveAsync(host);
+        var unwatchedId = await SeedGraveAsync(host);
+        using (var scope = host.Services.CreateScope())
+        {
+            var audit = scope.ServiceProvider.GetRequiredService<AuditScope>();
+            audit.Arm();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            using (var action = audit.Begin(AuditActions.GraveEdited))
+            {
+                await action.WatchGravesAsync([watchedId], CancellationToken.None);
+                (await db.Graves.SingleAsync(g => g.Id == watchedId)).SiteName = "Neu";
+                (await db.Graves.SingleAsync(g => g.Id == unwatchedId)).SiteName = "Auch neu";
+                await db.SaveChangesAsync();
+                await action.CompleteAsync(CancellationToken.None);
+            }
+
+            await transaction.CommitAsync();
+        }
+
+        var entries = await EntriesAsync(host);
+        Assert.Equal(2, entries.Count);
+        Assert.Contains(entries, e =>
+            e.Action == AuditActions.Unattributed && e.GraveId == unwatchedId
+        );
+        Assert.Contains(entries, e =>
+            e.Action == AuditActions.GraveEdited && e.GraveId == watchedId
+        );
+    }
+
+    [Fact]
+    public async Task Record_mode_files_an_invoice_the_action_did_not_record()
+    {
+        using var host = RecordModeHost();
+        long rootId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var audit = scope.ServiceProvider.GetRequiredService<AuditScope>();
+            audit.Arm();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            using (var action = audit.Begin(AuditActions.InvoiceCreated))
+            {
+                var invoice = NewInvoice(1);
+                db.Invoices.Add(invoice);
+                await db.SaveChangesAsync();
+                invoice.RootId = invoice.Id;
+                rootId = invoice.Id;
+                action.Record(new AuditSubject.Invoice(rootId + 1), Paid());
+                await action.CompleteAsync(CancellationToken.None);
+            }
+
+            await transaction.CommitAsync();
+        }
+
+        var entries = await EntriesAsync(host);
+        Assert.Equal(2, entries.Count);
+        Assert.Equal(AuditActions.InvoiceCreated, entries[0].Action);
+        Assert.Equal(rootId + 1, entries[0].InvoiceRootId);
+        Assert.Equal(AuditActions.Unattributed, entries[1].Action);
+        Assert.Equal(rootId, entries[1].InvoiceRootId);
+    }
 }
