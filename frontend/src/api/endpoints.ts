@@ -39,12 +39,15 @@ export async function createRevision(
 }
 
 /** Revises every recipient invoice of the grave and half-year the invoice
- *  belongs to. `lines` are grave-level: the full count at the full price. */
+ *  belongs to. `lines` are grave-level: the full count at the full price. Each
+ *  replacement gives one recipient's invoice (its latest revision) another
+ *  recipient. */
 export async function createGraveInvoiceRevision(
   invoiceId: number,
   lines: InvoiceLineInput[],
+  replacements: { invoiceId: number; recipientId: number }[],
 ): Promise<void> {
-  await postJson("/odata/CreateGraveInvoiceRevision", { invoiceId, lines });
+  await postJson("/odata/CreateGraveInvoiceRevision", { invoiceId, lines, replacements });
 }
 
 /** Marks an invoice paid -- the backend stamps the day -- or takes the mark back. */
@@ -461,7 +464,13 @@ export interface GraveDetails {
   CanRestore: boolean;
   Items: GraveItemLink[];
   Recipients: {
-    Recipient: { Id: number; Name: string; Address: string; Email: string | null };
+    Recipient: {
+      Id: number;
+      Number: string;
+      Name: string;
+      Address: string;
+      Email: string | null;
+    };
   }[];
 }
 
@@ -474,7 +483,10 @@ export function fetchGraveDetails(graveId: number): Promise<GraveDetails> {
 
 export interface GraveInvoiceRecipient {
   Id: number;
+  /** Number, name and address as the invoice snapshot has them. */
+  Number: string | null;
   Name: string;
+  Address: string;
   InvoiceId: number;
   Paid: boolean;
   RootId: number;

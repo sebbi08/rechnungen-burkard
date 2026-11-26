@@ -47,7 +47,9 @@ export function useDrawerFocus() {
     const target = event.target;
     if (
       event.key === "Escape" &&
-      !(target instanceof HTMLElement && target.getAttribute("aria-expanded") === "true")
+      !(target instanceof HTMLElement && target.getAttribute("aria-expanded") === "true") &&
+      // a control inside the drawer that takes the Escape for itself and stops it
+      !(target instanceof HTMLElement && target.closest("[data-owns-escape]"))
     ) {
       event.stopPropagation();
       close();

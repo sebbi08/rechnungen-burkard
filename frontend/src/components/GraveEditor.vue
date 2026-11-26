@@ -31,6 +31,7 @@ import CorrectionsDialog, { type CorrectionRow } from "./CorrectionsDialog.vue";
 import GraveBillingPreview from "./GraveBillingPreview.vue";
 import GraveHandOverDialog from "./GraveHandOverDialog.vue";
 import LineEditor from "./LineEditor.vue";
+import RecipientCard from "./RecipientCard.vue";
 import RecipientPicker from "./RecipientPicker.vue";
 
 const props = defineProps<{
@@ -85,7 +86,17 @@ const title = computed(() =>
 );
 const cemeteries = useCemeteriesQuery();
 const lines = ref<DraftLine[]>([]);
-const recipients = ref<{ id: number; name: string }[]>([]);
+interface GraveRecipient {
+  id: number;
+  number: string;
+  name: string;
+  address: string;
+}
+const recipients = ref<GraveRecipient[]>([]);
+// The recipient being swapped, whose card the picker stands in for, and the id
+// the picker holds.
+const swappingId = ref<number | null>(null);
+const swapPickId = ref<number | null>(null);
 const linkRecipientId = ref<number | null>(null);
 // the recipient behind that id, as the picker knows it
 const linkRecipient = ref<Recipient | null>(null);
@@ -105,6 +116,15 @@ const discard = useDiscardGuard(visible, () => ({
 // closed -- or reopened for another grave, or for a new one -- is dropped:
 // filled in, it turned a new grave into a copy of the old one.
 let opening = 0;
+
+function toGraveRecipient(recipient: Recipient): GraveRecipient {
+  return {
+    id: recipient.Id,
+    number: recipient.Number,
+    name: recipient.Name,
+    address: recipient.Address,
+  };
+}
 
 function fill(grave: GraveDetails): void {
   Object.assign(form, {
@@ -127,10 +147,7 @@ function fill(grave: GraveDetails): void {
       unitPrice: link.UnitPrice,
     }),
   );
-  recipients.value = grave.Recipients.map((link) => ({
-    id: link.Recipient.Id,
-    name: link.Recipient.Name,
-  }));
+  recipients.value = grave.Recipients.map((link) => toGraveRecipient(link.Recipient));
 }
 
 watch(visible, async (open) => {
@@ -161,6 +178,7 @@ watch(visible, async (open) => {
   lines.value = [];
   recipients.value = [];
   linkRecipientId.value = null;
+  stopSwapping();
   if (props.graveId == null) {
     const predecessor = props.successorOf;
     if (predecessor) {
@@ -204,13 +222,47 @@ function addRecipient(): void {
   if (recipient == null || recipient.Id !== linkRecipientId.value) {
     return;
   }
-  recipients.value = [...recipients.value, { id: recipient.Id, name: recipient.Name }];
+  recipients.value = [...recipients.value, toGraveRecipient(recipient)];
   // the picker no longer offers a recipient the grave has
   linkRecipientId.value = null;
 }
 
 function removeRecipient(id: number): void {
+  stopSwapping();
   recipients.value = recipients.value.filter((recipient) => recipient.id !== id);
+}
+
+function startSwapping(id: number): void {
+  swappingId.value = id;
+  swapPickId.value = null;
+}
+
+function stopSwapping(): void {
+  swappingId.value = null;
+  swapPickId.value = null;
+}
+
+/** A pick replaces the recipient at the same position. */
+function swapRecipient(picked: Recipient | null): void {
+  const swapping = swappingId.value;
+  if (swapping == null || picked == null || picked.Id !== swapPickId.value) {
+    return;
+  }
+  recipients.value = recipients.value.map((recipient) =>
+    recipient.id === swapping ? toGraveRecipient(picked) : recipient,
+  );
+  stopSwapping();
+}
+
+/** Escape in the swap picker puts the card back and leaves the drawer open;
+ *  one that only closes the picker's list is the list's own. */
+function onSwapKeydown(event: KeyboardEvent): void {
+  const target = event.target;
+  if (target instanceof HTMLElement && target.getAttribute("aria-expanded") === "true") {
+    return;
+  }
+  event.stopPropagation();
+  stopSwapping();
 }
 
 const items = useItemsQuery(ref(""));
@@ -270,9 +322,6 @@ async function focusFailingInvoice(): Promise<void> {
 
 // The box is fixed once invoices exist: they were split by who bills them.
 const flagLocked = computed(() => stored.value?.HasInvoices === true || props.successorOf != null);
-// The recipients of a grave can change until its first invoice: the invoices
-// were split among them.
-const recipientsEditable = computed(() => props.graveId == null || !stored.value?.HasInvoices);
 
 async function save(): Promise<void> {
   if (form.CemeteryId == null) {
@@ -538,31 +587,56 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
 
       <section class="flex flex-col gap-3">
         <h3 class="m-0 text-base font-semibold">{{ t("graveRecipients") }}</h3>
-        <Message v-if="!recipientsEditable" severity="info" size="small">
-          {{ t("graveRecipientsFixed") }}
-        </Message>
         <ul class="m-0 flex list-none flex-col gap-1 p-0">
           <li
             v-for="recipient in recipients"
             :key="recipient.id"
-            class="flex min-h-10 items-center justify-between rounded-lg border border-surface px-3 py-1"
+            class="flex min-h-10 items-center justify-between gap-2 rounded-lg border border-surface px-3 py-1"
           >
-            <span>{{ recipient.name }}</span>
-            <Button
-              v-if="recipientsEditable"
-              icon="pi pi-times"
-              text
-              rounded
-              severity="danger"
-              :aria-label="t('delete')"
-              @click="removeRecipient(recipient.id)"
-            />
+            <div
+              v-if="swappingId === recipient.id"
+              data-owns-escape
+              class="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+              @keydown.esc="onSwapKeydown"
+            >
+              <RecipientPicker
+                v-model="swapPickId"
+                :input-id="`swapRecipient${recipient.id}`"
+                :exclude="
+                  recipients.filter((other) => other.id !== recipient.id).map((other) => other.id)
+                "
+                class="min-w-0 flex-1"
+                @selected="swapRecipient"
+              />
+              <Button :label="t('cancel')" severity="secondary" text @click="stopSwapping" />
+            </div>
+            <template v-else>
+              <RecipientCard
+                :number="recipient.number"
+                :name="recipient.name"
+                :address="recipient.address"
+              />
+              <div class="flex shrink-0 items-center gap-1">
+                <Button
+                  :label="t('swapRecipient')"
+                  severity="secondary"
+                  text
+                  size="small"
+                  @click="startSwapping(recipient.id)"
+                />
+                <Button
+                  icon="pi pi-times"
+                  text
+                  rounded
+                  severity="danger"
+                  :aria-label="t('delete')"
+                  @click="removeRecipient(recipient.id)"
+                />
+              </div>
+            </template>
           </li>
         </ul>
-        <div
-          v-if="recipientsEditable && recipients.length < MAX_RECIPIENTS"
-          class="flex flex-wrap items-center gap-2"
-        >
+        <div v-if="recipients.length < MAX_RECIPIENTS" class="flex flex-wrap items-center gap-2">
           <!-- the newest recipient by default for the first one only: after an
                add the field stays empty rather than move on to the next -->
           <RecipientPicker
@@ -575,11 +649,7 @@ async function persist(corrections: BillingCorrection[]): Promise<void> {
           />
           <Button :label="t('add')" icon="pi pi-plus" outlined @click="addRecipient" />
         </div>
-        <Message
-          v-if="recipientsEditable && recipients.length >= MAX_RECIPIENTS"
-          severity="info"
-          size="small"
-        >
+        <Message v-if="recipients.length >= MAX_RECIPIENTS" severity="info" size="small">
           {{ t("graveRecipientsMax") }}
         </Message>
       </section>

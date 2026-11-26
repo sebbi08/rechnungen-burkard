@@ -11,7 +11,15 @@ export interface GraveInvoiceDraft {
   warning: string;
   lines: DraftLine[];
   /** How many recipients share the bill: the divisor its prices must split by. */
-  recipients: number;
+  recipientCount: number;
+  /** One per recipient invoice of the half-year, as invoiced. */
+  members: {
+    invoiceId: number;
+    recipientId: number;
+    number: string | null;
+    name: string;
+    address: string;
+  }[];
 }
 
 /** Opens the grave-invoice editor -- or explains why not. One edit revises
@@ -36,7 +44,14 @@ export function useGraveInvoiceEdit() {
       }
       draft.value = {
         invoiceId,
-        recipients: group.Recipients.length,
+        recipientCount: group.Recipients.length,
+        members: group.Recipients.map((recipient) => ({
+          invoiceId: recipient.InvoiceId,
+          recipientId: recipient.Id,
+          number: recipient.Number || null,
+          name: recipient.Name,
+          address: recipient.Address,
+        })),
         warning: t("graveInvoiceEditWarning", [
           halfYearText(group.PeriodYear, group.PeriodHalf),
           group.Recipients.map((recipient) => recipient.Name).join(", "),
