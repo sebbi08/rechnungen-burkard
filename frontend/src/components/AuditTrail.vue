@@ -122,9 +122,13 @@ const hasMore = computed(() => (query.data.value?.total ?? 0) > entries.value.le
             class="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pl-4 text-sm"
           >
             <li v-for="(line, index) in entry.lines" :key="index">
-              <span class="text-muted-color">{{ line.head }}</span>
+              <!-- "Feld: alt → neu"; the spaces are interpolated, since the
+                   template drops whitespace that opens an element -->
+              <span class="text-muted-color"
+                >{{ line.head }}<template v-if="line.parts.length">:</template></span
+              >
               <template v-if="line.parts.length">
-                <span v-if="line.sign"> {{ line.sign }}</span>
+                <template v-if="line.sign">{{ " " }}{{ line.sign }}</template>
                 <template v-for="(part, at) in line.parts" :key="at">
                   {{ " " }}
                   <RouterLink v-if="part.to" :to="part.to" class="text-primary hover:underline">
