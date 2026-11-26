@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -14,17 +15,23 @@ public sealed class GraveInvoiceRevisionService
 {
     private readonly AppDbContext _db;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly DocumentDataBuilder _documentData;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
     public GraveInvoiceRevisionService(
         AppDbContext db,
         InvoiceDocumentFactory documentFactory,
-        IClock clock
+        DocumentDataBuilder documentData,
+        IClock clock,
+        AuditScope audit
     )
     {
         _db = db;
         _documentFactory = documentFactory;
+        _documentData = documentData;
         _clock = clock;
+        _audit = audit;
     }
 
     public async Task<List<Invoice>> CreateAsync(
@@ -122,6 +129,18 @@ public sealed class GraveInvoiceRevisionService
         // the wall-clock here, like the number's year (see InvoiceService)
         var now = _clock.GetLocalNow();
 
+        // the grave's entry names the new revisions; each chain gets its own
+        // entry, compared with the revision it replaces
+        using var audit = _audit.Begin(
+            AuditActions.GraveInvoiceRevised,
+            new Dictionary<string, string>
+            {
+                ["year"] = AuditValues.Int(edited.PeriodYear)!,
+                ["half"] = AuditValues.Int(edited.PeriodHalf)!,
+            }
+        );
+        var graveChanges = new List<AuditChange>();
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var created = new List<Invoice>(siblings.Count);
         for (var r = 0; r < siblings.Count; r++)
@@ -198,8 +217,21 @@ public sealed class GraveInvoiceRevisionService
             revision.Documents = _documentFactory.Build(revision, now);
             await _db.SaveChangesAsync(ct);
             created.Add(revision);
+            audit.Record(
+                new AuditSubject.Invoice(revision.RootId),
+                InvoiceAuditDiff.Revised(
+                    sibling,
+                    _documentData.BilledGross(sibling),
+                    revision,
+                    _documentData.BilledGross(revision)
+                ),
+                AuditActions.InvoiceRevised
+            );
+            graveChanges.Add(InvoiceAuditDiff.InvoiceLink(revision));
         }
 
+        audit.Record(new AuditSubject.Grave(edited.GraveId.Value), graveChanges);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return created;
     }

@@ -162,7 +162,7 @@ public class InvoicesController : ODataController
         var data = _documentData.Build(invoice);
         invoice.NetTotal = data.Share?.NetTotal ?? data.NetTotal;
         invoice.VatTotal = data.Share?.VatTotal ?? data.TotalVat;
-        invoice.GrossTotal = data.Share?.GrossTotal ?? data.GrossTotal;
+        invoice.GrossTotal = DocumentDataBuilder.BilledGross(data);
         return invoice;
     }
 

@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -23,21 +24,27 @@ public sealed class InvoiceService
     private readonly InvoiceNumberService _numbers;
     private readonly LineBuilder _lines;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly DocumentDataBuilder _documentData;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
     public InvoiceService(
         AppDbContext db,
         InvoiceNumberService numbers,
         LineBuilder lines,
         InvoiceDocumentFactory documentFactory,
-        IClock clock
+        DocumentDataBuilder documentData,
+        IClock clock,
+        AuditScope audit
     )
     {
         _db = db;
         _numbers = numbers;
         _lines = lines;
         _documentFactory = documentFactory;
+        _documentData = documentData;
         _clock = clock;
+        _audit = audit;
     }
 
     public async Task<Invoice> CreateAsync(
@@ -59,6 +66,7 @@ public sealed class InvoiceService
         // in: creates at once take turns rather than read the same number. (They
         // used to read it first and retry on the unique index, and a request that
         // lost the race three times in a row came back as a 500.)
+        using var audit = _audit.Begin(AuditActions.InvoiceCreated);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var invoice = await PersistAsync(
             recipient,
@@ -68,6 +76,8 @@ public sealed class InvoiceService
             quoteId: null,
             ct
         );
+        RecordCreated(audit, invoice);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return invoice;
     }
@@ -105,6 +115,12 @@ public sealed class InvoiceService
         RequireAddress(recipient);
         var settings = await _db.GlobalSettings.FirstAsync(ct);
 
+        // after every refusal above, so a refused conversion writes no entry
+        using var audit = _audit.Begin(
+            AuditActions.InvoiceCreatedFromQuote,
+            new Dictionary<string, string> { ["quote"] = latest.QuoteNumber }
+        );
+
         // as quoted, not through LineBuilder: a price or description changed on
         // the item since does not reach the invoice
         var lines = await _db
@@ -133,6 +149,8 @@ public sealed class InvoiceService
             quote.InvoiceId = invoice.Id;
         }
         await _db.SaveChangesAsync(ct);
+        RecordCreated(audit, invoice);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return invoice;
     }
@@ -222,16 +240,25 @@ public sealed class InvoiceService
             Lines = lines,
         };
 
+        using var audit = _audit.Begin(AuditActions.InvoiceRevised);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
         // the chain has exactly one latest revision, and it is now this one
         var superseded = await _db
-            .Invoices.Where(i => i.RootId == edited.RootId && i.IsLatestRevision)
+            .Invoices.Include(i => i.Lines)
+            .Where(i => i.RootId == edited.RootId && i.IsLatestRevision)
             .ToListAsync(ct);
         foreach (var invoice in superseded)
         {
             invoice.IsLatestRevision = false;
         }
+
+        // the Verlauf compares with the revision this one replaces, which need
+        // not be the one that was edited
+        var previous = superseded.MaxBy(i => i.RevisionNumber)
+            ?? throw new InvalidOperationException(
+                $"The invoice chain {edited.RootId} has no latest revision."
+            );
 
         _db.Invoices.Add(revision);
         await _db.SaveChangesAsync(ct);
@@ -239,6 +266,16 @@ public sealed class InvoiceService
         revision.Documents = _documentFactory.Build(revision, now);
 
         await _db.SaveChangesAsync(ct);
+        audit.Record(
+            new AuditSubject.Invoice(revision.RootId),
+            InvoiceAuditDiff.Revised(
+                previous,
+                _documentData.BilledGross(previous),
+                revision,
+                _documentData.BilledGross(revision)
+            )
+        );
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return revision;
     }
@@ -262,16 +299,21 @@ public sealed class InvoiceService
             );
         }
 
-        if (paid)
+        // marked as it already is: nothing changes, and nothing is recorded
+        if ((invoice.PaidOn is not null) == paid)
         {
-            invoice.PaidOn ??= DateOnly.FromDateTime(_clock.GetLocalNow());
-        }
-        else
-        {
-            invoice.PaidOn = null;
+            return invoice;
         }
 
+        using var audit = _audit.Begin(
+            paid ? AuditActions.InvoicePaid : AuditActions.InvoiceUnpaid
+        );
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        invoice.PaidOn = paid ? DateOnly.FromDateTime(_clock.GetLocalNow()) : null;
         await _db.SaveChangesAsync(ct);
+        RecordPaid(audit, invoice, paid);
+        await audit.CompleteAsync(ct);
+        await tx.CommitAsync(ct);
         return invoice;
     }
 
@@ -295,13 +337,51 @@ public sealed class InvoiceService
             );
         }
 
-        var today = DateOnly.FromDateTime(_clock.GetLocalNow());
-        foreach (var invoice in invoices)
+        // one that is paid already keeps its day and records nothing
+        var unpaid = invoices.Where(i => i.PaidOn is null).OrderBy(i => i.Id).ToList();
+        if (unpaid.Count == 0)
         {
-            invoice.PaidOn ??= today;
+            return;
+        }
+
+        using var audit = _audit.Begin(AuditActions.InvoicePaid);
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var today = DateOnly.FromDateTime(_clock.GetLocalNow());
+        foreach (var invoice in unpaid)
+        {
+            invoice.PaidOn = today;
+            RecordPaid(audit, invoice, true);
         }
 
         await _db.SaveChangesAsync(ct);
+        await audit.CompleteAsync(ct);
+        await tx.CommitAsync(ct);
+    }
+
+    private void RecordCreated(AuditAction audit, Invoice invoice) =>
+        audit.Record(
+            new AuditSubject.Invoice(invoice.RootId),
+            InvoiceAuditDiff.Created(invoice, _documentData.BilledGross(invoice))
+        );
+
+    /// <summary>On the chain, and on the grave of a grave invoice, where the
+    /// change names the invoice: one grave entry gathers every invoice of the
+    /// grave the action marks.</summary>
+    private static void RecordPaid(AuditAction audit, Invoice invoice, bool paid)
+    {
+        var old = AuditValues.Bool(!paid);
+        var @new = AuditValues.Bool(paid);
+        audit.Record(
+            new AuditSubject.Invoice(invoice.RootId),
+            [new AuditChange("paid", null, old, @new, "bool")]
+        );
+        if (invoice.GraveId is { } graveId)
+        {
+            audit.Record(
+                new AuditSubject.Grave(graveId),
+                [new AuditChange("paid", invoice.InvoiceNumber, old, @new, "bool")]
+            );
+        }
     }
 
     private static void RequireAddress(Recipient recipient)

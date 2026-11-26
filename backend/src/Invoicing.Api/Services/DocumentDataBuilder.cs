@@ -82,6 +82,16 @@ public sealed class DocumentDataBuilder
         };
     }
 
+    /// <summary>The gross the invoice bills: the recipient's share on a grave
+    /// invoice, the whole of it on every other one. The invoice list and the
+    /// Verlauf both read it from here, so they never disagree. Needs the lines
+    /// loaded.</summary>
+    public decimal BilledGross(Invoice invoice) => BilledGross(Build(invoice));
+
+    /// <summary><see cref="BilledGross(Invoice)"/> from data already built.</summary>
+    public static decimal BilledGross(InvoiceDocumentData data) =>
+        data.Share?.GrossTotal ?? data.GrossTotal;
+
     /// <summary>A quote prints as an invoice titled Angebot: the same lines, VAT
     /// block and totals, worked out by the same calculation, and never a stamp,
     /// since a quote has no copy.</summary>

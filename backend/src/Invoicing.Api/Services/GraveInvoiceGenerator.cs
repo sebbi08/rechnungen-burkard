@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -10,19 +11,25 @@ public sealed class GraveInvoiceGenerator
     private readonly AppDbContext _db;
     private readonly InvoiceNumberService _numbers;
     private readonly InvoiceDocumentFactory _documentFactory;
+    private readonly DocumentDataBuilder _documentData;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
     public GraveInvoiceGenerator(
         AppDbContext db,
         InvoiceNumberService numbers,
         InvoiceDocumentFactory documentFactory,
-        IClock clock
+        DocumentDataBuilder documentData,
+        IClock clock,
+        AuditScope audit
     )
     {
         _db = db;
         _numbers = numbers;
         _documentFactory = documentFactory;
+        _documentData = documentData;
         _clock = clock;
+        _audit = audit;
     }
 
     /// <summary>Generates all invoices for one grave and half-year in a single
@@ -138,6 +145,17 @@ public sealed class GraveInvoiceGenerator
         // the wall-clock here, like the number's year (see InvoiceService)
         var now = _clock.GetLocalNow();
 
+        // a skipped grave has returned by now, so it writes no entry; the
+        // grave's entry names the invoices, each new chain gets its own
+        using var audit = _audit.Begin(
+            AuditActions.GraveInvoicesGenerated,
+            new Dictionary<string, string>
+            {
+                ["year"] = AuditValues.Int(year)!,
+                ["half"] = AuditValues.Int(half)!,
+            }
+        );
+
         // No retry around the numbers, as in InvoiceService.CreateAsync: SQLite
         // opens this transaction with BEGIN IMMEDIATE, so it holds the write lock
         // from here on, and no other connection can insert an invoice between
@@ -194,7 +212,17 @@ public sealed class GraveInvoiceGenerator
             invoice.Documents = _documentFactory.Build(invoice, now);
             await _db.SaveChangesAsync(ct);
             invoices.Add(invoice);
+            audit.Record(
+                new AuditSubject.Invoice(invoice.RootId),
+                InvoiceAuditDiff.Created(invoice, _documentData.BilledGross(invoice)),
+                AuditActions.InvoiceCreated
+            );
         }
+
+        audit.Record(
+            new AuditSubject.Grave(grave.Id),
+            invoices.Select(InvoiceAuditDiff.InvoiceLink).ToList()
+        );
 
         _db.GraveInvoiceRuns.Add(
             new GraveInvoiceRun
@@ -206,6 +234,7 @@ public sealed class GraveInvoiceGenerator
             }
         );
         await _db.SaveChangesAsync(ct);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return new GraveGenerationResult(invoices, null);
     }
