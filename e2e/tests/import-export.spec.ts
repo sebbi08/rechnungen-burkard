@@ -245,7 +245,8 @@ test("an archive with e-mail addresses, grave prices and an old position imports
 
   // the detail page names the position and shows the e-mail address
   await page.goto(`/graves/${graveId}`);
-  await expect(page.getByText("Rasen-Urnengrab außen")).toBeVisible();
+  // exact: the Verlauf names the position too
+  await expect(page.getByText("Rasen-Urnengrab außen", { exact: true })).toBeVisible();
   await expect(page.getByRole("table").filter({ hasText: "Anna Altbestand" })).toContainText(email);
 
   // the editor keeps the position beside the six it offers, and saves it unchanged
@@ -258,7 +259,8 @@ test("an archive with e-mail addresses, grave prices and an old position imports
   await expect(page.locator(".p-select-overlay").getByRole("option")).toHaveCount(7);
   await pickOption(page, position, "Rasen-Urnengrab außen");
   await saveEditor(editor);
-  await expect(page.getByText("Rasen-Urnengrab außen")).toBeVisible();
+  // exact: the Verlauf names the position too
+  await expect(page.getByText("Rasen-Urnengrab außen", { exact: true })).toBeVisible();
 
   // a new grave is offered the six alone
   await page.goto("/graves");

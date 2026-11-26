@@ -108,21 +108,37 @@ test("create an invoice with a mandatory price and open its document (Story 4, 8
   expect(disposition).not.toContain("Kopie");
 });
 
-test("a recipient suggestion shows the first line of the address (Story 3)", async ({ page }) => {
-  const { recipientName } = await seedMasterData(page);
+test("the invoice editor shows the recipient's number and full address", async ({ page }) => {
+  const name = `Adresse ${unique()}`;
+  const recipient = await createRow(page, "/odata/Recipients", {
+    Name: name,
+    Address: "Musterstraße 1\n12345 Musterstadt",
+  });
+  const label = `${recipient.Number} · ${name}`;
   await page.goto("/invoices");
   await openNewInvoice(page);
 
+  // every option names the recipient by number and name, with every line of
+  // the address under it: an address runs over as many lines as the user typed
   await page.locator(`#${RECIPIENT}`).click();
   const overlay = page.locator(".p-select-overlay");
-  await overlay.locator("input.p-select-filter").fill(recipientName);
-
-  // the recipient is seeded with "Musterstraße 1\n12345 Musterstadt", so this
-  // also pins that the secondary value is the first line and not the whole
-  // address — an address runs over as many lines as the user typed
-  const option = overlay.getByRole("option", { name: recipientName });
+  await overlay.locator("input.p-select-filter").fill(name);
+  const option = overlay.getByRole("option", { name, exact: true });
+  await expect(option).toContainText(label);
   await expect(option).toContainText("Musterstraße 1");
-  await expect(option).not.toContainText("12345 Musterstadt");
+  await expect(option).toContainText("12345 Musterstadt");
+  await page.locator(`#${RECIPIENT}`).click();
+  await expect(overlay).toHaveCount(0);
+
+  // the pick shows as number and name, and its full address stands under the field
+  await pickRecipient(page, RECIPIENT, name);
+  const editor = drawer(page);
+  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(label);
+  const card = editor.getByTestId("recipient-card");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText(label);
+  await expect(card).toContainText("Musterstraße 1");
+  await expect(card).toContainText("12345 Musterstadt");
 });
 
 test("the recipient picker offers the newest twenty and searches the rest", async ({ page }) => {
@@ -255,7 +271,8 @@ test("create invoice with an on-the-fly recipient (Story 3.2)", async ({ page })
   // the dialog closes without leaving the invoice editor, which now shows the
   // newly created recipient as selected
   await expect(quickDialog).toHaveCount(0);
-  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(quickName);
+  // with the number the server gave it
+  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(new RegExp(`^E-\\d+ · ${quickName}$`));
 
   await pickItem(page, 1, itemNumber);
   await fillNumber(drawer(page).getByRole("spinbutton", { name: "Preis 1" }), "120");
@@ -296,7 +313,7 @@ test("editing an invoice creates a revision with -R1 number and badge (Story 9)"
   await waitForOverlayOpen(page);
   const editor = drawer(page);
   // the editor opens on the invoice as it is
-  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(recipientName);
+  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(`${recipient.Number} · ${recipientName}`);
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("100,00");
   await fillNumber(editor.getByRole("spinbutton", { name: "Anzahl 1" }), "3");
   await fillNumber(editor.getByRole("spinbutton", { name: "Preis 1" }), "150");
@@ -440,8 +457,8 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   // landing between this draft opening and the check below would make the
   // right recipient look like the wrong one. The draft's default is the first
   // entry of the list the picker loads, so the first entry of every list it
-  // loads is noted, with the name it had then.
-  const listed: Promise<{ Id: number; Name: string } | undefined>[] = [];
+  // loads is noted, with the number and name it had then, which the field shows.
+  const listed: Promise<{ Id: number; Number: string | null; Name: string } | undefined>[] = [];
   page.on("response", (response) => {
     const url = new URL(response.url());
     if (
@@ -461,7 +478,11 @@ test("the second invoice goes to the recipient the reopened editor shows", async
   await openNewInvoice(page);
   const shown = (await page.locator(`#${RECIPIENT}`).innerText()).trim();
   expect(shown).not.toBe("");
-  const onScreen = (await Promise.all(listed)).reverse().find((first) => first?.Name === shown);
+  const onScreen = (await Promise.all(listed))
+    .reverse()
+    .find(
+      (first) => first && (first.Number ? `${first.Number} · ${first.Name}` : first.Name) === shown,
+    );
   expect(onScreen, "the recipient shown is the newest of a list the editor loaded").toBeDefined();
 
   await fillLine(page, itemNumber);

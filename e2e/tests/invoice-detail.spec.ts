@@ -43,7 +43,8 @@ test("the detail page shows every revision of an invoice", async ({ page }) => {
 
   // the chain's number heads the page, without the revision suffix
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(created.InvoiceNumber);
-  await expect(page.getByText(RECIPIENT_NAME)).toBeVisible();
+  // exact: the Verlauf names the recipient too, after their number
+  await expect(page.getByText(RECIPIENT_NAME, { exact: true })).toBeVisible();
 
   // the original and its revision are both on the page, newest first
   const headers = page.locator(".p-accordionheader");

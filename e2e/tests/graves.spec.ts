@@ -194,6 +194,38 @@ async function addRecipient(page: Page, editor: Locator, name: string): Promise<
   await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
 }
 
+/** A recipient's entry in the grave editor's list, by their name. */
+function recipientItem(editor: Locator, name: string): Locator {
+  return editor.getByRole("listitem").filter({ hasText: name });
+}
+
+/**
+ * Picks a recipient in a swap picker of the grave editor. The picker gives way
+ * to the new recipient's card as soon as the pick lands, so pickOption, which
+ * waits for the field to show the pick, does not fit; this makes the pick again
+ * the same way until the picker has gone.
+ */
+async function swapTo(page: Page, picker: Locator, name: string): Promise<void> {
+  const overlay = page.locator(".p-select-overlay");
+  const step = { timeout: 3000 };
+  await expect(async () => {
+    if (!(await overlay.isVisible())) {
+      await picker.click(step);
+    }
+    await expect(overlay).toBeVisible(step);
+    await expect(overlay).not.toHaveClass(/p-connected-overlay-enter-active/, step);
+    await overlay.locator("input.p-select-filter").fill(name, step);
+    await overlay.getByRole("option", { name, exact: true }).click(step);
+    await expect(overlay).toHaveCount(0, step);
+    await expect(picker).toHaveCount(0, step);
+  }).toPass({ timeout: 30_000 });
+}
+
+/** The rows of the grave detail page's recipient table. */
+function graveRecipientRows(page: Page): Locator {
+  return card(page, "Empfänger").locator("tbody tr");
+}
+
 /** A cooperative grave with one all-year item and no recipient, the way a save
  *  without any stores it; `startDate` and `endDate` as in `term`. */
 async function seedCooperativeGrave(
@@ -247,6 +279,39 @@ test("a recipient added to a grave is no longer offered for it", async ({ page }
   await overlay.locator("input.p-select-filter").fill(street);
   await expect(overlay.getByRole("option", { name: second })).toHaveCount(1);
   await expect(overlay.getByRole("option", { name: first })).toHaveCount(0);
+  // closed by the field that opened it, as a click would
+  await picker.click();
+  await expect(overlay).toHaveCount(0);
+
+  // nor does the picker that swaps a recipient offer one the grave already has
+  await addRecipient(page, editor, second);
+  await recipientItem(editor, first).getByRole("button", { name: "Austauschen" }).click();
+  const swap = editor.getByRole("combobox", { name: `Empfänger für ${first}` });
+  await swap.click();
+  await expect(overlay).toBeVisible();
+  await overlay.locator("input.p-select-filter").fill(street);
+  await expect(overlay.getByRole("option", { name: first })).toHaveCount(1);
+  await expect(overlay.getByRole("option", { name: second })).toHaveCount(0);
+});
+
+test("the recipient search is empty again after adding a recipient", async ({ page }) => {
+  const marker = `GQ-${unique()}`;
+  const name = `Suche ${marker}`;
+  await createRow(page, "/odata/Recipients", { Name: name, Address: "Suchweg 1" });
+  await page.goto("/graves");
+  const editor = await startNewGrave(page, marker);
+  // searched for by name, picked and added
+  await addRecipient(page, editor, name);
+
+  // Opened again, the list starts on the newest recipients with an empty
+  // search field. A search left behind would find nothing now: its only hit
+  // is on the grave and no longer offered.
+  await page.locator(`#${RECIPIENT}`).click();
+  const overlay = page.locator(".p-select-overlay");
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator("input.p-select-filter")).toHaveValue("");
+  await expect(overlay.getByRole("option").first()).toBeVisible();
+  await expect(overlay.getByRole("option", { name })).toHaveCount(0);
 });
 
 test("a cooperative grave is saved without recipients and items", async ({ page }) => {
@@ -464,24 +529,79 @@ test("an item without a default price needs an explicit price (Story 6)", async 
   expect(Number(links.value[0].UnitPrice)).toBe(40);
 });
 
-test("editing a grave warns about future invoices and, once invoiced, freezes its recipients", async ({
+test("an invoiced grave warns about future invoices and takes another recipient", async ({
   page,
 }) => {
   const marker = `GF-${unique()}`;
-  const name = `Fest ${marker}`;
+  const anna = `Anna ${marker}`;
   // its own period, so the invoice below belongs to this test alone
-  const { graveId } = await seedGrave(page, marker, [name], [{}], term(2034, 2));
+  const { graveId } = await seedGrave(page, marker, [anna], [{}], term(2034, 2));
   await generateFor(page, 2034, 2);
+  const bernd = await createRow(page, "/odata/Recipients", {
+    Name: `Bernd ${marker}`,
+    Address: "Bachgasse 3\n97070 Würzburg",
+  });
 
   const editor = await editGraveOnItsPage(page, graveId);
   await expect(editor).toContainText("nur auf künftig erstellte Rechnungen");
-  await expect(editor).toContainText("Die Empfänger eines Grabs");
-  // the recipient stays visible but cannot be removed or added to; the line
-  // editor has its own "Zeile löschen" and "Zeile hinzufügen", hence exact names
-  await expect(editor.getByRole("listitem").filter({ hasText: name })).toBeVisible();
-  await expect(editor.getByRole("button", { name: "Hinzufügen", exact: true })).toHaveCount(0);
-  await expect(editor.getByRole("button", { name: "Löschen", exact: true })).toHaveCount(0);
-  await expect(editor.locator(`#${RECIPIENT}`)).toHaveCount(0);
+  // the recipients stay open to change, invoice or not
+  await expect(editor).not.toContainText("Die Empfänger eines Grabs");
+  await addRecipient(page, editor, bernd.Name);
+  // the card names him by number and name, over every line of his address
+  const added = recipientItem(editor, bernd.Name).getByTestId("recipient-card");
+  await expect(added).toContainText(`${bernd.Number} · ${bernd.Name}`);
+  await expect(added).toContainText("Bachgasse 3");
+  await expect(added).toContainText("97070 Würzburg");
+  await saveEditor(editor);
+
+  // saved: the grave has both, and the invoice already issued keeps its one recipient
+  await expect(graveRecipientRows(page)).toHaveCount(2);
+  await expect(graveRecipientRows(page).filter({ hasText: bernd.Name })).toHaveCount(1);
+  await expect(graveInvoiceRows(page)).toHaveCount(1);
+  await expect(graveInvoiceRows(page)).toContainText(anna);
+  await expect(graveInvoiceRows(page)).not.toContainText(bernd.Name);
+});
+
+test("a recipient is swapped in the grave editor", async ({ page }) => {
+  const marker = `GS-${unique()}`;
+  const [anna, bernd] = [`Anna ${marker}`, `Bernd ${marker}`];
+  // a term nobody generates: the grave has no invoices
+  const { graveId } = await seedGrave(page, marker, [anna, bernd], [{}], term(2044, 2));
+  const carla = await createRow(page, "/odata/Recipients", {
+    Name: `Carla ${marker}`,
+    Address: "Lindenweg 5\n97080 Würzburg",
+  });
+
+  const editor = await editGraveOnItsPage(page, graveId);
+  const swapButton = (name: string) =>
+    recipientItem(editor, name).getByRole("button", { name: "Austauschen" });
+  const picker = editor.getByRole("combobox", { name: `Empfänger für ${anna}` });
+
+  // Escape in the swap picker puts the card back and leaves the editor open
+  await swapButton(anna).click();
+  await expect(picker).toBeFocused();
+  await picker.press("Escape");
+  await expect(picker).toHaveCount(0);
+  await expect(swapButton(anna)).toBeFocused();
+  await expect(editor).toBeVisible();
+
+  // a pick takes the swapped recipient's place, and focus stays in the list
+  await swapButton(anna).click();
+  await swapTo(page, picker, carla.Name);
+  const cards = editor.getByTestId("recipient-card");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0)).toContainText(`${carla.Number} · ${carla.Name}`);
+  await expect(cards.nth(0)).toContainText("Lindenweg 5");
+  await expect(cards.nth(1)).toContainText(bernd);
+  await expect(editor).not.toContainText(anna);
+  await expect(swapButton(carla.Name)).toBeFocused();
+  await saveEditor(editor);
+
+  // saved: Carla and Bernd, and Anna no longer
+  await expect(graveRecipientRows(page)).toHaveCount(2);
+  await expect(graveRecipientRows(page).filter({ hasText: carla.Name })).toHaveCount(1);
+  await expect(graveRecipientRows(page).filter({ hasText: bernd })).toHaveCount(1);
+  await expect(graveRecipientRows(page).filter({ hasText: anna })).toHaveCount(0);
 });
 
 /**
@@ -605,6 +725,61 @@ test("editing a grave invoice revises every recipient", async ({ page }) => {
   await expect(graveInvoiceRows(page)).toHaveCount(2);
   await expect(graveInvoiceRows(page).filter({ hasText: "R1" })).toHaveCount(2);
   await expect(graveInvoiceRows(page).filter({ hasText: "107,00 €" })).toHaveCount(2);
+});
+
+test("a grave invoice's recipient is swapped on revision", async ({ page }) => {
+  const marker = `GW-${unique()}`;
+  const names = [`Anna ${marker}`, `Bernd ${marker}`];
+  const { graveId } = await seedGrave(page, marker, names, [{}], term(2042, 1));
+  const carla = await createRow(page, "/odata/Recipients", {
+    Name: `Carla ${marker}`,
+    Address: "Lindenweg 5\n97080 Würzburg",
+  });
+
+  // its own period, so the rows below belong to this test alone
+  await generateFor(page, 2042, 1);
+
+  await page.goto(`/graves/${graveId}`);
+  await expect(graveInvoiceRows(page)).toHaveCount(2);
+  await graveInvoiceRows(page)
+    .filter({ hasText: names[0] })
+    .getByRole("button", { name: "Bearbeiten" })
+    .click();
+  await waitForOverlayOpen(page);
+
+  // every recipient of the half-year has a picker, preset to them
+  const editor = drawer(page);
+  const memberPicker = (name: string) =>
+    editor.getByRole("combobox", { name: new RegExp(`^Empfänger für E-\\d+ · ${name}$`) });
+  await expect(memberPicker(names[0])).toContainText(names[0]);
+  await expect(memberPicker(names[1])).toContainText(names[1]);
+  await pickOption(page, memberPicker(names[0]), carla.Name, { filter: carla.Name });
+  await saveEditor(editor);
+
+  // both invoices moved to R1: Anna's now goes to Carla, Bernd's stays his
+  await expect(graveInvoiceRows(page)).toHaveCount(2);
+  await expect(graveInvoiceRows(page).filter({ hasText: "R1" })).toHaveCount(2);
+  await expect(graveInvoiceRows(page).filter({ hasText: carla.Name })).toHaveCount(1);
+  await expect(graveInvoiceRows(page).filter({ hasText: names[1] })).toHaveCount(1);
+  await expect(graveInvoiceRows(page).filter({ hasText: names[0] })).toHaveCount(0);
+
+  // the swapped invoice's page shows Carla, and its Verlauf the swap
+  await graveInvoiceRows(page)
+    .filter({ hasText: carla.Name })
+    .getByRole("button", { name: rowAction("Details") })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/graves/${graveId}/invoices/\\d+$`));
+  await expect(page.getByText(carla.Name, { exact: true })).toBeVisible();
+  const revised = page.getByTestId("audit-entry").first();
+  await expect(revised).toContainText("Rechnung überarbeitet");
+  await expect(revised).toContainText(`${names[0]} → ${carla.Number} ${carla.Name}`);
+
+  // the sibling keeps its recipient
+  await card(page, "Weitere Empfänger").getByRole("link", { name: names[1] }).click();
+  await expect(page.getByText(names[1], { exact: true })).toBeVisible();
+  await expect(
+    card(page, "Weitere Empfänger").getByRole("link", { name: carla.Name }),
+  ).toBeVisible();
 });
 
 test("a grave invoice's detail page shows its revisions and its siblings", async ({ page }) => {
@@ -2075,7 +2250,8 @@ test.describe("the half-year today falls in", () => {
 
     // ... and the predecessor ends the month before it
     await page.goto(`/graves/${graveId}`);
-    await expect(page.getByText(lastMonth)).toBeVisible();
+    // exact: the Verlauf records the new end as well
+    await expect(page.getByText(lastMonth, { exact: true })).toBeVisible();
   });
 });
 

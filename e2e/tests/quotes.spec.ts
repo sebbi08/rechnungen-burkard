@@ -25,6 +25,7 @@ const RECIPIENT = "invoiceRecipient";
 async function seedMasterData(page: Page): Promise<{
   recipientName: string;
   recipientId: number;
+  recipientNumber: string;
   itemNumber: string;
   itemId: number;
 }> {
@@ -42,7 +43,13 @@ async function seedMasterData(page: Page): Promise<{
     Name: recipientName,
     Address: "Musterstraße 1\n12345 Musterstadt",
   });
-  return { recipientName, recipientId: recipient.Id, itemNumber, itemId: item.Id };
+  return {
+    recipientName,
+    recipientId: recipient.Id,
+    recipientNumber: recipient.Number,
+    itemNumber,
+    itemId: item.Id,
+  };
 }
 
 /** A seeded quote of one line, 1 × 100,00 net, and its master data. */
@@ -122,7 +129,7 @@ test("create a quote and open its PDF", async ({ page }) => {
 });
 
 test("editing a quote makes a revision", async ({ page }) => {
-  const { recipientName, number } = await seedOneQuote(page);
+  const { recipientName, recipientNumber, number } = await seedOneQuote(page);
   const row = await openListFor(page, number);
   await expect(row.getByText("R1", { exact: true })).toHaveCount(0);
 
@@ -130,8 +137,9 @@ test("editing a quote makes a revision", async ({ page }) => {
   await waitForOverlayOpen(page);
   const editor = drawer(page);
   await expect(editor).toContainText("Angebot bearbeiten");
-  // the editor opens on the quote as it is
-  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(recipientName);
+  // the editor opens on the quote as it is; the field names the recipient by
+  // number and name
+  await expect(page.locator(`#${RECIPIENT}`)).toHaveText(`${recipientNumber} · ${recipientName}`);
   await expect(editor.getByRole("spinbutton", { name: "Preis 1" })).toHaveValue("100,00");
   await fillNumber(editor.getByRole("spinbutton", { name: "Anzahl 1" }), "3");
   await saveEditor(editor);

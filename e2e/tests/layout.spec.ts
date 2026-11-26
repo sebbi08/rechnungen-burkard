@@ -601,7 +601,8 @@ async function expectPickerGetsTheWidth(page: Page, recipientPicker: string): Pr
   const editor = drawer(page);
   const rem = await remInPixels(page);
   const picker = page.locator(`#${recipientPicker}`);
-  await expect(picker).toHaveText(RECIPIENT_NAME);
+  // the field shows the recipient's number before the name
+  await expect(picker).toHaveText(new RegExp(` · ${RECIPIENT_NAME}$`));
   const pickerSelect = editor.locator(".p-select", { has: page.locator(`#${recipientPicker}`) });
   expect(await widthOf(pickerSelect), "the recipient picker is squeezed").toBeGreaterThan(
     Math.min(20 * rem, (await widthOf(editor)) * 0.8),
@@ -777,6 +778,66 @@ test("the grave detail page fits the viewport", async ({ page }) => {
   await expect(page.getByRole("group", { name: /^Volles H[12]$/ }).first()).toBeVisible();
   await expectHeaderActionsFit(page);
   await expectNoSidewaysScrolling(page);
+});
+
+/** On screen from edge to edge, and nothing inside it runs past its own edge:
+ *  a card keeps its width while a long word sticks out of it. */
+async function expectFitsTheScreen(page: Page, locator: Locator, what: string): Promise<void> {
+  const viewport = page.viewportSize()!;
+  const box = (await locator.boundingBox())!;
+  expect(box.x, what).toBeGreaterThanOrEqual(-1);
+  expect(box.x + box.width, what).toBeLessThanOrEqual(viewport.width + 1);
+  const overflow = await locator.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow, `${what} overflows`).toBeLessThanOrEqual(1);
+}
+
+// The seeded grave's creation is in its Verlauf with every value it started
+// with, the long grave and item numbers among them, and its recipient has a
+// long name and an address of two lines.
+test("the Verlauf and the recipient cards fit the viewport", async ({ page }) => {
+  const { invoiceRootId } = await seed(page);
+  const graves = await (
+    await page.request.get(`/odata/Graves?$filter=GraveNumber eq '${GRAVE_NUMBER}'&$select=Id`)
+  ).json();
+
+  await page.goto(`/graves/${graves.value[0].Id}`);
+  const graveTrail = page.getByTestId("audit-trail");
+  // generations of other tests add entries above it as they invoice the grave
+  await expect(
+    graveTrail.getByTestId("audit-entry").filter({ hasText: "Grab angelegt" }),
+  ).toContainText(GRAVE_NUMBER);
+  // the billing preview, the widest part of the page, comes in last
+  await expect(page.getByRole("group", { name: /^Volles H[12]$/ }).first()).toBeVisible();
+  await expectFitsTheScreen(page, graveTrail, "the grave's Verlauf");
+  await expectNoSidewaysScrolling(page);
+
+  await page.getByRole("button", { name: "Grab bearbeiten" }).click();
+  await waitForOverlayOpen(page);
+  const editor = drawer(page);
+  const recipient = editor.getByRole("listitem").filter({ hasText: RECIPIENT_NAME });
+  await expect(recipient.getByTestId("recipient-card")).toContainText("12345 Musterstadt");
+  await expectFitsTheScreen(page, recipient, "the grave editor's recipient card");
+  for (const name of ["Austauschen", "Löschen"]) {
+    await expectFitsTheScreen(page, recipient.getByRole("button", { name }), name);
+  }
+  await expectNoSidewaysScrolling(page);
+  await editor.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(editor).toHaveCount(0);
+
+  await page.goto(`/invoices/${invoiceRootId}`);
+  const invoiceTrail = page.getByTestId("audit-trail");
+  await expect(invoiceTrail.getByTestId("audit-entry").first()).toContainText(ITEM_NUMBER);
+  await expectFitsTheScreen(page, invoiceTrail, "the invoice's Verlauf");
+  await expectNoSidewaysScrolling(page);
+
+  await page.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  await waitForOverlayOpen(page);
+  const card = drawer(page).getByTestId("recipient-card");
+  await expect(card).toContainText("12345 Musterstadt");
+  await expectFitsTheScreen(page, card, "the invoice editor's recipient card");
+  await expectNoSidewaysScrolling(page);
+  await drawer(page).getByRole("button", { name: "Abbrechen" }).click();
+  await expect(drawer(page)).toHaveCount(0);
 });
 
 test("settings: the form, the VAT rate row and the cemeteries fit the viewport", async ({
