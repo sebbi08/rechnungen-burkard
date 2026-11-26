@@ -34,6 +34,13 @@ public sealed class AppDbContext : DbContext
         // without foreign keys, so an entry never blocks or cascades a write
         mb.Entity<AuditEntry>().HasIndex(e => e.GraveId);
         mb.Entity<AuditEntry>().HasIndex(e => e.InvoiceRootId);
+        // written as UTC, but SQLite hands a DateTime back without a kind, and
+        // OData serialises one without a kind with the server's offset (the
+        // image runs in Europe/Berlin): 13:32 UTC would be served as 13:32+01:00.
+        // Same column type either way, so no migration.
+        mb.Entity<AuditEntry>()
+            .Property(e => e.OccurredAt)
+            .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
         mb.Entity<VatRate>().HasIndex(v => v.Rate).IsUnique();
         mb.Entity<InvoiceItem>().HasIndex(i => i.Number).IsUnique();
         mb.Entity<Recipient>().HasIndex(r => r.Number).IsUnique();
