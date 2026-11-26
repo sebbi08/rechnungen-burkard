@@ -11,6 +11,7 @@ import { RouterLink } from "vue-router";
 import { fetchGraveDetails, fetchGraveInvoiceGroup } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadChain } from "@/api/queries";
+import AuditTrail from "@/components/AuditTrail.vue";
 import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
@@ -150,6 +151,7 @@ const halfYear = computed(() =>
     </Card>
 
     <RevisionList :revisions="revisions" kind="invoice" />
+    <AuditTrail :invoice-root-id="rootId" />
   </div>
 
   <GraveInvoiceEditor v-model:visible="editorOpen" :draft="draft" />

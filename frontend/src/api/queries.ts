@@ -406,3 +406,33 @@ export async function fetchOpenGraveInvoices(graveId: number): Promise<Invoice[]
     return response.data.value;
   });
 }
+
+/** A grave's or an invoice chain's Verlauf, newest first: the first `top`
+ *  entries and how many there are in all. No subject, no query. */
+export function useAuditEntriesQuery(
+  subject: Ref<{ graveId: number } | { invoiceRootId: number } | null>,
+  top: Ref<number>,
+) {
+  return useQuery({
+    queryKey: ["audit", subject, top],
+    enabled: () => subject.value != null,
+    queryFn: async () => {
+      const target = subject.value!;
+      const response = await odata
+        .AuditEntries()
+        .query((b, q) => {
+          b.filter(
+            "graveId" in target
+              ? q.GraveId.eq(target.graveId)
+              : q.InvoiceRootId.eq(target.invoiceRootId),
+          )
+            .orderBy(q.OccurredAt.desc(), q.Id.desc())
+            .top(top.value)
+            .count();
+        })
+        .execute();
+      return { rows: response.data.value, total: response.data["@odata.count"] ?? 0 };
+    },
+    placeholderData: keepPreviousData,
+  });
+}

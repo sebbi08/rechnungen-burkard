@@ -1,0 +1,151 @@
+<script setup lang="ts">
+import Button from "primevue/button";
+import Card from "primevue/card";
+import Message from "primevue/message";
+import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { RouterLink } from "vue-router";
+import { useAuditEntriesQuery } from "@/api/queries";
+import {
+  type AuditChange,
+  auditActionText,
+  auditChangeHead,
+  formatAuditValue,
+  parseChanges,
+  parseDetails,
+  parseInvoiceValue,
+} from "@/lib/audit";
+import { formatDateTime } from "@/lib/format";
+
+/** The Verlauf of a grave or of an invoice chain, newest first. */
+const props = defineProps<{ graveId?: number; invoiceRootId?: number }>();
+const { t } = useI18n();
+
+const STEP = 20;
+const top = ref(STEP);
+const subject = computed(() =>
+  props.graveId != null
+    ? { graveId: props.graveId }
+    : props.invoiceRootId != null
+      ? { invoiceRootId: props.invoiceRootId }
+      : null,
+);
+const query = useAuditEntriesQuery(subject, top);
+
+interface ValuePart {
+  text: string;
+  /** Where the value links to, for an invoice. */
+  to?: string;
+}
+
+interface ChangeLine {
+  head: string;
+  /** "+" for an added value, "−" for a removed one. */
+  sign: string;
+  /** The old value, an arrow and the new one, or the one value there is. */
+  parts: ValuePart[];
+}
+
+/** An invoice value links to the invoice's page: the grave's, where the entry
+ *  belongs to one. */
+function valuePart(change: AuditChange, value: string | null, graveId: number | null): ValuePart {
+  const text = formatAuditValue(change, value, t);
+  const invoice = change.Type === "invoice" && value != null ? parseInvoiceValue(value) : null;
+  if (!invoice) {
+    return { text };
+  }
+  return {
+    text,
+    to:
+      graveId != null
+        ? `/graves/${graveId}/invoices/${invoice.rootId}`
+        : `/invoices/${invoice.rootId}`,
+  };
+}
+
+function changeLine(change: AuditChange, graveId: number | null): ChangeLine {
+  const head = auditChangeHead(change, t);
+  // a missing end is a value ("ohne Ende"), not an absent one
+  const open = change.Field === "end";
+  if (change.Old == null && change.New == null) {
+    return { head, sign: "", parts: [] };
+  }
+  if (change.Old == null && !open) {
+    return { head, sign: "+", parts: [valuePart(change, change.New, graveId)] };
+  }
+  if (change.New == null && !open) {
+    return { head, sign: "−", parts: [valuePart(change, change.Old, graveId)] };
+  }
+  return {
+    head,
+    sign: "",
+    parts: [
+      valuePart(change, change.Old, graveId),
+      { text: "→" },
+      valuePart(change, change.New, graveId),
+    ],
+  };
+}
+
+const entries = computed(() =>
+  (query.data.value?.rows ?? []).map((entry) => ({
+    id: entry.Id,
+    // the API serialises the UTC instant with its offset, but be safe without one
+    when: formatDateTime(
+      /(Z|[+-]\d\d:?\d\d)$/i.test(entry.OccurredAt) ? entry.OccurredAt : `${entry.OccurredAt}Z`,
+    ),
+    action: auditActionText(entry.Action, parseDetails(entry.DetailsJson), t),
+    lines: parseChanges(entry.ChangesJson).map((change) =>
+      changeLine(change, entry.GraveId ?? null),
+    ),
+  })),
+);
+const hasMore = computed(() => (query.data.value?.total ?? 0) > entries.value.length);
+</script>
+
+<template>
+  <Card data-testid="audit-trail">
+    <template #title>{{ t("auditTitle") }}</template>
+    <template #content>
+      <Message v-if="query.isError.value" severity="error">{{ t("loadFailed") }}</Message>
+      <p v-else-if="query.isSuccess.value && !entries.length" class="m-0 text-muted-color">
+        {{ t("auditEmpty") }}
+      </p>
+      <ol v-else class="m-0 flex list-none flex-col gap-4 p-0">
+        <li v-for="entry in entries" :key="entry.id" data-testid="audit-entry">
+          <div class="flex flex-wrap items-baseline gap-x-3">
+            <span class="text-sm tabular-nums text-muted-color">{{ entry.when }}</span>
+            <span class="font-semibold">{{ entry.action }}</span>
+          </div>
+          <ul
+            v-if="entry.lines.length"
+            class="m-0 mt-1 flex list-none flex-col gap-0.5 p-0 pl-4 text-sm"
+          >
+            <li v-for="(line, index) in entry.lines" :key="index">
+              <span class="text-muted-color">{{ line.head }}</span>
+              <template v-if="line.parts.length">
+                <span v-if="line.sign"> {{ line.sign }}</span>
+                <template v-for="(part, at) in line.parts" :key="at">
+                  {{ " " }}
+                  <RouterLink v-if="part.to" :to="part.to" class="text-primary hover:underline">
+                    {{ part.text }}
+                  </RouterLink>
+                  <template v-else>{{ part.text }}</template>
+                </template>
+              </template>
+            </li>
+          </ul>
+        </li>
+      </ol>
+      <Button
+        v-if="hasMore"
+        class="mt-4"
+        :label="t('auditMore')"
+        severity="secondary"
+        outlined
+        :loading="query.isFetching.value"
+        @click="top += STEP"
+      />
+    </template>
+  </Card>
+</template>

@@ -1,3 +1,6 @@
+export * from "./audit-entry/AuditEntry.js";
+export * from "./audit-entry/AuditEntryService.js";
+export * from "./audit-entry/QAuditEntry.js";
 export * from "./billing-quarter/BillingQuarter.js";
 export * from "./cemetery/Cemetery.js";
 export * from "./cemetery/CemeteryService.js";

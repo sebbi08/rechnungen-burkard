@@ -9,6 +9,7 @@ import { useI18n } from "vue-i18n";
 import { RouterLink, useRouter } from "vue-router";
 import { isNotFound } from "@/api/http";
 import { loadChain, useQuoteQuery } from "@/api/queries";
+import AuditTrail from "@/components/AuditTrail.vue";
 import InvoiceEditor from "@/components/InvoiceEditor.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import PaidStatusTag from "@/components/PaidStatusTag.vue";
@@ -102,6 +103,7 @@ const editorOpen = ref(false);
       </template>
     </Card>
     <RevisionList :revisions="revisions" kind="invoice" />
+    <AuditTrail :invoice-root-id="rootId" />
   </div>
 
   <InvoiceEditor v-model:visible="editorOpen" :target="editorTarget" />

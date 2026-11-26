@@ -12,6 +12,7 @@ import { useI18n } from "vue-i18n";
 import { type GraveDetails, restoreGrave } from "@/api/endpoints";
 import { isNotFound } from "@/api/http";
 import { loadGraveDetail } from "@/api/queries";
+import AuditTrail from "@/components/AuditTrail.vue";
 import GraveBillingPreview from "@/components/GraveBillingPreview.vue";
 import GraveEditor from "@/components/GraveEditor.vue";
 import GraveInvoiceEditor from "@/components/GraveInvoiceEditor.vue";
@@ -417,6 +418,7 @@ const {
         </DataTable>
       </template>
     </Card>
+    <AuditTrail :grave-id="graveId" />
   </div>
 
   <GraveEditor

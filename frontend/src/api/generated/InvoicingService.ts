@@ -13,6 +13,7 @@ import type { InvoiceId, Invoice } from "./burkard-invoicing-domain-entities/inv
 import type { DocumentId } from "./burkard-invoicing-domain-entities/document/Document.js";
 import type { QuoteId, Quote } from "./burkard-invoicing-domain-entities/quote/Quote.js";
 import type { JobId, Job } from "./burkard-invoicing-domain-entities/job/Job.js";
+import type { AuditEntryId } from "./burkard-invoicing-domain-entities/audit-entry/AuditEntry.js";
 import {
   VatRateService,
   VatRateCollectionService,
@@ -61,6 +62,10 @@ import {
   JobService,
   JobCollectionService,
 } from "./burkard-invoicing-domain-entities/job/JobService.js";
+import {
+  AuditEntryService,
+  AuditEntryCollectionService,
+} from "./burkard-invoicing-domain-entities/audit-entry/AuditEntryService.js";
 import { GlobalSettingsService } from "./burkard-invoicing-domain-entities/global-settings/GlobalSettingsService.js";
 import {
   QCreateInvoice,
@@ -228,6 +233,18 @@ export class InvoicingService extends ODataService {
     const fieldName = "Jobs";
     const { client, path, options } = this.__base;
     const collection = new JobCollectionService(client, path, fieldName, {
+      ...options,
+      subtype: false,
+    });
+    return typeof id === "undefined" || id === null ? collection : collection.byId(id);
+  }
+
+  public AuditEntries(): AuditEntryCollectionService;
+  public AuditEntries(id: AuditEntryId): AuditEntryService;
+  public AuditEntries(id?: AuditEntryId | undefined) {
+    const fieldName = "AuditEntries";
+    const { client, path, options } = this.__base;
+    const collection = new AuditEntryCollectionService(client, path, fieldName, {
       ...options,
       subtype: false,
     });
