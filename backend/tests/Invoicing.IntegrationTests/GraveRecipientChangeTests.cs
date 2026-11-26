@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain.Entities;
@@ -10,7 +11,7 @@ using Xunit;
 
 namespace Burkard.Invoicing.IntegrationTests;
 
-public class GraveRecipientImmutabilityTests
+public class GraveRecipientChangeTests
 {
     private static async Task<(long GraveId, long ItemId, long AnnaId, long BerndId)> SeedAsync(
         ApiTestHost host
@@ -190,17 +191,13 @@ public class GraveRecipientImmutabilityTests
         Assert.Equal(2, await db.GraveRecipients.CountAsync(r => r.GraveId == newGraveId));
     }
 
-    [Fact]
-    public async Task Saving_a_grave_after_it_was_invoiced_keeps_its_recipients()
-    {
-        // the split across the recipients is baked into the invoices already
-        // generated, so the set stays what it was when they were sent out
-        using var host = new ApiTestHost();
-        var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
-
-        using var client = host.CreateClient();
-        await GraveGenerationHelper.RunAsync(client, 2033, 1);
-        var response = await client.PostAsync(
+    private static async Task<HttpResponseMessage> SaveRecipientsAsync(
+        HttpClient client,
+        long graveId,
+        long itemId,
+        params long[] recipientIds
+    ) =>
+        await client.PostAsync(
             "/odata/SaveGrave",
             ODataJson.Body(
                 new
@@ -222,20 +219,108 @@ public class GraveRecipientImmutabilityTests
                             unitPrice = (decimal?)null,
                         },
                     },
-                    recipientIds = new[] { annaId, berndId },
+                    recipientIds,
                 }
             )
         );
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        using var json = await ODataJson.ReadAsync(response);
-        Assert.Equal(
-            "GraveRecipientsImmutable",
-            json.RootElement.GetProperty("error").GetProperty("code").GetString()
-        );
+    [Fact]
+    public async Task Saving_an_invoiced_grave_with_another_recipient_set_replaces_it()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
+
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2033, 1);
+        var response = await SaveRecipientsAsync(client, graveId, itemId, annaId, berndId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(1, await db.GraveRecipients.CountAsync(r => r.GraveId == graveId));
+        Assert.Equal(2, await db.GraveRecipients.CountAsync(r => r.GraveId == graveId));
+    }
+
+    [Fact]
+    public async Task The_next_generation_bills_the_new_recipients()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
+
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2033, 1);
+        (
+            await SaveRecipientsAsync(client, graveId, itemId, annaId, berndId)
+        ).EnsureSuccessStatusCode();
+        await GraveGenerationHelper.RunAsync(client, 2033, 2);
+
+        using var scope = host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var invoices = await db
+            .Invoices.Where(i => i.GraveId == graveId && i.IsLatestRevision)
+            .ToListAsync();
+
+        var first = invoices.Where(i => i.PeriodYear == 2033 && i.PeriodHalf == 1).ToList();
+        var onlyFirst = Assert.Single(first);
+        Assert.Equal("Anna Beispiel", onlyFirst.RecipientName);
+        Assert.Equal(100m, onlyFirst.SharePercent);
+
+        var second = invoices.Where(i => i.PeriodYear == 2033 && i.PeriodHalf == 2).ToList();
+        Assert.Equal(2, second.Count);
+        Assert.All(second, i => Assert.Equal(50m, i.SharePercent));
+        Assert.Equal(
+            ["Anna Beispiel", "Bernd Beispiel"],
+            second.Select(i => i.RecipientName).OrderBy(n => n).ToArray()
+        );
+    }
+
+    [Fact]
+    public async Task Revising_an_issued_half_year_keeps_its_own_recipients()
+    {
+        using var host = new ApiTestHost();
+        var (graveId, itemId, annaId, berndId) = await SeedAsync(host);
+
+        using var client = host.CreateClient();
+        await GraveGenerationHelper.RunAsync(client, 2033, 1);
+        (
+            await SaveRecipientsAsync(client, graveId, itemId, annaId, berndId)
+        ).EnsureSuccessStatusCode();
+
+        long invoiceId;
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            invoiceId = (await db.Invoices.SingleAsync(i => i.GraveId == graveId)).Id;
+        }
+
+        var response = await client.PostAsync(
+            "/odata/CreateGraveInvoiceRevision",
+            ODataJson.Body(
+                new
+                {
+                    invoiceId,
+                    lines = new[]
+                    {
+                        new
+                        {
+                            itemId,
+                            count = 2,
+                            unitPrice = (decimal?)100m,
+                        },
+                    },
+                }
+            )
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var verify = host.Services.CreateScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<AppDbContext>();
+        var latest = await verifyDb
+            .Invoices.Where(i => i.GraveId == graveId && i.IsLatestRevision)
+            .ToListAsync();
+        var revision = Assert.Single(latest);
+        Assert.Equal("Anna Beispiel", revision.RecipientName);
+        Assert.Equal(1, revision.RecipientCount);
+        Assert.Equal(2, await verifyDb.Invoices.CountAsync(i => i.GraveId == graveId));
     }
 }

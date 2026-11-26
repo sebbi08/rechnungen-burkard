@@ -174,9 +174,10 @@ recipients, then listing it and searching it by column.
    and recipients, **Then** they are stored together with the grave on save.
 4. **Given** an item without a default price, **When** the user enters a price for
    it on the grave, **Then** the grave is saved and that price is billed.
-5. **Given** a grave with recipients, **When** the user tries to change its
-   recipients, **Then** the change is rejected and the grave keeps the
-   recipients it was created with.
+5. **Given** a grave with recipients that has already been invoiced, **When**
+   the user changes its recipients, **Then** the change is saved and applies to
+   half-years generated afterwards; the invoices already issued keep their
+   recipients and split.
 6. **Given** a grave with number 1234 whose term runs from 01/2020 to 12/2030,
    **When** the user saves another grave with number 1234 and a term that
    overlaps it, **Then** the save is refused, naming the grave that holds the
@@ -583,6 +584,9 @@ it holds.
   the correction is stored with the grave. A price is never lowered. Only when
   no line can be raised far enough is saving refused, naming the first invoice
   that does not divide.
+- What happens when a grave's recipients were changed after a half-year was
+  invoiced, and that half-year is then revised? The revision bills the
+  half-year's issued recipients, not the grave's current ones.
 - What happens when a recipient's address is changed after invoices were
   generated? Historical invoices must remain unchanged.
 - What happens when a grave's end month lies before the selected half-year (or
@@ -812,9 +816,11 @@ it holds.
   skips it until then.
 - **FR-020a**: Users MUST be able to add a grave's items and recipients before the
   grave is saved; the grave and its links MUST be stored together in one step.
-- **FR-020b**: A grave's set of recipients MAY change until the grave has its
-  first invoice and MUST be fixed from then on. Unticking a cooperative grave
-  applies every rule of an ordinary grave, including FR-020 and FR-021a.
+- **FR-020b**: A grave's set of recipients MAY change at any time; a change
+  applies to half-years generated afterwards. Invoices already issued keep
+  their recipients and split, also when revised (FR-034a). Unticking a
+  cooperative grave applies every rule of an ordinary grave, including FR-020
+  and FR-021a.
 - **FR-021**: When a grave has multiple recipients, the system MUST generate one
   invoice per recipient, each carrying the grave's own items and counts in full,
   billed at the same amount as every other recipient's invoice.

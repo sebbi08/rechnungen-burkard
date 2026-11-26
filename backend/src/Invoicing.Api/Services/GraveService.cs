@@ -128,26 +128,6 @@ public sealed class GraveService
             );
         }
 
-        // A grave's recipients are fixed by its first invoice: the even split
-        // across them is baked into every invoice already generated, and changing
-        // the set would make a later revision disagree with what was sent out. A
-        // grave that was never invoiced has no split to disagree with, so its
-        // recipients may change.
-        if (graveId is { } existingId && stored is { HasInvoices: true })
-        {
-            var storedRecipients = await _db
-                .GraveRecipients.Where(r => r.GraveId == existingId)
-                .Select(r => r.RecipientId)
-                .ToListAsync(ct);
-            if (!storedRecipients.OrderBy(id => id).SequenceEqual(recipientIds.OrderBy(id => id)))
-            {
-                throw new ValidationException(
-                    "GraveRecipientsImmutable",
-                    "A grave's recipients cannot be changed."
-                );
-            }
-        }
-
         // corrections are a promise the user confirmed: a price the editor did
         // not show is never stored
         var confirmed = corrections.Select(c => new CorrectionKey(

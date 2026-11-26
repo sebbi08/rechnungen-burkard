@@ -356,7 +356,6 @@
   "errorSuccessorNumberDiffers": "Das neue Grab muss dieselbe Nummer haben wie das bisherige.",
   "errorSuccessorOnlyOnCreate": "Ein bestehendes Grab kann nicht nachträglich zum Nachfolger eines anderen werden.",
   "errorSuccessorChangesCorrections": "Der Wechsel ändert die Rundungskorrekturen des bisherigen Grabs. Setzen Sie zuerst dessen Ende auf den Monat vor dem Wechsel und speichern Sie es; danach ist der Wechsel möglich.",
-  "errorGraveRecipientsImmutable": "Die Empfänger eines Grabs können nicht geändert werden.",
   "errorQuarterImmutable": "Das Quartal ist festgelegt, solange Gräber die Leistung verwenden.",
   "errorTooManyRecipients": "Ein Grab kann höchstens 4 Empfänger haben.",
   "errorVatRateImmutable": "Der MwSt.-Satz einer Leistung, die Gräber verwenden, kann nicht geändert werden.",

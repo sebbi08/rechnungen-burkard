@@ -109,9 +109,11 @@ public sealed class GraveInvoiceRevisionService
             throw new GraveShareValidationException(problems, siblings.Count);
         }
 
-        // A grave's recipients are fixed once invoiced, so the group is always the grave's
-        // full set. Every recipient is billed the same lines — the grave's own,
-        // exactly as the dialog sent them, the same way generation bills them.
+        // The group is the half-year's issued set of recipients, which may differ from
+        // the grave's current one: the recipients can change after invoicing, and a
+        // revision keeps who was billed. Every recipient of the group is billed the
+        // same lines — the grave's own, exactly as the dialog sent them, the same way
+        // generation bills them.
         var billedLines = graveLines;
         var settings = await _db.GlobalSettings.FirstAsync(ct);
         // like the address, a revision takes the grave as it is now

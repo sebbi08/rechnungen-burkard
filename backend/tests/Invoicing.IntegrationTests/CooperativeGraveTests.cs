@@ -497,7 +497,7 @@ public class CooperativeGraveTests
     }
 
     [Fact]
-    public async Task An_ordinary_grave_without_invoices_may_change_its_recipients()
+    public async Task An_ordinary_grave_may_change_its_recipients_also_once_invoiced()
     {
         using var host = new ApiTestHost();
         using var client = host.CreateClient();
@@ -511,9 +511,8 @@ public class CooperativeGraveTests
         );
 
         await GraveGenerationHelper.RunAsync(client, 2026, 1);
-        await AssertRefusedAsync(
-            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna]),
-            "GraveRecipientsImmutable"
+        await SavedIdAsync(
+            await SaveAsync(client, id, false, [Link(seed.PricedItem)], [seed.Anna])
         );
     }
 
