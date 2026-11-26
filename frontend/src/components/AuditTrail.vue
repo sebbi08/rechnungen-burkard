@@ -50,7 +50,7 @@ interface ChangeLine {
  *  belongs to one. */
 function valuePart(change: AuditChange, value: string | null, graveId: number | null): ValuePart {
   const text = formatAuditValue(change, value, t);
-  const invoice = change.Type === "invoice" && value != null ? parseInvoiceValue(value) : null;
+  const invoice = change.type === "invoice" && value != null ? parseInvoiceValue(value) : null;
   if (!invoice) {
     return { text };
   }
@@ -66,23 +66,23 @@ function valuePart(change: AuditChange, value: string | null, graveId: number | 
 function changeLine(change: AuditChange, graveId: number | null): ChangeLine {
   const head = auditChangeHead(change, t);
   // a missing end is a value ("ohne Ende"), not an absent one
-  const open = change.Field === "end";
-  if (change.Old == null && change.New == null) {
+  const open = change.field === "end";
+  if (change.old == null && change.new == null) {
     return { head, sign: "", parts: [] };
   }
-  if (change.Old == null && !open) {
-    return { head, sign: "+", parts: [valuePart(change, change.New, graveId)] };
+  if (change.old == null && !open) {
+    return { head, sign: "+", parts: [valuePart(change, change.new, graveId)] };
   }
-  if (change.New == null && !open) {
-    return { head, sign: "−", parts: [valuePart(change, change.Old, graveId)] };
+  if (change.new == null && !open) {
+    return { head, sign: "−", parts: [valuePart(change, change.old, graveId)] };
   }
   return {
     head,
     sign: "",
     parts: [
-      valuePart(change, change.Old, graveId),
+      valuePart(change, change.old, graveId),
       { text: "→" },
-      valuePart(change, change.New, graveId),
+      valuePart(change, change.new, graveId),
     ],
   };
 }

@@ -2,15 +2,16 @@ import type { Composer } from "vue-i18n";
 import { formatAmount, formatDate, formatMonth } from "./format";
 import { halfYearText } from "./halfYear";
 
-/** One field of an entry's ChangesJson, as the backend writes it (AuditChange):
- *  values are invariant strings, formatted here by `Type`. */
+/** One field of an entry's ChangesJson, as the backend writes it (AuditChange,
+ *  serialised with the web defaults, so in camelCase): values are invariant
+ *  strings, formatted here by `type`. */
 export interface AuditChange {
-  Field: string;
-  Label: string | null;
-  Old: string | null;
-  New: string | null;
-  Type: string;
-  Period: string | null;
+  field: string;
+  label: string | null;
+  old: string | null;
+  new: string | null;
+  type: string;
+  period: string | null;
 }
 
 type Translate = Composer["t"];
@@ -55,9 +56,9 @@ function money(value: string): string {
  *  value is "–", except a missing end, which is a grave without one. */
 export function formatAuditValue(change: AuditChange, value: string | null, t: Translate): string {
   if (value == null) {
-    return change.Field === "end" ? t("auditNoEnd") : t("auditNone");
+    return change.field === "end" ? t("auditNoEnd") : t("auditNone");
   }
-  switch (change.Type) {
+  switch (change.type) {
     case "money":
       return money(value);
     case "month":
@@ -139,13 +140,13 @@ export function auditActionText(
  *  correction's block, then the field. "Grabpflege: Preis". */
 export function auditChangeHead(change: AuditChange, t: Translate): string {
   const parts: string[] = [];
-  const period = change.Period ? auditPeriodText(change.Period, t) : null;
+  const period = change.period ? auditPeriodText(change.period, t) : null;
   if (period) {
     parts.push(period);
   }
-  if (change.Label) {
-    parts.push(change.Label);
+  if (change.label) {
+    parts.push(change.label);
   }
-  parts.push(t(`auditField${change.Field[0].toUpperCase()}${change.Field.slice(1)}`));
+  parts.push(t(`auditField${change.field[0].toUpperCase()}${change.field.slice(1)}`));
   return parts.join(": ");
 }
