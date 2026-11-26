@@ -168,6 +168,27 @@ what the workflow releases — unpushed commits are not in it, and a branch with
 nothing releasable on it stops the script instead of starting a run that
 `next-version.sh` would fail a minute later.
 
+## Every write to graves and invoices declares an audit action
+
+Graves and invoices have a Verlauf (`AuditEntries`). A write path that touches
+them `Begin`s an audit action on `AuditScope`, watches or records its subjects,
+and calls `CompleteAsync` inside its transaction, before the commit; the
+existing services (`GraveService`, `InvoiceService`, ...) show the pattern.
+`AuditGuardInterceptor` refuses an audited change that no action declared once
+the scope is armed, and requests and the grave-invoice job are armed. So a test
+that fails with "Audited change without a declared audit action", or a request
+that answers 500 for it, means exactly that: the path forgot to declare itself.
+`AuditCoverageTests` runs every write path once.
+
+Test seeding through `host.Services.CreateScope()` is unarmed on purpose: it is
+no write path of the application.
+
+The guard throws in Development and Testing and records an unattributed entry in
+Production, so that a missed path cannot block the user's work. The config key
+`Audit:GuardMode` (`Throw` or `Record`; environment variable `Audit__GuardMode`)
+overrides that. `docker-compose.e2e.yml` sets `Throw`, so the E2E stack, which
+runs as Production, fails loudly instead.
+
 ## The dev container and the SDK container share `backend/obj`
 
 `backend/` is bind-mounted into the dev backend container (`dotnet watch`) and

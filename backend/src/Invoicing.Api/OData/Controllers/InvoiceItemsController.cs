@@ -160,35 +160,37 @@ public class InvoiceItemsController : ODataController
         // was billing the old default keeps it, written onto the link as its
         // own price, so nothing already set up changes what it bills. A link
         // that already carries the old default as its own price needs nothing.
-        if (previousDefault is { } oldDefault && item.DefaultPrice != oldDefault)
+        // Any change of the default is an audited one, even where no grave
+        // bills it (a default set where there was none, or removed): the action
+        // is then open but records nothing, and writes no entry.
+        if (item.DefaultPrice != previousDefault)
         {
-            var onDefault = await _db
-                .GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null)
-                .ToListAsync();
-            if (onDefault.Count > 0)
-            {
-                // the snapshots read what is stored, so watching comes before the save
-                using var audit = _audit.Begin(
-                    AuditActions.ItemDefaultPriceChanged,
-                    new Dictionary<string, string>
-                    {
-                        ["item"] = $"{item.Number} {item.Description}",
-                        ["old"] = AuditValues.Money(oldDefault)!,
-                        ["new"] = AuditValues.Money(item.DefaultPrice) ?? "",
-                    }
-                );
-                await audit.WatchGravesAsync(onDefault.Select(l => l.GraveId), default);
-                await using var tx = await _db.Database.BeginTransactionAsync();
-                foreach (var link in onDefault)
+            var onDefault = previousDefault is null
+                ? []
+                : await _db
+                    .GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null)
+                    .ToListAsync();
+            // the snapshots read what is stored, so watching comes before the save
+            using var audit = _audit.Begin(
+                AuditActions.ItemDefaultPriceChanged,
+                new Dictionary<string, string>
                 {
-                    link.UnitPrice = oldDefault;
+                    ["item"] = $"{item.Number} {item.Description}",
+                    ["old"] = AuditValues.Money(previousDefault) ?? "",
+                    ["new"] = AuditValues.Money(item.DefaultPrice) ?? "",
                 }
-
-                await _db.SaveChangesAsync();
-                await audit.CompleteAsync(default);
-                await tx.CommitAsync();
-                return Updated(item);
+            );
+            await audit.WatchGravesAsync(onDefault.Select(l => l.GraveId), default);
+            await using var tx = await _db.Database.BeginTransactionAsync();
+            foreach (var link in onDefault)
+            {
+                link.UnitPrice = previousDefault;
             }
+
+            await _db.SaveChangesAsync();
+            await audit.CompleteAsync(default);
+            await tx.CommitAsync();
+            return Updated(item);
         }
 
         _db.SaveChanges();

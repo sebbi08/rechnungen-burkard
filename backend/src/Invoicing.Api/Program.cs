@@ -42,11 +42,12 @@ builder.Services.AddAppDbContext(connectionString);
 
 // an audited change no action declared fails the tests and development, but
 // only gets recorded in production, where it must not block the user's work;
+// Audit:GuardMode ("Throw" or "Record") overrides that, the E2E stack sets it
+// to Throw although it runs as Production;
 // an enum is no reference type, so it is registered through the untyped overload
-builder.Services.AddSingleton(
-    typeof(AuditGuardMode),
-    builder.Environment.IsProduction() ? AuditGuardMode.Record : AuditGuardMode.Throw
-);
+var guardMode = builder.Configuration.GetValue<AuditGuardMode?>("Audit:GuardMode")
+    ?? (builder.Environment.IsProduction() ? AuditGuardMode.Record : AuditGuardMode.Throw);
+builder.Services.AddSingleton(typeof(AuditGuardMode), guardMode);
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
 builder.Services.AddScoped<DocumentDataBuilder>();
@@ -92,6 +93,16 @@ using (var scope = app.Services.CreateScope())
 // while it swaps the file (BackupService.RestoreAsync). It comes before
 // routing, so nothing about a request is looked at while the gate is closed.
 app.UseMiddleware<DatabaseGateMiddleware>();
+
+// Every request's changes to graves and invoices must declare an audit action;
+// the scope the request's services share is armed before any of them runs.
+app.Use(
+    (context, next) =>
+    {
+        context.RequestServices.GetRequiredService<AuditScope>().Arm();
+        return next(context);
+    }
+);
 app.UseRouting();
 
 // Serve the frontend's build from wwwroot (combined release image). Vue Router

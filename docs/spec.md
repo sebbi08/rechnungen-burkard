@@ -1408,6 +1408,36 @@ it holds.
   missing or unknown variant or quarter, MUST be refused with the code
   `ValidationFailed`; a list without graves MUST be refused with
   `NoGravesOnList`, and the page MUST show the server's message as an error.
+- **FR-109**: Graves and invoices MUST have a Verlauf: a list, newest first, of
+  what was changed, when (shown in local time) and, per change, the field with
+  its old and new value, resolved to what a person reads (item number and
+  description, recipient number and name, money, month) as it was when the change
+  was made. It MUST NOT say who made the change. It starts with the version that
+  introduces it: earlier changes are not reconstructed, and an empty Verlauf says
+  so. An invoice's Verlauf MUST be shared by all revisions of its chain.
+- **FR-110**: A grave's Verlauf MUST record: the grave created (all initial
+  values, items with count and price, recipients), created by hand-over (and, on
+  the predecessor, its end month old to new), edited (each changed field, items
+  added, removed or changed in count or own price, recipients added or removed,
+  rounding corrections), deleted, restored, imported, grave invoices generated
+  (half-year and invoice numbers), a grave invoice revised (half-year and
+  numbers), and its invoices marked paid or unpaid.
+- **FR-111**: An invoice's Verlauf MUST record: created (recipient, intro text,
+  lines, total), created from a quote (as created, plus the quote number), revised
+  (revision number, recipient old to new, intro text, lines added, removed or
+  changed, total old to new) and marked paid or unpaid. A grave invoice's chain
+  MUST also record its creation by generation and a recipient swapped on revision.
+- **FR-112**: A change of an item's price MUST appear in the Verlauf of every
+  grave whose billed price for it changes: a price increase applied (also for
+  graves on the default price whose default rose), and an edit of the item's
+  default price, which pins the old default as the own price of every grave that
+  billed the default.
+- **FR-113**: An entry MUST be written in the transaction of the change it
+  describes, so that a refused or rolled-back change leaves none, and a save that
+  changes nothing MUST write none. Every request and the grave invoice job MUST
+  declare what it changes; a change that nothing declared MUST fail in
+  development and testing, and be recorded as an unattributed entry in production
+  rather than block the user's work.
 
 ### Key Entities _(include if feature involves data)_
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain;
@@ -26,6 +27,8 @@ public sealed class GraveInvoicesJobHandler : IJobHandler
             ?? throw new InvalidOperationException("missing payload");
 
         using var scope = _scopeFactory.CreateScope();
+        // the job's changes must declare an audit action like a request's
+        scope.ServiceProvider.GetRequiredService<AuditScope>().Arm();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var generator = scope.ServiceProvider.GetRequiredService<GraveInvoiceGenerator>();
 
