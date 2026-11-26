@@ -15,12 +15,47 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261114084602_GrossLinePrices";
+    public override string LastMigrationId => "20261126164912_AuditEntries";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
 #pragma warning disable 612, 618
         modelBuilder.HasAnnotation("ProductVersion", "11.0.0");
+
+        modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.AuditEntry", b =>
+            {
+                b.Property<long>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("INTEGER");
+
+                b.Property<string>("Action")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("ChangesJson")
+                    .IsRequired()
+                    .HasColumnType("TEXT");
+
+                b.Property<string>("DetailsJson")
+                    .HasColumnType("TEXT");
+
+                b.Property<long?>("GraveId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<long?>("InvoiceRootId")
+                    .HasColumnType("INTEGER");
+
+                b.Property<DateTime>("OccurredAt")
+                    .HasColumnType("TEXT");
+
+                b.HasKey("Id");
+
+                b.HasIndex("GraveId");
+
+                b.HasIndex("InvoiceRootId");
+
+                b.ToTable("AuditEntries");
+            });
 
         modelBuilder.Entity("Burkard.Invoicing.Domain.Entities.Cemetery", b =>
             {

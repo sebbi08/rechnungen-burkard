@@ -26,9 +26,14 @@ public sealed class AppDbContext : DbContext
     public DbSet<QuoteDocument> QuoteDocuments => Set<QuoteDocument>();
     public DbSet<QuoteNumberCounter> QuoteNumberCounters => Set<QuoteNumberCounter>();
     public DbSet<Job> Jobs => Set<Job>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
+        // a Verlauf is read by its grave or its invoice chain; plain columns
+        // without foreign keys, so an entry never blocks or cascades a write
+        mb.Entity<AuditEntry>().HasIndex(e => e.GraveId);
+        mb.Entity<AuditEntry>().HasIndex(e => e.InvoiceRootId);
         mb.Entity<VatRate>().HasIndex(v => v.Rate).IsUnique();
         mb.Entity<InvoiceItem>().HasIndex(i => i.Number).IsUnique();
         mb.Entity<Recipient>().HasIndex(r => r.Number).IsUnique();

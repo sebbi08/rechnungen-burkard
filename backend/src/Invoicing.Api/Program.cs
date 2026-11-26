@@ -1,4 +1,5 @@
 using System.Reflection;
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.OData;
 using Burkard.Invoicing.Api.Persistence;
@@ -37,7 +38,15 @@ builder
 
 var connectionString = builder.Configuration.GetConnectionString("Invoicing")
     ?? "Data Source=invoicing.db";
-builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connectionString));
+builder.Services.AddAppDbContext(connectionString);
+
+// an audited change no action declared fails the tests and development, but
+// only gets recorded in production, where it must not block the user's work;
+// an enum is no reference type, so it is registered through the untyped overload
+builder.Services.AddSingleton(
+    typeof(AuditGuardMode),
+    builder.Environment.IsProduction() ? AuditGuardMode.Record : AuditGuardMode.Throw
+);
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddScoped<InvoiceNumberService>();
 builder.Services.AddScoped<DocumentDataBuilder>();

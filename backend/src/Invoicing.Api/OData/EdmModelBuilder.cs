@@ -31,6 +31,7 @@ public static class EdmModelBuilder
         b.EntitySet<Quote>("Quotes");
         b.EntityType<Quote>().Ignore(q => q.Document);
         b.EntitySet<Job>("Jobs");
+        b.EntitySet<AuditEntry>("AuditEntries");
         b.Singleton<GlobalSettings>("Settings");
         b.Action("CreateInvoice").ReturnsFromEntitySet<Invoice>("Invoices");
         b.Action("CreateRevision").ReturnsFromEntitySet<Invoice>("Invoices");

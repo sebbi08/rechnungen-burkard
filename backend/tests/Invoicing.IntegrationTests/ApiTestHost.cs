@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Burkard.Invoicing.Api;
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Jobs;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
@@ -9,6 +10,7 @@ using Burkard.Invoicing.Domain.Entities;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -41,17 +43,22 @@ public class ApiTestHost : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.Single(d =>
-                d.ServiceType == typeof(DbContextOptions<AppDbContext>)
-            );
-            services.Remove(descriptor);
-            services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={DbFilePath}"));
+            // the app's configuration goes too: AddDbContext accumulates them,
+            // and the app's would add its interceptor a second time
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
+            services.AddAppDbContext($"Data Source={DbFilePath}");
             services.AddSingleton<IJobHandler, TestJobHandler>();
             services.AddSingleton<IJobHandler, UnrecordableJobHandler>();
             services.RemoveAll<IClock>();
             services.AddSingleton<IClock>(new FixedClock(Now, UtcNow));
+            ConfigureTestServices?.Invoke(services);
         });
     }
+
+    /// <summary>Registrations applied after the app's and the host's own, e.g.
+    /// <c>s =&gt; s.AddSingleton(typeof(AuditGuardMode), AuditGuardMode.Record)</c>.</summary>
+    public Action<IServiceCollection>? ConfigureTestServices { get; init; }
 
     /// <summary>Starts the app, which migrates the database, and puts
     /// <see cref="TestCemetery"/> in it: every grave needs a cemetery, and most
