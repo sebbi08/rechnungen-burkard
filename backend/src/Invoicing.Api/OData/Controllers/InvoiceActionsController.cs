@@ -202,6 +202,7 @@ public class InvoiceActionsController : ODataController
             var revisions = await _graveRevisions.CreateAsync(
                 request.InvoiceId,
                 request.Lines,
+                request.Replacements ?? [],
                 HttpContext.RequestAborted
             );
             return Ok(revisions);
@@ -472,6 +473,9 @@ public class InvoiceActionsController : ODataController
         /// <summary>Grave-level lines: the grave's count at the grave's price,
         /// before the even split across its recipients.</summary>
         public List<InvoiceLineInput> Lines { get; set; } = new();
+
+        /// <summary>Invoices of the group that go to another recipient.</summary>
+        public List<RecipientReplacementInput>? Replacements { get; set; }
     }
 
     public sealed class SetInvoicePaidRequest

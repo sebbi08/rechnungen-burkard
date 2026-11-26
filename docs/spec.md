@@ -939,6 +939,10 @@ it holds.
   in full, the same way generation bills them.
 - **FR-034b**: The edit MUST start from the amounts as they were invoiced for
   that half-year, not from the grave's current configuration.
+- **FR-034c**: Revising a grave invoice MAY swap the recipient of any invoice of
+  the half-year for another recipient with an address who is not already among
+  them; the number of recipients and the split stay, and the grave's own
+  recipients are not changed.
 - **FR-035**: The invoice number of a revision MUST clearly indicate that it is a
   new revision of an existing invoice.
 - **FR-036**: Invoices MUST NOT be deletable.

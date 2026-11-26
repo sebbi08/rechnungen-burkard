@@ -110,6 +110,8 @@ public class GraveInvoiceGroupController : ODataController
             {
                 Id = s.RecipientId,
                 Name = s.RecipientName,
+                Number = s.RecipientNumber,
+                Address = s.RecipientAddress,
                 InvoiceId = s.Id,
                 RootId = s.RootId,
                 Paid = s.PaidOn != null,

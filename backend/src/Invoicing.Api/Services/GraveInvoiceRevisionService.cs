@@ -6,6 +6,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Burkard.Invoicing.Api.Services;
 
+/// <summary>Names the new recipient of one invoice of the group.</summary>
+public sealed class RecipientReplacementInput
+{
+    public long InvoiceId { get; set; }
+    public long RecipientId { get; set; }
+}
+
 /// <summary>Revises a grave's invoices for one half-year. A grave invoice bills
 /// one grave's own lines, so editing it edits the bill: every recipient of that
 /// grave and half-year gets a new revision carrying the grave's edited lines in
@@ -37,6 +44,7 @@ public sealed class GraveInvoiceRevisionService
     public async Task<List<Invoice>> CreateAsync(
         long invoiceId,
         IReadOnlyList<InvoiceLineInput> lineInputs,
+        IReadOnlyList<RecipientReplacementInput> replacements,
         CancellationToken ct
     )
     {
@@ -116,6 +124,10 @@ public sealed class GraveInvoiceRevisionService
             throw new GraveShareValidationException(problems, siblings.Count);
         }
 
+        // who each invoice of the group goes to after this revision; refused here,
+        // before anything is written or recorded
+        var newRecipients = await ResolveReplacementsAsync(siblings, replacements, ct);
+
         // The group is the half-year's issued set of recipients, which may differ from
         // the grave's current one: the recipients can change after invoicing, and a
         // revision keeps who was billed. Every recipient of the group is billed the
@@ -146,18 +158,7 @@ public sealed class GraveInvoiceRevisionService
         for (var r = 0; r < siblings.Count; r++)
         {
             var sibling = siblings[r];
-            var recipient = await _db.Recipients.FindAsync(new object[] { sibling.RecipientId }, ct)
-                ?? throw new ValidationException(
-                    "RecipientNotFound",
-                    "The recipient does not exist."
-                );
-            if (string.IsNullOrWhiteSpace(recipient.Address))
-            {
-                throw new ValidationException(
-                    "RecipientAddressRequired",
-                    "The recipient address is required."
-                );
-            }
+            var recipient = newRecipients[r];
 
             // the number continues the whole chain, not just the row that was edited
             var lastRevision = await _db
@@ -228,12 +229,85 @@ public sealed class GraveInvoiceRevisionService
                 AuditActions.InvoiceRevised
             );
             graveChanges.Add(InvoiceAuditDiff.InvoiceLink(revision));
+            if (revision.RecipientId != sibling.RecipientId)
+            {
+                // the chain's entry already shows old and new as its recipient
+                // change; the grave's names which invoice it was
+                graveChanges.Add(
+                    new AuditChange(
+                        "recipientSwapped",
+                        revision.InvoiceNumber,
+                        InvoiceAuditDiff.RecipientLabel(sibling),
+                        InvoiceAuditDiff.RecipientLabel(revision),
+                        "text"
+                    )
+                );
+            }
         }
 
         audit.Record(new AuditSubject.Grave(edited.GraveId.Value), graveChanges);
         await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
         return created;
+    }
+
+    /// <summary>The recipient each sibling is billed after the revision, in the
+    /// siblings' order: its own, or the one a replacement names. A replacement
+    /// has to name one of the group's invoices once, the recipient has to exist
+    /// and have an address, and no recipient may end up on two invoices.</summary>
+    private async Task<List<Recipient>> ResolveReplacementsAsync(
+        List<Invoice> siblings,
+        IReadOnlyList<RecipientReplacementInput> replacements,
+        CancellationToken ct
+    )
+    {
+        var byInvoice = new Dictionary<long, long>();
+        foreach (var replacement in replacements)
+        {
+            if (
+                siblings.All(s => s.Id != replacement.InvoiceId)
+                || !byInvoice.TryAdd(replacement.InvoiceId, replacement.RecipientId)
+            )
+            {
+                throw new ValidationException(
+                    "ReplacementNotInGroup",
+                    "A replacement must name one invoice of the group, once."
+                );
+            }
+        }
+
+        var ids = siblings
+            .Select(s => byInvoice.TryGetValue(s.Id, out var id) ? id : s.RecipientId)
+            .ToList();
+        var recipients = await _db
+            .Recipients.Where(r => ids.Contains(r.Id))
+            .ToDictionaryAsync(r => r.Id, ct);
+        var result = new List<Recipient>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (!recipients.TryGetValue(id, out var recipient))
+            {
+                throw new ValidationException("RecipientNotFound", "The recipient does not exist.");
+            }
+            if (string.IsNullOrWhiteSpace(recipient.Address))
+            {
+                throw new ValidationException(
+                    "RecipientAddressRequired",
+                    "The recipient address is required."
+                );
+            }
+            result.Add(recipient);
+        }
+
+        if (ids.Distinct().Count() != ids.Count)
+        {
+            throw new ValidationException(
+                "GraveRecipientLinkExists",
+                "A recipient cannot be on two invoices of the same grave and half-year."
+            );
+        }
+
+        return result;
     }
 
     /// <summary>The grave's lines from what the dialog sent: the full count at
