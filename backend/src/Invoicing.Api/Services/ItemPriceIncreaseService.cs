@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Domain;
 using Burkard.Invoicing.Domain.Entities;
@@ -89,11 +90,13 @@ public sealed class ItemPriceIncreaseService
 {
     private readonly AppDbContext _db;
     private readonly IClock _clock;
+    private readonly AuditScope _audit;
 
-    public ItemPriceIncreaseService(AppDbContext db, IClock clock)
+    public ItemPriceIncreaseService(AppDbContext db, IClock clock, AuditScope audit)
     {
         _db = db;
         _clock = clock;
+        _audit = audit;
     }
 
     /// <summary>The problem a grave's evaluation names, or null when it divides.</summary>
@@ -368,6 +371,26 @@ public sealed class ItemPriceIncreaseService
             );
         }
 
+        // every grave the new prices reach is watched before the first write:
+        // the affected ones, and every grave billing the default (a deleted one
+        // too), whose price follows the default without a link changing
+        using var audit = _audit.Begin(
+            AuditActions.ItemPriceIncreased,
+            new Dictionary<string, string> { ["item"] = $"{item.Number} {item.Description}" }
+        );
+        var watched = affected.ToList();
+        if (rows.Any(r => r.IsDefault))
+        {
+            watched.AddRange(
+                await _db
+                    .GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null)
+                    .Select(l => l.GraveId)
+                    .ToListAsync(ct)
+            );
+        }
+
+        await audit.WatchGravesAsync(watched, ct);
+
         if (rows.FirstOrDefault(r => r.IsDefault) is { } defaultRow)
         {
             item.DefaultPrice = defaultRow.NewPrice;
@@ -398,6 +421,7 @@ public sealed class ItemPriceIncreaseService
         }
 
         await _db.SaveChangesAsync(ct);
+        await audit.CompleteAsync(ct);
         await tx.CommitAsync(ct);
     }
 

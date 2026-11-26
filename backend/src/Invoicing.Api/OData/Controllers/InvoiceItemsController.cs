@@ -1,3 +1,4 @@
+using Burkard.Invoicing.Api.Audit;
 using Burkard.Invoicing.Api.Persistence;
 using Burkard.Invoicing.Api.Services;
 using Burkard.Invoicing.Domain.Entities;
@@ -11,8 +12,13 @@ namespace Burkard.Invoicing.Api.OData.Controllers;
 public class InvoiceItemsController : ODataController
 {
     private readonly AppDbContext _db;
+    private readonly AuditScope _audit;
 
-    public InvoiceItemsController(AppDbContext db) => _db = db;
+    public InvoiceItemsController(AppDbContext db, AuditScope audit)
+    {
+        _db = db;
+        _audit = audit;
+    }
 
     [EnableQuery]
     public IQueryable<InvoiceItem> Get() => _db.InvoiceItems.AsNoTracking();
@@ -65,7 +71,7 @@ public class InvoiceItemsController : ODataController
         return Created(item);
     }
 
-    public IActionResult Patch(
+    public async Task<IActionResult> Patch(
         [FromRoute] long key,
         [FromBody] Microsoft.AspNetCore.OData.Deltas.Delta<InvoiceItem>? delta
     )
@@ -156,10 +162,32 @@ public class InvoiceItemsController : ODataController
         // that already carries the old default as its own price needs nothing.
         if (previousDefault is { } oldDefault && item.DefaultPrice != oldDefault)
         {
-            var onDefault = _db.GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null);
-            foreach (var link in onDefault)
+            var onDefault = await _db
+                .GraveItems.Where(l => l.ItemId == item.Id && l.UnitPrice == null)
+                .ToListAsync();
+            if (onDefault.Count > 0)
             {
-                link.UnitPrice = oldDefault;
+                // the snapshots read what is stored, so watching comes before the save
+                using var audit = _audit.Begin(
+                    AuditActions.ItemDefaultPriceChanged,
+                    new Dictionary<string, string>
+                    {
+                        ["item"] = $"{item.Number} {item.Description}",
+                        ["old"] = AuditValues.Money(oldDefault)!,
+                        ["new"] = AuditValues.Money(item.DefaultPrice) ?? "",
+                    }
+                );
+                await audit.WatchGravesAsync(onDefault.Select(l => l.GraveId), default);
+                await using var tx = await _db.Database.BeginTransactionAsync();
+                foreach (var link in onDefault)
+                {
+                    link.UnitPrice = oldDefault;
+                }
+
+                await _db.SaveChangesAsync();
+                await audit.CompleteAsync(default);
+                await tx.CommitAsync();
+                return Updated(item);
             }
         }
 
